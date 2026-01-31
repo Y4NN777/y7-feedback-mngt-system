@@ -67,4 +67,4 @@ It is a **methodology for conceptual correctness**.
 
 ## Case of a Multivendor Ecosystem ( SahelArt Market )
 
-[**Source Code**](https://github.com/Y4NN777/SahelArt-Market/docs/)
+[**Repository Code**](https://github.com/Y4NN777/SahelArt-Market/blob/main/docs/sahel_art_prd.md))
