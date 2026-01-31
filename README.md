@@ -62,3 +62,7 @@ It is a **methodology for conceptual correctness**.
 2. **Apply 01 & 02** to your next project before opening your IDE.
 3. **Draft your System Contract (03)** before designing your database schema.
 4. **Use 04 & 05** to defend your architectural choices during review.
+
+## CASE OF MULTIVENDOR ECOMMERCE ECOSYSTEM ( SahelArt Market )
+
+[**Source Code**](https://github.com/Y4NN777/SahelArt-Market/docs/)
