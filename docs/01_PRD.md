@@ -2,138 +2,312 @@
 
 ## 1. Product Intent
 
-Y7 Feedback exists to give projects one consistent place to receive useful,
-structured feedback from the people who use or evaluate them.
+Y7 Feedback exists to create a durable learning loop between the people who use
+or evaluate a project and the people responsible for improving it.
 
-The product begins as shared feedback infrastructure for Y7 Labs projects. Its
-declared evolution is a SaaS through which independent customers can own a
-workspace, register projects, and manage feedback without receiving a separate
-copy of the software.
+It is not merely a message form. It must help a reporter explain an experience,
+help a maintainer understand and clarify it, preserve what happened during its
+treatment, and make recurring problems and needs visible from the original
+feedback and its legitimate context.
 
-This trajectory justifies a workspace ownership boundary. It does not justify
-billing, subscriptions, complex teams, or other SaaS features until those
-problems enter scope.
+The product begins as shared feedback infrastructure for Y7 Labs projects. It is
+intended to support independent customer workspaces through the same product,
+with strict ownership and access isolation.
 
 ## 2. Problem
 
-Feedback is commonly fragmented across private messages, unrelated forms, app
-stores, and informal conversations. The receiving project is not always clear,
-bug reports frequently omit reproduction context, evidence is separated from the
-report, and every new project risks creating another incompatible collection
-process.
+Product feedback is commonly fragmented across private messages, unrelated
+forms, app stores, screenshots, and informal conversations. These channels lose
+the target project, reporter continuity, product version, usage context,
+evidence, clarification history, and treatment outcome.
 
-A reusable service must solve this without hard-coding WiseMoney or requiring a
-separate deployment for each project.
+As a result:
 
-## 3. Actors
+- reporters cannot reliably know whether feedback was received or acted upon;
+- maintainers repeatedly ask for missing context through disconnected channels;
+- related problems reported by the same or different people remain isolated;
+- teams cannot reliably compare problems across versions, screens, features, or
+  time;
+- each new project risks introducing another incompatible process.
 
-- **Reporter** - provides feedback about a project. No authentication state is
-  assumed by this role.
-- **Workspace owner** - owns a feedback space and its projects.
-- **Project maintainer** - needs access to feedback for projects they manage.
-- **Platform operator** - operates the shared Y7 Feedback service.
+Y7 Feedback must solve this without hard-coding WiseMoney, requiring a separate
+product copy per project, becoming the client application's identity provider,
+or turning legitimate context collection into hidden surveillance.
 
-The relationship between workspace owner and project maintainer is deliberately
-not expanded into a complete role system at this stage.
+## 3. Target Actors
 
-## 4. Core Use Cases
+- **Reporter** - the workspace-scoped source or subject of feedback. A Reporter
+  may be unidentified or associated with legitimate identity information, and
+  is not necessarily an authentication account.
+- **Workspace Owner** - owns a workspace, its projects, access assignments, and
+  workspace-level feedback responsibilities.
+- **Project Maintainer** - works on feedback for specifically assigned projects.
+- **Platform Operator** - operates Y7 Feedback. This role has no ordinary right
+  to read all workspace business content.
+- **Client Application** - may send project context or assert an application
+  identity through a trusted interaction. It cannot assign ownership or
+  authorization merely by sending public fields.
 
-### UC-01 - Reach a project feedback space
+## 4. Product Principles
 
-A reporter opens a stable project feedback address and can verify which project
-will receive the feedback.
+### P-01 - Preserve the source
 
-### UC-02 - Submit feedback
+Reporter content and submitted context remain distinguishable from maintainer
+interpretation and derived Product Intelligence.
 
-A reporter selects an available feedback type and provides the information
-required for that type.
+### P-02 - Maintain the loop
+
+Acceptance is the start of a feedback lifecycle, not the end of a form request.
+Reporter and maintainer must be able to clarify, act, resolve, and learn.
+
+### P-03 - Collect intentionally
+
+Identity and context are collected only for an explicit feedback, analysis,
+security, or communication purpose. Y7 Feedback does not fingerprint a device or
+observe unrelated behavior to recognize a reporter.
+
+### P-04 - Separate identity from access
+
+Reporter attribution, reporter access to a feedback item, client-application
+identity, and workspace-actor authentication are different concerns.
+
+### P-05 - Isolate by workspace
+
+Every project, reporter, feedback item, conversation, attachment, and derived
+analysis is owned within one workspace. No convenience feature may weaken that
+boundary.
+
+### P-06 - Keep interpretation accountable
+
+Themes, relationships, trends, and later automated analysis are derived data.
+They must not silently replace or rewrite source feedback.
+
+### P-07 - Let architecture follow behavior
+
+The product definition does not select a framework, host, storage system,
+identity provider, notification provider, or deployment topology.
+
+## 5. Core Use Cases
+
+### UC-01 - Reach the intended project
+
+A reporter opens a current or historical public project route and can verify the
+current project that will receive feedback.
+
+### UC-02 - Submit structured feedback
+
+A reporter submits a `bug`, `suggestion`, or `review` using the information
+meaningful to that type, with optional legitimate reporter and product context.
 
 ### UC-03 - Add evidence
 
-A reporter may attach supported evidence when the project permits attachments.
+A reporter attaches permitted evidence needed to understand the feedback.
 
-### UC-04 - Receive confirmation
+### UC-04 - Confirm and recover access
 
-A reporter can distinguish an accepted submission from a failed attempt.
+After durable acceptance, the reporter receives a unique reference and a means
+to retrieve the feedback without creating a Y7 Feedback account.
 
-### UC-05 - Manage projects
+### UC-05 - Follow and clarify feedback
 
-An authorized workspace actor can register and configure multiple projects in the
-same feedback service.
+The reporter views the current state and reporter-visible conversation, responds
+to information requests, and updates information that policy permits without
+silently replacing the original submission.
 
-### UC-06 - Review project feedback
+### UC-06 - Request deletion
 
-An authorized workspace actor can access feedback belonging to their projects
-without gaining access to another workspace.
+The reporter requests deletion of a feedback item. The service applies the
+approved anonymization, soft-deletion, and retention policy.
 
-## 5. Initial Product Scope
+### UC-07 - Manage projects and maintainers
 
-- One operational workspace owned by Y7 Labs.
-- Multiple projects in that workspace, beginning with WiseMoney.
-- Root service page and stable project slug pages.
-- Structured review, suggestion, and bug-report experiences.
-- Project-specific guidance and optional attachments.
-- Clear acceptance and failure outcomes.
-- A means for authorized Y7 Labs actors to configure projects and retrieve their
-  feedback.
-- Foundations that preserve workspace ownership and project isolation.
+A Workspace Owner creates and configures projects, changes their active state,
+changes their public slug, and assigns Project Maintainers.
 
-The initial scope does not decide whether reporters are anonymous, identified by
-contact information, verified, or authenticated. That is an unresolved product
-policy, not an implementation default.
+### UC-08 - Work a feedback item
 
-## 6. SaaS Evolution Scope
+An assigned Project Maintainer reads feedback and evidence, adds internal notes,
+communicates with the reporter, requests information, changes lifecycle state,
+records resolution, and reopens feedback when further work is justified.
 
-The future SaaS problem adds independent customer workspaces. A customer must be
-able to own projects and access only its own feedback. The shared service must not
-require a code fork or dedicated frontend deployment for each customer.
+### UC-09 - Receive relevant notifications
 
-The following are not implied merely by saying “SaaS” and remain future product
-decisions:
+Reporters and authorized workspace actors receive in-product and, when an
+eligible address exists, email notification of relevant feedback events.
 
-- subscriptions and billing;
-- plans and quotas;
-- invitations and complex team roles;
+### UC-10 - Learn across feedback
+
+Authorized workspace actors filter, relate, group, and compare source feedback
+by type, reporter attribution when available, context, theme, version, place,
+and time without gaining access to another workspace.
+
+### UC-11 - Operate the platform safely
+
+A Platform Operator diagnoses and operates the service without ordinary access
+to workspace business content. Exceptional access is explicitly granted,
+justified, limited, and audited.
+
+## 6. MVP Product Scope
+
+- One initial Y7 Labs workspace with multiple projects, beginning with
+  WiseMoney.
+- A globally unique public slug per project, with `/wisemoney` as the first
+  route and historical slug redirects after a rename.
+- French and English public intake and reporter follow-up experiences.
+- Workspace-scoped Reporter records supporting unidentified attribution,
+  voluntary contact, application-scoped external identifiers, and identity
+  assertions from client applications.
+- Structured `bug`, `suggestion`, and `review` experiences.
+- Intentional product context, including applicable version, screen or page,
+  feature, platform, operating system, device, locale, environment, and
+  functional context.
+- Accountless confirmation, retrieval, status visibility, clarification,
+  permitted updates, and deletion requests.
+- Reporter-visible messages, separate internal notes, lifecycle history, and
+  reopening.
+- In-product and email notifications.
+- Attachments used as evidence.
+- Maintainer workflows and structured Product Intelligence.
+- An explicit administration capability for Y7 Labs that preserves the future
+  Workspace Owner and Project Maintainer responsibilities.
+- Anonymization and soft deletion.
+
+The service root `/` is in scope, but only one behavior is currently fixed: it
+does not automatically expose a public project catalog. Its exact entry
+experience remains pending review of the non-normative
+[Root Experience Study](./research/ROOT_EXPERIENCE.md).
+
+## 7. Feedback Types and Source Information
+
+The initial types express different reporter intents; they are not arbitrary
+form names.
+
+- **Bug** captures what does not work. Expected behavior, observed behavior,
+  reproduction steps, and context are captured when applicable.
+- **Suggestion** captures the proposed improvement, why it would help, and its
+  usage context when applicable.
+- **Review** captures the experienced outcome and the reporter's appreciation.
+  A structured rating is not implied until its analytical value and semantics
+  are approved.
+
+Projects may enable the applicable system types and provide project-specific
+guidance. Arbitrary executable project forms are not part of the MVP.
+
+## 8. Feedback Lifecycle
+
+The product lifecycle follows this intent:
+
+```text
+Submit -> Understand -> Clarify -> Analyze -> Act -> Resolve -> Learn
+```
+
+The MVP workflow distinguishes feedback that is received, under review, waiting
+for reporter information, resolved, or closed. A Project Maintainer can reopen a
+resolved or closed item when further work is justified. Resolution records a
+maintainer conclusion; closure records that no active exchange or treatment is
+expected. Neither state deletes the feedback.
+
+## 9. Product Intelligence Scope
+
+Product Intelligence in the MVP means that authorized workspace actors can use
+preserved structured information to:
+
+- find recurring problems and needs;
+- relate feedback items and group them under accountable themes;
+- compare feedback by version, time, screen/page, feature, platform, locale,
+  environment, and other approved context;
+- identify repeated feedback associated with a reporter when legitimate
+  identity information exists;
+- observe whether reported patterns increase or decrease over time or after a
+  version change.
+
+The MVP does not require autonomous classification, automatic prioritization,
+or AI-generated product decisions. Those may later enrich, but never replace,
+the source model.
+
+## 10. SaaS Evolution Scope
+
+The future SaaS problem adds independent customer workspaces. Each customer can
+own projects, assign maintainers, and work only with its own reporter,
+conversation, attachment, notification, and intelligence data. The shared
+service must not require a code fork or dedicated product copy for each customer.
+
+SaaS does not currently imply:
+
+- subscriptions, billing, plans, quotas, or trials;
+- configurable role builders or complex team hierarchies;
 - custom domains;
-- public review widgets;
+- marketplaces;
+- public review widgets or public feedback boards;
 - external issue-tracker integrations;
-- service-level agreements.
+- contractual service-level agreements.
 
-## 7. Out of Scope Until Decided
+## 11. Explicitly Out of Scope
 
-- A mandatory or anonymous reporter identity model.
-- Public publication of reviews.
+- Y7 Feedback acting as the client application's identity provider.
+- Hidden fingerprinting or behavioral surveillance.
+- Public publication of feedback, reviews, conversations, or reporter profiles.
 - Community comments and voting.
-- Reporter-to-maintainer conversation.
-- Product roadmaps generated from feedback.
-- Automatic prioritization or AI classification.
-- Reading private data from the project being reviewed.
-- Commercial SaaS mechanics listed in Section 6.
+- A real-time chat product unrelated to a feedback item.
+- Product roadmaps generated automatically from feedback.
+- Autonomous AI classification, prioritization, or resolution.
+- Reading private client-application data that was not intentionally supplied.
+- Commercial SaaS mechanics listed in Section 10.
+- Any specific implementation architecture or vendor.
 
-## 8. Success Criteria
+## 12. Success Criteria
 
-- A reporter can reach the intended project and submit an allowed feedback type.
-- The receiving maintainer can determine which workspace and project own every
-  accepted feedback item.
-- Evidence remains associated with the correct feedback and project.
-- A second Y7 Labs project can be added without duplicating the feedback service.
-- Introducing a second workspace does not require changing the meaning or shape
-  of existing project feedback.
-- Unauthorized actors cannot retrieve feedback or evidence from another project
-  or workspace.
-- Failed submissions are never presented as accepted.
+- A reporter can complete the feedback loop from submission through later
+  retrieval and reporter-visible resolution without a Y7 Feedback account.
+- A maintainer can obtain the source, evidence, context, and clarification needed
+  to act without mixing internal notes with reporter-visible messages.
+- Reopening preserves the prior lifecycle and conversation history.
+- Authorized workspace actors can identify and compare recurring feedback from
+  structured source data and accountable derived classifications.
+- Every accepted item and all of its related data retain one workspace and one
+  project ownership scope.
+- A second workspace can be introduced without changing existing ownership or
+  exposing data across workspaces.
+- Platform operation does not grant routine access to customer business content.
+- A renamed project remains reachable from its historical slug without routing
+  that slug to another project.
+- Soft-deleted feedback is absent from ordinary work and intelligence views, and
+  its reporter attribution is anonymized according to policy.
+- Failed or partially failed operations are never represented as fully accepted.
 
-Numeric performance, completion, retention, and availability targets remain open
-until product expectations are supplied; inventing them here would create false
-requirements.
+## 13. Validated Product Decisions
 
-## 9. Product Questions Blocking Final SRS Approval
+| ID | Decision |
+| --- | --- |
+| PD-001 | Y7 Feedback is an independent, multi-project feedback-loop product. |
+| PD-002 | Workspace is the customer ownership and SaaS isolation boundary. |
+| PD-003 | Reporter is workspace-scoped and distinct from authentication accounts. |
+| PD-004 | Accountless retrieval, conversation, lifecycle, history, and reopening are MVP capabilities. |
+| PD-005 | Reporter-visible messages and workspace-internal notes are separate. |
+| PD-006 | Workspace Owner assigns Project Maintainers; roles are fixed rather than a configurable RBAC product. |
+| PD-007 | Platform Operator content access is exceptional, justified, limited, and audited. |
+| PD-008 | `bug`, `suggestion`, and `review` are structured MVP types. |
+| PD-009 | Intentional context and structured Product Intelligence are MVP capabilities. |
+| PD-010 | Attachments are optional per feedback but supported by the MVP. |
+| PD-011 | Notifications support in-product and email delivery. |
+| PD-012 | Deletion uses anonymization and soft deletion. |
+| PD-013 | Project slugs are global; historical slugs redirect after a rename. |
+| PD-014 | `/` does not automatically list projects; its exact experience is not yet approved. |
+| PD-015 | The MVP supports French and English. |
+| PD-016 | SaaS evolution excludes unrequested commercial and complex-team features. |
 
-1. Which reporter identity modes must the product support?
-2. Is identity policy global, workspace-specific, or project-specific?
-3. Can reporters return later to track or amend feedback?
-4. Who configures projects in the initial release, and through which product
-   capability rather than temporary operational tooling?
-5. Which actors can review feedback inside a workspace?
-6. Are review, suggestion, and bug fixed system types or project configuration?
-7. What retention and deletion rights apply to reporter data and attachments?
+## 14. Remaining Product Parameters
+
+The following are genuine unresolved parameters and must not be guessed:
+
+1. Accepted attachment formats, per-file size, per-feedback count, validation
+   depth, metadata treatment, rejection atomicity, and retention periods.
+2. Retention periods for feedback, reporter identifiers, messages, internal
+   notes, history, notification records, audit records, soft-deleted records,
+   and backups; and the point at which soft deletion becomes irreversible purge.
+3. The authority and approval flow that grants exceptional Platform Operator
+   content access.
+4. Numeric availability, latency, capacity, viewport, notification-delivery,
+   and anti-abuse objectives.
+5. The exact root `/` experience. The current recommendation remains explicitly
+   non-binding until accepted.
