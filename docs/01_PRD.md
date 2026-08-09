@@ -44,6 +44,9 @@ or turning legitimate context collection into hidden surveillance.
 - **Project Maintainer** - works on feedback for specifically assigned projects.
 - **Platform Operator** - operates Y7 Feedback. This role has no ordinary right
   to read all workspace business content.
+- **Platform Owner / Super Administrator** - governs exceptional platform
+  access and is organizationally distinct from the requesting Platform Operator
+  for approval purposes.
 - **Client Application** - may send project context or assert an application
   identity through a trusted interaction. It cannot assign ownership or
   authorization merely by sending public fields.
@@ -171,10 +174,13 @@ justified, limited, and audited.
 - An explicit administration capability for Y7 Labs that preserves the future
   Workspace Owner and Project Maintainer responsibilities.
 - Anonymization and soft deletion.
+- A bilingual root orientation experience at `/` for starting feedback,
+  retrieving existing feedback, or entering Workspace management, without
+  project discovery or Workspace exposure.
 
-The service root `/` is in scope, but only one behavior is currently fixed: it
-does not automatically expose a public project catalog. Its exact entry
-experience remains pending review of the non-normative
+The service root `/` is a bilingual orientation point, not a directory. Direct
+Project URLs remain the normal contextual entry into intake. The observations
+behind this decision remain in the
 [Root Experience Study](./research/ROOT_EXPERIENCE.md).
 
 ## 7. Feedback Types and Source Information
@@ -271,8 +277,12 @@ SaaS does not currently imply:
 - Platform operation does not grant routine access to customer business content.
 - A renamed project remains reachable from its historical slug without routing
   that slug to another project.
+- The root helps a person start feedback, recover an existing feedback item, or
+  enter Workspace management without exposing a project or Workspace catalog.
 - Soft-deleted feedback is absent from ordinary work and intelligence views, and
   its reporter attribution is anonymized according to policy.
+- The service meets its internal availability, responsiveness, recovery, and
+  notification objectives under a load envelope established by testing.
 - Failed or partially failed operations are never represented as fully accepted.
 
 ## 13. Validated Product Decisions
@@ -285,29 +295,45 @@ SaaS does not currently imply:
 | PD-004 | Accountless retrieval, conversation, lifecycle, history, and reopening are MVP capabilities. |
 | PD-005 | Reporter-visible messages and workspace-internal notes are separate. |
 | PD-006 | Workspace Owner assigns Project Maintainers; roles are fixed rather than a configurable RBAC product. |
-| PD-007 | Platform Operator content access is exceptional, justified, limited, and audited. |
+| PD-007 | Platform Operator content access is exceptional, independently approved by a Platform Owner / Super Administrator, justified, narrowly scoped, limited to one hour, and audited; critical break-glass use additionally requires post-incident review. |
 | PD-008 | `bug`, `suggestion`, and `review` are structured MVP types. |
 | PD-009 | Intentional context and structured Product Intelligence are MVP capabilities. |
-| PD-010 | Attachments are optional per feedback but supported by the MVP. |
+| PD-010 | Attachments are optional per feedback but supported by the MVP under a private, content-validated, bounded, logically atomic policy. |
 | PD-011 | Notifications support in-product and email delivery. |
-| PD-012 | Deletion uses anonymization and soft deletion. |
+| PD-012 | Deletion uses immediate anonymization when required and immediate soft deletion, permits authorized audited restoration before a 30-day purge, and has no business restoration after purge. |
 | PD-013 | Project slugs are global; historical slugs redirect after a rename. |
-| PD-014 | `/` does not automatically list projects; its exact experience is not yet approved. |
+| PD-014 | `/` is a bilingual orientation point for giving feedback, retrieving feedback, or entering Workspace management; it exposes no automatic catalog or public search, while direct Project URLs remain accessible. |
 | PD-015 | The MVP supports French and English. |
 | PD-016 | SaaS evolution excludes unrequested commercial and complex-team features. |
+| PD-017 | MVP Attachments accept JPEG, PNG, WebP, GIF, PDF, TXT, and CSV only, at 10 MB per file and five files per submission; archives and executables are forbidden and actual content is validated. |
+| PD-018 | Daily backups are retained for 30 days and recovery targets are RPO 24 hours and RTO 4 hours. |
+| PD-019 | Public abuse controls are 60 requests/minute/IP, 10 feedback submissions/minute/IP, 20 uploaded files/minute/IP, and 30 feedback/hour/external identity/project, with HTTP 429 on excess and no unnecessary permanent tracking. |
+| PD-020 | Internal SLOs are 99.9% monthly availability, approved Web Vitals and P95 operation targets, with capacity established by load testing and a 320 px minimum viewport. |
 
-## 14. Remaining Product Parameters
+## 14. Validated Operating Parameters
 
-The following are genuine unresolved parameters and must not be guessed:
+These values complete the product inputs required for architecture. They are
+internal product objectives and policies, not commercial service-level
+agreements.
 
-1. Accepted attachment formats, per-file size, per-feedback count, validation
-   depth, metadata treatment, rejection atomicity, and retention periods.
-2. Retention periods for feedback, reporter identifiers, messages, internal
-   notes, history, notification records, audit records, soft-deleted records,
-   and backups; and the point at which soft deletion becomes irreversible purge.
-3. The authority and approval flow that grants exceptional Platform Operator
-   content access.
-4. Numeric availability, latency, capacity, viewport, notification-delivery,
-   and anti-abuse objectives.
-5. The exact root `/` experience. The current recommendation remains explicitly
-   non-binding until accepted.
+1. Attachment policy: JPEG, PNG, WebP, GIF, PDF, TXT, and CSV; at most 10 MB per
+   file and five files per submission; archives and executables forbidden;
+   actual-content validation, private controlled storage, logical submission
+   atomicity, and the Feedback lifecycle apply.
+2. Data lifecycle: immediate soft deletion, immediate anonymization when
+   required, authorized and audited restoration before definitive purge after 30
+   days, and no business restoration after purge. Daily backups are retained for
+   30 days, with RPO 24 hours and RTO 4 hours.
+3. Exceptional access: a Platform Owner / Super Administrator other than the
+   requesting operator approves a justified resource/action-scoped grant for at
+   most one hour. Extension requires a new approval. Critical break-glass use is
+   justified, audited, and reviewed after the incident.
+4. Anti-abuse: 60 requests/minute/IP, 10 submissions/minute/IP, 20 uploaded
+   files/minute/IP, and 30 feedback/hour/external identity/project; excess
+   receives HTTP 429. Accountless protection creates no unnecessary persistent
+   tracking and CAPTCHA is not mandatory for the MVP.
+5. Internal SLOs: 99.9% availability/month; LCP P75 <= 2.5 s, INP P75 <= 200
+   ms, CLS P75 <= 0.1; critical API P95 <= 500 ms; Feedback creation P95 <= 1 s
+   excluding upload; Dashboard P95 <= 1 s; upload processing P95 <= 2 s after
+   receipt; in-product notification P95 <= 5 s; email-provider handoff P95 <= 30
+   s; minimum viewport 320 px. Capacity is established by load testing.
