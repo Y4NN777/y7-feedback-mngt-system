@@ -5,9 +5,9 @@
 This SRS derives observable behavior from `01_PRD.md`. `MUST` and `MUST NOT`
 are normative. Every normative requirement has an acceptance condition.
 
-The product direction is approved, but the parameters listed in Section 15 are
-still open. An `OPEN-*` entry records missing input and is not permission for an
-implementation to invent a default.
+The product direction and pre-architecture operating parameters are approved.
+Architecture MUST derive from these requirements without weakening their
+acceptance conditions.
 
 ## 2. Domain Vocabulary
 
@@ -30,6 +30,8 @@ implementation to invent a default.
   replace source feedback.
 - **Access proof** - confidential evidence authorizing accountless access to a
   feedback item; it is distinct from the confirmation reference.
+- **Platform Owner / Super Administrator** - the authority that independently
+  approves exceptional Platform Operator access.
 
 ## 3. Ownership and Isolation
 
@@ -55,7 +57,8 @@ implementation to invent a default.
 | FR-PROJ-006 | PD-001 | Only an active Project MUST accept new feedback. | Unknown or inactive project routes create no feedback and show an unavailable outcome. |
 | FR-PROJ-007 | PD-001 | Deactivating a Project MUST preserve its feedback, conversation, attachments, history, and intelligence ownership. | Historical data remains available to authorized actors after intake stops. |
 | FR-PROJ-008 | PD-014 | `/` MUST NOT automatically list or enumerate Projects. | An unauthenticated root response contains no generated project catalog or project suggestions. |
-| OPEN-ROOT-001 | PD-014 | The exact content and navigation behavior of `/` awaits explicit approval of or changes to `research/ROOT_EXPERIENCE.md`. | No additional root behavior is normative yet. |
+| FR-PROJ-009 | PD-014, PD-015 | `/` MUST provide French and English orientation for three intents: give feedback through a project-provided direct link, retrieve existing Feedback, and enter Workspace management. | Each intent has a labelled path in both languages; the give-feedback path explains the need for a project-specific link. |
+| FR-PROJ-010 | PD-013, PD-014 | `/` MUST NOT provide public Project search or expose Projects or Workspaces, and a valid current or historical direct Project URL MUST bypass root orientation. | Root enumeration and search tests disclose no Project or Workspace; direct URL tests retain resolved Project context. |
 
 ## 5. Reporter Attribution
 
@@ -142,19 +145,20 @@ Allowed primary transitions are:
 | FR-ATT-003 | PD-010 | An Attachment MAY identify the Message or source submission through which it was added without changing its Feedback ownership. | Evidence added in an approved phase remains owned by the same Feedback. |
 | FR-ATT-004 | PD-010 | Attachments MUST NOT be publicly listable or retrievable. | Access without authorized Reporter or workspace-actor scope returns no content or identifying metadata. |
 | FR-ATT-005 | PD-010 | Attachment authorization MUST follow Feedback authorization and Message audience. | A Reporter cannot retrieve evidence attached only to an Internal Note. |
-| FR-ATT-006 | PD-010 | Declared type, actual content, size, count, and security policy MUST be validated before acceptance. | A file violating any approved rule is not marked accepted. |
-| FR-ATT-007 | PD-010 | Failed intake MUST NOT leave request-owned Attachment data as an unassociated durable object. | Cleanup verification finds no durable orphan after failure. |
-| FR-ATT-008 | PD-010, PD-012 | Attachment metadata collection, visibility, anonymization, retention, and deletion MUST follow an explicit approved policy. | Policy tests prove that undeclared metadata is neither exposed nor retained beyond its rule. |
-
-`OPEN-ATT-001`: formats, byte limits, count, validation depth, metadata treatment,
-initial-submission atomicity, later-message attachment behavior, and retention
-periods are not yet supplied.
+| FR-ATT-006 | PD-010, PD-017 | The only accepted MVP file formats MUST be JPEG, PNG, WebP, GIF, PDF, UTF-8 TXT, and CSV. | Valid fixtures for each format are accepted and every other format, including every archive and executable fixture, is rejected. |
+| FR-ATT-007 | PD-017 | An Attachment MUST be no larger than 10 MB and one submission operation MUST contain no more than five files. | Boundary tests accept exactly 10 MB and five valid files and reject any larger file or sixth file. |
+| FR-ATT-008 | PD-010, PD-017 | Acceptance MUST validate actual file content; a client-supplied MIME type or filename extension MUST NOT be sufficient. | A spoofed extension or MIME value is rejected when its content does not match an allowed format. |
+| FR-ATT-009 | PD-010, PD-017 | Attachments MUST be stored outside the public webroot and MUST require Feedback- and audience-scoped authorization for every metadata or content access. | No storage URL permits unauthorised listing or retrieval; authorized access is denied after scope or audience removal. |
+| FR-ATT-010 | PD-010, PD-017 | Initial Feedback intake with Attachments MUST be logically atomic: either the Feedback and every submitted Attachment are accepted, or none is accepted. | Failure or rejection of any of the five-or-fewer files produces no Feedback success and no accepted Attachment association. |
+| FR-ATT-011 | PD-010, PD-017 | Failed intake MUST NOT leave request-owned Attachment data as an unassociated durable object. | Cleanup verification finds no durable orphan after failure or staging expiry. |
+| FR-ATT-012 | PD-010, PD-012, PD-017 | Attachment availability, restoration, anonymization, purge, and backup treatment MUST follow the owning Feedback and its audience. | Lifecycle tests make evidence unavailable on soft deletion, restore permitted evidence before purge, and remove it at definitive purge. |
+| FR-ATT-013 | PD-010, PD-017 | Attachment metadata MUST be limited to what validation, authorization, presentation, integrity, audit, and lifecycle processing require. | Stored metadata has a documented purpose and unauthorised outputs expose none of it. |
 
 ## 10. Roles, Project Operation, and Exceptional Access
 
 | ID | Source | Requirement | Acceptance condition |
 | --- | --- | --- | --- |
-| FR-OPS-001 | PD-006 | The MVP MUST use the fixed responsibilities Workspace Owner, Project Maintainer, and Platform Operator without a configurable role builder. | Authorization can be tested against these roles without defining custom roles. |
+| FR-OPS-001 | PD-006, PD-007 | The MVP MUST use the fixed responsibilities Workspace Owner, Project Maintainer, Platform Operator, and Platform Owner / Super Administrator without a configurable role builder. | Authorization can be tested against these responsibilities without defining custom roles. |
 | FR-OPS-002 | PD-006 | A Workspace Owner MUST be able to create, configure, activate, and deactivate Projects in that Workspace. | The same action against another Workspace is rejected. |
 | FR-OPS-003 | PD-006, PD-013 | A Workspace Owner MUST be able to change a Project slug subject to global current-and-historical uniqueness. | A valid rename creates the canonical slug and redirect; a collision is rejected. |
 | FR-OPS-004 | PD-006 | A Workspace Owner MUST be able to assign and remove Project Maintainers for Projects in that Workspace. | Assignment grants only the selected project scope; removal ends new access. |
@@ -164,9 +168,11 @@ periods are not yet supplied.
 | FR-OPS-008 | PD-007 | A Platform Operator MUST NOT have standing access to Workspace business content. | Normal operator credentials cannot read Feedback content, Reporter identifiers, Messages, Internal Notes, or Attachments. |
 | FR-OPS-009 | PD-007 | Exceptional operator access MUST be explicitly authorized, purpose-bound, workspace-scoped, time-limited, revocable, and audited. | Access outside its approved scope or time fails; grant and use events identify authorizer, operator, purpose, scope, and time. |
 | FR-OPS-010 | PD-001, PD-016 | The MVP MUST provide an explicit first-party operational path for project management and feedback work; a vendor console MUST NOT be the product contract. | UC-07 and UC-08 can be completed without directly editing vendor-owned data. |
-
-`OPEN-OPS-001`: the role or authority allowed to approve exceptional Platform
-Operator content access has not been supplied.
+| FR-OPS-011 | PD-007 | A Platform Owner / Super Administrator other than the requesting Platform Operator MUST approve normal exceptional access; self-approval MUST be impossible. | A grant with the same requester and approver is rejected, while a distinct authorized approver can grant it. |
+| FR-OPS-012 | PD-007 | A grant MUST state its justification and the minimum Workspace, resource, and action scope, and MUST expire no later than one hour after activation. | Missing fields or an expiry over one hour are rejected; out-of-scope actions fail. |
+| FR-OPS-013 | PD-007 | Continuing access beyond the approved duration MUST require a new approval and MUST NOT extend the old grant. | An extension attempt fails; a separately approved grant has a new identity and audit trail. |
+| FR-OPS-014 | PD-007 | Every grant, use, denial, revocation, and expiry MUST be audited, and a Platform Operator MUST NOT modify or delete audit records covering its own activity. | Tampering tests fail and leave the original audit record intact. |
+| FR-OPS-015 | PD-007 | Break-glass access MUST be limited to critical incidents and MUST record justification, complete access audit, and a mandatory post-incident review. | A non-critical use is rejected; a critical use cannot be closed without the review record. |
 
 ## 11. Notifications
 
@@ -205,22 +211,27 @@ Operator content access has not been supplied.
 | FR-PRIV-004 | PD-012 | Soft deletion MUST preserve a minimal auditable record until the approved purge point. | Authorized audit can prove the deletion action without exposing removed Reporter content beyond policy. |
 | FR-PRIV-005 | PD-012 | Anonymization MUST remove or irreversibly detach direct Reporter identifiers from the soft-deleted Feedback according to policy. | Searches by former contact or external identifier no longer return the Feedback. |
 | FR-PRIV-006 | PD-012 | Retention and purge MUST be applied independently to source Feedback, identifiers, Messages, Internal Notes, Attachments, notifications, lifecycle events, exceptional-access audit, and backups. | A policy test for each data class reaches its specified retention outcome. |
+| FR-PRIV-007 | PD-012 | Approved deletion MUST soft-delete the Feedback immediately and anonymize it immediately when anonymization is required. | On completion of the deletion operation, ordinary access is denied and required direct attribution can no longer identify the Reporter. |
+| FR-PRIV-008 | PD-012 | Soft-deleted Feedback and its lifecycle-bound data MUST be definitively purged after 30 days. | Purge never occurs before the 30-day threshold and the first eligible purge run removes the business-restorable record and owned Attachment content. |
+| FR-PRIV-009 | PD-012 | Before purge, an authorized Workspace Owner MUST be able to restore soft-deleted Feedback through an audited operation; restoration MUST NOT recreate information already anonymized. | Authorized pre-purge restoration returns the item to ordinary scope with an audit entry, unauthorized or post-purge restoration fails, and anonymized identity remains unavailable. |
+| NFR-REC-001 | PD-018 | The system MUST create a recoverable backup at least daily and retain each backup for 30 days. | Backup inventory over a 30-day observation shows no gap greater than 24 hours and no backup retained past policy except a documented legal hold. |
+| NFR-REC-002 | PD-018 | Disaster recovery MUST achieve an RPO of at most 24 hours and an RTO of at most 4 hours. | A representative recovery exercise restores service within four hours with no more than 24 hours of committed data loss. |
+| NFR-REC-003 | PD-012, PD-018 | Restoring a backup MUST NOT make already purged or soft-deleted data ordinarily accessible again. | A recovery exercise reapplies deletion state and purge records before ordinary access is enabled. |
 | NFR-SEC-001 | PD-002 | Privileged credentials and Access Proofs MUST remain outside unauthorised public outputs and logs. | Response and log inspection finds no such secrets. |
 | NFR-SEC-002 | PD-002 | All protected reads, writes, searches, aggregates, attachment access, and notification access MUST enforce scope at a trusted boundary. | Tampered public identifiers cannot expand the authorized scope. |
 | NFR-SEC-003 | PD-002 | Public requests MUST NOT assign Workspace, Project ownership, authorization, lifecycle status, trusted Reporter identity, or storage location. | Each forged field is ignored or rejected and no protected state is changed. |
-| NFR-SEC-004 | PD-001 | Public intake and accountless retrieval MUST apply approved bounded anti-abuse controls. | Requests beyond each approved bound are rejected without protected-data disclosure. |
+| NFR-SEC-004 | PD-019 | Public and accountless traffic MUST be limited to 60 requests per minute per IP address. | The 61st request in a rolling minute receives HTTP 429 without protected-data disclosure. |
 | NFR-SEC-005 | PD-003, PD-007 | Logs MUST NOT contain Attachment content, Access Proofs, privileged credentials, Internal Notes, or unapproved Reporter and Feedback content. | Representative log inspection contains only allowed redacted fields. |
 | NFR-SEC-006 | PD-002 | Public and unauthorized errors MUST NOT expose internal identifiers, existence across scopes, stack details, or credentials. | Error cases return safe outcomes with indistinguishable cross-scope disclosure. |
+| NFR-SEC-007 | PD-019 | Feedback intake MUST be limited to 10 submission attempts per minute per IP address. | The 11th attempt in a rolling minute receives HTTP 429 and creates no Feedback. |
+| NFR-SEC-008 | PD-017, PD-019 | Attachment intake MUST be limited to 20 file upload attempts per minute per IP address, independently of the five-files-per-submission limit. | The 21st file attempt receives HTTP 429; no accepted submission contains more than five files. |
+| NFR-SEC-009 | PD-003, PD-019 | Intake associated with a supplied external identity MUST be limited to 30 accepted Feedback items per hour for the same external-identity scope and Project. | The 31st otherwise-valid Feedback in that issuer/application and Project scope receives HTTP 429; another scope is unaffected. |
+| NFR-SEC-010 | PD-003, PD-019 | Accountless anti-abuse MUST NOT require permanent raw-IP retention, fingerprinting, or hidden behavioral tracking. | Rate-limit state expires after its operational window and stored keys cannot be used as a permanent raw-IP history. |
+| NFR-SEC-011 | PD-019 | CAPTCHA MUST NOT be required for ordinary MVP completion. | Every core public and accountless use case can complete without a CAPTCHA challenge. |
 | NFR-CON-001 | PD-001, PD-010 | Success MUST imply durable Feedback ownership, source content, initial lifecycle state, confirmation reference, and every accepted Attachment association. | Immediately retrieving after success returns the complete accepted result. |
 | NFR-CON-002 | PD-001 | Retrying one logical accepted operation MUST NOT create duplicate Feedback, Message, transition, deletion request, or Attachment association. | Repeating a request with the same logical-operation identity produces one domain effect. |
 | NFR-CON-003 | PD-001 | A failed operation MUST NOT be presented as accepted. | Every simulated failure lacks a success outcome and preserves invariants. |
 | NFR-CON-004 | PD-004 | Domain history MUST remain ordered and attributable despite retry or notification failure. | Controlled concurrent and retry scenarios produce one coherent ordered history. |
-
-`OPEN-RET-001`: concrete retention periods, purge timing, restoration authority,
-and backup-expiry behavior are not yet supplied.
-
-`OPEN-ABUSE-001`: quantitative intake, retrieval, messaging, and notification
-anti-abuse bounds are not yet supplied.
 
 ## 14. Accessibility, Localization, and Evolvability
 
@@ -231,14 +242,32 @@ anti-abuse bounds are not yet supplied.
 | NFR-UX-003 | PD-001 | All controls, state changes, errors, and conversation authorship MUST be programmatically labelled. | Accessibility inspection exposes a meaningful accessible name and state. |
 | NFR-UX-004 | PD-001 | Public, Reporter, and workspace workflows MUST be operable by keyboard and assistive technology. | Each core use case completes without pointer-only interaction. |
 | NFR-UX-005 | PD-004 | Lifecycle state and notification meaning MUST NOT rely on color alone. | Text or programmatic state distinguishes every lifecycle and delivery outcome. |
+| NFR-UX-006 | PD-020 | All MVP workflows MUST remain usable at a viewport width of 320 CSS pixels without loss of content or required action. | Each core flow completes at 320 px with no two-dimensional page scrolling or clipped required control. |
 | NFR-EVO-001 | PD-001 | Core behavior and source schemas MUST NOT depend on WiseMoney-specific rules. | A second project passes the same core use cases with different guidance and context. |
 | NFR-EVO-002 | PD-002 | Workspace isolation MUST be testable with at least two Workspaces before external onboarding. | A complete cross-workspace isolation suite passes for every protected data type. |
 | NFR-EVO-003 | PD-008, PD-009 | Project configuration MUST NOT execute arbitrary customer code. | Configuration containing executable behavior is rejected. |
 | NFR-EVO-004 | PD-016 | Commercial or complex-team concepts MUST NOT be required for core Workspace ownership, feedback work, or Product Intelligence. | Core use cases complete with no billing, plan, invitation, or custom-role record. |
 | NFR-EVO-005 | PD-003 | Reporter attribution MUST remain independent of the workspace-actor authentication mechanism. | Changing an administrative authentication mechanism does not change Reporter meaning or ownership. |
 
-`OPEN-SLO-001`: quantitative availability, latency, capacity, viewport, and
-notification-delivery objectives are not yet supplied.
+### 14.1 Internal Service-Level Objectives
+
+These are internal SLOs, not commercial SLAs. Percentiles apply to eligible
+production observations over the monthly reporting window; upload time is
+excluded from Feedback creation latency.
+
+| ID | Source | Requirement | Acceptance condition |
+| --- | --- | --- | --- |
+| NFR-SLO-001 | PD-020 | Monthly service availability MUST be at least 99.9%. | Synthetic and server-side availability records compute at least 99.9% for the calendar month under the approved measurement policy. |
+| NFR-SLO-002 | PD-020 | Real-user LCP MUST have P75 <= 2.5 seconds. | Monthly eligible real-user measurements satisfy the threshold. |
+| NFR-SLO-003 | PD-020 | Real-user INP MUST have P75 <= 200 milliseconds. | Monthly eligible real-user measurements satisfy the threshold. |
+| NFR-SLO-004 | PD-020 | Real-user CLS MUST have P75 <= 0.1. | Monthly eligible real-user measurements satisfy the threshold. |
+| NFR-SLO-005 | PD-020 | Critical API operations MUST have P95 <= 500 milliseconds. | Instrumented intake commit, accountless retrieval, conversation, lifecycle, and authorized attachment-control operations satisfy the monthly threshold, excluding file transfer. |
+| NFR-SLO-006 | PD-020 | Feedback creation MUST have P95 <= 1 second excluding upload. | Receipt of the complete validated submission to committed acceptance satisfies the monthly threshold. |
+| NFR-SLO-007 | PD-020 | Dashboard requests MUST have P95 <= 1 second. | Instrumented authorized dashboard data requests satisfy the monthly threshold for the tested capacity envelope. |
+| NFR-SLO-008 | PD-020 | Attachment processing MUST have P95 <= 2 seconds after complete file receipt. | Receipt-to-validation-outcome observations satisfy the monthly threshold. |
+| NFR-SLO-009 | PD-020 | In-product notification availability MUST have P95 <= 5 seconds after its source event commits. | Source-event-to-authorized-feed observations satisfy the monthly threshold. |
+| NFR-SLO-010 | PD-020 | Email notification handoff to the configured provider MUST have P95 <= 30 seconds after its source event commits. | Source-event-to-provider-acceptance observations satisfy the monthly threshold; end-recipient delivery is not implied. |
+| NFR-SLO-011 | PD-020 | Supported capacity MUST be established and revised through load tests rather than an invented product threshold. | Before release, a reproducible load report states the envelope within which NFR-SLO-005..010 hold. |
 
 ## 15. Error Outcomes
 
@@ -252,23 +281,19 @@ notification-delivery objectives are not yet supplied.
 | ERR-006 | Accountless Access Proof is invalid, expired, or revoked | Return no protected Feedback data. |
 | ERR-007 | Request violates Workspace, Project, role, or audience scope | Reject without disclosing scoped data or existence. |
 | ERR-008 | Lifecycle transition is invalid | Reject transition; preserve current state and history. |
-| ERR-009 | Attachment violates policy | Apply the approved atomicity policy; never mark the rejected evidence accepted. |
+| ERR-009 | Any Attachment violates policy | Reject the logical submission; accept neither its Feedback nor any submitted Attachment. |
 | ERR-010 | Persistence fails before intake acceptance | Do not confirm; remove request-owned staged data. |
 | ERR-011 | Duplicate logical operation | Return the original result or a deterministic duplicate outcome with one domain effect. |
 | ERR-012 | Notification delivery fails | Preserve the domain event; record a non-success delivery outcome. |
 | ERR-013 | Exceptional operator grant is missing or outside scope/time | Reject content access and record the denied attempt. |
 | ERR-014 | Dependency is unavailable | Return a safe retryable outcome when retry can succeed without duplicating effects. |
+| ERR-015 | An anti-abuse bound is exceeded | Return HTTP 429 with a safe retry indication; create no excess domain effect. |
+| ERR-016 | Restore is unauthorized or purge already occurred | Reject restoration; preserve audit and purge state. |
 
-## 16. Remaining Approval Blockers
+## 16. Architecture Readiness
 
-The following inputs are still required before architecture comparison:
-
-1. `OPEN-ATT-001` - attachment limits, validation, metadata, atomicity, and
-   retention.
-2. `OPEN-RET-001` - retention, irreversible purge, restoration, and backup expiry.
-3. `OPEN-OPS-001` - exceptional Platform Operator access approval authority.
-4. `OPEN-ABUSE-001` - quantitative anti-abuse bounds.
-5. `OPEN-SLO-001` - measurable service and device targets.
-
-`OPEN-ROOT-001` blocks only unapproved root-page behavior. It does not block the
-already specified no-catalog rule or direct project routes.
+All product parameters previously identified as architecture blockers are now
+normative in this SRS. Architecture may choose mechanisms for persistence,
+offline synchronization, authorization enforcement, file validation, delivery,
+recovery, and observation, but MUST trace each choice back to these requirements
+and MUST NOT reinterpret an internal SLO as a commercial SLA.
