@@ -1,123 +1,103 @@
-# System Contract and Invariants - Y7 Feedback
+# Core Contract - Y7 Feedback
 
-## 1. Allowed Inputs
+## 1. Purpose
 
-The system accepts only:
+This contract states the guarantees that every implementation of the feedback
+service must preserve. It does not select a framework, database, identity
+provider, hosting platform, or commercial model.
 
-- an active registered application slug;
-- one supported feedback type;
-- type-specific structured text within configured lengths;
-- optional contact data with explicit purpose notice;
-- optional diagnostic context reviewed by the submitter;
-- attachments matching the configured count, size, and type policy;
-- valid anti-abuse evidence and an idempotency key.
+## 2. Ownership Invariants
 
-Anything else is rejected before durable mutation.
+1. Every project belongs to exactly one workspace.
+2. Every feedback item belongs to exactly one project.
+3. Every attachment belongs to exactly one feedback item.
+4. A feedback item's workspace is derived through its project.
+5. An attachment's project and workspace are derived through its feedback item.
+6. These ownership associations do not change after acceptance.
 
-## 2. Guaranteed Outputs
+Moving data between workspaces or projects, if ever required, is a separate
+administrative operation with its own authorization and audit contract. It is
+not an update to accepted feedback.
 
-For a valid accepted request, the system guarantees:
+## 3. Isolation Contract
 
-- one durable submission associated with exactly one application;
-- durable association of every accepted attachment;
-- private attachment access;
-- one acknowledgement reference;
-- a localized success response containing no privileged identifiers.
+- A public request identifies a project through its public route; it cannot
+  independently assign workspace ownership.
+- A trusted project registry resolves the route to one active project and its
+  workspace.
+- Every privileged read and write is checked against the resolved ownership
+  scope.
+- Failure to resolve or authorize a scope creates no data and discloses no data
+  from another scope.
+- Attachments inherit access rules from their feedback item and are not public
+  objects merely because intake is public.
 
-For a rejected request, the system guarantees:
+## 4. Reporter Contract
 
-- no confirmed submission;
-- no request-owned orphan attachment after cleanup completes;
-- an error classification safe for public display;
-- no disclosure of internal credentials or stack details.
+`Reporter` names the actor submitting feedback. It does not mean anonymous,
+identified, authenticated, or untrusted by definition.
 
-## 3. Invariants
+Before collecting identity or contact information, the product must define:
 
-### Identity and tenancy
+- which data is requested;
+- whether it is optional or required;
+- why it is needed;
+- who may access it;
+- how long it is retained;
+- which follow-up or data-right capabilities it enables.
 
-- **INV-TEN-001** Every submission belongs to exactly one registered application.
-- **INV-TEN-002** A submission's application association never changes.
-- **INV-TEN-003** A public request cannot select a storage partition separately
-  from its resolved application.
-- **INV-TEN-004** Application slugs are globally unique and immutable after use.
+The interface and documentation must not claim anonymity when collected data or
+operational metadata can reasonably identify the reporter.
 
-### Privacy
+## 5. Acceptance Contract
 
-- **INV-PRV-001** Public actors cannot list or read submissions.
-- **INV-PRV-002** Public actors cannot list or read attachments.
-- **INV-PRV-003** Contact data, free text, and attachment content never enter
-  application logs.
-- **INV-PRV-004** Privileged data-service credentials never reach a browser.
-- **INV-PRV-005** No submission flow reads data from the application being
-  reviewed, including WiseMoney financial data.
+- A submission is accepted only when the feedback, its ownership, and every
+  accepted attachment association are durable.
+- A confirmation reference is issued only after acceptance.
+- A rejected or interrupted submission is never presented as accepted.
+- Retrying one logical submission does not create multiple feedback items.
+- Request-owned attachment data is removed when its feedback cannot be accepted.
+- A confirmation reference does not grant read, update, or tracking access by
+  itself.
 
-### Consistency
+## 6. Project Lifecycle Contract
 
-- **INV-CON-001** A success acknowledgement implies a durable submission and all
-  accepted attachment associations.
-- **INV-CON-002** One idempotency key creates at most one submission.
-- **INV-CON-003** A submission has exactly one supported type and one valid status.
-- **INV-CON-004** A deactivated application keeps historical records but accepts
-  no new submissions.
+- Only active projects accept new feedback.
+- Deactivation stops new intake but preserves existing ownership and history.
+- Public routes resolve to at most one active project.
+- Project configuration may constrain accepted feedback types and attachments,
+  but cannot weaken workspace isolation.
 
-### File safety
+## 7. Evolvability Contract
 
-- **INV-FILE-001** Every stored attachment passed server-side count, size, and
-  content-type validation.
-- **INV-FILE-002** Every attachment is stored in the partition configured for its
-  submission's application.
-- **INV-FILE-003** Files owned only by a failed request are eventually deleted.
+- Core feedback records contain no WiseMoney-specific behavior.
+- Additional Y7 Labs projects use the same ownership and submission model.
+- External customers can be represented as separate workspaces without copying
+  the service or changing existing feedback ownership.
+- Plans, billing, invitations, teams, and custom domains may surround the
+  workspace boundary; they are not prerequisites for the core feedback model.
 
-### User trust
+## 8. Explicit Non-Guarantees
 
-- **INV-UX-001** The visible product context matches the application that receives
-  the submission.
-- **INV-UX-002** Optional diagnostic and contact data are identified before send.
-- **INV-UX-003** An acknowledgement never implies public tracking unless such a
-  capability is explicitly delivered.
+Until product decisions are approved, this contract does not guarantee:
 
-## 4. Explicit Refusals
+- anonymous submission;
+- authenticated submission;
+- reporter accounts, status tracking, or replies;
+- public visibility of submitted feedback;
+- a specific moderation workflow or status taxonomy;
+- a specific attachment policy;
+- per-customer domains, billing, plans, or team roles;
+- any particular infrastructure or vendor.
 
-The system refuses to:
+## 9. Unresolved Contract Points
 
-- accept feedback for an unknown, inactive, or origin-mismatched application;
-- accept a request that bypasses anti-abuse verification;
-- accept arbitrary HTML, scripts, executables, or archives as attachments;
-- trust client-supplied application, bucket, status, or operator fields;
-- publish a review without moderation;
-- expose one application's attachments or submissions to another application;
-- request passwords, financial records, API keys, authentication tokens, or
-  payment information;
-- report success before consistency guarantees hold.
+The following must be decided before their related behavior can become a stable
+contract:
 
-## 5. Dependency Contract
-
-### Managed data service
-
-The platform depends on a managed service that can persist structured records,
-store private objects, enforce privileged server access, and return stable
-resource identifiers. The application must treat this service as fallible and
-must not expose its raw errors.
-
-### Anti-abuse service
-
-The platform depends on a server-verifiable proof. Failure, expiry, hostname
-mismatch, or service rejection must fail closed for public submissions.
-
-### Hosting platform
-
-The platform depends on HTTPS static delivery and server-side request execution.
-Secrets must be injected only into server execution contexts.
-
-## 6. Coherence Checklist
-
-- [x] Application identity comes from the route and server registry.
-- [x] Attachment partition comes from the application registry.
-- [x] Public actors have create-only behavior through a controlled boundary.
-- [x] Submission success is defined after persistence, not button activation.
-- [x] Duplicate requests have an idempotency rule.
-- [x] Failed multipart flows have a cleanup responsibility.
-- [x] Reviews are private until moderation exists.
-- [ ] Retention rules are numerically defined.
-- [ ] Attachment policy is numerically defined.
-- [ ] Operator access scope for MVP is approved.
+1. Reporter identity and follow-up policy.
+2. Workspace actor authentication and authorization roles.
+3. Attachment acceptance, scanning, retention, and cleanup policy.
+4. Feedback type schemas and their configuration authority.
+5. Submission atomicity when only one attachment fails validation.
+6. Public slug namespace rules once more than one workspace is onboarded.

@@ -1,112 +1,109 @@
-# Requirement-to-Responsibility Map - Y7 Feedback
+# Responsibility Model - Y7 Feedback
 
-## 1. Derivation Rules
+## 1. Purpose
 
-Each guarantee has one primary owner. Components below are conceptual; they do
-not prescribe a framework or deployment topology.
+This document assigns behavior to conceptual responsibilities. It is not a
+component diagram and does not imply deployable services, libraries, or vendors.
+Several responsibilities may initially live in one implementation.
 
-## 2. Responsibility Catalog
+## 2. Core Responsibilities
 
-### R-REG - Application Registry
+### Workspace Ownership Policy
 
-Owns slug normalization, application activation, allowed origins, enabled
-feedback types, branding data, and attachment-partition mapping.
+- Defines the root ownership boundary.
+- Verifies that privileged operations stay within an authorized workspace.
+- Prevents project, feedback, and attachment ownership from being reassigned by
+  public input.
 
-Derived from: FR-APP-001..005, FR-OPS-001..002, BR-001, BR-005,
-INV-TEN-001..004.
+### Project Registry
 
-### R-PRES - Public Experience
+- Stores project identity, workspace ownership, public slug, lifecycle state,
+  and approved intake configuration.
+- Resolves a public route to exactly one active project.
+- Rejects unknown, inactive, invalid, or ambiguous routes.
 
-Owns product discovery, visible application context, guided forms, localization,
-accessible interaction, safe draft preservation, and acknowledgement display.
+### Public Feedback Experience
 
-Derived from: FR-SUB-003..008, FR-CTX-002..004, FR-UX-001..006,
-INV-UX-001..003.
+- Shows the resolved project before submission.
+- Collects feedback according to the selected feedback type.
+- Discloses requested reporter and diagnostic data before sending.
+- Allows the reporter to review entered content and attachments.
+- Presents accepted, rejected, and retryable outcomes accurately.
 
-### R-GATE - Submission Gateway
+### Feedback Validation
 
-Owns request-size bounds, origin checks, anti-abuse verification, rate limiting,
-idempotency admission, public error mapping, and authoritative orchestration.
+- Applies the resolved project's feedback rules.
+- Rejects incomplete, malformed, oversized, or unsupported input.
+- Treats workspace and project identifiers from public input as untrusted.
+- Produces actionable validation outcomes without exposing internal details.
 
-Derived from: FR-APP-005, FR-VAL-001..005, NFR-SEC-001..006,
-NFR-PERF-003, NFR-REL-002..003.
+### Feedback Intake Coordination
 
-### R-VALID - Feedback Policy Validator
+- Coordinates validation, anti-abuse checks, persistence, and attachment
+  association as one logical submission.
+- Applies idempotency to retries.
+- Issues a confirmation reference only after durable acceptance.
+- Ensures failed intake does not leave orphaned request-owned data.
 
-Owns type-specific schemas, field normalization, length constraints, impact
-vocabulary, diagnostic-context policy, and forbidden-field rejection.
+### Attachment Coordination
 
-Derived from: FR-SUB-001..008, FR-CTX-001..004, BR-002..004.
+- Enforces the approved attachment policy.
+- Associates accepted evidence with exactly one feedback item.
+- Prevents public listing or retrieval.
+- Coordinates cleanup when submission fails.
 
-### R-FILE - Attachment Coordinator
+### Feedback Repository
 
-Owns file policy, content validation, per-application storage selection,
-temporary ownership, private permissions, durable association, and cleanup.
+- Persists projects, feedback, attachments, and immutable ownership links.
+- Retrieves data only within an authorized ownership scope.
+- Preserves historical feedback when a project is deactivated.
 
-Derived from: FR-ATT-001..006, NFR-REL-001, INV-FILE-001..003.
+### Access Control
 
-### R-STORE - Submission Repository
+- Establishes the trusted identity and permissions of workspace actors.
+- Authorizes project configuration and feedback retrieval.
+- Remains policy-neutral until roles and authentication are approved.
 
-Owns unique submission identity, initial status, application immutability,
-idempotent persistence, attachment-link persistence, and operator queries.
+### Safe Observability
 
-Derived from: FR-SUB-009, FR-VAL-004..005, FR-OPS-003..004, BR-002..003,
-INV-CON-001..004.
+- Records enough operational evidence to diagnose failures and abuse.
+- Excludes secrets and attachment content.
+- Redacts reporter and feedback content by default until logging and retention
+  policy explicitly permits otherwise.
 
-### R-OPS - Operator Access
+## 3. Responsibility Boundaries
 
-Owns privileged application registration and feedback review, with scoped access
-and no public credential exposure.
+- The Public Feedback Experience never decides ownership or authorization.
+- The Project Registry resolves ownership but does not accept feedback.
+- Feedback Validation decides input validity but does not claim persistence.
+- Feedback Intake Coordination decides when the overall operation is accepted.
+- The Feedback Repository does not infer authorization from identifiers alone.
+- Attachment Coordination does not make attachments public assets.
+- Access Control does not define reporter identity policy.
 
-Derived from: FR-OPS-001..004, NFR-SEC-001, INV-PRV-001..004.
+## 4. Requirement Mapping
 
-### R-OBS - Safe Observability
-
-Owns request correlation, aggregate operational metrics, redaction, failure
-classification, and alerting without feedback content.
-
-Derived from: NFR-SEC-005..006, NFR-REL-003, success criteria.
-
-## 3. Guarantee Ownership Matrix
-
-| Guarantee | Primary owner | Collaborators |
+| Requirement area | Primary responsibility | Supporting responsibilities |
 | --- | --- | --- |
-| Slug resolves to one active app | R-REG | R-GATE, R-PRES |
-| Browser cannot choose app/bucket IDs | R-GATE | R-REG, R-FILE |
-| Type-specific payload is valid | R-VALID | R-PRES, R-GATE |
-| Automated abuse fails closed | R-GATE | Anti-abuse dependency |
-| One key creates at most one record | R-STORE | R-GATE |
-| Attachments remain private | R-FILE | R-STORE, R-OPS |
-| Failed flow leaves no owned files | R-FILE | R-GATE |
-| Success means complete durability | R-GATE | R-FILE, R-STORE |
-| Logs contain no user content | R-OBS | Every component |
-| Interface remains localized/accessibile | R-PRES | R-VALID |
+| Workspace isolation | Workspace Ownership Policy | Access Control, Feedback Repository |
+| Public slug resolution | Project Registry | Public Feedback Experience |
+| Structured capture | Public Feedback Experience | Feedback Validation |
+| Durable acceptance | Feedback Intake Coordination | Feedback Repository |
+| Attachment lifecycle | Attachment Coordination | Feedback Intake Coordination, Feedback Repository |
+| Project operation | Project Registry | Access Control, Workspace Ownership Policy |
+| Safe failures | Feedback Intake Coordination | Feedback Validation, Safe Observability |
+| Future workspace onboarding | Workspace Ownership Policy | Project Registry, Access Control |
 
-## 4. Proposed Structural Mapping
+## 5. Deferred Allocation Decisions
 
-Only after responsibility derivation, the selected delivery constraints map the
-conceptual owners as follows:
+The following are intentionally not assigned to technical components yet:
 
-| Responsibility | Proposed structure |
-| --- | --- |
-| R-PRES | React/Vite public web application |
-| R-GATE | Vercel server function boundary |
-| R-REG, R-STORE | Appwrite database accessed server-side |
-| R-FILE | Vercel orchestration plus private Appwrite buckets |
-| R-VALID | Shared pure schemas used by browser and server |
-| R-OPS | Appwrite console for MVP |
-| R-OBS | Structured Vercel logs with mandatory redaction |
+- frontend framework and rendering model;
+- API shape and process boundaries;
+- persistence and object-storage products;
+- identity and anti-abuse providers;
+- hosting, regions, CDN, and deployment topology;
+- whether management operations initially use a dedicated interface.
 
-Cloudflare Turnstile fulfills the anti-abuse dependency but does not own
-submission authorization; R-GATE remains responsible for verification and
-policy.
-
-## 5. Change Boundaries
-
-- Product branding changes should affect R-REG and R-PRES, not persistence.
-- A new feedback type should affect R-VALID and R-PRES, with an explicit schema
-  migration if persistence fields change.
-- Replacing Appwrite should affect R-STORE and R-FILE adapters, not product forms.
-- Replacing Turnstile should affect the anti-abuse adapter, not acceptance rules.
-- Adding a custom operator dashboard should consume R-OPS contracts without
-  weakening public permissions.
+Those choices follow approved requirements and quality targets; they do not
+define the domain.

@@ -1,212 +1,137 @@
-# UML and C4 Modeling - Y7 Feedback
+# Behavioral and Domain Models - Y7 Feedback
 
-## 1. C4 Context
+## 1. Modeling Scope
 
-```mermaid
-C4Context
-  title Y7 Feedback - System Context
+These models describe actors, behavior, and information ownership. A technical
+container architecture is deferred because identity, attachment policy,
+operational roles, and measurable service targets remain open.
 
-  Person(submitter, "Submitter", "Leaves a review, suggestion, or bug report")
-  Person(operator, "Platform operator", "Registers apps and reviews feedback")
-  System(feedback, "Y7 Feedback", "Collects private, product-scoped feedback")
-  System_Ext(product, "Registered Y7 application", "Links users to its feedback page")
-  System_Ext(antibot, "Anti-abuse service", "Verifies public submission evidence")
-  System_Ext(data, "Managed data service", "Stores records and private attachments")
-
-  Rel(submitter, feedback, "Submits feedback", "HTTPS")
-  Rel(product, feedback, "Links using registered slug", "HTTPS")
-  Rel(operator, feedback, "Configures and reviews")
-  Rel(feedback, antibot, "Verifies evidence", "HTTPS")
-  Rel(feedback, data, "Persists private records/files", "HTTPS")
-```
-
-## 2. UML Use Cases
+## 2. System Context
 
 ```mermaid
 flowchart LR
-  submitter([Submitter])
-  operator([Platform operator])
+    Reporter[Reporter]
+    WorkspaceActor[Authorized workspace actor]
+    Operator[Platform operator]
+    FeedbackSystem[Y7 Feedback system]
 
-  subgraph feedback[Y7 Feedback]
-    discover[Discover active application]
-    review[Leave review]
-    suggest[Suggest improvement]
-    bug[Report bug]
-    attach[Attach evidence]
-    ack[Receive acknowledgement]
-    register[Register application]
-    inspect[Review submissions]
-  end
-
-  submitter --> discover
-  submitter --> review
-  submitter --> suggest
-  submitter --> bug
-  review -. optional .-> attach
-  suggest -. optional .-> attach
-  bug -. optional .-> attach
-  review --> ack
-  suggest --> ack
-  bug --> ack
-  operator --> register
-  operator --> inspect
+    Reporter -->|submits feedback and evidence| FeedbackSystem
+    FeedbackSystem -->|shows outcome and confirmation| Reporter
+    WorkspaceActor -->|configures projects and reviews feedback| FeedbackSystem
+    Operator -->|operates and monitors the platform| FeedbackSystem
 ```
 
-## 3. Submission Activity
+The context intentionally leaves authentication and reporter identity modes
+unspecified.
+
+## 3. Core Use Cases
+
+| ID | Actor | Outcome |
+| --- | --- | --- |
+| UC-01 | Reporter | Resolve a project from its public slug. |
+| UC-02 | Reporter | Submit a review, suggestion, or bug report. |
+| UC-03 | Reporter | Attach permitted supporting evidence. |
+| UC-04 | Reporter | Receive an accurate acceptance or failure outcome. |
+| UC-05 | Authorized workspace actor | Configure or deactivate a permitted project. |
+| UC-06 | Authorized workspace actor | Retrieve feedback for permitted projects. |
+| UC-07 | Platform operator | Diagnose operational failures without exposing protected content. |
+
+Reporter follow-up, replies, public boards, voting, and status tracking are not
+core use cases until explicitly approved.
+
+## 4. Submission Activity
 
 ```mermaid
 flowchart TD
-  start([Open /:appSlug]) --> resolve{Active app and allowed origin?}
-  resolve -- No --> notFound[Show unavailable state]
-  resolve -- Yes --> form[Show app-scoped form]
-  form --> validateClient{Client input valid?}
-  validateClient -- No --> fieldErrors[Show field errors]
-  fieldErrors --> form
-  validateClient -- Yes --> send[Send payload, files, proof, idempotency key]
-  send --> gate{Server admission valid?}
-  gate -- No --> reject[Return safe rejection]
-  gate -- Yes --> files[Validate and stage attachments]
-  files --> fileOk{All files accepted?}
-  fileOk -- No --> cleanup[Delete request-owned files]
-  cleanup --> reject
-  fileOk -- Yes --> persist[Persist submission and attachment links]
-  persist --> stored{Durable?}
-  stored -- No --> cleanup
-  stored -- Yes --> success[Return acknowledgement reference]
-  success --> done([Complete])
+    Start([Open project route]) --> Resolve{Resolve one active project?}
+    Resolve -- No --> RouteError[Show unavailable project outcome]
+    Resolve -- Yes --> Show[Show project identity and feedback choices]
+    Show --> Enter[Enter feedback and optional disclosed data]
+    Enter --> Review[Review target, content, context, and attachments]
+    Review --> Validate{Input and policy valid?}
+    Validate -- No --> Correct[Show actionable validation errors]
+    Correct --> Enter
+    Validate -- Yes --> Admit{Admission and persistence succeed?}
+    Admit -- No, retryable --> Retry[Show safe retryable outcome]
+    Admit -- No, rejected --> Reject[Show rejection without confirmation]
+    Admit -- Yes --> Confirm[Show confirmation reference]
 ```
 
-## 4. Submission Sequence
+## 5. Submission Sequence
 
 ```mermaid
 sequenceDiagram
-  autonumber
-  actor U as Submitter
-  participant W as Public Web App
-  participant G as Submission Gateway
-  participant R as Application Registry
-  participant T as Anti-abuse Service
-  participant F as Attachment Coordinator
-  participant S as Submission Repository
+    actor R as Reporter
+    participant P as Public Experience
+    participant G as Project Registry
+    participant V as Validation
+    participant I as Intake Coordination
+    participant A as Attachment Coordination
+    participant F as Feedback Repository
 
-  U->>W: Open /wisemoney
-  W->>G: Resolve slug
-  G->>R: Find active app + policy
-  R-->>G: Public app configuration
-  G-->>W: Safe branding and form policy
-  U->>W: Complete form and select files
-  W->>G: Submit with proof and idempotency key
-  G->>R: Resolve slug and allowed origin again
-  G->>T: Verify anti-abuse proof
-  T-->>G: Verification result
-  G->>G: Validate request policy
-  G->>F: Validate and stage accepted files for app
-  F-->>G: Private file references
-  G->>S: Persist submission and file links atomically/idempotently
-  alt persistence succeeds
-    S-->>G: Submission ID and reference
-    G-->>W: Acknowledgement
-    W-->>U: Show reference
-  else persistence fails
-    S-->>G: Failure
-    G->>F: Delete request-owned files
-    G-->>W: Safe retryable error
-    W-->>U: Preserve form and offer retry
-  end
+    R->>P: Open /{project-slug}
+    P->>G: Resolve active project
+    G-->>P: Trusted project and workspace scope
+    P-->>R: Project identity and configured form
+    R->>P: Submit feedback and optional evidence
+    P->>V: Validate against resolved project policy
+    V-->>P: Validated input or actionable errors
+    P->>I: Admit logical submission
+    I->>A: Validate and stage permitted evidence
+    A-->>I: Evidence result
+    I->>F: Persist feedback, ownership, and associations
+    F-->>I: Durable acceptance
+    I-->>P: Confirmation reference
+    P-->>R: Accepted outcome
 ```
 
-## 5. C4 Container View
+Failure paths must follow the acceptance and cleanup guarantees in the core
+contract.
 
-```mermaid
-C4Container
-  title Y7 Feedback - Container View
-
-  Person(submitter, "Submitter")
-  Person(operator, "Platform operator")
-
-  System_Boundary(system, "Y7 Feedback") {
-    Container(web, "Public Web Application", "React, TypeScript, Vite", "Localized app discovery and guided forms")
-    Container(api, "Submission API", "Vercel Functions", "Admission, validation, orchestration, and safe responses")
-    ContainerDb(db, "Feedback Database", "Appwrite", "Applications, submissions, attachment metadata, events")
-    ContainerDb(files, "Private App Buckets", "Appwrite Storage", "One configured private bucket per application")
-  }
-
-  System_Ext(turnstile, "Cloudflare Turnstile", "Anti-abuse verification")
-
-  Rel(submitter, web, "Uses", "HTTPS")
-  Rel(web, api, "Resolves apps and submits feedback", "HTTPS/JSON + multipart")
-  Rel(api, turnstile, "Verifies proof", "HTTPS")
-  Rel(api, db, "Reads registry and persists records", "Server credentials")
-  Rel(api, files, "Stores/deletes private evidence", "Server credentials")
-  Rel(operator, db, "Configures/reviews for MVP", "Appwrite Console")
-  Rel(operator, files, "Reviews evidence for MVP", "Appwrite Console")
-```
-
-## 6. Conceptual Data Model
+## 6. Conceptual Information Model
 
 ```mermaid
 erDiagram
-  APPLICATION ||--o{ SUBMISSION : receives
-  APPLICATION ||--|| STORAGE_PARTITION : owns
-  SUBMISSION ||--o{ ATTACHMENT : includes
-  SUBMISSION ||--o{ SUBMISSION_EVENT : records
+    WORKSPACE ||--o{ PROJECT : owns
+    PROJECT ||--o{ FEEDBACK : receives
+    FEEDBACK ||--o{ ATTACHMENT : includes
 
-  APPLICATION {
-    string id PK
-    string slug UK
-    string display_name
-    string status
-    json allowed_origins
-    json enabled_types
-    json branding
-    string storage_partition_id
-  }
-
-  SUBMISSION {
-    string id PK
-    string reference UK
-    string application_id FK
-    string idempotency_hash UK
-    string type
-    string status
-    string title
-    json payload
-    string contact_email
-    datetime created_at
-  }
-
-  ATTACHMENT {
-    string id PK
-    string submission_id FK
-    string application_id FK
-    string private_file_id UK
-    string media_type
-    int byte_size
-    datetime created_at
-  }
-
-  SUBMISSION_EVENT {
-    string id PK
-    string submission_id FK
-    string event_type
-    string actor_id
-    datetime created_at
-  }
-
-  STORAGE_PARTITION {
-    string id PK
-    string application_id FK
-    string provider_bucket_id UK
-  }
+    WORKSPACE {
+        identifier id
+    }
+    PROJECT {
+        identifier id
+        identifier workspace_id
+        string public_slug
+        lifecycle_state state
+    }
+    FEEDBACK {
+        identifier id
+        identifier project_id
+        feedback_type type
+        content payload
+        timestamp accepted_at
+    }
+    ATTACHMENT {
+        identifier id
+        identifier feedback_id
+        attachment_metadata metadata
+    }
 ```
 
-## 7. Model Review Questions
+This is a conceptual model, not a database schema. Reporter identity is absent
+because its data model depends on the unresolved identity policy. Feedback
+content remains abstract because type-specific schemas are also unresolved.
 
-- Can the chosen persistence boundary provide the required submission/file
-  consistency, or must the coordinator implement compensating cleanup?
-- Should type-specific fields remain a validated payload or become dedicated
-  columns for operator queries?
-- Does contact data require a separate retention boundary from submission text?
-- How is the idempotency hash expired without allowing delayed duplicates?
-- Does one bucket per application remain operationally acceptable at the expected
-  number of registered products?
+## 7. Deferred Architecture Views
+
+A container or deployment view becomes meaningful only after decisions establish:
+
+1. identity and authorization boundaries;
+2. attachment processing and retention requirements;
+3. management-interface scope;
+4. availability, latency, scale, and regional requirements;
+5. privacy and data-location constraints.
+
+At that point, architecture options can be compared against the same contract
+without changing the domain model.
