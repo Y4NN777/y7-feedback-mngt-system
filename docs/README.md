@@ -1,6 +1,6 @@
 # Y7 Feedback - Engineering Foundations
 
-This directory defines Y7 Feedback before architecture or implementation. The
+This directory defines Y7 Feedback through architecture, before implementation. The
 documents follow the mandatory chain in `../BASICS/`; a downstream document may
 clarify an upstream decision, but may not redefine it.
 
@@ -8,8 +8,9 @@ clarify an upstream decision, but may not redefine it.
 Intent -> Requirements -> Contract -> Responsibilities -> Modeling -> Architecture
 ```
 
-Architecture, vendors, data stores, authentication providers, deployment
-topology, and application frameworks are deliberately absent from this chain.
+The first six documents remain technology-independent product truth. Architecture
+then allocates their responsibilities to the already selected frontend stack and
+Appwrite without rewriting the upstream contract.
 
 ## Stable Product Statement
 
@@ -55,6 +56,10 @@ The fuller conceptual model is derived in `05_MODELING.md`.
    cardinalities.
 6. [Decision Traceability](./06_DECISION_TRACEABILITY.md) - decision-to-model
    coverage across the chain.
+7. [Architecture](./07_ARCHITECTURE.md) - context, logical boundaries, flows,
+   security, offline behavior, recovery, and SLO tactics.
+8. [Architecture Decisions](./08_ARCHITECTURE_DECISIONS.md) - ADRs, alternatives,
+   consequences, and implementation fitness conditions.
 
 Supporting research is non-normative unless a recommendation is explicitly
 promoted into the PRD:
@@ -78,14 +83,21 @@ promoted into the PRD:
 - `bug`, `suggestion`, and `review` are structured MVP feedback types.
 - Product Intelligence is an MVP capability built from preserved source data,
   context, relationships, themes, and trends.
-- Workspace Owner, Project Maintainer, and Platform Operator remain distinct
-  responsibilities without introducing configurable SaaS RBAC.
+- Workspace Owner, Project Maintainer, Platform Operator, and Platform Owner /
+  Super Administrator remain distinct responsibilities without introducing
+  configurable SaaS RBAC.
 - Platform Operator access to workspace content is exceptional, justified,
-  limited, and auditable.
-- Attachments, anonymization, and soft deletion are part of the MVP.
+  independently approved, scoped to at most one hour, and auditable.
+- Attachments use the validated formats, 10 MB/file, five files/submission,
+  actual-content validation, private access, and logical atomicity.
+- Deletion immediately soft-deletes and anonymizes when required, supports an
+  audited pre-purge restore, and purges after 30 days. Daily backups are retained
+  30 days with RPO 24 hours and RTO 4 hours.
+- Quantitative anti-abuse bounds and internal availability, performance,
+  notification, capacity-testing, and 320 px objectives are fixed in the SRS.
 - Public project slugs are global; historical slugs redirect to the same project.
-- `/` must not automatically publish a project catalog. Its exact experience is
-  still under product review.
+- `/` is a bilingual orientation point for giving feedback, retrieving a
+  feedback item, or entering Workspace management, without public discovery.
 - The MVP public and reporter experiences support French and English.
 
 ## Explicitly Deferred
@@ -96,16 +108,21 @@ promoted into the PRD:
 - community voting and public discussion boards;
 - automatic prioritization or autonomous AI decisions;
 - external issue-tracker integrations;
-- implementation architecture and vendor selection.
+- billing-driven infrastructure or architecture not justified by current load;
+- exact email, malware-scanning, telemetry, and backup repository products;
+- infrastructure-as-code, CI/CD, migrations, and application implementation.
 
-## Gate Before Architecture
+## Architecture Gate
 
-Architecture comparison may begin only after:
+The gate is passed:
 
 - each normative requirement has an acceptance condition;
 - every invariant has one primary responsibility owner;
-- remaining attachment, retention, deletion-finalization, service-level, and
-  exceptional-access parameters have explicit values or approved policies;
-- the root experience recommendation has either been accepted or kept outside
-  the architecture-driving scope;
+- attachment, retention, deletion-finalization, service-level, anti-abuse, and
+  exceptional-access parameters have approved values;
+- the root experience recommendation is accepted;
 - the decision traceability matrix has no unexplained gap.
+
+The validated implementation constraints are React, TypeScript, Vite, TanStack
+Query, IndexedDB, PWA/offline-first behavior, and Appwrite. Their cooperation is
+defined downstream rather than retrofitted into the product requirements.

@@ -1,11 +1,12 @@
-# Root Experience Study - Non-Normative
+# Root Experience Study
 
 ## Status
 
-This note records observation and a recommendation for
-`feedback.y7labs.studio/`. It is not a product decision, requirement, or
-architecture choice. Only the validated rule that `/` must not automatically
-publish a project catalog is normative.
+This note preserves the observations and recommendation for
+`feedback.y7labs.studio/`. The recommendation was explicitly accepted on
+2026-08-09. Normative behavior now lives in the PRD, SRS, Contract,
+Responsibilities, and Modeling documents; this study remains explanatory rather
+than a second normative source.
 
 Observed on 2026-08-09. Product interfaces evolve; the cited official material
 is the evidence used for this pass.
@@ -76,7 +77,7 @@ This pattern avoids two errors for Y7 Feedback: asking a reporter to choose amon
 unrelated projects, and turning the root into an accidental public customer
 directory.
 
-## Recommendation - Not Validated
+## Accepted Recommendation
 
 Use `/` as a bilingual orientation page with three explicit intentions:
 
@@ -111,7 +112,8 @@ Additional recommended behavior:
   cannot discover a project from `/`; projects remain responsible for providing
   their public feedback link.
 
-## Decision Still Required
+## Decision Outcome
 
-Accept, modify, or reject the recommendation above before converting any part of
-it beyond the no-catalog rule into normative requirements.
+Accepted. `/` is the bilingual orientation experience described above. The
+no-catalog, no-search, no-Workspace-exposure constraints and continued access to
+direct Project URLs are normative in `01_PRD.md` through `05_MODELING.md`.
