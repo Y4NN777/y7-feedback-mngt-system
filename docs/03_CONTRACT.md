@@ -348,7 +348,35 @@ do not require an event bus, event sourcing, or any transport technology.
 | `ExceptionalAccessUsed` | Grant, operator, accessed scope, purpose, time. |
 | `ExceptionalAccessRevoked` | Grant, revoker, reason, time. |
 
-## 18. Explicit Non-Guarantees
+## 18. User Experience Contract
+
+- Public intake, Reporter follow-up, workspace operation, validation outcomes,
+  in-product notifications, email notifications, and errors are available in
+  French and English.
+- Changing language preserves safe unsent input and the resolved Project context.
+- Controls, errors, authorship, and lifecycle state expose programmatic labels
+  and do not communicate meaning through color alone.
+- Core Reporter and workspace workflows remain operable by keyboard and
+  assistive technology.
+- Quantitative viewport and performance behavior is not guaranteed until
+  `OPEN-SLO-001` is approved.
+
+## 19. Evolvability Contract
+
+- Core feedback behavior and source meaning contain no WiseMoney-specific rule.
+- Additional Projects and Workspaces use the same ownership, Reporter,
+  conversation, lifecycle, Attachment, notification, and Product Intelligence
+  contracts.
+- Introducing an external customer Workspace does not require a product copy or
+  change the ownership of existing data.
+- Billing, plans, quotas, invitations, custom roles, custom domains, and
+  marketplace concepts are not prerequisites for the core behavior.
+- Project configuration remains declarative and cannot execute arbitrary
+  customer code.
+- Reporter attribution remains independent of the chosen workspace-actor
+  authentication mechanism.
+
+## 20. Explicit Non-Guarantees
 
 This contract does not guarantee:
 
