@@ -23,6 +23,8 @@ initially live in one implementation.
 | Theme / Feedback relationship | Owns accountable derived classification without owning or rewriting source Feedback. |
 | Notification | Owns one recipient-scoped awareness outcome derived from a domain event. |
 | Deletion record | Owns evidence of request, anonymization, soft deletion, retention, and eventual purge outcome. |
+| Exceptional access grant | Owns one independently approved, narrowly scoped and expiring authority plus its immutable audit evidence. |
+| Backup set | Owns one recoverable daily snapshot, its creation evidence, 30-day expiry, and recovery validation state. |
 
 ## 3. Actor Responsibilities
 
@@ -67,6 +69,14 @@ initially live in one implementation.
   business content.
 - Uses content access only through an authorized, scoped, expiring, auditable
   exceptional grant.
+- Cannot approve its own access or modify audit evidence covering its activity.
+
+### Platform Owner / Super Administrator
+
+- Independently approves or denies justified exceptional access requests.
+- Verifies the minimum Workspace, resource, action, and maximum one-hour scope.
+- Reviews critical break-glass use after the incident.
+- Does not convert approval authority into ordinary Workspace business access.
 
 ## 4. System Responsibilities
 
@@ -119,7 +129,10 @@ initially live in one implementation.
 - Lets the Reporter review and correct safe input before sending.
 - Presents accepted, rejected, and retryable outcomes accurately.
 - Never decides ownership, trusted identity, authorization, or lifecycle state.
-- At `/`, never generates a Project catalog; further root behavior remains open.
+- At `/`, presents bilingual orientation to a project-provided feedback link,
+  reference-based retrieval, and authenticated Workspace management.
+- Never generates Project search, Project suggestions, a Project catalog, or
+  Workspace exposure; direct Project routes bypass root orientation.
 
 ### Feedback Validation
 
@@ -182,12 +195,20 @@ initially live in one implementation.
 
 ### Attachment Policy and Coordination
 
-- Owns accepted format, actual-content validation, size, count, security,
-  metadata, audience, retention, deletion, and atomicity rules once approved.
+- Accepts only JPEG, PNG, WebP, GIF, PDF, UTF-8 TXT, and CSV; rejects archives,
+  executables, and unspecified formats.
+- Enforces actual-content validation independently of client MIME and extension,
+  10 MB per file, and five files per submission operation.
 - Associates accepted evidence with one Feedback and optionally its source entry.
 - Authorizes evidence through Feedback scope and entry audience.
-- Prevents public listing and retrieval.
-- Removes request-owned evidence after failed intake.
+- Keeps evidence outside the public webroot and prevents public listing and
+  retrieval.
+- Coordinates logical all-or-nothing intake and removes failed or expired staged
+  evidence.
+- Limits metadata to validation, integrity, presentation, authorization, audit,
+  and lifecycle needs.
+- Applies the owning Feedback's visibility, restoration, purge, and backup
+  lifecycle.
 - Does not make a rejected Attachment accepted because its Feedback exists.
 
 ### Workspace Access Control
@@ -203,9 +224,14 @@ initially live in one implementation.
 
 - Keeps Platform Operator content access absent by default.
 - Creates, validates, revokes, expires, and audits exceptional grants.
-- Enforces purpose, Workspace, content scope, operator, and time limits.
-- Records grants, uses, denied attempts, and revocations.
-- Cannot choose its own grant approver while approval authority remains open.
+- Requires a Platform Owner / Super Administrator distinct from the operator to
+  approve a mandatory justification and minimum Workspace/resource/action scope.
+- Enforces a maximum one-hour grant; continued access requires a new approval.
+- Records grants, uses, denied attempts, revocations, expiries, and critical
+  break-glass post-incident reviews.
+- Prevents the operator from changing audit evidence covering its own activity.
+- Allows break-glass only for a critical incident under the same justification
+  and audit guarantees.
 
 ### Maintainer Feedback Experience
 
@@ -240,13 +266,35 @@ initially live in one implementation.
 ### Data Lifecycle and Privacy
 
 - Receives deletion requests and applies approved authorization.
-- Coordinates Feedback-specific anonymization and soft deletion.
+- Coordinates immediate Feedback-specific anonymization when required and
+  immediate soft deletion.
 - Removes soft-deleted data from ordinary Reporter, maintainer, search,
   notification, and Product Intelligence views.
-- Preserves only the approved minimal deletion audit.
-- Applies explicit retention and purge outcomes to each data class and backups.
-- Does not interpret an unspecified duration as permission for indefinite
-  retention.
+- Authorizes Workspace Owner restoration before purge and records its audit;
+  restoration never reconstructs already anonymized identity.
+- Purges Feedback-owned business data and Attachments after 30 days and makes
+  business restoration impossible thereafter.
+- Preserves only the approved minimal deletion and purge evidence.
+
+### Backup and Recovery
+
+- Produces and verifies a recoverable backup at least daily.
+- Expires backups after 30 days.
+- Owns recovery procedures and exercises for RPO 24 hours and RTO 4 hours.
+- Reapplies deletion and purge state before restored data becomes ordinarily
+  accessible.
+- Does not own business deletion approval or ordinary Feedback restoration.
+
+### Anti-Abuse Policy
+
+- Enforces the overlapping IP limits of 60 requests/minute, 10 Feedback
+  submissions/minute, and 20 uploaded files/minute.
+- Enforces 30 Feedback/hour for one external-identity issuer/application scope
+  and Project.
+- Returns HTTP 429 without protected-data disclosure or excess domain effects.
+- Uses expiring operational state and avoids permanent raw-IP history,
+  fingerprinting, and hidden behavioral tracking.
+- Keeps CAPTCHA optional rather than a required MVP dependency.
 
 ### Safe Observability
 
@@ -255,6 +303,9 @@ initially live in one implementation.
 - Excludes Access Proofs, privileged credentials, Attachment content, Internal
   Notes, and unapproved Reporter or Feedback content.
 - Produces safe public errors without cross-scope existence disclosure.
+- Measures monthly availability, Web Vitals, critical operation latency,
+  notification handoff latency, recovery exercises, and the load-tested capacity
+  envelope against the approved internal SLOs.
 - Does not become a parallel business-content repository.
 
 ## 5. Invariant Ownership
@@ -280,6 +331,8 @@ Every invariant has exactly one primary responsibility owner.
 | INV-LIFE-001 | Feedback Lifecycle | Feedback Record Stewardship |
 | INV-LIFE-002 | Feedback Lifecycle | Project Registry, Data Lifecycle and Privacy |
 | INV-ATT-001 | Attachment Policy and Coordination | Feedback Record Stewardship |
+| INV-ATT-002 | Attachment Policy and Coordination | Feedback Validation |
+| INV-ATT-003 | Attachment Policy and Coordination | Workspace Access Control |
 | INV-AUTH-001 | Workspace Access Control | Workspace Ownership Policy |
 | INV-AUTH-002 | Workspace Access Control | Project Registry |
 | INV-BREAKGLASS-001 | Exceptional Access Control | Safe Observability |
@@ -287,6 +340,7 @@ Every invariant has exactly one primary responsibility owner.
 | INV-INTEL-001 | Product Intelligence | Feedback Record Stewardship |
 | INV-INTEL-002 | Product Intelligence | Context Policy, Reporter Attribution |
 | INV-DELETE-001 | Data Lifecycle and Privacy | Reporter Attribution, Product Intelligence |
+| INV-ABUSE-001 | Anti-Abuse Policy | Feedback Intake Coordination, Reporter Feedback Access |
 
 ## 6. Requirement-to-Responsibility Coverage
 
@@ -305,10 +359,12 @@ Every invariant has exactly one primary responsibility owner.
 | FR-NOT-* | Notification Coordination |
 | FR-INT-* | Product Intelligence |
 | FR-PRIV-* | Data Lifecycle and Privacy |
-| NFR-SEC-* | Workspace Ownership Policy, Workspace Access Control, Safe Observability |
+| NFR-REC-* | Backup and Recovery; Data Lifecycle and Privacy for deletion replay |
+| NFR-SEC-* | Workspace Ownership Policy, Workspace Access Control, Anti-Abuse Policy, Safe Observability |
 | NFR-CON-* | Feedback Intake Coordination, Feedback Record Stewardship |
 | NFR-UX-* | Public Feedback Experience, Maintainer Feedback Experience, Notification Coordination |
 | NFR-EVO-* | Workspace Ownership Policy and the relevant domain responsibility |
+| NFR-SLO-* | Safe Observability and the responsibility owning the measured operation |
 
 ## 7. Explicit Boundaries
 
@@ -328,9 +384,9 @@ Every invariant has exactly one primary responsibility owner.
 - Safe Observability stores operational evidence, not an unrestricted copy of
   business content.
 
-## 8. Deferred Allocation Decisions
+## 8. Architectural Allocation Boundary
 
-These responsibility definitions do not decide:
+These responsibility definitions do not themselves decide:
 
 - frontend framework, rendering model, or application count;
 - API protocol or process boundaries;
@@ -339,7 +395,8 @@ These responsibility definitions do not decide:
 - anti-abuse provider or algorithm;
 - hosting, region, CDN, or deployment topology;
 - whether responsibilities become modules, processes, or services;
-- exact root `/` interface beyond the no-catalog guarantee.
+- the exact page composition or interaction design of the validated root intents.
 
-The open Attachment, retention, exceptional-access approval, anti-abuse, and
-service-level parameters must be supplied before architecture is compared.
+The validated React, TypeScript, Vite, TanStack Query, IndexedDB, PWA, and
+Appwrite constraints and their allocation to these responsibilities are defined
+only in `07_ARCHITECTURE.md` and its ADRs.
