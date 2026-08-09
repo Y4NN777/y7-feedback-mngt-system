@@ -16,6 +16,7 @@ API, database, component, deployment, or vendor specification.
 | Workspace Owner | Manage Projects and their slugs; assign Project Maintainers; work with all Feedback in the Workspace; authorize deletion according to policy. | Has no authority in another Workspace. |
 | Project Maintainer | Work with Feedback, Attachments, Messages, Internal Notes, lifecycle, and Product Intelligence for assigned Projects. | Has no authority in unassigned Projects or another Workspace. |
 | Platform Operator | Operate and diagnose the shared platform using operational data. | Has no standing right to Workspace business content; exceptional content access requires a grant. |
+| Platform Owner / Super Administrator | Independently approve or deny exceptional Platform Operator access and review critical break-glass use. | Cannot approve a request in which it is the requesting operator; approval grants only the declared scope and duration. |
 
 Reporter attribution is not administrative authentication. A person may act as
 a Reporter and as a workspace actor through different, independently authorized
@@ -109,8 +110,12 @@ no continuing real-person identity.
 - Only the current route of an active Project accepts new Feedback.
 - Deactivation stops intake without deleting or moving historical data.
 - `/wisemoney` identifies the initial WiseMoney Project.
-- `/` does not automatically enumerate Projects. No additional root experience
-  is guaranteed until the pending recommendation is approved.
+- `/` is a French-and-English orientation point for giving feedback through a
+  project-provided link, retrieving existing Feedback, or entering Workspace
+  management.
+- `/` never supplies a public Project search, automatic Project catalog, or
+  automatic Workspace exposure. Current and historical direct Project URLs
+  remain accessible without passing through root orientation.
 
 ## 6. Reporter Attribution Contract
 
@@ -178,14 +183,12 @@ no continuing real-person identity.
 - Retrying one logical operation creates at most one Feedback, Message,
   transition, deletion request, or Attachment association.
 - Request-owned Attachment data is removed when its Feedback cannot be accepted.
+- Initial intake with Attachments is logically atomic: rejection or failure of
+  any submitted file accepts neither the Feedback nor any of its Attachments.
 - Notification delivery is not part of the transaction that accepts the domain
   change; delivery failure cannot undo accepted Feedback or history.
 - Ordered domain history remains coherent after retry, concurrency, or
   notification failure.
-
-Attachment atomicity remains governed by `OPEN-ATT-001`; until approved, the
-contract does not choose between rejecting an entire initial submission and
-explicitly allowing submission without rejected evidence.
 
 ## 10. Conversation and Visibility Contract
 
@@ -238,16 +241,21 @@ explicitly allowing submission without rejected evidence.
 - An authorized Reporter may retrieve only Attachments permitted by Feedback
   access and conversation audience.
 - Workspace actors retrieve Attachments only within role and Project scope.
-- Declared type, actual content, size, count, and security policy are validated
-  before acceptance.
+- Accepted MVP content is limited to JPEG, PNG, WebP, GIF, PDF, UTF-8 TXT, and
+  CSV. Archives, executables, and every unspecified format are rejected.
+- Each file is at most 10 MB and each submission operation contains at most five
+  files.
+- **INV-ATT-002** Actual content determines whether a file has an allowed type;
+  a client MIME declaration or filename extension is never sufficient.
+- **INV-ATT-003** Attachment storage is private and outside the public webroot;
+  metadata and content access is authorized against Feedback scope and audience.
 - Rejected or failed request evidence is not retained as an unassociated durable
   object.
-- Metadata collection, visibility, anonymization, retention, and deletion follow
-  the approved Attachment policy.
-
-Formats, limits, security depth, metadata treatment, atomicity, later-message
-evidence behavior, and retention are intentionally unresolved in
-`OPEN-ATT-001`.
+- Metadata is limited to validation, integrity, presentation, authorization,
+  audit, and lifecycle purposes.
+- Availability, restoration, anonymization, purge, and backup treatment follow
+  the owning Feedback and the audience of the source submission, Message, or
+  Internal Note.
 
 ## 13. Role and Exceptional Access Contract
 
@@ -260,12 +268,18 @@ evidence behavior, and retention are intentionally unresolved in
   identifiers, Messages, Internal Notes, and Attachments.
 - **INV-BREAKGLASS-001** Exceptional operator access exists only through an
   explicit grant containing authorizer, operator, purpose, Workspace scope,
-  allowed content scope, start, expiry, and revocation state.
+  resource and action scope, start, expiry, and revocation state.
+- A Platform Owner / Super Administrator distinct from the requesting Platform
+  Operator is the normal approver; self-approval is forbidden.
+- Justification is mandatory, scope is limited to what is necessary, and expiry
+  is no later than one hour after activation.
+- Continued access requires a new approval and a new grant; an existing grant is
+  never extended beyond one hour.
 - Every exceptional grant, use, denied attempt, and revocation is auditable.
+- The operator cannot modify or delete audit records covering its own activity.
 - Expired, revoked, or out-of-scope exceptional access is rejected.
-
-The authority allowed to approve a grant remains `OPEN-OPS-001`; no
-implementation may self-authorize Platform Operator access by default.
+- Break-glass follows the same justification and audit guarantees, is allowed
+  only for a critical incident, and requires a recorded post-incident review.
 
 ## 14. Notification Contract
 
@@ -307,19 +321,42 @@ implementation may self-authorize Platform Operator access by default.
 - A deletion request is a recorded request, not a false promise of immediate
   irreversible purge.
 - An approved deletion operation anonymizes direct Reporter attribution for the
-  Feedback and marks the Feedback soft-deleted.
+  Feedback immediately when required and marks the Feedback soft-deleted
+  immediately.
 - **INV-DELETE-001** Soft-deleted Feedback is absent from ordinary Reporter,
   maintainer, search, notification, and Product Intelligence views.
-- A minimal deletion audit remains until the approved purge point.
+- A minimal deletion audit remains until definitive purge after 30 days.
 - Searching by former contact or external identifier does not return anonymized
   Feedback.
-- Retention and purge rules apply explicitly to each data class, including
-  backups; absence of a supplied duration is not indefinite-retention approval.
+- Before purge, a Workspace Owner may restore Feedback through an authorized,
+  audited operation. Restoration does not reverse completed anonymization.
+- After purge, business restoration is impossible, including by an ordinary
+  backup-restore operation.
+- Feedback-owned Attachments follow the same soft-delete, restore, and purge
+  lifecycle.
+- Recoverable backups are produced daily, retained for 30 days, and operated to
+  an RPO of 24 hours and RTO of 4 hours.
+- Recovery reapplies deletion and purge state before restoring ordinary service
+  so that backup media does not resurrect data into business access.
 
-Concrete periods, restoration authority, purge timing, and backup expiry remain
-`OPEN-RET-001`.
+## 17. Anti-Abuse Contract
 
-## 17. Semantic Events
+- **INV-ABUSE-001** Public and accountless traffic is limited to 60 requests per
+  minute per IP address.
+- Feedback intake is additionally limited to 10 submission attempts per minute
+  per IP address.
+- Attachment intake is additionally limited to 20 file upload attempts per
+  minute per IP address and never weakens the five-files-per-submission rule.
+- Feedback associated with the same external-identity issuer/application scope
+  and Project is limited to 30 accepted items per hour.
+- Exceeding any applicable bound returns HTTP 429, creates no excess domain
+  effect, and discloses no protected data.
+- Accountless protection uses only expiring operational state. It does not
+  create permanent raw-IP history, fingerprinting, or hidden behavioral
+  tracking.
+- CAPTCHA is not a required MVP step.
+
+## 18. Semantic Events
 
 These events describe observable domain facts and required audit evidence. They
 do not require an event bus, event sourcing, or any transport technology.
@@ -342,13 +379,16 @@ do not require an event bus, event sourcing, or any transport technology.
 | `DeletionRequested` | Feedback, authorized requester, time. |
 | `FeedbackAnonymized` | Feedback, policy, actor/process, time. |
 | `FeedbackSoftDeleted` | Feedback, actor/process, reason, time, retention rule reference. |
+| `FeedbackRestored` | Feedback, Workspace Owner, prior deletion state, reason, time; previously anonymized identity remains absent. |
+| `FeedbackPurged` | Feedback deletion reference, purge eligibility time, process, completion time. |
 | `NotificationRequested` | Source event, recipient scope, channel, time. |
 | `NotificationDeliveryRecorded` | Notification, channel, outcome, time. |
 | `ExceptionalAccessGranted` | Authorizer, operator, purpose, scope, start, expiry, time. |
 | `ExceptionalAccessUsed` | Grant, operator, accessed scope, purpose, time. |
 | `ExceptionalAccessRevoked` | Grant, revoker, reason, time. |
+| `BreakGlassReviewCompleted` | Grant, critical incident, independent reviewer, findings, follow-up, time. |
 
-## 18. User Experience Contract
+## 19. User Experience and Internal SLO Contract
 
 - Public intake, Reporter follow-up, workspace operation, validation outcomes,
   in-product notifications, email notifications, and errors are available in
@@ -358,10 +398,22 @@ do not require an event bus, event sourcing, or any transport technology.
   and do not communicate meaning through color alone.
 - Core Reporter and workspace workflows remain operable by keyboard and
   assistive technology.
-- Quantitative viewport and performance behavior is not guaranteed until
-  `OPEN-SLO-001` is approved.
+- Core workflows remain usable at a 320 CSS-pixel viewport width.
+- Monthly internal availability is at least 99.9%.
+- Eligible monthly real-user measurements satisfy LCP P75 <= 2.5 seconds, INP
+  P75 <= 200 milliseconds, and CLS P75 <= 0.1.
+- Critical API P95 is at most 500 milliseconds; Feedback creation P95 is at most
+  one second excluding upload; Dashboard request P95 is at most one second.
+- Complete-file-receipt to Attachment processing outcome P95 is at most two
+  seconds.
+- Source-event commit to in-product notification availability P95 is at most
+  five seconds. Source-event commit to email-provider acceptance P95 is at most
+  30 seconds; recipient delivery time is not guaranteed.
+- Supported capacity is the envelope proven by reproducible load testing; no
+  arbitrary untested capacity number is part of this contract.
+- These objectives are internal SLOs and not commercial SLAs.
 
-## 19. Evolvability Contract
+## 20. Evolvability Contract
 
 - Core feedback behavior and source meaning contain no WiseMoney-specific rule.
 - Additional Projects and Workspaces use the same ownership, Reporter,
@@ -376,7 +428,7 @@ do not require an event bus, event sourcing, or any transport technology.
 - Reporter attribution remains independent of the chosen workspace-actor
   authentication mechanism.
 
-## 20. Explicit Non-Guarantees
+## 21. Explicit Non-Guarantees
 
 This contract does not guarantee:
 
@@ -389,5 +441,6 @@ This contract does not guarantee:
 - billing, plans, quotas, custom domains, complex teams, or a marketplace;
 - any framework, database, object store, identity provider, email provider,
   hosting platform, CDN, region, process boundary, or deployment topology;
-- any root `/` behavior beyond not automatically enumerating Projects;
-- attachment, retention, or service-level values that remain explicitly open.
+- project or Workspace discovery from `/`;
+- end-recipient email delivery within the provider-handoff SLO;
+- a commercial SLA or an untested capacity promise.
