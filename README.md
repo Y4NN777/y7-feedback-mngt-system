@@ -3,6 +3,12 @@
 
 > **"Code is a liability. Logic is an asset."**
 
+> [!NOTE]
+> This checkout is the engineering foundation for **Y7 Feedback**. The applied
+> product documents start at [`docs/README.md`](./docs/README.md). The `BASICS/`
+> directory remains the governing methodology and must not be replaced by
+> implementation notes.
+
 This repository is **not a coding tutorial**.  
 It is a **thinking framework** for software engineers. It standardizes the mental process that must occur **before the first line of code is written**.
 
