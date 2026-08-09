@@ -2,108 +2,344 @@
 
 ## 1. Purpose
 
-This document assigns behavior to conceptual responsibilities. It is not a
-component diagram and does not imply deployable services, libraries, or vendors.
-Several responsibilities may initially live in one implementation.
+This document assigns each contract guarantee to one primary conceptual
+responsibility. A responsibility is ownership of a rule or state, not a service,
+class, database, process, or deployment boundary. Several responsibilities may
+initially live in one implementation.
 
-## 2. Core Responsibilities
+## 2. Domain Accountability
+
+| Domain concept | Accountable meaning |
+| --- | --- |
+| Workspace | Owns the customer isolation scope, Projects, Reporters, Themes, workspace actors, and all derived business data. |
+| Project | Owns one feedback target, its canonical and historical slugs, intake state, guidance, type configuration, Context declarations, and Maintainer assignments. |
+| Reporter | Represents the Workspace-scoped source or subject of one or more Feedback items without implying a Y7 Feedback account. |
+| Feedback | Owns one source submission, current treatment state, Context, conversation, Attachments, history, and derived associations inside one Project. |
+| Reporter-visible Message | Owns an attributable conversation contribution visible to the Reporter and authorized workspace actors. |
+| Internal Note | Owns an attributable workspace-only contribution that is never part of Reporter-visible conversation. |
+| Attachment | Owns private evidence and its approved metadata under one Feedback and one audience. |
+| Context snapshot | Owns intentionally supplied situation data together with source, purpose, and trust state. |
+| Lifecycle event | Owns the attributable evidence of one Feedback state transition. |
+| Theme / Feedback relationship | Owns accountable derived classification without owning or rewriting source Feedback. |
+| Notification | Owns one recipient-scoped awareness outcome derived from a domain event. |
+| Deletion record | Owns evidence of request, anonymization, soft deletion, retention, and eventual purge outcome. |
+
+## 3. Actor Responsibilities
+
+### Reporter
+
+- Supplies source Feedback and optional declared identity, Context, and evidence.
+- Protects the confidential accountless Access Proof supplied for a Feedback.
+- Uses authorized access to view, clarify, revise permitted information, and
+  request deletion.
+- Does not decide ownership, trusted identity state, lifecycle state, internal
+  visibility, or Product Intelligence classification.
+
+### Client Application
+
+- Supplies only declared Context and identity assertions that it is authorized to
+  make.
+- Identifies the application or issuer scope of an `external_user_id`.
+- Does not use public fields to grant trust, Workspace ownership, or permissions.
+
+### Workspace Owner
+
+- Owns project creation, configuration, activation, deactivation, and slug
+  changes within the Workspace.
+- Assigns and removes Project Maintainers.
+- Can perform Project Maintainer feedback work throughout the Workspace.
+- Authorizes deletion when policy grants that capability.
+- Has no authority in another Workspace.
+
+### Project Maintainer
+
+- Works only with assigned Projects.
+- Understands Feedback, reviews evidence and Context, communicates with the
+  Reporter, requests clarification, adds Internal Notes, and manages lifecycle.
+- Records resolution, closure, reopening, themes, and Feedback relationships.
+- Uses deletion only when explicitly authorized.
+
+### Platform Operator
+
+- Operates availability, security controls, delivery health, and safe
+  observability for the shared platform.
+- Diagnoses through operational data without ordinary access to Workspace
+  business content.
+- Uses content access only through an authorized, scoped, expiring, auditable
+  exceptional grant.
+
+## 4. System Responsibilities
 
 ### Workspace Ownership Policy
 
-- Defines the root ownership boundary.
-- Verifies that privileged operations stay within an authorized workspace.
-- Prevents project, feedback, and attachment ownership from being reassigned by
-  public input.
+- Defines Workspace as the root business ownership and isolation boundary.
+- Validates that Project, Reporter, Feedback, child data, search, aggregates, and
+  notifications remain inside one Workspace.
+- Prevents public or ordinary update input from reassigning Workspace or Project
+  ownership.
+- Owns cross-workspace isolation guarantees; it does not authenticate actors.
 
 ### Project Registry
 
-- Stores project identity, workspace ownership, public slug, lifecycle state,
-  and approved intake configuration.
-- Resolves a public route to exactly one active project.
-- Rejects unknown, inactive, invalid, or ambiguous routes.
+- Owns Project identity, Workspace ownership, lifecycle, current slug,
+  historical slugs, enabled feedback types, guidance, and declared Context.
+- Enforces global uniqueness across current and historical slugs.
+- Resolves a route to one Project and trusted Workspace scope.
+- Redirects historical slugs to the same Project's canonical route.
+- Stops intake for inactive Projects without deleting history.
+- Does not accept Feedback or authorize a Reporter.
+
+### Reporter Attribution
+
+- Owns Reporter records and identifier evidence inside one Workspace.
+- Preserves identifier kind, application/issuer scope, value, provenance, and
+  trust state.
+- Decides whether attribution evidence is sufficient to link Feedback to an
+  existing Reporter.
+- Prevents unverified contact, untrusted public identifiers, fingerprinting, and
+  cross-workspace matching from creating false continuity.
+- Coordinates controlled linking, correction, merging, and anonymization while
+  preserving attribution history.
+- Does not provide administrative authentication or accountless Feedback access.
+
+### Context Policy
+
+- Defines common and project-declared Context names, types, purposes,
+  sensitivity, optionality, and trust handling.
+- Rejects undeclared, malformed, oversized, executable, or falsely trusted
+  Context.
+- Ensures the Reporter can review submitted Context before acceptance.
+- Preserves each value's source and purpose for later analysis.
 
 ### Public Feedback Experience
 
-- Shows the resolved project before submission.
-- Collects feedback according to the selected feedback type.
-- Discloses requested reporter and diagnostic data before sending.
-- Allows the reporter to review entered content and attachments.
+- Displays resolved Project identity, type choices, guidance, source fields,
+  declared Reporter data, Context, and Attachments.
+- Supports French and English and the required accessibility behavior.
+- Lets the Reporter review and correct safe input before sending.
 - Presents accepted, rejected, and retryable outcomes accurately.
+- Never decides ownership, trusted identity, authorization, or lifecycle state.
+- At `/`, never generates a Project catalog; further root behavior remains open.
 
 ### Feedback Validation
 
-- Applies the resolved project's feedback rules.
-- Rejects incomplete, malformed, oversized, or unsupported input.
-- Treats workspace and project identifiers from public input as untrusted.
-- Produces actionable validation outcomes without exposing internal details.
+- Applies enabled system-type semantics and Project guidance.
+- Validates required source meaning, bounded Context, logical-operation input, and
+  safe field constraints.
+- Treats public Workspace, Project, Reporter trust, status, and storage fields as
+  untrusted.
+- Produces actionable field outcomes without exposing protected internals.
+- Does not claim acceptance or persistence.
 
 ### Feedback Intake Coordination
 
-- Coordinates validation, anti-abuse checks, persistence, and attachment
-  association as one logical submission.
-- Applies idempotency to retries.
-- Issues a confirmation reference only after durable acceptance.
-- Ensures failed intake does not leave orphaned request-owned data.
+- Coordinates Project resolution, attribution, validation, anti-abuse,
+  Attachment results, durable Feedback creation, initial lifecycle state,
+  confirmation reference, and accountless access issuance as one logical intake.
+- Applies idempotency to intake retries.
+- Declares acceptance only after the acceptance invariant holds.
+- Ensures failed intake leaves no durable orphaned request evidence.
+- Does not deliver notifications as part of the acceptance transaction.
 
-### Attachment Coordination
+### Feedback Record Stewardship
 
-- Enforces the approved attachment policy.
-- Associates accepted evidence with exactly one feedback item.
-- Prevents public listing or retrieval.
-- Coordinates cleanup when submission fails.
+- Owns the original source, attributable revisions, current status reference,
+  ordered history, and immutable Workspace/Project ownership of Feedback.
+- Keeps source, Reporter contribution, maintainer interpretation, Internal Notes,
+  Context, and derived Product Intelligence distinguishable.
+- Retrieves Feedback only through already established authorization scope.
+- Does not own Project records, authentication decisions, or classification
+  policy.
 
-### Feedback Repository
+### Reporter Feedback Access
 
-- Persists projects, feedback, attachments, and immutable ownership links.
-- Retrieves data only within an authorized ownership scope.
-- Preserves historical feedback when a project is deactivated.
+- Owns confirmation-reference lookup and confidential Access Proof lifecycle.
+- Separates stable reference from authorization evidence.
+- Limits a Feedback-specific proof to one Feedback.
+- Supports proof validation and revocation without changing Feedback identity.
+- Produces only the Reporter-visible projection and permitted Reporter actions.
+- Never exposes Internal Notes, sibling Feedback, or workspace-only data.
 
-### Access Control
+### Conversation Coordination
 
-- Establishes the trusted identity and permissions of workspace actors.
-- Authorizes project configuration and feedback retrieval.
-- Remains policy-neutral until roles and authentication are approved.
+- Owns reporter-visible Messages and Internal Notes under one Feedback.
+- Enforces author, time, audience, and Project/Workspace scope.
+- Keeps internal and Reporter-visible entries separate.
+- Coordinates information requests and Reporter clarifications with lifecycle
+  behavior.
+- Prevents internal content from entering Reporter views or notifications.
+
+### Feedback Lifecycle
+
+- Owns state meanings and allowed transitions.
+- Creates `received` on acceptance.
+- Requires a visible request for `awaiting_reporter` and a visible conclusion for
+  `resolved`.
+- Returns an awaiting item to `under_review` after Reporter clarification.
+- Allows authorized closure and reasoned reopening.
+- Records previous state, next state, actor, time, and trigger for every change.
+- Keeps treatment state separate from Project state and deletion state.
+
+### Attachment Policy and Coordination
+
+- Owns accepted format, actual-content validation, size, count, security,
+  metadata, audience, retention, deletion, and atomicity rules once approved.
+- Associates accepted evidence with one Feedback and optionally its source entry.
+- Authorizes evidence through Feedback scope and entry audience.
+- Prevents public listing and retrieval.
+- Removes request-owned evidence after failed intake.
+- Does not make a rejected Attachment accepted because its Feedback exists.
+
+### Workspace Access Control
+
+- Establishes the trusted administrative identity and fixed actor responsibility
+  of Workspace Owners and Project Maintainers.
+- Authorizes Owner operations within one Workspace.
+- Applies Maintainer assignments to Project-scoped operations.
+- Ends future Maintainer access after assignment removal without erasing history.
+- Does not define Reporter attribution or choose an identity provider.
+
+### Exceptional Access Control
+
+- Keeps Platform Operator content access absent by default.
+- Creates, validates, revokes, expires, and audits exceptional grants.
+- Enforces purpose, Workspace, content scope, operator, and time limits.
+- Records grants, uses, denied attempts, and revocations.
+- Cannot choose its own grant approver while approval authority remains open.
+
+### Maintainer Feedback Experience
+
+- Presents authorized source, Context, evidence, conversation, Internal Notes,
+  history, classification, and lifecycle actions for assigned Projects.
+- Supports Project-scoped search, filters, themes, relationships, and trends.
+- Keeps Reporter-visible actions explicit from internal actions.
+- Does not expand authorization merely because an identifier is known.
+
+### Notification Coordination
+
+- Converts approved domain events into recipient- and audience-scoped in-product
+  notifications.
+- Requests email only for an eligible, purpose-authorized address.
+- Prevents Internal Notes, Access Proofs, and unnecessary sensitive content from
+  entering Reporter email.
+- Records delivery outcome independently from the accepted domain action.
+- Applies current Project and recipient authorization when notifying workspace
+  actors.
+
+### Product Intelligence
+
+- Owns authorized filters, aggregates, Themes, Feedback relationships, and trend
+  comparison.
+- Uses legitimate Reporter attribution and declared Context without broadening
+  their scope.
+- Preserves author/source and time for derived classification.
+- Excludes soft-deleted Feedback from ordinary results.
+- Prevents derived interpretation from rewriting source Feedback.
+- Delivers MVP value without depending on automated or AI classification.
+
+### Data Lifecycle and Privacy
+
+- Receives deletion requests and applies approved authorization.
+- Coordinates Feedback-specific anonymization and soft deletion.
+- Removes soft-deleted data from ordinary Reporter, maintainer, search,
+  notification, and Product Intelligence views.
+- Preserves only the approved minimal deletion audit.
+- Applies explicit retention and purge outcomes to each data class and backups.
+- Does not interpret an unspecified duration as permission for indefinite
+  retention.
 
 ### Safe Observability
 
-- Records enough operational evidence to diagnose failures and abuse.
-- Excludes secrets and attachment content.
-- Redacts reporter and feedback content by default until logging and retention
-  policy explicitly permits otherwise.
+- Records sufficient operational evidence to diagnose failure, abuse, delivery,
+  and exceptional access.
+- Excludes Access Proofs, privileged credentials, Attachment content, Internal
+  Notes, and unapproved Reporter or Feedback content.
+- Produces safe public errors without cross-scope existence disclosure.
+- Does not become a parallel business-content repository.
 
-## 3. Responsibility Boundaries
+## 5. Invariant Ownership
 
-- The Public Feedback Experience never decides ownership or authorization.
-- The Project Registry resolves ownership but does not accept feedback.
-- Feedback Validation decides input validity but does not claim persistence.
-- Feedback Intake Coordination decides when the overall operation is accepted.
-- The Feedback Repository does not infer authorization from identifiers alone.
-- Attachment Coordination does not make attachments public assets.
-- Access Control does not define reporter identity policy.
+Every invariant has exactly one primary responsibility owner.
 
-## 4. Requirement Mapping
-
-| Requirement area | Primary responsibility | Supporting responsibilities |
+| Invariant | Primary responsibility | Supporting responsibilities |
 | --- | --- | --- |
-| Workspace isolation | Workspace Ownership Policy | Access Control, Feedback Repository |
-| Public slug resolution | Project Registry | Public Feedback Experience |
-| Structured capture | Public Feedback Experience | Feedback Validation |
-| Durable acceptance | Feedback Intake Coordination | Feedback Repository |
-| Attachment lifecycle | Attachment Coordination | Feedback Intake Coordination, Feedback Repository |
-| Project operation | Project Registry | Access Control, Workspace Ownership Policy |
-| Safe failures | Feedback Intake Coordination | Feedback Validation, Safe Observability |
-| Future workspace onboarding | Workspace Ownership Policy | Project Registry, Access Control |
+| INV-OWN-001 | Project Registry | Workspace Ownership Policy |
+| INV-OWN-002 | Reporter Attribution | Workspace Ownership Policy |
+| INV-OWN-003 | Workspace Ownership Policy | Project Registry, Reporter Attribution, Feedback Record Stewardship |
+| INV-OWN-004 | Workspace Ownership Policy | All child-data responsibilities |
+| INV-OWN-005 | Feedback Record Stewardship | Workspace Ownership Policy |
+| INV-OWN-006 | Workspace Ownership Policy | Workspace Access Control, Reporter Attribution, Product Intelligence |
+| INV-ROUTE-001 | Project Registry | Workspace Ownership Policy |
+| INV-REP-001 | Reporter Attribution | Context Policy |
+| INV-ACCESS-001 | Reporter Feedback Access | Safe Observability |
+| INV-SOURCE-001 | Feedback Record Stewardship | Conversation Coordination, Product Intelligence |
+| INV-CTX-001 | Context Policy | Feedback Record Stewardship |
+| INV-ACCEPT-001 | Feedback Intake Coordination | Feedback Record Stewardship, Attachment Policy and Coordination |
+| INV-VIS-001 | Conversation Coordination | Reporter Feedback Access, Notification Coordination |
+| INV-VIS-002 | Conversation Coordination | Workspace Access Control, Notification Coordination |
+| INV-LIFE-001 | Feedback Lifecycle | Feedback Record Stewardship |
+| INV-LIFE-002 | Feedback Lifecycle | Project Registry, Data Lifecycle and Privacy |
+| INV-ATT-001 | Attachment Policy and Coordination | Feedback Record Stewardship |
+| INV-AUTH-001 | Workspace Access Control | Workspace Ownership Policy |
+| INV-AUTH-002 | Workspace Access Control | Project Registry |
+| INV-BREAKGLASS-001 | Exceptional Access Control | Safe Observability |
+| INV-NOTIFY-001 | Notification Coordination | Conversation Coordination, Workspace Access Control |
+| INV-INTEL-001 | Product Intelligence | Feedback Record Stewardship |
+| INV-INTEL-002 | Product Intelligence | Context Policy, Reporter Attribution |
+| INV-DELETE-001 | Data Lifecycle and Privacy | Reporter Attribution, Product Intelligence |
 
-## 5. Deferred Allocation Decisions
+## 6. Requirement-to-Responsibility Coverage
 
-The following are intentionally not assigned to technical components yet:
+| Requirement area | Primary responsibility or responsibilities |
+| --- | --- |
+| FR-OWN-* | Workspace Ownership Policy, Project Registry, Reporter Attribution |
+| FR-PROJ-* | Project Registry; Public Feedback Experience for presentation |
+| FR-REP-* | Reporter Attribution |
+| FR-FDB-* | Feedback Validation, Feedback Intake Coordination, Feedback Record Stewardship |
+| FR-CTX-* | Context Policy |
+| FR-ACC-* | Reporter Feedback Access |
+| FR-CONV-* | Conversation Coordination |
+| FR-LIFE-* | Feedback Lifecycle |
+| FR-ATT-* | Attachment Policy and Coordination |
+| FR-OPS-* | Workspace Access Control, Project Registry, Maintainer Feedback Experience, Exceptional Access Control |
+| FR-NOT-* | Notification Coordination |
+| FR-INT-* | Product Intelligence |
+| FR-PRIV-* | Data Lifecycle and Privacy |
+| NFR-SEC-* | Workspace Ownership Policy, Workspace Access Control, Safe Observability |
+| NFR-CON-* | Feedback Intake Coordination, Feedback Record Stewardship |
+| NFR-UX-* | Public Feedback Experience, Maintainer Feedback Experience, Notification Coordination |
+| NFR-EVO-* | Workspace Ownership Policy and the relevant domain responsibility |
 
-- frontend framework and rendering model;
-- API shape and process boundaries;
-- persistence and object-storage products;
-- identity and anti-abuse providers;
-- hosting, regions, CDN, and deployment topology;
-- whether management operations initially use a dedicated interface.
+## 7. Explicit Boundaries
 
-Those choices follow approved requirements and quality targets; they do not
-define the domain.
+- Project Registry owns Project records; Feedback Record Stewardship does not.
+- Reporter Attribution establishes subject continuity; Reporter Feedback Access
+  establishes permission to one Feedback.
+- Workspace Access Control authenticates and authorizes administrative actors;
+  it does not define Reporter identity.
+- Feedback Validation determines admissibility; Feedback Intake Coordination
+  alone declares overall acceptance.
+- Conversation Coordination owns audience; Notification Coordination cannot
+  broaden it.
+- Product Intelligence owns interpretations; Feedback Record Stewardship owns
+  source truth.
+- Data Lifecycle and Privacy decides deletion visibility and retention outcomes;
+  lifecycle `closed` does not.
+- Safe Observability stores operational evidence, not an unrestricted copy of
+  business content.
+
+## 8. Deferred Allocation Decisions
+
+These responsibility definitions do not decide:
+
+- frontend framework, rendering model, or application count;
+- API protocol or process boundaries;
+- database, search, object storage, queue, or email products;
+- workspace-actor authentication provider or Reporter proof technology;
+- anti-abuse provider or algorithm;
+- hosting, region, CDN, or deployment topology;
+- whether responsibilities become modules, processes, or services;
+- exact root `/` interface beyond the no-catalog guarantee.
+
+The open Attachment, retention, exceptional-access approval, anti-abuse, and
+service-level parameters must be supplied before architecture is compared.
