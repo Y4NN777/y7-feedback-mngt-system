@@ -18,6 +18,7 @@ flowchart LR
     Owner[Workspace Owner]
     Maintainer[Project Maintainer]
     Operator[Platform Operator]
+    PlatformOwner[Platform Owner / Super Administrator]
     Email[Email Delivery Environment]
     System[Y7 Feedback]
 
@@ -27,6 +28,7 @@ flowchart LR
     Owner -->|manage projects, assignments, and feedback| System
     Maintainer -->|understand, respond, classify, resolve, reopen| System
     Operator -->|operate; request exceptional access| System
+    PlatformOwner -->|approve exceptional access; review break-glass| System
     System -->|purpose-limited email request| Email
     Email -->|delivery outcome| System
 ```
@@ -50,6 +52,10 @@ interaction; public fields do not establish trust.
 | UC-09 | Reporter / workspace actor | Receive scoped in-product and eligible email notifications. |
 | UC-10 | Workspace actor | Filter, relate, theme, and compare Feedback for Product Intelligence. |
 | UC-11 | Platform Operator | Operate without standing business-content access and use an audited exceptional grant when authorized. |
+
+The root `/` orients a context-free visitor toward a project-provided direct
+link, accountless retrieval, or Workspace management. It contains no Project or
+Workspace discovery model.
 
 Public publication, community voting, arbitrary chat, commercial SaaS behavior,
 and autonomous AI decisions are not use cases in this model.
@@ -80,9 +86,9 @@ flowchart TD
     Notify --> Confirm[Show accepted outcome]
 ```
 
-The unresolved Attachment atomicity policy controls whether the reporter must
-correct rejected evidence before `Accept` or can explicitly continue without it.
-The diagram does not choose that policy.
+If any submitted Attachment fails format, actual-content, size, count, or
+security validation, the reporter must correct the submission before `Accept`.
+No Feedback or sibling Attachment from that logical submission is accepted.
 
 ## 5. Feedback Intake Sequence
 
@@ -112,7 +118,7 @@ sequenceDiagram
     P->>RA: Resolve workspace-scoped reporter attribution
     RA-->>P: Reporter and attribution trust result
     P->>A: Validate and stage permitted evidence
-    A-->>P: Evidence policy result
+    A-->>P: All evidence valid, private, <= 10 MB each, <= 5 files
     P->>I: Accept one logical submission
     I->>F: Preserve source, ownership, and received event
     F-->>I: Durable feedback result
@@ -124,7 +130,9 @@ sequenceDiagram
 ```
 
 Participants express responsibility ownership only. They may be implemented
-together.
+together. If staging, validation, or durable commit fails, Intake Coordination
+returns no accepted Feedback and Attachment Coordination removes request-owned
+staged evidence.
 
 ## 6. Accountless Retrieval Activity
 
@@ -223,12 +231,47 @@ Deletion is an orthogonal record state:
 ```mermaid
 stateDiagram-v2
     active_record --> deletion_requested: authorized reporter or workspace action
-    deletion_requested --> soft_deleted: approved anonymization and soft deletion
-    soft_deleted --> purged: retention policy reaches irreversible purge
+    deletion_requested --> soft_deleted: immediate soft delete and required anonymization
+    soft_deleted --> active_record: Workspace Owner restores before purge
+    soft_deleted --> purged: 30 days elapsed; definitive purge
 ```
 
-The presence of `purged` does not set its timing; `OPEN-RET-001` must provide the
-policy and backup-expiry behavior.
+Restoration is authorized and audited, and cannot reconstruct identity removed
+by immediate anonymization. Attachments move with the owning Feedback. `purged`
+has no business transition back to an active record. Daily backups expire after
+30 days; disaster recovery reapplies deletion and purge evidence before ordinary
+access resumes.
+
+```mermaid
+flowchart LR
+    Commit[Committed business state] -->|at least daily| Backup[Recoverable backup]
+    Backup -->|retain 30 days| Expire[Backup expiry]
+    Backup -->|disaster recovery| Restore[Isolated restore]
+    Restore --> Replay[Reapply soft-delete and purge evidence]
+    Replay --> Verify{RPO <= 24 h and RTO <= 4 h?}
+    Verify -- Yes --> Resume[Resume ordinary access]
+    Verify -- No --> Incident[Keep recovery incident active]
+```
+
+Exceptional access has a separate authority lifecycle:
+
+```mermaid
+stateDiagram-v2
+    [*] --> requested: operator supplies justification and minimum scope
+    requested --> denied: Platform Owner rejects
+    requested --> active: distinct Platform Owner approves <= 1 hour
+    active --> revoked: approver revokes
+    active --> expired: time limit reached
+    active --> review_required: critical break-glass use ends
+    review_required --> reviewed: post-incident review recorded
+    denied --> [*]
+    revoked --> [*]
+    expired --> [*]
+    reviewed --> [*]
+```
+
+Continued access starts a new `requested` instance. The requesting operator
+cannot approve itself or mutate its own access audit.
 
 ## 9. Reporter Attribution Model
 
@@ -289,6 +332,7 @@ erDiagram
     FEEDBACK ||--o{ DELETION_RECORD : governs
 
     PLATFORM_OPERATOR ||--o{ EXCEPTIONAL_ACCESS_GRANT : receives
+    PLATFORM_OWNER ||--o{ EXCEPTIONAL_ACCESS_GRANT : approves
 
     WORKSPACE {
         identifier id
@@ -343,6 +387,8 @@ erDiagram
         identifier id
         attachment_metadata approved_metadata
         audience inherited_audience
+        validation_state staged_accepted_or_rejected
+        deletion_state follows_feedback
     }
     LIFECYCLE_EVENT {
         lifecycle_state previous_state
@@ -384,11 +430,15 @@ erDiagram
     PLATFORM_OPERATOR {
         identifier id
     }
+    PLATFORM_OWNER {
+        identifier id
+    }
     EXCEPTIONAL_ACCESS_GRANT {
         identifier workspace_id
-        access_scope content_scope
-        grant_window start_and_expiry
-        audit authorizer_purpose_state
+        access_scope resource_and_action
+        grant_window start_and_expiry_max_one_hour
+        audit approver_justification_state
+        incident_scope normal_or_critical_break_glass
     }
 ```
 
@@ -404,7 +454,11 @@ In particular:
 - Reporter-visible Message and Internal Note are separate concepts because audience is
   an invariant, not a presentation toggle;
 - Access Grant is distinct from Reporter Identifier and confirmation reference;
+- an Attachment has a staging state only to support logical acceptance and is
+  not domain-visible until the complete submission commits;
 - Theme, association, and relationship are derived records with provenance;
+- a Platform Owner approval is distinct from the requesting Platform Operator,
+  and a continued access window is a new grant rather than a mutation of expiry;
 - application, page, screen, feature, version, device, and environment remain
   Context values until an independently justified lifecycle requires new domain
   entities.
@@ -417,23 +471,16 @@ In particular:
 | Reporter | Workspace scope; identifier provenance history | Identifiers, trust, linkage, correction, anonymization through controlled actions |
 | Feedback | Workspace/Project ownership, original source, acceptance time | Reporter attribution through controlled history, current lifecycle state, soft-delete state |
 | Message / Internal Note | Feedback, author, audience, creation time | No silent audience conversion; corrections are attributable additions |
-| Attachment | Feedback ownership and accepted-policy evidence | Approved retention and deletion state |
+| Attachment | Feedback ownership, actual-content validation evidence, accepted audience | Staging before acceptance; afterward visibility, restoration, and purge follow Feedback |
 | Lifecycle event | Previous/next state, actor, time, reason/trigger | Append only |
 | Theme / relationship | Workspace scope, provenance | Accountable correction or removal without source mutation |
 | Access Grant | Feedback scope | Active, revoked, or expired |
-| Exceptional access grant | Operator, authorizer, purpose, Workspace, time bounds | Revocation before expiry |
+| Exceptional access grant | Operator, distinct approver, justification, Workspace/resource/action scope, start and <=1-hour expiry | Revocation before expiry; audit is append-only and extension creates a new grant |
 
-## 12. Deferred Architecture Views
+## 12. Architecture Handoff
 
-Container, component, deployment, and data-store views remain intentionally
-absent. They become meaningful only after the remaining requirements provide:
-
-1. Attachment formats, limits, validation, metadata, atomicity, and retention.
-2. Retention, irreversible purge, restoration, and backup-expiry policies.
-3. Exceptional Platform Operator access approval authority.
-4. Quantitative anti-abuse, availability, latency, capacity, viewport, and
-   notification-delivery targets.
-5. A decision on the exact root `/` experience if it is to drive architecture.
-
-At that point, architecture options can be compared against this behavior and
-contract without changing the domain meaning.
+All previously blocking product parameters are represented in these behavioral
+and conceptual models. Container, component, deployment, persistence, offline
+synchronization, and observability views now follow in `07_ARCHITECTURE.md`.
+Those views allocate this model to the validated technical stack; they do not
+change its domain identities, ownership, lifecycle, or invariants.
