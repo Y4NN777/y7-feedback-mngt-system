@@ -183,6 +183,16 @@ describe("Appwrite transactional intake adapter", () => {
     expect(tables.transactionUpdates).toEqual([
       { transactionId: "transaction-1", commit: true },
     ]);
+    expect(tables.createdRows[1]?.data).toMatchObject({
+      currentSourceJson: JSON.stringify(acceptance().feedback.originalSource),
+      reporterHistoryJson: "[]",
+      reporterMessagesJson: "[]",
+      reporterAttachmentsJson: "[]",
+      sourceRevisionsJson: "[]",
+      deletionRequestsJson: "[]",
+      internalNotesJson: "[]",
+      workspaceClassification: null,
+    });
     expect(JSON.stringify(tables.createdRows)).not.toContain('"accessProof"');
   });
 
