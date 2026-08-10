@@ -1,6 +1,13 @@
+import { randomUUID } from "node:crypto";
+
+import { serializeOperationalEvent } from "./observability";
+import type { PublicApi } from "./public-api";
+
 export interface FunctionRequest {
   readonly method: string;
   readonly path: string;
+  readonly headers?: Readonly<Record<string, string | undefined>>;
+  readonly bodyJson?: unknown;
 }
 
 export interface FunctionResponse {
@@ -22,6 +29,7 @@ export interface HttpDependencies {
   readonly createCorrelationId: () => string;
   readonly environment: "development" | "preview" | "production";
   readonly now: () => number;
+  readonly publicApi?: PublicApi;
   readonly release: string;
   readonly startedAt: () => number;
 }
@@ -34,10 +42,10 @@ const defaultDependencies: HttpDependencies = {
   startedAt: Date.now,
 };
 
-export function routeRequest(
+export async function routeRequest(
   { req, res, log }: FunctionContext,
   dependencies: HttpDependencies = defaultDependencies,
-): unknown {
+): Promise<unknown> {
   const startedAt = dependencies.startedAt();
   const correlationId = dependencies.createCorrelationId();
   const headers = {
@@ -46,15 +54,31 @@ export function routeRequest(
   } as const;
 
   const isHealth = req.method === "GET" && req.path === "/health";
-  const statusCode = isHealth ? 200 : 404;
+  const publicResponse = isHealth
+    ? null
+    : await dependencies.publicApi?.handle({
+        method: req.method,
+        path: req.path,
+        headers: req.headers ?? {},
+        body: req.bodyJson,
+      });
+  const statusCode = isHealth ? 200 : (publicResponse?.statusCode ?? 404);
+  const operation = isHealth ? "health" : publicResponse ? "public_api" : "unknown";
+  const outcome = isHealth
+    ? "success"
+    : publicResponse
+      ? statusCode < 400
+        ? "success"
+        : "rejected"
+      : "not_found";
   log(
     serializeOperationalEvent({
       event: "api.request.completed",
       correlationId,
       environment: dependencies.environment,
       release: dependencies.release,
-      operation: isHealth ? "health" : "unknown",
-      outcome: isHealth ? "success" : "not_found",
+      operation,
+      outcome,
       statusCode,
       durationMs: Math.max(0, dependencies.now() - startedAt),
     }),
@@ -64,8 +88,9 @@ export function routeRequest(
     return res.json({ status: "ok" }, statusCode, headers);
   }
 
+  if (publicResponse) {
+    return res.json(publicResponse.body, publicResponse.statusCode, headers);
+  }
+
   return res.json({ error: "not_found" }, statusCode, headers);
 }
-import { randomUUID } from "node:crypto";
-
-import { serializeOperationalEvent } from "./observability";
