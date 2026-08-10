@@ -1,60 +1,50 @@
 # Y7 Feedback
 
-Y7 Feedback is an independent feedback-management platform that connects
-Reporters, product context, Maintainers, treatment history, and Product
-Intelligence in one continuous improvement loop.
+Y7 Feedback gives product teams one place to collect, understand, discuss, and
+act on user feedback.
 
-The public platform is intended for `feedback.y7labs.studio`. Each active
-Project has a direct public route such as `/wisemoney`, while Workspace business
-data remains strictly isolated.
+Each Project has a public feedback route, such as
+`feedback.y7labs.studio/wisemoney`. Reporters can submit feedback, attach
+evidence, receive a reference, return without creating an account, follow the
+status, answer Maintainer questions, and request deletion.
 
-## Current Status
+## Capabilities
 
-Product requirements, contracts, responsibilities, domain models, architecture,
-and the delivery sprint are defined. Application implementation has not yet
-been committed to this repository.
+- structured Bug, Suggestion, and Review submissions;
+- optional Reporter identity and product Context;
+- private Attachments;
+- accountless Feedback retrieval;
+- Reporter-visible conversations and separate Internal Notes;
+- treatment lifecycle, resolution, closure, and reopening;
+- in-product and email notifications;
+- themes, relationships, trends, and Product Intelligence;
+- strict Workspace and Project isolation;
+- French and English experiences;
+- offline-aware PWA behavior.
 
-The complete source of truth starts at the
-[documentation index](./docs/README.md).
-
-## Validated Stack
+## Technology
 
 - React and TypeScript;
 - Vite;
 - TanStack Query;
 - IndexedDB;
-- installable, connectivity-aware PWA;
-- Vercel for PWA delivery;
-- Appwrite as the authoritative backend.
+- Vercel;
+- Appwrite.
 
-## Domain Spine
+## Domain Model
 
 ```text
 Workspace 1 --- * Project 1 --- * Feedback 1 --- 0..* Attachment
 ```
 
-Reporter attribution is distinct from authentication. Feedback is a living
-object with source content, Context, conversation, Internal Notes, lifecycle,
-history, Attachments, notifications, and accountable derived analysis.
+A Reporter belongs to a Workspace and remains distinct from an authentication
+account. Feedback owns its source, Context, conversation, lifecycle, history,
+Attachments, notifications, and derived analysis.
 
 ## Documentation
 
-Read the documents in their declared dependency order:
-
-```text
-Intent
-  -> Requirements
-  -> Contract
-  -> Responsibilities
-  -> Modeling
-  -> Architecture
-  -> Delivery Plan
-```
-
 - [Documentation index](./docs/README.md)
+- [Product requirements](./docs/01_PRD.md)
+- [System requirements](./docs/02_SRS.md)
 - [Architecture](./docs/07_ARCHITECTURE.md)
 - [Architecture decisions](./docs/08_ARCHITECTURE_DECISIONS.md)
-- [One-week delivery sprint](./docs/09_ONE_WEEK_SPRINT_PLAN.md)
-
-Downstream implementation must satisfy the documented requirements and must not
-silently redefine product or security guarantees.
