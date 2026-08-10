@@ -27,6 +27,8 @@ The architecture must preserve these properties simultaneously:
 - immediate anonymization when required, immediate soft deletion, 30-day purge,
   and safe pre-purge restoration;
 - durable in-product and email notification outcomes;
+- optional Project-scoped GitHub and GitLab.com connections with consent-aware,
+  bidirectional issue and visible-conversation synchronization;
 - independently approved, narrowly scoped exceptional access;
 - quantitative anti-abuse, recovery, accessibility, and internal SLOs.
 
@@ -50,6 +52,8 @@ flowchart LR
     Mail[Email Provider]
     Backup[Encrypted Backup Repository]
     Observe[Operational Telemetry]
+    GitHub[GitHub]
+    GitLab[GitLab.com]
 
     Reporter -->|submit, retrieve, clarify, delete request| Y7
     Client -->|declared context and scoped identity assertion| Y7
@@ -62,10 +66,16 @@ flowchart LR
     Y7 -->|daily protected backup| Backup
     Backup -->|isolated disaster restore| Y7
     Y7 -->|redacted logs, metrics, traces| Observe
+    Y7 -->|selected repository metadata and issue operations| GitHub
+    GitHub -->|installation, issue, and comment webhooks| Y7
+    Y7 -->|selected project metadata and issue operations| GitLab
+    GitLab -->|signed issue and comment webhooks| Y7
 ```
 
 The email, backup, and telemetry boxes are logical external capabilities. Their
-vendors are implementation selections, not additional product actors.
+vendors are implementation selections, not additional product actors. GitHub
+and GitLab.com are validated integration boundaries; neither owns Y7 Project,
+Feedback, Reporter, consent, or lifecycle authority.
 
 ## 4. Logical Application Boundaries
 
@@ -94,6 +104,7 @@ flowchart TB
         API[Trusted API Functions]
         Worker[Async and event Functions]
         Scheduler[Scheduled maintenance Functions]
+        Providers[Git provider adapters and webhook ingress]
         DB[TablesDB - server source of truth]
         Storage[Private Storage - staging and accepted evidence]
         Realtime[Realtime invalidation channel]
@@ -105,12 +116,16 @@ flowchart TB
         Worker --> Storage
         Scheduler --> DB
         Scheduler --> Storage
+        API --> Providers
+        Worker --> Providers
         DB --> Realtime
     end
 
     Mail[Email Provider]
     Backup[Backup Repository]
     Telemetry[Telemetry Sink]
+    GitHub[GitHub API / App webhooks]
+    GitLab[GitLab.com API / signed webhooks]
 
     Static --> SW
     Route --> UI
@@ -123,6 +138,8 @@ flowchart TB
     API --> Telemetry
     Worker --> Telemetry
     Scheduler --> Telemetry
+    Providers <--> GitHub
+    Providers <--> GitLab
 ```
 
 ### 4.1 One modular backend, three execution modes
@@ -134,6 +151,11 @@ Appwrite Functions in three modes:
 - asynchronous event/outbox handling for notifications and non-blocking work;
 - scheduled maintenance for purge, staged-file cleanup, reconciliation, backup,
   and recovery verification.
+
+Provider callbacks enter the synchronous trusted boundary only for
+authentication, normalization, deduplication, and durable inbox recording.
+Business effects and outbound provider calls execute through the asynchronous
+worker; scheduled reconciliation repairs recoverable divergence.
 
 These are execution modes, not independently owned microservices. Domain rules,
 authorization, identifiers, and observability conventions remain shared.
@@ -247,8 +269,9 @@ approve access; operators hold no standing data API key.
 TablesDB is the authoritative store for the conceptual records in
 `05_MODELING.md`. It also holds supporting consistency records: idempotency
 results, notification outbox entries, staged-upload manifests, transient
-rate-limit counters, purge evidence, and recovery checkpoints. These support the
-contract but are not new product concepts.
+rate-limit counters, provider inbox/outbox entries, synchronization cursors,
+purge evidence, and recovery checkpoints. These support the contract but are not
+new product concepts.
 
 Appwrite Transactions commit changes that must be atomically visible, such as a
 Feedback, initial lifecycle event, reference verifier, Attachment associations,
@@ -442,7 +465,8 @@ This enforces:
 
 - `awaiting_reporter` only with a visible information request;
 - Reporter clarification returning `awaiting_reporter` to `under_review`;
-- `resolved` only with a visible substantive conclusion;
+- `resolved` only with a visible substantive conclusion or a verified external
+  treatment conclusion under `FR-SYNC-003..004`;
 - reasoned reopening of `resolved` or `closed` to `under_review`;
 - treatment, Project-active, and deletion states remaining orthogonal;
 - original source and every prior transition remaining attributable.
@@ -450,6 +474,10 @@ This enforces:
 Append-only conversation commands are idempotent by logical operation ID.
 Conflicting state changes return a conflict outcome, refresh the server state,
 and require an informed retry; they never use last-write-wins.
+
+Provider-driven lifecycle commands use the same transaction and version checks.
+They retain the external event identity, actor, reason, and time and cannot
+bypass the ordinary lifecycle history or notification path.
 
 ## 11. Notifications
 
@@ -491,7 +519,123 @@ one-second Dashboard P95; every aggregate retains a refresh time and can be
 rebuilt from source. No external search engine or AI pipeline is needed for MVP
 compliance.
 
-## 13. Anti-Abuse
+## 13. GitHub and GitLab.com Integration
+
+### 13.1 Connection and authorization
+
+GitHub uses a GitHub App rather than a user-wide OAuth application. The App
+requests Metadata read, Contents read only because private release metadata is
+covered by that permission, Issues read/write, and only the installation,
+repository-selection, issue, and issue-comment webhook events required by the
+contract. The adapter allow-lists release/metadata endpoints and never requests
+file, blob, tree, archive, or Git content. It requests no repository-content
+write permission. Installation access tokens are generated server-side,
+short-lived, and limited to repositories selected during installation.
+
+GitLab.com uses an OAuth application because issue creation, comments, state
+changes, project discovery, and webhook management act for an authorizing user.
+The required API grant is stored only by the backend; Y7 additionally enforces a
+Workspace-owned allow-list of explicitly selected GitLab project IDs. Refresh,
+revocation, disconnect, and provider-denial outcomes update Source Connection
+state and stop use of an invalid grant.
+
+OAuth `state`, callback identity, redirect targets, installation ownership, and
+Project/Workspace scope are verified by a trusted Function. Provider tokens and
+webhook signing material are encrypted using a separate Function secret and are
+never returned to the PWA, IndexedDB, logs, or telemetry. The selected secret
+facility and rotation runbook are production selections, not domain choices.
+
+A Workspace Owner manages connections. Assigned Maintainers receive only
+Project-scoped commands that use an already active connection; they never
+receive or expand the provider grant. Imported repository and release records
+retain immutable provider IDs and provenance. The generated badge is a plain
+Project-route snippet; Y7 performs no source commit or automatic README edit.
+
+### 13.2 Issue and conversation synchronization
+
+```mermaid
+sequenceDiagram
+    actor M as Project Maintainer
+    actor R as Reporter
+    participant API as Trusted API Function
+    participant DB as TablesDB
+    participant W as Provider Sync Worker
+    participant G as GitHub / GitLab.com
+
+    M->>API: Link Feedback to selected repository
+    API->>DB: Commit pending link + outbound operation
+    W->>DB: Lease operation
+    W->>G: Create issue with permitted payload
+    G-->>W: Provider issue identity
+    W->>DB: Activate link and record outcome
+    G->>API: Signed issue/comment event
+    API->>DB: Deduplicate and persist normalized inbox fact
+    W->>G: Verify repository and author write authority
+    alt authorized and consent permits content
+        W->>DB: Commit message/revision or mapped lifecycle event
+        DB-->>R: Visible history on next authorized refresh
+    else prohibited or unverifiable
+        W->>DB: Record ignored/quarantined outcome
+    end
+```
+
+One Feedback has at most one active External Issue Link. A stable logical
+operation ID, provider event ID, provider issue ID, direction, and origin marker
+prevent duplicate effects and outbound/inbound echo loops. The worker uses a
+durable outbox for Y7-to-provider actions and a durable inbox for provider
+events. It retries transient failure with provider `Retry-After` guidance and
+uses a scheduled cursor-based reconciliation to compare active links after
+missed, delayed, or reordered events.
+
+Y7-managed labels represent `received`, `under_review`, and
+`awaiting_reporter`. `resolved` closes a GitHub issue as `completed` and closes a
+GitLab issue; `closed` uses GitHub `not_planned` and a Y7 label on GitLab.
+GitHub `completed`, `not_planned`, and `duplicate`, GitLab closure, and either
+provider's reopening apply the exact inbound mappings in `FR-SYNC-003`.
+Provider-driven transitions commit through the ordinary lifecycle transaction
+and add a visible external-treatment statement.
+
+Visible messages synchronize as provider comments. An inbound comment is
+accepted only after a fresh or bounded-cache provider permission check proves
+that the author has repository write authority; inability to verify fails
+closed. Provider edits append a revision and deletion appends a tombstone. Y7
+source and prior conversation are never overwritten.
+
+### 13.3 Public visibility and data minimization
+
+Repository visibility is refreshed before first content publication. For a
+public repository, the Reporter must grant active, versioned consent for that
+Feedback and external issue. Until then the external issue contains only a
+non-secret confirmation reference, a protected workspace-management link, type,
+and non-sensitive treatment metadata. It never contains an accountless Access
+Proof.
+
+Consent permits future Reporter-visible content for that issue. Revocation
+blocks new Reporter content immediately and queues best-effort deletion or
+redaction of Y7-controlled issue body/comment content. The UI states that
+provider history, caches, notifications, quotations, and copies already made
+public cannot be guaranteed erased.
+
+Automatic provider payload builders use an explicit allow-list. Reporter
+identifiers/contact, Access Proofs, Internal Notes, Attachment bytes or access
+URLs, unrelated Context, credentials, and raw provider grants have no serializing
+path. Private repository visibility does not relax Internal Note or protected
+payload exclusions.
+
+### 13.4 Offline and failure behavior
+
+Connection, consent, issue-link, and provider-originated operations require an
+online trusted boundary. The PWA may queue a maintainer's requested link or
+visible response as a local intent, but it displays `pending` until Appwrite
+commits it and never claims provider acceptance from IndexedDB state.
+
+Provider outage never rolls back an accepted Y7 Message or lifecycle action.
+The workspace UI exposes `pending`, `synchronized`, `failed`, or `suspended`
+outcomes with retry guidance. Disconnect, token revocation, repository removal,
+or Feedback deletion disables active workers for the link; later webhook events
+cannot mutate business state.
+
+## 14. Anti-Abuse
 
 Application limits run at the trusted public boundary because Appwrite's own
 route-specific limits do not express every validated dimension and server SDK
@@ -517,7 +661,7 @@ and reveals no protected existence. Offline replay obeys the same gate. CAPTCHA
 is not on the required path; adding adaptive challenges later would require a
 separate product/security decision.
 
-## 14. Platform Operator and Break-Glass
+## 15. Platform Operator and Break-Glass
 
 Ordinary Platform Operator access is limited to redacted operational telemetry,
 health, deployment, queue, and recovery state. Operators do not hold standing
@@ -552,9 +696,9 @@ an explicit critical-incident flag, the same justification/scope/audit path, and
 cannot close until a Platform Owner records post-incident review. Audit writes
 fail closed for content access: an action that cannot be audited is denied.
 
-## 15. Deletion, Retention, Backup, and Recovery
+## 16. Deletion, Retention, Backup, and Recovery
 
-### 15.1 Business deletion
+### 16.1 Business deletion
 
 The authorized delete operation uses a TablesDB transaction to:
 
@@ -575,7 +719,7 @@ objects whose deletion time is at least 30 days old. It writes a minimal purge
 checkpoint and makes no business restoration path available. Idempotent retries
 and a reconciliation scan handle partial Storage/database deletion failures.
 
-### 15.2 Backup and disaster recovery
+### 16.2 Backup and disaster recovery
 
 At least daily, a controlled backup job captures TablesDB, private Storage, and
 critical Appwrite configuration into an encrypted, access-controlled repository
@@ -592,7 +736,7 @@ Recovery is exercised at least quarterly and after material persistence changes;
 the exercise cadence is an architecture control used to make the RPO/RTO
 testable, not a commercial promise.
 
-## 16. Observability and SLO Control
+## 17. Observability and SLO Control
 
 All request and asynchronous paths carry a correlation ID and structured event
 names. Telemetry is redacted before export and excludes Access Proofs,
@@ -623,7 +767,7 @@ throughput/concurrency envelope within which the latency SLOs hold. Capacity is
 increased only from evidence: query/index tuning first, then Function concurrency
 and Appwrite plan resources, and only then a justified boundary split.
 
-## 17. Security and Privacy Posture
+## 18. Security and Privacy Posture
 
 - TLS protects every browser, provider, backup, and telemetry connection.
 - Secrets live in Appwrite Function secret variables or the selected secret
@@ -638,8 +782,15 @@ and Appwrite plan resources, and only then a justified boundary split.
   necessary and respect their own retention policy.
 - Privileged grants, recovery access, and backup credentials are separated by
   least privilege and independently auditable.
+- GitHub webhook signatures and GitLab signed-webhook material are verified over
+  the raw request with freshness and replay checks before durable inbox
+  acceptance; OAuth callbacks bind state to the initiating Owner, Workspace, and
+  Project.
+- Provider payload logging records opaque connection, operation, issue, and
+  outcome identifiers only; message bodies, tokens, and webhook secrets are
+  excluded.
 
-## 18. Requirement-to-Architecture Allocation
+## 19. Requirement-to-Architecture Allocation
 
 | Requirement area | Primary architectural realization |
 | --- | --- |
@@ -650,12 +801,13 @@ and Appwrite plan resources, and only then a justified boundary split.
 | FR-OPS | Appwrite Auth, domain role/assignment records, scoped Functions, exceptional-grant control plane |
 | FR-NOT | Transactional in-product records and outbox, Realtime/refetch, reporter polling, email adapter |
 | FR-INT | Scoped indexed TablesDB queries and rebuildable aggregates only when evidenced |
+| FR-SRC, FR-SYNC | GitHub App and GitLab.com OAuth adapters, server-side encrypted grants, selected-repository registry, provider inbox/outbox, consent gate, author verification, state mapper, reconciliation worker |
 | FR-PRIV, NFR-REC | Transactional soft delete/anonymization, hourly purge, daily full backup, isolated restore and deletion replay |
 | NFR-SEC | Trusted boundary, short-lived HMAC counters, least privilege, safe errors/logs |
 | NFR-UX | Responsive bilingual React shells, PWA draft continuity, accessibility tests |
 | NFR-SLO | RUM, server histograms, synthetic probes, outbox timing, recovery/load exercises |
 
-## 19. Architectural Fitness Tests
+## 20. Architectural Fitness Tests
 
 Before implementation is considered releasable, evidence must show:
 
@@ -674,8 +826,23 @@ Before implementation is considered releasable, evidence must show:
     notification objectives under the declared capacity envelope;
 12. an Appwrite Cloud upload path capable of the validated 10 MB file plus
     protocol overhead without opening Storage publicly.
+13. cross-Workspace and unselected-repository denial for connection discovery,
+    callbacks, issue operations, webhooks, and reconciliation;
+14. duplicate, delayed, reordered, replayed, and looped provider events
+    converging to one issue, Message, revision, and lifecycle effect;
+15. every GitHub/GitLab state mapping in both directions, including GitHub
+    `completed`, `not_planned`, `duplicate`, and both-provider reopening;
+16. outsider and unverifiable provider comments never entering Reporter-visible
+    conversation, while a verified write collaborator does;
+17. public-repository synchronization publishing no Reporter content before
+    consent and no future content after revocation;
+18. provider payload and log scans containing no Internal Note, Reporter
+    identifier/contact, Access Proof, Attachment content/URL, credential, or
+    unrelated Context;
+19. outage, rate limit, token revocation, repository removal, disconnect, and
+    reconciliation preserving Y7 history without duplicate external effects.
 
-## 20. Remaining Decisions
+## 21. Remaining Decisions
 
 No remaining product decision blocks this logical architecture. The following
 selections are intentionally deferred to implementation or production readiness
@@ -697,11 +864,18 @@ because they do not alter the validated behavior:
 - confirmation of the Function-mediated upload transport by the 10 MB Appwrite
   Cloud fitness test; a failed test makes the replacement transport an explicit
   blocking ADR.
+- production GitHub App ownership, callback/webhook URLs, and credential
+  rotation runbook within the accepted permissions;
+- production GitLab.com OAuth application ownership, callback URL, token
+  rotation, and selected-project webhook registration runbook;
+- bounded cache duration for provider collaborator-write checks and the exact
+  reconciliation cadence, subject to fail-closed authorization and recovery
+  fitness tests.
 
 The upload fitness test and governance retention policy are production gates,
 not reasons to reopen the domain model or select another backend prematurely.
 
-## 21. Technical Evidence
+## 22. Technical Evidence
 
 The design relies on current official capabilities and constraints:
 
@@ -734,3 +908,11 @@ The design relies on current official capabilities and constraints:
   Vite delivery and SPA deep-link rewrites, and
   [Vercel cache controls](https://vercel.com/docs/caching/cache-control-headers)
   for immutable hashed assets and revalidated entry resources.
+- [GitHub App permissions](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/choosing-permissions-for-a-github-app)
+  and [GitHub issue state reasons](https://docs.github.com/en/rest/issues/issues)
+  for repository selection, least privilege, comments, and lifecycle mapping;
+- [GitLab OAuth scopes](https://docs.gitlab.com/integration/oauth_provider/),
+  [Issues API](https://docs.gitlab.com/api/issues/), and
+  [signed webhooks](https://docs.gitlab.com/user/project/integrations/webhooks/)
+  for GitLab.com authorization, issue operations, event authentication, replay
+  defense, and idempotency.
