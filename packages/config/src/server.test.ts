@@ -18,6 +18,9 @@ const validServer = {
   APPWRITE_NOTIFICATIONS_TABLE_ID: "notifications",
   APPWRITE_OUTBOX_TABLE_ID: "notification_outbox",
   APPWRITE_IDEMPOTENCY_TABLE_ID: "intake_idempotency",
+  APPWRITE_ATTACHMENT_BUCKET_ID: "private_attachments",
+  APPWRITE_ATTACHMENT_STAGING_TABLE_ID: "attachment_staging",
+  APPWRITE_ATTACHMENTS_TABLE_ID: "attachments",
   ACCESS_PROOF_ENVELOPE_KEY: "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc",
   RELEASE: "commit-123",
 };
@@ -40,6 +43,9 @@ describe("trusted environment contract", () => {
         notificationsTableId: "notifications",
         outboxTableId: "notification_outbox",
         idempotencyTableId: "intake_idempotency",
+        attachmentBucketId: "private_attachments",
+        attachmentStagingTableId: "attachment_staging",
+        attachmentsTableId: "attachments",
       },
       accessProofEnvelopeKey: "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc",
       release: "commit-123",
@@ -65,6 +71,18 @@ describe("trusted environment contract", () => {
         APPWRITE_FEEDBACK_TABLE_ID: "reporters",
       }),
     ).toThrow(new ConfigError("APPWRITE_SCHEMA_INVALID"));
+    expect(() =>
+      parseServerConfig({
+        ...validServer,
+        APPWRITE_ATTACHMENT_STAGING_TABLE_ID: "attachments",
+      }),
+    ).toThrow(new ConfigError("APPWRITE_SCHEMA_INVALID"));
+    expect(() =>
+      parseServerConfig({
+        ...validServer,
+        APPWRITE_ATTACHMENT_BUCKET_ID: "",
+      }),
+    ).toThrow(new ConfigError("CONFIG_MISSING"));
     expect(() =>
       parseServerConfig({
         ...validServer,

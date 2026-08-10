@@ -23,6 +23,9 @@ export interface ServerConfig {
     readonly notificationsTableId: string;
     readonly outboxTableId: string;
     readonly idempotencyTableId: string;
+    readonly attachmentBucketId: string;
+    readonly attachmentStagingTableId: string;
+    readonly attachmentsTableId: string;
   };
   readonly accessProofEnvelopeKey: string;
   readonly release: string;
@@ -48,6 +51,11 @@ function parseAppwriteSchema(input: Readonly<Record<string, string | undefined>>
     notificationsTableId: requireAppwriteId(input.APPWRITE_NOTIFICATIONS_TABLE_ID),
     outboxTableId: requireAppwriteId(input.APPWRITE_OUTBOX_TABLE_ID),
     idempotencyTableId: requireAppwriteId(input.APPWRITE_IDEMPOTENCY_TABLE_ID),
+    attachmentBucketId: requireAppwriteId(input.APPWRITE_ATTACHMENT_BUCKET_ID),
+    attachmentStagingTableId: requireAppwriteId(
+      input.APPWRITE_ATTACHMENT_STAGING_TABLE_ID,
+    ),
+    attachmentsTableId: requireAppwriteId(input.APPWRITE_ATTACHMENTS_TABLE_ID),
   };
   if (new Set(Object.values(tableIds)).size !== Object.values(tableIds).length) {
     throw new ConfigError("APPWRITE_SCHEMA_INVALID");
