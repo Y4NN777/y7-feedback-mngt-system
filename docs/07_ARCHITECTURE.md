@@ -344,10 +344,11 @@ sequenceDiagram
 Each upload is mediated by the trusted API so application rate limits and
 private storage cannot be bypassed. Before implementation, the selected
 Appwrite Cloud runtime must prove that a 10 MB request plus protocol overhead is
-supported. If it is not, the same flow uses a Function-issued short-lived
-technical upload session restricted to the private staging manifest; it does
-not create a Reporter account or public bucket. This is a platform fitness test,
-not a product decision.
+supported. Appwrite's public documentation does not currently establish that
+ingress limit. If the test fails, ADR-005 must be reopened to compare a
+controlled upload gateway with a self-hosted Appwrite deployment; a public
+bucket or unrestricted client upload is not an acceptable fallback. This is a
+technical production gate, not permission to weaken the Attachment contract.
 
 Validation combines:
 
@@ -688,8 +689,9 @@ because they do not alter the validated behavior:
   which require a governance policy before production;
 - assignment of the restoration capability among the fixed workspace roles;
 - documented SLO eligibility/calculation rules and alert thresholds;
-- the controlled-upload transport branch after the 10 MB Appwrite Cloud fitness
-  test.
+- confirmation of the Function-mediated upload transport by the 10 MB Appwrite
+  Cloud fitness test; a failed test makes the replacement transport an explicit
+  blocking ADR.
 
 The upload fitness test and governance retention policy are production gates,
 not reasons to reopen the domain model or select another backend prematurely.

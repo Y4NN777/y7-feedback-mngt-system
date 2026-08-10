@@ -233,18 +233,19 @@ commit removes operation-owned staging; a scheduled sweeper reconciles orphans.
 All retrieval passes through trusted authorization.
 
 Before implementation, prove that the Appwrite Cloud Function ingress supports
-10 MB plus multipart/protocol overhead within the upload SLO. If it does not,
-use a Function-issued, short-lived technical upload session restricted to one
-private staging manifest, then retain the same validation and commit flow. That
-session is not a Reporter identity.
+10 MB plus multipart/protocol overhead within the upload SLO. Appwrite's public
+documentation does not establish that limit. If the test fails, reopen this ADR
+to compare a controlled upload gateway with self-hosted Appwrite. Do not fall
+back to a public bucket or unrestricted client upload.
 
 ### Consequences
 
 - Logical atomicity is explicit even though binary and row storage differ.
 - Appwrite bucket extension/size settings are coarse defense only; trusted
   content inspection decides acceptance.
-- Direct file transfer through a Function may add memory/latency pressure; the
-  fitness test decides the transport branch without changing product behavior.
+- Direct file transfer through a Function may add memory/latency pressure; a
+  failed fitness test makes the replacement transport a blocking architecture
+  decision without changing product behavior.
 - Staging requires expiry, cleanup metrics, and reconciliation.
 
 ### Alternatives not selected
@@ -524,7 +525,8 @@ selection exists:
 - Appwrite Cloud region and plan;
 - exact Appwrite Auth login and account-recovery methods;
 - email, telemetry, antivirus, and backup repository vendors;
-- controlled-upload transport selected by the 10 MB fitness test;
+- controlled-upload transport reconsideration only if the 10 MB Function
+  fitness test fails;
 - concrete local-cache allow-list, IndexedDB quota behavior, and encryption
   handling;
 - physical TablesDB indexes, Storage bucket configuration, and data migrations;
