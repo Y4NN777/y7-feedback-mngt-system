@@ -1,2 +1,5 @@
 # Local delivery planning
 docs/09_ONE_WEEK_SPRINT_PLAN.md
+
+# Raw Codex transcripts can contain prompts, tool output, and sensitive metadata
+docs/sessions/raw/*.jsonl
