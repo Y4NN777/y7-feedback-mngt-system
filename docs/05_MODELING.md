@@ -20,6 +20,7 @@ flowchart LR
     Operator[Platform Operator]
     PlatformOwner[Platform Owner / Super Administrator]
     Email[Email Delivery Environment]
+    Git[GitHub / GitLab.com]
     System[Y7 Feedback]
 
     Reporter -->|submit, retrieve, clarify, request deletion| System
@@ -31,6 +32,9 @@ flowchart LR
     PlatformOwner -->|approve exceptional access; review break-glass| System
     System -->|purpose-limited email request| Email
     Email -->|delivery outcome| System
+    Owner -->|connect and select repositories| System
+    System -->|repository metadata, issues, comments, state operations| Git
+    Git -->|authorized metadata and signed events| System
 ```
 
 The email participant is an environmental capability, not a selected provider.
@@ -52,13 +56,15 @@ interaction; public fields do not establish trust.
 | UC-09 | Reporter / workspace actor | Receive scoped in-product and eligible email notifications. |
 | UC-10 | Workspace actor | Filter, relate, theme, and compare Feedback for Product Intelligence. |
 | UC-11 | Platform Operator | Operate without standing business-content access and use an audited exceptional grant when authorized. |
+| UC-12 | Workspace Owner / Project Maintainer | Connect selected repositories and link one Feedback to one synchronized external issue. |
 
 The root `/` orients a context-free visitor toward a project-provided direct
 link, accountless retrieval, or Workspace management. It contains no Project or
 Workspace discovery model.
 
-Public publication, community voting, arbitrary chat, commercial SaaS behavior,
-and autonomous AI decisions are not use cases in this model.
+Public Feedback catalogs, unconsented public publication, community voting,
+arbitrary chat, commercial SaaS behavior, and autonomous AI decisions are not
+use cases in this model.
 
 ## 4. Feedback Intake Activity
 
@@ -273,7 +279,63 @@ stateDiagram-v2
 Continued access starts a new `requested` instance. The requesting operator
 cannot approve itself or mutate its own access audit.
 
-## 9. Reporter Attribution Model
+## 9. Source Connection and External Issue Model
+
+```mermaid
+sequenceDiagram
+    actor O as Workspace Owner
+    actor M as Project Maintainer
+    actor R as Reporter
+    participant S as Source Connection Registry
+    participant P as Publication Policy
+    participant X as External Issue Coordination
+    participant L as Feedback Lifecycle
+    participant G as GitHub / GitLab.com
+
+    O->>S: Grant provider access and select repository
+    S->>G: Verify grant and repository
+    G-->>S: Repository metadata and releases
+    S-->>O: Active Project-scoped connection
+    M->>X: Create linked issue for Feedback
+    X->>P: Check repository visibility and consent
+    alt public repository without consent
+        P-->>X: Metadata-only publication
+    else private repository or active consent
+        P-->>X: Visible-content publication allowed
+    end
+    X->>G: Create issue with permitted payload
+    G-->>X: Provider issue identity
+    X-->>M: Active link and sync outcome
+    G->>X: Signed issue or comment event
+    X->>G: Verify current author write authority
+    alt eligible comment author
+        X->>L: Apply approved state mapping if present
+        X-->>R: Add attributable visible message or treatment conclusion
+    else unverifiable or insufficient authority
+        X-->>X: Ignore business effect and retain safe audit evidence
+    end
+```
+
+The Project remains authoritative as the feedback target. A connection may be
+removed without changing Project or Feedback identity. One Project may connect
+multiple repositories, while one Feedback has at most one active External Issue
+Link so provider states cannot compete for lifecycle authority.
+
+```mermaid
+stateDiagram-v2
+    [*] --> disconnected
+    disconnected --> active: Owner grants and selects repository
+    active --> suspended: provider revocation, verification failure, or Owner action
+    suspended --> active: Owner reconnects and reconciliation succeeds
+    active --> disconnected: Owner disconnects
+    suspended --> disconnected: Owner disconnects
+```
+
+For a public repository, consent is Feedback-specific and continuing. Revocation
+blocks future Reporter-content publication and records best-effort external
+cleanup; already public copies remain outside Y7's deletion guarantee.
+
+## 10. Reporter Attribution Model
 
 ```mermaid
 flowchart TD
@@ -299,7 +361,7 @@ Equal raw identifiers outside the same Workspace and application/issuer scope do
 not meet the `Existing` condition. Browser or device fingerprinting is not an
 input to this model.
 
-## 10. Conceptual Information Model
+## 11. Conceptual Information Model
 
 ```mermaid
 erDiagram
@@ -312,6 +374,7 @@ erDiagram
     PROJECT ||--o{ PROJECT_SLUG : reserves
     PROJECT ||--o{ FEEDBACK : receives
     PROJECT ||--o{ PROJECT_ASSIGNMENT : defines
+    PROJECT ||--o{ SOURCE_CONNECTION : connects
     WORKSPACE_ACTOR ||--o{ PROJECT_ASSIGNMENT : receives
 
     REPORTER ||--o{ REPORTER_IDENTIFIER : has
@@ -330,6 +393,10 @@ erDiagram
     FEEDBACK ||--o{ FEEDBACK_RELATION : source
     FEEDBACK ||--o{ FEEDBACK_RELATION : target
     FEEDBACK ||--o{ DELETION_RECORD : governs
+    FEEDBACK ||--o{ EXTERNAL_ISSUE_LINK : histories
+    FEEDBACK ||--o{ PUBLICATION_CONSENT : authorizes
+    SOURCE_CONNECTION ||--o{ EXTERNAL_ISSUE_LINK : targets
+    EXTERNAL_ISSUE_LINK ||--o{ EXTERNAL_SYNC_FACT : records
 
     PLATFORM_OPERATOR ||--o{ EXCEPTIONAL_ACCESS_GRANT : receives
     PLATFORM_OWNER ||--o{ EXCEPTIONAL_ACCESS_GRANT : approves
@@ -440,6 +507,35 @@ erDiagram
         audit approver_justification_state
         incident_scope normal_or_critical_break_glass
     }
+    SOURCE_CONNECTION {
+        identifier id
+        identifier workspace_and_project
+        provider github_or_gitlab_com
+        repository_identity immutable_provider_id
+        connection_state active_suspended_or_disconnected
+        authorization selected_scope
+    }
+    EXTERNAL_ISSUE_LINK {
+        identifier feedback_id
+        identifier source_connection_id
+        provider_issue immutable_provider_identity
+        visibility public_or_private
+        link_state active_or_historical
+        synchronization_state current_outcome
+    }
+    PUBLICATION_CONSENT {
+        identifier feedback_id
+        consent_state active_or_revoked
+        disclosure version_and_audience
+        audit reporter_and_time
+    }
+    EXTERNAL_SYNC_FACT {
+        provider_event immutable_identity
+        external_author authority_evidence
+        synchronization_direction inbound_or_outbound
+        revision_state created_edited_deleted_or_state
+        processing_outcome accepted_ignored_pending_or_failed
+    }
 ```
 
 This model expresses conceptual identity and cardinality, not storage fields.
@@ -462,8 +558,17 @@ In particular:
 - application, page, screen, feature, version, device, and environment remain
   Context values until an independently justified lifecycle requires new domain
   entities.
+- a Source Connection is optional and provider-scoped; it does not own Project
+  identity or Feedback source;
+- historical External Issue Links remain attributable, but only one link is
+  active for a Feedback;
+- publication consent governs public external audience only and never changes a
+  Message into an Internal Note or authorizes protected payload categories;
+- External Sync Facts preserve provider event, author authority, direction,
+  revision, outcome, and time so retries and reconciliation do not rewrite
+  source history.
 
-## 11. Ownership and Mutability Summary
+## 12. Ownership and Mutability Summary
 
 | Concept | Immutable or append-preserved | Controlled mutable state |
 | --- | --- | --- |
@@ -476,8 +581,12 @@ In particular:
 | Theme / relationship | Workspace scope, provenance | Accountable correction or removal without source mutation |
 | Access Grant | Feedback scope | Active, revoked, or expired |
 | Exceptional access grant | Operator, distinct approver, justification, Workspace/resource/action scope, start and <=1-hour expiry | Revocation before expiry; audit is append-only and extension creates a new grant |
+| Source Connection | Workspace/Project, provider, immutable repository identity, granting evidence | Active, suspended, reconnected, or disconnected; imported metadata may refresh |
+| External Issue Link | Feedback, repository, provider issue identity, creation provenance | One active link; state and synchronization outcome evolve while old links remain historical |
+| Publication consent | Feedback, Reporter decision, disclosure version, time | Active or revoked; revocation never rewrites prior publication history |
+| External Sync Fact | Provider event/logical operation identity, direction, actor evidence, time | Processing outcome may move from pending to final without duplicating the fact |
 
-## 12. Architecture Handoff
+## 13. Architecture Handoff
 
 All previously blocking product parameters are represented in these behavioral
 and conceptual models. Container, component, deployment, persistence, offline
