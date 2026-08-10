@@ -1,0 +1,250 @@
+:root {
+  color: #242917;
+  background: #e8dcc7;
+  font-family: "Epilogue Variable", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  background: #e8dcc7;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 14% 18%, rgb(176 139 110 / 30%), transparent 28rem),
+    #e8dcc7;
+}
+
+body::before {
+  position: fixed;
+  z-index: -1;
+  inset: 0;
+  background: url("/grain.svg") repeat;
+  content: "";
+  pointer-events: none;
+}
+
+button,
+a {
+  font: inherit;
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid #242917;
+  outline-offset: 4px;
+}
+
+.root-page {
+  width: min(100% - 2rem, 88rem);
+  margin-inline: auto;
+  padding: 1.25rem 0 5rem;
+}
+
+.masthead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.brand {
+  display: grid;
+  width: 3.75rem;
+  height: 3.75rem;
+  place-items: center;
+  border-radius: 50%;
+  color: #e8dcc7;
+  background: #4f5a2e;
+  font-weight: 760;
+  text-decoration: none;
+}
+
+.language-switcher {
+  display: flex;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0.3rem;
+  border: 1px solid #4f5a2e;
+  border-radius: 2rem;
+}
+
+.language-switcher legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.language-switcher button {
+  border: 0;
+  border-radius: 1.5rem;
+  padding: 0.65rem 0.85rem;
+  color: #242917;
+  background: transparent;
+  cursor: pointer;
+}
+
+.language-switcher button[aria-pressed="true"] {
+  color: #e8dcc7;
+  background: #4f5a2e;
+}
+
+.introduction {
+  max-width: 68rem;
+  padding: clamp(5rem, 12vw, 10rem) 0 clamp(4rem, 8vw, 7rem);
+}
+
+.eyebrow {
+  margin: 0 0 1.25rem;
+  font-weight: 700;
+}
+
+h1,
+h2,
+p {
+  margin-top: 0;
+}
+
+h1,
+h2 {
+  font-family: "Fraunces Variable", serif;
+  font-variation-settings:
+    "SOFT" 80,
+    "WONK" 1;
+}
+
+h1 {
+  max-width: 13ch;
+  margin-bottom: 1.5rem;
+  font-size: clamp(3.25rem, 9vw, 8.5rem);
+  font-weight: 590;
+  line-height: 0.91;
+  letter-spacing: -0.055em;
+}
+
+.lede {
+  max-width: 47rem;
+  margin-bottom: 0;
+  font-size: clamp(1.05rem, 2.2vw, 1.45rem);
+  line-height: 1.55;
+}
+
+.intent-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.intent {
+  display: grid;
+  grid-template-columns: 5rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: clamp(1rem, 3vw, 3rem);
+  min-height: 13rem;
+  padding: clamp(1.5rem, 4vw, 3rem);
+  border-radius: 2rem;
+  background: #8b9d83;
+}
+
+.intent:nth-child(2) {
+  width: calc(100% - clamp(0rem, 5vw, 5rem));
+  margin-left: auto;
+  background: #d4b895;
+}
+
+.intent:nth-child(3) {
+  width: calc(100% - clamp(0rem, 10vw, 10rem));
+  background: #b08b6e;
+}
+
+.intent-number {
+  align-self: start;
+  padding-top: 0.4rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.intent h2 {
+  margin-bottom: 0.65rem;
+  font-size: clamp(2rem, 5vw, 4.5rem);
+  font-weight: 570;
+  line-height: 1;
+}
+
+.intent p {
+  max-width: 42rem;
+  margin-bottom: 0;
+  line-height: 1.5;
+}
+
+.intent-action {
+  display: inline-flex;
+  justify-content: center;
+  border-radius: 2rem;
+  padding: 0.9rem 1.2rem;
+  color: #e8dcc7;
+  background: #4f5a2e;
+  font-weight: 700;
+  text-align: center;
+  text-decoration: none;
+}
+
+.intent-action-disabled {
+  border: 1px solid #4f5a2e;
+  color: #242917;
+  background: transparent;
+}
+
+@media (max-width: 46rem) {
+  .root-page {
+    width: min(100% - 1.25rem, 88rem);
+    padding-top: 0.75rem;
+  }
+
+  .masthead {
+    align-items: center;
+  }
+
+  .language-switcher button {
+    padding-inline: 0.65rem;
+    font-size: 0.8rem;
+  }
+
+  .introduction {
+    padding-top: 5rem;
+  }
+
+  .intent,
+  .intent:nth-child(2),
+  .intent:nth-child(3) {
+    width: 100%;
+    margin-left: 0;
+    grid-template-columns: 2.5rem minmax(0, 1fr);
+    border-radius: 1.5rem;
+  }
+
+  .intent-action {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+  }
+}
