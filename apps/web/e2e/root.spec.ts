@@ -63,3 +63,58 @@ test("BDD-PWA-001 emits a manifest and a public-only service worker", async ({
   expect(serviceWorkerResponse.ok()).toBe(true);
   expect(await serviceWorkerResponse.text()).not.toContain('"/api/');
 });
+
+test("BDD-UX-INTAKE-001 reviews a bilingual WiseMoney draft without losing input", async ({
+  page,
+}) => {
+  await page.goto("/wisemoney");
+
+  await expect(
+    page.getByRole("heading", { name: "Partager un retour sur WiseMoney" }),
+  ).toBeVisible();
+  await page.getByRole("radio", { name: "Suggestion" }).focus();
+  await page.keyboard.press("Space");
+  await page
+    .getByRole("textbox", { name: "Que proposez-vous ?" })
+    .fill("Ajouter une vue mensuelle.");
+  await page
+    .getByRole("textbox", { name: "Pourquoi serait-ce utile ?" })
+    .fill("Pour comprendre les variations.");
+  await page
+    .getByRole("textbox", { name: "Version de l’application (facultatif)" })
+    .fill("2.4.1");
+
+  await page.getByRole("button", { name: "English" }).click();
+  await expect(page.getByRole("textbox", { name: "What do you propose?" })).toHaveValue(
+    "Ajouter une vue mensuelle.",
+  );
+  await page.getByRole("button", { name: "Review feedback" }).click();
+
+  await expect(
+    page.getByRole("heading", { name: "Review before continuing" }),
+  ).toBeVisible();
+  await expect(page.getByText("WiseMoney", { exact: true })).toBeVisible();
+  await expect(page.getByText("Suggestion", { exact: true })).toBeVisible();
+  await expect(page.getByText("Ajouter une vue mensuelle.")).toBeVisible();
+  await expect(page.getByText("2.4.1")).toBeVisible();
+  await expect(page.getByText("No attachments")).toBeVisible();
+  await expect(page.getByText(/optional.*follow up/i)).toBeVisible();
+});
+
+test("BDD-UX-INTAKE-001 is accessible without overflow at 320 px", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await page.goto("/wisemoney");
+
+  const accessibility = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa"])
+    .analyze();
+  const seriousViolations = accessibility.violations.filter(
+    (violation) => violation.impact === "serious" || violation.impact === "critical",
+  );
+  const hasHorizontalOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  );
+
+  expect(seriousViolations).toEqual([]);
+  expect(hasHorizontalOverflow).toBe(false);
+});

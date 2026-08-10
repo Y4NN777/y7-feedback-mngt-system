@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import type { Locale } from "@y7-feedback/domain";
 
+import { FeedbackIntake } from "./FeedbackIntake";
 import { messages } from "./i18n/messages";
 
 export function App() {
@@ -11,6 +12,10 @@ export function App() {
   function selectLocale(nextLocale: Locale) {
     document.documentElement.lang = nextLocale;
     setLocale(nextLocale);
+  }
+
+  if (window.location.pathname === "/wisemoney") {
+    return <FeedbackIntake locale={locale} onLocaleChange={selectLocale} />;
   }
 
   return (

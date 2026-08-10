@@ -39,9 +39,282 @@ a {
 }
 
 button:focus-visible,
-a:focus-visible {
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
   outline: 3px solid #242917;
   outline-offset: 4px;
+}
+
+.intake-page {
+  width: min(100% - 2rem, 82rem);
+  margin-inline: auto;
+  padding: 1.25rem 0 6rem;
+}
+
+.intake-header {
+  align-items: center;
+}
+
+.back-link {
+  margin-right: auto;
+  color: #242917;
+  font-weight: 700;
+  text-underline-offset: 0.3rem;
+}
+
+.intake-introduction {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(16rem, 0.5fr);
+  align-items: end;
+  gap: 2rem;
+  padding: clamp(4.5rem, 10vw, 8rem) 0 clamp(3rem, 7vw, 5rem);
+}
+
+.intake-introduction .eyebrow,
+.intake-introduction h1 {
+  grid-column: 1;
+}
+
+.intake-introduction h1 {
+  max-width: 11ch;
+  margin-bottom: 0;
+  font-size: clamp(3rem, 7vw, 7rem);
+}
+
+.intake-introduction .lede {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
+.intake-form {
+  display: grid;
+  gap: 1.25rem;
+  max-width: 68rem;
+  margin-inline: auto;
+}
+
+.type-picker {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.type-picker legend {
+  width: 100%;
+  margin-bottom: 1rem;
+  font-family: "Fraunces Variable", serif;
+  font-size: clamp(1.5rem, 3vw, 2.25rem);
+  font-weight: 580;
+}
+
+.type-picker label {
+  position: relative;
+  cursor: pointer;
+}
+
+.type-picker input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.type-picker span {
+  display: block;
+  border: 1px solid #4f5a2e;
+  border-radius: 1.25rem;
+  padding: 1.1rem 1.25rem;
+  font-weight: 740;
+  text-align: center;
+}
+
+.type-picker input:checked + span {
+  color: #f7ecda;
+  background: #4f5a2e;
+}
+
+.type-picker input:focus-visible + span {
+  outline: 3px solid #242917;
+  outline-offset: 4px;
+}
+
+.form-card {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+  border-radius: 2rem;
+  padding: clamp(1.25rem, 4vw, 2.75rem);
+  background: #8b9d83;
+}
+
+.supporting-fields {
+  margin-left: clamp(0rem, 5vw, 4rem);
+  background: #d4b895;
+}
+
+.field {
+  display: grid;
+  align-content: start;
+  gap: 0.6rem;
+  min-width: 0;
+  font-weight: 700;
+}
+
+.field-wide {
+  grid-column: 1 / -1;
+}
+
+.field input,
+.field textarea {
+  width: 100%;
+  border: 1px solid rgb(36 41 23 / 65%);
+  border-radius: 1rem;
+  padding: 1rem;
+  color: #242917;
+  background: rgb(248 240 224 / 78%);
+  font: inherit;
+  font-weight: 450;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.field small {
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.form-error {
+  margin: 0;
+  border-left: 0.35rem solid #7a2f21;
+  padding: 0.85rem 1rem;
+  color: #5d1e15;
+  background: #efd4c5;
+  font-weight: 700;
+}
+
+.primary-action {
+  justify-self: end;
+  border: 0;
+  border-radius: 2rem;
+  padding: 1rem 1.5rem;
+  color: #f7ecda;
+  background: #4f5a2e;
+  font-weight: 760;
+  cursor: pointer;
+}
+
+.review-panel {
+  max-width: 68rem;
+  margin: clamp(4.5rem, 9vw, 8rem) auto 0;
+}
+
+.review-panel > h1 {
+  max-width: 12ch;
+  margin-bottom: 1rem;
+  font-size: clamp(3rem, 7vw, 6.5rem);
+}
+
+.review-hint {
+  max-width: 40rem;
+  margin-bottom: 3rem;
+  font-size: 1.05rem;
+  line-height: 1.55;
+}
+
+.review-band {
+  position: relative;
+  border-radius: 2rem;
+  padding: clamp(1.4rem, 4vw, 3rem);
+}
+
+.review-band + .review-band {
+  margin-top: 1rem;
+}
+
+.review-band-source {
+  width: 100%;
+  background: #8b9d83;
+}
+
+.review-band-identity {
+  width: calc(100% - clamp(0rem, 5vw, 4rem));
+  margin-left: auto;
+  background: #d4b895;
+}
+
+.review-band-context {
+  width: calc(100% - clamp(0rem, 9vw, 8rem));
+  background: #b08b6e;
+}
+
+.review-band h2 {
+  margin-bottom: 1.25rem;
+  font-size: clamp(2rem, 4vw, 3.75rem);
+}
+
+.review-band h3 {
+  margin: 1.5rem 0 0.35rem;
+  font-family: "Fraunces Variable", serif;
+  font-size: 1.4rem;
+}
+
+.review-band p:last-child {
+  margin-bottom: 0;
+}
+
+.review-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 0 0 1.5rem;
+}
+
+.review-facts div {
+  border-top: 1px solid rgb(36 41 23 / 45%);
+  padding-top: 0.7rem;
+}
+
+.review-facts dt {
+  font-size: 0.75rem;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.review-facts dd {
+  margin: 0.35rem 0 0;
+  font-size: 1.25rem;
+  font-weight: 680;
+}
+
+.review-values {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.review-values li {
+  border-left: 0.25rem solid #4f5a2e;
+  padding-left: 1rem;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.disclosure {
+  max-width: 46rem;
+  line-height: 1.5;
+}
+
+.review-panel > .primary-action {
+  display: block;
+  margin: 1.5rem 0 0 auto;
 }
 
 .root-page {
@@ -211,6 +484,60 @@ h1 {
   .root-page {
     width: min(100% - 1.25rem, 88rem);
     padding-top: 0.75rem;
+  }
+
+  .intake-page {
+    width: min(100% - 1.25rem, 82rem);
+    padding-top: 0.75rem;
+  }
+
+  .intake-header {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .intake-header .back-link {
+    justify-self: end;
+    margin-right: 0;
+    font-size: 0.82rem;
+  }
+
+  .intake-header .language-switcher {
+    grid-column: 1 / -1;
+    justify-self: end;
+  }
+
+  .intake-introduction {
+    display: block;
+    padding-top: 4rem;
+  }
+
+  .intake-introduction h1 {
+    margin-bottom: 1.5rem;
+  }
+
+  .type-picker,
+  .form-card,
+  .review-facts {
+    grid-template-columns: 1fr;
+  }
+
+  .supporting-fields,
+  .review-band-source,
+  .review-band-identity,
+  .review-band-context {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .form-card,
+  .review-band {
+    border-radius: 1.4rem;
+  }
+
+  .primary-action {
+    width: 100%;
+    justify-self: stretch;
   }
 
   .masthead {
