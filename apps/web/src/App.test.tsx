@@ -1,8 +1,9 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "./App";
+import type { IntakeGateway } from "./IntakeGateway";
 
 afterEach(() => {
   cleanup();
@@ -214,5 +215,84 @@ describe("WiseMoney feedback intake", () => {
     await user.click(screen.getByRole("button", { name: "Relire le retour" }));
     expect(screen.getByText("Simple et rapide.")).toBeInTheDocument();
     expect(screen.getByText("La lisibilité.")).toBeInTheDocument();
+  });
+
+  it("BDD-UX-INTAKE-002 confirms only authoritative acceptance and retains proof in memory", async () => {
+    window.history.replaceState({}, "", "/wisemoney");
+    const user = userEvent.setup();
+    const accept = vi.fn(() =>
+      Promise.resolve({
+        status: "accepted" as const,
+        reference: "Y7-2026-000001",
+        accessProof: "proof_abcdefghijklmnopqrstuvwxyz_0123456789ABCDEFG",
+        replayed: false,
+      }),
+    );
+    render(
+      <App
+        createOperationId={() => "123e4567-e89b-42d3-a456-426614174000"}
+        intakeGateway={{ accept }}
+      />,
+    );
+
+    await user.type(
+      screen.getByRole("textbox", { name: "Quel problème avez-vous rencontré ?" }),
+      "Le solde est incorrect.",
+    );
+    await user.click(screen.getByRole("button", { name: "Relire le retour" }));
+    expect(screen.queryByText("Y7-2026-000001")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Envoyer le retour" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Retour envoyé" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Y7-2026-000001")).toBeInTheDocument();
+    expect(
+      screen.getByText("proof_abcdefghijklmnopqrstuvwxyz_0123456789ABCDEFG"),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/conservez cette preuve séparément/i)).toBeInTheDocument();
+    expect(accept).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectSlug: "wisemoney",
+        clientOperationId: "123e4567-e89b-42d3-a456-426614174000",
+        locale: "fr",
+      }),
+    );
+  });
+
+  it("retries the same operation after transient failure", async () => {
+    window.history.replaceState({}, "", "/wisemoney");
+    const user = userEvent.setup();
+    const accept = vi
+      .fn<IntakeGateway["accept"]>()
+      .mockResolvedValueOnce({ status: "retryable" as const })
+      .mockResolvedValueOnce({
+        status: "accepted" as const,
+        reference: "Y7-2026-000002",
+        accessProof: "proof_abcdefghijklmnopqrstuvwxyz_0123456789ABCDEFG",
+        replayed: true,
+      });
+    render(
+      <App
+        createOperationId={() => "123e4567-e89b-42d3-a456-426614174000"}
+        intakeGateway={{ accept }}
+      />,
+    );
+    await user.type(
+      screen.getByRole("textbox", { name: "Quel problème avez-vous rencontré ?" }),
+      "Le solde est incorrect.",
+    );
+    await user.click(screen.getByRole("button", { name: "Relire le retour" }));
+    await user.click(screen.getByRole("button", { name: "Envoyer le retour" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /réessayer sans créer de doublon/i,
+    );
+    await user.click(screen.getByRole("button", { name: "Envoyer le retour" }));
+    expect(await screen.findByText("Y7-2026-000002")).toBeInTheDocument();
+    expect(accept).toHaveBeenCalledTimes(2);
+    expect(accept.mock.calls[0]?.[0].clientOperationId).toBe(
+      accept.mock.calls[1]?.[0].clientOperationId,
+    );
   });
 });

@@ -12,6 +12,14 @@ export default defineConfig({
   },
   webServer: {
     command: "pnpm build && pnpm preview --host 127.0.0.1",
+    env: {
+      VITE_Y7_ENVIRONMENT: "development",
+      VITE_APPWRITE_ENVIRONMENT: "development",
+      VITE_APPWRITE_ENDPOINT: "http://127.0.0.1/v1",
+      VITE_APPWRITE_PROJECT_ID: "feedback-e2e",
+      VITE_API_ENDPOINT: "http://127.0.0.1:8787/",
+      VITE_RELEASE: "e2e",
+    },
     url: "http://127.0.0.1:4173",
     reuseExistingServer: !process.env.CI,
   },

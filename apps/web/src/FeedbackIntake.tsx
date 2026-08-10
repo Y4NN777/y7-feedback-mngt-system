@@ -10,8 +10,11 @@ import {
 } from "@y7-feedback/domain";
 
 import { intakeMessages } from "./i18n/intake";
+import type { IntakeGateway, IntakeGatewayOutcome } from "./IntakeGateway";
 
 interface FeedbackIntakeProps {
+  readonly createOperationId: () => string;
+  readonly gateway: IntakeGateway;
   readonly locale: Locale;
   readonly onLocaleChange: (locale: Locale) => void;
 }
@@ -234,10 +237,16 @@ function Review({
   data,
   locale,
   onEdit,
+  onSend,
+  outcome,
+  pending,
 }: {
   readonly data: ValidatedFeedbackDraft;
   readonly locale: Locale;
   readonly onEdit: () => void;
+  readonly onSend: () => void;
+  readonly outcome: IntakeGatewayOutcome | null;
+  readonly pending: boolean;
 }) {
   const copy = intakeMessages[locale];
   const contact =
@@ -280,18 +289,73 @@ function Review({
         <p>{copy.attachmentsNone}</p>
       </div>
 
-      <button className="primary-action" type="button" onClick={onEdit}>
-        {copy.edit}
-      </button>
+      {outcome && outcome.status !== "accepted" ? (
+        <p className="form-error" role="alert">
+          {outcome.status === "conflict"
+            ? copy.conflictError
+            : outcome.status === "invalid"
+              ? copy.invalidError
+              : copy.retryableError}
+        </p>
+      ) : null}
+      <div className="review-actions">
+        <button type="button" onClick={onEdit} disabled={pending}>
+          {copy.edit}
+        </button>
+        <button
+          className="primary-action"
+          type="button"
+          onClick={onSend}
+          disabled={pending}
+        >
+          {pending ? copy.sending : copy.send}
+        </button>
+      </div>
     </section>
   );
 }
 
-export function FeedbackIntake({ locale, onLocaleChange }: FeedbackIntakeProps) {
+function Confirmation({
+  locale,
+  outcome,
+}: {
+  readonly locale: Locale;
+  readonly outcome: Extract<IntakeGatewayOutcome, { readonly status: "accepted" }>;
+}) {
+  const copy = intakeMessages[locale];
+  return (
+    <section className="review-panel" aria-labelledby="confirmation-title">
+      <p className="eyebrow">WiseMoney · Y7 Feedback</p>
+      <h1 id="confirmation-title">{copy.confirmationTitle}</h1>
+      <p>{copy.confirmationHint}</p>
+      <dl className="review-facts">
+        <div>
+          <dt>{copy.reference}</dt>
+          <dd>{outcome.reference}</dd>
+        </div>
+        <div>
+          <dt>{copy.accessProof}</dt>
+          <dd className="access-material">{outcome.accessProof}</dd>
+        </div>
+      </dl>
+      <p className="disclosure">{copy.accessProofWarning}</p>
+    </section>
+  );
+}
+
+export function FeedbackIntake({
+  createOperationId,
+  gateway,
+  locale,
+  onLocaleChange,
+}: FeedbackIntakeProps) {
   const copy = intakeMessages[locale];
   const [draft, setDraft] = useState<DraftFields>(initialDraft);
   const [error, setError] = useState<string | null>(null);
   const [review, setReview] = useState<ValidatedFeedbackDraft | null>(null);
+  const [operationId, setOperationId] = useState<string | null>(null);
+  const [outcome, setOutcome] = useState<IntakeGatewayOutcome | null>(null);
+  const [pending, setPending] = useState(false);
 
   function update(field: keyof DraftFields, value: string) {
     setDraft((current) => ({ ...current, [field]: value }));
@@ -346,9 +410,30 @@ export function FeedbackIntake({ locale, onLocaleChange }: FeedbackIntakeProps) 
         },
       );
       setReview(validated);
+      setOperationId(createOperationId());
+      setOutcome(null);
       setError(null);
     } catch {
       setError(copy.reviewError);
+    }
+  }
+
+  async function send() {
+    if (!review || !operationId || pending) return;
+    setPending(true);
+    try {
+      setOutcome(
+        await gateway.accept({
+          projectSlug: "wisemoney",
+          clientOperationId: operationId,
+          locale,
+          draft: review,
+        }),
+      );
+    } catch {
+      setOutcome({ status: "retryable" });
+    } finally {
+      setPending(false);
     }
   }
 
@@ -384,13 +469,22 @@ export function FeedbackIntake({ locale, onLocaleChange }: FeedbackIntakeProps) 
         </fieldset>
       </header>
 
-      {review ? (
+      {outcome?.status === "accepted" ? (
+        <Confirmation locale={locale} outcome={outcome} />
+      ) : review ? (
         <Review
           data={review}
           locale={locale}
           onEdit={() => {
             setReview(null);
+            setOperationId(null);
+            setOutcome(null);
           }}
+          onSend={() => {
+            void send();
+          }}
+          outcome={outcome}
+          pending={pending}
         />
       ) : (
         <>

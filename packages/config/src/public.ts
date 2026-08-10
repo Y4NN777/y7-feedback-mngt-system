@@ -15,6 +15,7 @@ export interface PublicConfig {
   readonly backendEnvironment: ApplicationEnvironment;
   readonly appwriteEndpoint: string;
   readonly appwriteProjectId: string;
+  readonly apiEndpoint: string;
   readonly release: string;
 }
 
@@ -41,6 +42,7 @@ export function parsePublicConfig(
     backendEnvironment,
     appwriteEndpoint: parseEndpoint(input.VITE_APPWRITE_ENDPOINT, environment),
     appwriteProjectId: requireValue(input.VITE_APPWRITE_PROJECT_ID),
+    apiEndpoint: parseEndpoint(input.VITE_API_ENDPOINT, environment),
     release: requireValue(input.VITE_RELEASE),
   };
 }

@@ -4,16 +4,24 @@ import type { Locale } from "@y7-feedback/domain";
 
 import { FeedbackIntake } from "./FeedbackIntake";
 import { messages } from "./i18n/messages";
+import type { IntakeGateway } from "./IntakeGateway";
 import { RetrieveFeedback, type AccountlessGateway } from "./RetrieveFeedback";
 
 const unavailableGateway: AccountlessGateway = {
   retrieve: () => Promise.resolve({ status: "retryable" }),
 };
+const unavailableIntakeGateway: IntakeGateway = {
+  accept: () => Promise.resolve({ status: "retryable" }),
+};
 
 export function App({
   accountlessGateway = unavailableGateway,
+  createOperationId = () => crypto.randomUUID(),
+  intakeGateway = unavailableIntakeGateway,
 }: {
   readonly accountlessGateway?: AccountlessGateway;
+  readonly createOperationId?: () => string;
+  readonly intakeGateway?: IntakeGateway;
 }) {
   const [locale, setLocale] = useState<Locale>("fr");
   const copy = messages[locale];
@@ -24,7 +32,14 @@ export function App({
   }
 
   if (window.location.pathname === "/wisemoney") {
-    return <FeedbackIntake locale={locale} onLocaleChange={selectLocale} />;
+    return (
+      <FeedbackIntake
+        createOperationId={createOperationId}
+        gateway={intakeGateway}
+        locale={locale}
+        onLocaleChange={selectLocale}
+      />
+    );
   }
   if (window.location.pathname === "/retrieve") {
     return (

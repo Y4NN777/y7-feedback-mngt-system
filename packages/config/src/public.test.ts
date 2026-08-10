@@ -7,6 +7,7 @@ const validPreview = {
   VITE_APPWRITE_ENVIRONMENT: "preview",
   VITE_APPWRITE_ENDPOINT: "https://preview.appwrite.example/v1",
   VITE_APPWRITE_PROJECT_ID: "feedback-preview",
+  VITE_API_ENDPOINT: "https://feedback-api.example/",
   VITE_RELEASE: "commit-123",
 };
 
@@ -17,6 +18,7 @@ describe("public environment contract", () => {
       backendEnvironment: "preview",
       appwriteEndpoint: "https://preview.appwrite.example/v1",
       appwriteProjectId: "feedback-preview",
+      apiEndpoint: "https://feedback-api.example/",
       release: "commit-123",
     });
   });
@@ -34,6 +36,10 @@ describe("public environment contract", () => {
       "ENDPOINT_INSECURE",
     ],
     [{ ...validPreview, VITE_APPWRITE_PROJECT_ID: " " }, "CONFIG_MISSING"],
+    [
+      { ...validPreview, VITE_API_ENDPOINT: "http://remote.example" },
+      "ENDPOINT_INSECURE",
+    ],
     [{ ...validPreview, VITE_PROVIDER_TOKEN: "do-not-ship" }, "PUBLIC_SECRET_KEY"],
   ])("BDD-ENV-002 rejects invalid public configuration", (input, code) => {
     expect(() => parsePublicConfig(input)).toThrow(new ConfigError(code));
