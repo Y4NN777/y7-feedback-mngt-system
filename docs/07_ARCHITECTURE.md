@@ -84,7 +84,7 @@ flowchart TB
         SW --> UI
     end
 
-    subgraph Delivery[Web delivery]
+    subgraph Delivery[Vercel PWA delivery]
         Static[Versioned Vite static assets]
         Route[Root, Project, retrieval, and management routing]
     end
@@ -211,10 +211,14 @@ Cloud region and plan must be able to meet the recovery, capacity, and SLO
 fitness tests. Self-hosting remains a future deployment alternative, not a
 second MVP topology.
 
-Frontend static hosting is deliberately replaceable. It must serve the Vite PWA
-over TLS at `feedback.y7labs.studio`, support SPA navigation fallback and cache
-headers for versioned assets, and preserve the fixed routing contract. Selecting
-the static host does not change backend authority.
+Vercel hosts the Vite PWA at `feedback.y7labs.studio`. Its project configuration
+provides SPA navigation fallback after static asset resolution, the fixed custom
+domain and TLS, security headers, and differentiated caching: content-hashed
+assets are immutable, while the HTML entry point, web app manifest, and service
+worker revalidate so that a deployment cannot strand clients on a stale shell.
+Protected API calls go directly to Appwrite and are never cached by Vercel.
+Preview deployments use non-production Appwrite configuration and cannot access
+production secrets or data.
 
 ### 6.2 Trusted Function boundary
 
@@ -677,7 +681,6 @@ No remaining product decision blocks this logical architecture. The following
 selections are intentionally deferred to implementation or production readiness
 because they do not alter the validated behavior:
 
-- static asset host and edge routing implementation;
 - Appwrite Cloud region and capacity plan, subject to privacy and SLO evidence;
 - workspace-actor login methods and account recovery details within Appwrite
   Auth; MFA remains mandatory for platform privileged actions;
@@ -685,6 +688,8 @@ because they do not alter the validated behavior:
 - validation libraries and antivirus engine configuration;
 - exact persisted-query cache allow-list and browser storage budgets;
 - exact system route labels reserved from Project slugs;
+- exact Vercel project configuration for production/preview promotion, headers,
+  redirects, rewrites, and rollback procedure;
 - retention periods for exceptional-access audit and operational telemetry,
   which require a governance policy before production;
 - assignment of the restoration capability among the fixed workspace roles;
@@ -724,4 +729,8 @@ The design relies on current official capabilities and constraints:
 - [PWA data storage](https://web.dev/learn/pwa/assets-and-data) and
   [service-worker behavior](https://web.dev/learn/pwa/service-workers) for the
   separation of application assets, IndexedDB data, and progressive offline
-  execution.
+  execution;
+- [Vite on Vercel](https://vercel.com/docs/frameworks/frontend/vite) for static
+  Vite delivery and SPA deep-link rewrites, and
+  [Vercel cache controls](https://vercel.com/docs/caching/cache-control-headers)
+  for immutable hashed assets and revalidated entry resources.

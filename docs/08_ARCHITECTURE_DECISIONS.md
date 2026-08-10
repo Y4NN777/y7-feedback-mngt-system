@@ -15,6 +15,7 @@
 | ADR-009 | Scheduled purge and complete independent recovery set | Accepted |
 | ADR-010 | Independently approved exceptional-access control plane | Accepted |
 | ADR-011 | SLO-driven observability and evidence-based capacity | Accepted |
+| ADR-012 | Vercel hosts the Vite PWA | Accepted |
 
 An ADR is subordinate to `01_PRD.md` through `06_DECISION_TRACEABILITY.md`.
 “Accepted” means selected for the proposed architecture; it does not claim that
@@ -41,8 +42,8 @@ a modular application sharing domain policy across synchronous API Functions,
 async workers, and scheduled maintenance Functions. Use Appwrite Auth,
 TablesDB/Transactions, private Storage, and Realtime within that boundary.
 
-Use a replaceable static origin for the Vite PWA. The origin must meet the fixed
-domain, TLS, SPA fallback, and caching requirements; its vendor is deferred.
+Use Vercel as the static origin for the Vite PWA, under the controls recorded in
+ADR-012.
 
 ### Consequences
 
@@ -516,12 +517,59 @@ hold. Tune scoped indexes and bounded queries before adding new infrastructure.
 - **Scale out before query evidence:** adds cost and complexity without proving
   the bottleneck.
 
+## ADR-012 - Vercel Hosts the Vite PWA
+
+**Status:** Accepted
+
+**Decision drivers:** validated Vercel hosting decision; React/Vite/PWA stack;
+FR-PROJ-001..010; NFR-UX-001..006; NFR-SLO-001..004.
+
+### Context
+
+The Vite application needs production delivery at `feedback.y7labs.studio`, SPA
+deep links for direct Project routes, safe PWA updates, preview isolation, and
+cache behavior compatible with the Web Vitals objectives. Appwrite remains the
+authoritative backend and must not be replaced or duplicated at the edge.
+
+### Decision
+
+Host the built Vite PWA on Vercel. Configure route fallback only after static
+asset resolution so current/historical Project and reserved system routes reach
+the React router. Attach `feedback.y7labs.studio` as the production domain.
+
+Cache content-hashed JavaScript, CSS, fonts, and static media as immutable.
+Require revalidation for the HTML entry point, web app manifest, and service
+worker. Do not proxy-cache authenticated, accountless, Attachment, or other
+protected Appwrite responses through Vercel. Production and preview deployments
+use separate public configuration and preview has no production secrets or data
+access.
+
+### Consequences
+
+- Vercel owns frontend availability, TLS termination, static edge delivery, and
+  deployment rollback; Appwrite continues to own all business authority.
+- Deep-link rewrite and cache headers become release fitness tests.
+- A Vercel outage can affect new online navigation even when an already-installed
+  PWA shell remains locally usable.
+- Vercel telemetry must obey the same minimization and retention governance as
+  other operational telemetry.
+
+### Alternatives not selected
+
+- **Appwrite Sites or another static host:** contradicts the now-validated Vercel
+  hosting choice without a demonstrated impossibility.
+- **Vercel Functions as a second business backend:** duplicates the trusted
+  Appwrite Function boundary and risks inconsistent authorization.
+- **Cache protected Appwrite responses at Vercel:** risks cross-principal data
+  exposure and stale authorization.
+- **Immutable service-worker/HTML caching:** can prevent safe PWA rollout and
+  recovery.
+
 ## 2. Deferred Implementation Records
 
 The following topics should receive implementation ADRs only when evidence or a
 selection exists:
 
-- static hosting and domain/edge routing;
 - Appwrite Cloud region and plan;
 - exact Appwrite Auth login and account-recovery methods;
 - email, telemetry, antivirus, and backup repository vendors;
@@ -531,6 +579,7 @@ selection exists:
   handling;
 - physical TablesDB indexes, Storage bucket configuration, and data migrations;
 - operational/audit telemetry retention and SLO alert thresholds.
+- exact Vercel project settings, preview promotion policy, and rollback runbook.
 
 None authorizes a product behavior change. If one cannot meet an upstream
 requirement, the architecture must be revisited explicitly rather than silently
