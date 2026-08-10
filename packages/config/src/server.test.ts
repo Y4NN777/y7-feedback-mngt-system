@@ -9,6 +9,16 @@ const validServer = {
   APPWRITE_ENDPOINT: "https://preview.appwrite.example/v1",
   APPWRITE_PROJECT_ID: "feedback-preview",
   APPWRITE_API_KEY: "server-only-key",
+  APPWRITE_DATABASE_ID: "feedback",
+  APPWRITE_PROJECTS_TABLE_ID: "projects",
+  APPWRITE_REPORTERS_TABLE_ID: "reporters",
+  APPWRITE_FEEDBACK_TABLE_ID: "feedback",
+  APPWRITE_LIFECYCLE_TABLE_ID: "feedback_lifecycle",
+  APPWRITE_ACCESS_GRANTS_TABLE_ID: "access_grants",
+  APPWRITE_NOTIFICATIONS_TABLE_ID: "notifications",
+  APPWRITE_OUTBOX_TABLE_ID: "notification_outbox",
+  APPWRITE_IDEMPOTENCY_TABLE_ID: "intake_idempotency",
+  ACCESS_PROOF_ENVELOPE_KEY: "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc",
   RELEASE: "commit-123",
 };
 
@@ -20,6 +30,18 @@ describe("trusted environment contract", () => {
       appwriteEndpoint: "https://preview.appwrite.example/v1",
       appwriteProjectId: "feedback-preview",
       appwriteApiKey: "server-only-key",
+      appwriteSchema: {
+        databaseId: "feedback",
+        projectsTableId: "projects",
+        reportersTableId: "reporters",
+        feedbackTableId: "feedback",
+        lifecycleTableId: "feedback_lifecycle",
+        accessGrantsTableId: "access_grants",
+        notificationsTableId: "notifications",
+        outboxTableId: "notification_outbox",
+        idempotencyTableId: "intake_idempotency",
+      },
+      accessProofEnvelopeKey: "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc",
       release: "commit-123",
     });
   });
@@ -28,5 +50,26 @@ describe("trusted environment contract", () => {
     expect(() => parseServerConfig({ ...validServer, APPWRITE_API_KEY: "" })).toThrow(
       new ConfigError("CONFIG_MISSING"),
     );
+  });
+
+  it("BDD-ENV-004 rejects incomplete Appwrite schema and malformed proof keys", () => {
+    expect(() =>
+      parseServerConfig({ ...validServer, APPWRITE_DATABASE_ID: "" }),
+    ).toThrow(new ConfigError("CONFIG_MISSING"));
+    expect(() =>
+      parseServerConfig({ ...validServer, APPWRITE_DATABASE_ID: "bad/id" }),
+    ).toThrow(new ConfigError("APPWRITE_SCHEMA_INVALID"));
+    expect(() =>
+      parseServerConfig({
+        ...validServer,
+        APPWRITE_FEEDBACK_TABLE_ID: "reporters",
+      }),
+    ).toThrow(new ConfigError("APPWRITE_SCHEMA_INVALID"));
+    expect(() =>
+      parseServerConfig({
+        ...validServer,
+        ACCESS_PROOF_ENVELOPE_KEY: "not-a-32-byte-base64url-key",
+      }),
+    ).toThrow(new ConfigError("PROOF_KEY_INVALID"));
   });
 });
