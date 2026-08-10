@@ -22,8 +22,11 @@ Before the first development commit, validate all four identity layers:
    `user.email` is an address verified by that GitHub account or its GitHub
    no-reply address. The literal address is never copied into curated session
    summaries or plans.
-4. **Signature:** commits use a signing key registered with the personal
-   account and appear as verified on GitHub.
+4. **Human authorship:** commits use the configured personal Git author. Never
+   add `Co-Authored-By` or another machine-attribution trailer. This follows the
+   Aïobi Messenger convention: the human operating the repository is the commit
+   author; cryptographic GPG/SSH signing is optional and is not a delivery gate
+   unless a future repository rule explicitly requires it.
 
 Do not reuse organization, work, or alternate-account credentials. Do not
 place SSH keys, signing keys, tokens, or credential-helper output in the
@@ -32,7 +35,6 @@ repository or curated session evidence.
 Official references:
 
 - [GitHub repository rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets)
-- [Signing commits](https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits)
 
 ## 2. Branch and pull-request strategy
 
@@ -68,7 +70,6 @@ Configure the strongest repository ruleset supported by the repository:
 - required status checks;
 - linear history;
 - no force push or branch deletion for `main`;
-- signed commits;
 - no bypass during the Day 1/Day 2 Goal.
 
 If a personal-account repository setting cannot enforce one of these rules,
@@ -90,7 +91,9 @@ Every commit must:
 - contain no generated evidence, secret, local environment file, or editor
   state;
 - trace to at least one sprint task and requirement or architecture decision;
-- be signed and attributed to the personal GitHub account.
+- be attributed to the personal GitHub account with no machine co-author
+  trailer. Cryptographic signing may be used when configured, but its absence
+  is not a failure.
 
 Use Conventional Commits:
 
@@ -180,7 +183,8 @@ For each scenario:
 3. **Refactor:** improve names, boundaries, duplication, and design while the
    complete relevant suite stays green.
 4. **Integrate:** run contract/integration checks across the next boundary.
-5. **Commit:** create one signed atomic commit only after all commit gates pass.
+5. **Commit:** create one human-attributed atomic commit only after all commit
+   gates pass; add no machine co-author trailer.
 
 Run red and green validations through the active Codex session so its generated
 rollout transcript captures the commands and results. Summarize the final
@@ -473,7 +477,7 @@ Development may begin only after all items below are agreed:
 
 - [ ] The active Goal scope and its acceptance gates are complete.
 - [ ] Task sequencing and blocker rules are accepted.
-- [ ] Personal GitHub identity, remote, signature, and branch policy are
+- [ ] Personal GitHub identity, remote, human-authorship, and branch policy are
       verified.
 - [ ] Atomic commit format and pull-request strategy are accepted.
 - [ ] BDD/TDD workflow and test thresholds are accepted.
