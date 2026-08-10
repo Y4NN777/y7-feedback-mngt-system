@@ -75,7 +75,7 @@ jobs:
           package-manager-cache: false
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Install Chrome and browser dependencies
-        run: pnpm exec playwright install --with-deps chrome
+      - name: Install Chromium and browser dependencies
+        run: pnpm --filter @y7-feedback/web exec playwright install --with-deps chromium
       - name: Run browser scenarios
         run: pnpm test:e2e
