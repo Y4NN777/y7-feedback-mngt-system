@@ -6,6 +6,7 @@ import { createRoot } from "react-dom/client";
 
 import { parsePublicConfig } from "@y7-feedback/config/public";
 
+import { createHttpAccountlessGateway } from "./AccountlessHttpGateway";
 import { App } from "./App";
 import { createHttpIntakeGateway } from "./IntakeGateway";
 import "./styles.css";
@@ -14,6 +15,7 @@ const root = document.querySelector<HTMLDivElement>("#root");
 const queryClient = new QueryClient();
 const config = parsePublicConfig(import.meta.env);
 const intakeGateway = createHttpIntakeGateway(config.apiEndpoint);
+const accountlessGateway = createHttpAccountlessGateway(config.apiEndpoint);
 
 if (!root) {
   throw new Error("Application root is missing");
@@ -22,7 +24,7 @@ if (!root) {
 createRoot(root).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <App intakeGateway={intakeGateway} />
+      <App accountlessGateway={accountlessGateway} intakeGateway={intakeGateway} />
     </QueryClientProvider>
   </StrictMode>,
 );
