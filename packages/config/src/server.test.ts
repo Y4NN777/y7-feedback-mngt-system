@@ -21,7 +21,9 @@ const validServer = {
   APPWRITE_ATTACHMENT_BUCKET_ID: "private_attachments",
   APPWRITE_ATTACHMENT_STAGING_TABLE_ID: "attachment_staging",
   APPWRITE_ATTACHMENTS_TABLE_ID: "attachments",
+  APPWRITE_PROVIDER_GRANTS_TABLE_ID: "provider_grants",
   ACCESS_PROOF_ENVELOPE_KEY: "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc",
+  PROVIDER_GRANT_ENVELOPE_KEY: "CAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg",
   RELEASE: "commit-123",
 };
 
@@ -46,8 +48,10 @@ describe("trusted environment contract", () => {
         attachmentBucketId: "private_attachments",
         attachmentStagingTableId: "attachment_staging",
         attachmentsTableId: "attachments",
+        providerGrantsTableId: "provider_grants",
       },
       accessProofEnvelopeKey: "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc",
+      providerGrantEnvelopeKey: "CAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg",
       release: "commit-123",
     });
   });
@@ -89,5 +93,11 @@ describe("trusted environment contract", () => {
         ACCESS_PROOF_ENVELOPE_KEY: "not-a-32-byte-base64url-key",
       }),
     ).toThrow(new ConfigError("PROOF_KEY_INVALID"));
+    expect(() =>
+      parseServerConfig({
+        ...validServer,
+        PROVIDER_GRANT_ENVELOPE_KEY: validServer.ACCESS_PROOF_ENVELOPE_KEY,
+      }),
+    ).toThrow(new ConfigError("PROVIDER_GRANT_KEY_INVALID"));
   });
 });

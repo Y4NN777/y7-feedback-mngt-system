@@ -28,8 +28,10 @@ const config: ServerConfig = {
     attachmentBucketId: "private_attachments",
     attachmentStagingTableId: "attachment_staging",
     attachmentsTableId: "attachments",
+    providerGrantsTableId: "provider_grants",
   },
   accessProofEnvelopeKey: "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc",
+  providerGrantEnvelopeKey: "CAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg",
   release: "commit-application",
 };
 

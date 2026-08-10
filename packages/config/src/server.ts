@@ -26,8 +26,10 @@ export interface ServerConfig {
     readonly attachmentBucketId: string;
     readonly attachmentStagingTableId: string;
     readonly attachmentsTableId: string;
+    readonly providerGrantsTableId: string;
   };
   readonly accessProofEnvelopeKey: string;
+  readonly providerGrantEnvelopeKey: string;
   readonly release: string;
 }
 
@@ -56,6 +58,7 @@ function parseAppwriteSchema(input: Readonly<Record<string, string | undefined>>
       input.APPWRITE_ATTACHMENT_STAGING_TABLE_ID,
     ),
     attachmentsTableId: requireAppwriteId(input.APPWRITE_ATTACHMENTS_TABLE_ID),
+    providerGrantsTableId: requireAppwriteId(input.APPWRITE_PROVIDER_GRANTS_TABLE_ID),
   };
   if (new Set(Object.values(tableIds)).size !== Object.values(tableIds).length) {
     throw new ConfigError("APPWRITE_SCHEMA_INVALID");
@@ -69,6 +72,17 @@ function parseProofKey(value: string | undefined): string {
   return key;
 }
 
+function parseProviderGrantKey(
+  value: string | undefined,
+  proofEnvelopeKey: string,
+): string {
+  const key = requireValue(value);
+  if (!proofKey.test(key) || key === proofEnvelopeKey) {
+    throw new ConfigError("PROVIDER_GRANT_KEY_INVALID");
+  }
+  return key;
+}
+
 export function parseServerConfig(
   input: Readonly<Record<string, string | undefined>>,
 ): ServerConfig {
@@ -76,6 +90,7 @@ export function parseServerConfig(
   const backendEnvironment = parseEnvironment(input.APPWRITE_ENVIRONMENT);
   assertMatchingEnvironment(environment, backendEnvironment);
 
+  const accessProofEnvelopeKey = parseProofKey(input.ACCESS_PROOF_ENVELOPE_KEY);
   return {
     environment,
     backendEnvironment,
@@ -83,7 +98,11 @@ export function parseServerConfig(
     appwriteProjectId: requireValue(input.APPWRITE_PROJECT_ID),
     appwriteApiKey: requireValue(input.APPWRITE_API_KEY),
     appwriteSchema: parseAppwriteSchema(input),
-    accessProofEnvelopeKey: parseProofKey(input.ACCESS_PROOF_ENVELOPE_KEY),
+    accessProofEnvelopeKey,
+    providerGrantEnvelopeKey: parseProviderGrantKey(
+      input.PROVIDER_GRANT_ENVELOPE_KEY,
+      accessProofEnvelopeKey,
+    ),
     release: requireValue(input.RELEASE),
   };
 }
