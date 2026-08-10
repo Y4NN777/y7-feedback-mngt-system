@@ -317,6 +317,94 @@ textarea:focus-visible {
   margin: 1.5rem 0 0 auto;
 }
 
+.access-material,
+.retrieve-shell,
+.retrieved-view {
+  max-width: 68rem;
+  margin: clamp(4.5rem, 9vw, 8rem) auto 0;
+}
+
+.access-material > h1,
+.retrieve-shell > h1,
+.retrieved-view > h1 {
+  max-width: 12ch;
+  margin-bottom: 1.25rem;
+  font-size: clamp(3rem, 7vw, 6.5rem);
+}
+
+.access-pair,
+.retrieve-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+  margin-top: 2.5rem;
+  border-radius: 2rem;
+  padding: clamp(1.25rem, 4vw, 2.75rem);
+  background: #d4b895;
+}
+
+.text-action {
+  justify-self: start;
+  border: 0;
+  padding: 0;
+  color: #242917;
+  background: transparent;
+  font-weight: 740;
+  text-decoration: underline;
+  text-underline-offset: 0.25rem;
+  cursor: pointer;
+}
+
+.preservation-note {
+  border-left: 0.3rem solid #4f5a2e;
+  margin: 1.5rem 0 0;
+  padding: 0.75rem 1rem;
+  line-height: 1.55;
+}
+
+.retrieve-shell > .lede {
+  max-width: 42rem;
+}
+
+.retrieve-form .form-error,
+.retrieve-form .primary-action {
+  grid-column: 1 / -1;
+}
+
+.retrieve-form .primary-action {
+  justify-self: end;
+}
+
+.retrieved-view .review-band {
+  margin-top: 1rem;
+}
+
+.state-word {
+  font-family: "Fraunces Variable", serif;
+  font-size: clamp(1.8rem, 4vw, 3rem);
+  font-weight: 600;
+}
+
+.reporter-categories {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2rem;
+}
+
+.reporter-categories h2 {
+  font-size: clamp(1.5rem, 3vw, 2.5rem);
+}
+
+.reporter-categories p {
+  font-size: 1.5rem;
+  font-weight: 740;
+}
+
+.retrieve-again {
+  display: block;
+  margin: 1.5rem max(calc((100% - 68rem) / 2), 0rem) 0 auto;
+}
+
 .root-page {
   width: min(100% - 2rem, 88rem);
   margin-inline: auto;
@@ -538,6 +626,22 @@ h1 {
   .primary-action {
     width: 100%;
     justify-self: stretch;
+  }
+
+  .access-pair,
+  .retrieve-form,
+  .reporter-categories {
+    grid-template-columns: 1fr;
+  }
+
+  .access-pair,
+  .retrieve-form {
+    border-radius: 1.4rem;
+  }
+
+  .retrieve-form .primary-action,
+  .retrieve-again {
+    width: 100%;
   }
 
   .masthead {

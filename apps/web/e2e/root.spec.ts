@@ -118,3 +118,45 @@ test("BDD-UX-INTAKE-001 is accessible without overflow at 320 px", async ({ page
   expect(seriousViolations).toEqual([]);
   expect(hasHorizontalOverflow).toBe(false);
 });
+
+test("BDD-ACC-UX-001 preserves private retrieval input and fails honestly without an API", async ({
+  page,
+}) => {
+  await page.goto("/retrieve");
+
+  await page.getByRole("textbox", { name: "Référence" }).fill("Y7-2026-000001");
+  await page
+    .getByLabel("Preuve d’accès")
+    .fill("proof_A_abcdefghijklmnopqrstuvwxyz_0123456789ABCDEFG");
+  await page.getByRole("button", { name: "English" }).click();
+  await expect(page.getByRole("textbox", { name: "Reference" })).toHaveValue(
+    "Y7-2026-000001",
+  );
+  await expect(page.getByLabel("Access proof")).toHaveValue(
+    "proof_A_abcdefghijklmnopqrstuvwxyz_0123456789ABCDEFG",
+  );
+
+  await page.getByRole("button", { name: "Retrieve feedback" }).click();
+  await expect(page.getByRole("alert")).toContainText("temporarily unavailable");
+  await expect(page).not.toHaveURL(/proof_A/u);
+});
+
+test("BDD-ACC-UX-001 retrieval is accessible without overflow at 320 px", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await page.goto("/retrieve");
+
+  const accessibility = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa"])
+    .analyze();
+  const seriousViolations = accessibility.violations.filter(
+    (violation) => violation.impact === "serious" || violation.impact === "critical",
+  );
+  const hasHorizontalOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  );
+
+  expect(seriousViolations).toEqual([]);
+  expect(hasHorizontalOverflow).toBe(false);
+});
