@@ -6,7 +6,8 @@
   "main": "dist/main.js",
   "dependencies": {
     "@y7-feedback/config": "workspace:*",
-    "@y7-feedback/domain": "workspace:*"
+    "@y7-feedback/domain": "workspace:*",
+    "node-appwrite": "27.1.0"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

@@ -110,6 +110,9 @@ importers:
       "@y7-feedback/domain":
         specifier: workspace:*
         version: link:../../packages/domain
+      node-appwrite:
+        specifier: 27.1.0
+        version: 27.1.0
 
   packages/config: {}
 
@@ -2140,6 +2143,12 @@ packages:
         integrity: sha512-RKshQI1R3YQ+n9YJz2QQ147P66ELpa1FQEg20Dk8oW9t2KgLbpDLLp9aGZ7y8WHSshDknG0bknqGw5/tyCs5tw==,
       }
 
+  bignumber.js@9.3.1:
+    resolution:
+      {
+        integrity: sha512-Ko0uX15oIUS7wJ3Rb30Fs6SkVbLmPBAKdlm7q9+ak9bbIeFf0MwuBsQV6z7+X768/cHsfg+WlysDWJcmthjsjQ==,
+      }
+
   brace-expansion@1.1.18:
     resolution:
       {
@@ -3296,6 +3305,12 @@ packages:
     engines: { node: ">=6" }
     hasBin: true
 
+  json-bigint@1.0.0:
+    resolution:
+      {
+        integrity: sha512-SiPv/8VpZuWbvLSMtTDU8hEfrZWg/mH/nV/b4o0CYbSxu1UIQPLdwKOCIyLQX+VIPO5vrLX3i8qtqFyhdPSUSQ==,
+      }
+
   json-buffer@3.0.1:
     resolution:
       {
@@ -3621,6 +3636,12 @@ packages:
     resolution:
       {
         integrity: sha512-OWND8ei3VtNC9h7V60qff3SVobHr996CTwgxubgyQYEpg290h9J0buyECNNJexkFm5sOajh5G116RYA1c8ZMSw==,
+      }
+
+  node-appwrite@27.1.0:
+    resolution:
+      {
+        integrity: sha512-YUxhpqAcTryaO7jSo6CKBqTpBD3U7bPhEGjzoEWX5kSZGHnkQ0s3iJn5dUfJ4xID+afH4/j+8bU3Cacs5gbjXw==,
       }
 
   node-exports-info@1.6.2:
@@ -4423,6 +4444,13 @@ packages:
       {
         integrity: sha512-j375ScV60dom+YkPFIfTLcOiPxkN/buHz5GobjLhixFuANaNs3C9l4GmrWqejgXWJ7BbJcFYpTEUkS1Ge8bpZQ==,
       }
+
+  undici@6.28.0:
+    resolution:
+      {
+        integrity: sha512-LIY910g9TI13YS95lrMFrs8Rm/u/irgHeTWoKCoteeJ04CUJ92eEfj0rVn+7VKMPBpUPiUoBKfhNyLI23EE/KA==,
+      }
+    engines: { node: ">=18.17" }
 
   undici@8.10.0:
     resolution:
@@ -6203,6 +6231,8 @@ snapshots:
     dependencies:
       require-from-string: 2.0.2
 
+  bignumber.js@9.3.1: {}
+
   brace-expansion@1.1.18:
     dependencies:
       balanced-match: 1.0.2
@@ -6988,6 +7018,10 @@ snapshots:
 
   jsesc@3.1.0: {}
 
+  json-bigint@1.0.0:
+    dependencies:
+      bignumber.js: 9.3.1
+
   json-buffer@3.0.1: {}
 
   json-schema-traverse@0.4.1: {}
@@ -7138,6 +7172,11 @@ snapshots:
   nanoid@3.3.18: {}
 
   natural-compare@1.4.0: {}
+
+  node-appwrite@27.1.0:
+    dependencies:
+      json-bigint: 1.0.0
+      undici: 6.28.0
 
   node-exports-info@1.6.2:
     dependencies:
@@ -7695,6 +7734,8 @@ snapshots:
       which-boxed-primitive: 1.1.1
 
   undici-types@8.3.0: {}
+
+  undici@6.28.0: {}
 
   undici@8.10.0: {}
 
