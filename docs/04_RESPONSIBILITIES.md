@@ -270,8 +270,8 @@ initially live in one implementation.
   immediate soft deletion.
 - Removes soft-deleted data from ordinary Reporter, maintainer, search,
   notification, and Product Intelligence views.
-- Authorizes Workspace Owner restoration before purge and records its audit;
-  restoration never reconstructs already anonymized identity.
+- Enforces the explicit workspace restoration capability before purge and
+  records its audit; restoration never reconstructs already anonymized identity.
 - Purges Feedback-owned business data and Attachments after 30 days and makes
   business restoration impossible thereafter.
 - Preserves only the approved minimal deletion and purge evidence.

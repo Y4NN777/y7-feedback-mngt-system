@@ -232,7 +232,7 @@ Deletion is an orthogonal record state:
 stateDiagram-v2
     active_record --> deletion_requested: authorized reporter or workspace action
     deletion_requested --> soft_deleted: immediate soft delete and required anonymization
-    soft_deleted --> active_record: Workspace Owner restores before purge
+    soft_deleted --> active_record: authorized workspace restore before purge
     soft_deleted --> purged: 30 days elapsed; definitive purge
 ```
 
@@ -248,7 +248,7 @@ flowchart LR
     Backup -->|retain 30 days| Expire[Backup expiry]
     Backup -->|disaster recovery| Restore[Isolated restore]
     Restore --> Replay[Reapply soft-delete and purge evidence]
-    Replay --> Verify{RPO <= 24 h and RTO <= 4 h?}
+    Replay --> Verify{RPO at most 24 h and RTO at most 4 h?}
     Verify -- Yes --> Resume[Resume ordinary access]
     Verify -- No --> Incident[Keep recovery incident active]
 ```

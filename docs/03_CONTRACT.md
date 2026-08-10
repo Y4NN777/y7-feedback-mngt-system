@@ -328,8 +328,9 @@ no continuing real-person identity.
 - A minimal deletion audit remains until definitive purge after 30 days.
 - Searching by former contact or external identifier does not return anonymized
   Feedback.
-- Before purge, a Workspace Owner may restore Feedback through an authorized,
-  audited operation. Restoration does not reverse completed anonymization.
+- Before purge, a workspace actor holding the explicit restoration capability
+  may restore Feedback through an authorized, audited operation. Restoration
+  does not reverse completed anonymization.
 - After purge, business restoration is impossible, including by an ordinary
   backup-restore operation.
 - Feedback-owned Attachments follow the same soft-delete, restore, and purge
@@ -379,7 +380,7 @@ do not require an event bus, event sourcing, or any transport technology.
 | `DeletionRequested` | Feedback, authorized requester, time. |
 | `FeedbackAnonymized` | Feedback, policy, actor/process, time. |
 | `FeedbackSoftDeleted` | Feedback, actor/process, reason, time, retention rule reference. |
-| `FeedbackRestored` | Feedback, Workspace Owner, prior deletion state, reason, time; previously anonymized identity remains absent. |
+| `FeedbackRestored` | Feedback, authorized workspace actor, prior deletion state, reason, time; previously anonymized identity remains absent. |
 | `FeedbackPurged` | Feedback deletion reference, purge eligibility time, process, completion time. |
 | `NotificationRequested` | Source event, recipient scope, channel, time. |
 | `NotificationDeliveryRecorded` | Notification, channel, outcome, time. |
