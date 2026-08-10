@@ -9,7 +9,8 @@
     "@tanstack/react-query": "^5.101.4",
     "@y7-feedback/domain": "workspace:*",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "web-vitals": "^6.1.0"
   },
   "scripts": {
     "build": "pnpm typecheck && vite build",

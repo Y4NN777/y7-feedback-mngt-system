@@ -1,12 +1,17 @@
 {
-  "name": "@y7-feedback/api",
+  "name": "@y7-feedback/config",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "main": "dist/main.js",
-  "dependencies": {
-    "@y7-feedback/config": "workspace:*",
-    "@y7-feedback/domain": "workspace:*"
+  "exports": {
+    "./public": {
+      "types": "./src/public.ts",
+      "default": "./dist/public.js"
+    },
+    "./server": {
+      "types": "./src/server.ts",
+      "default": "./dist/server.js"
+    }
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

@@ -8,6 +8,7 @@ const requiredFiles = [
   "pnpm-workspace.yaml",
   "apps/web/package.json",
   "functions/api/package.json",
+  "packages/config/package.json",
   "packages/domain/package.json",
   "tsconfig.base.json",
   "vercel.json",

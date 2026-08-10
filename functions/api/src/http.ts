@@ -18,12 +18,54 @@ export interface FunctionContext {
   readonly error: (message: string) => void;
 }
 
-const noStore = { "cache-control": "no-store" } as const;
+export interface HttpDependencies {
+  readonly createCorrelationId: () => string;
+  readonly environment: "development" | "preview" | "production";
+  readonly now: () => number;
+  readonly release: string;
+  readonly startedAt: () => number;
+}
 
-export function routeRequest({ req, res }: FunctionContext): unknown {
-  if (req.method === "GET" && req.path === "/health") {
-    return res.json({ status: "ok" }, 200, noStore);
+const defaultDependencies: HttpDependencies = {
+  createCorrelationId: randomUUID,
+  environment: "development",
+  now: Date.now,
+  release: "local",
+  startedAt: Date.now,
+};
+
+export function routeRequest(
+  { req, res, log }: FunctionContext,
+  dependencies: HttpDependencies = defaultDependencies,
+): unknown {
+  const startedAt = dependencies.startedAt();
+  const correlationId = dependencies.createCorrelationId();
+  const headers = {
+    "cache-control": "no-store",
+    "x-correlation-id": correlationId,
+  } as const;
+
+  const isHealth = req.method === "GET" && req.path === "/health";
+  const statusCode = isHealth ? 200 : 404;
+  log(
+    serializeOperationalEvent({
+      event: "api.request.completed",
+      correlationId,
+      environment: dependencies.environment,
+      release: dependencies.release,
+      operation: isHealth ? "health" : "unknown",
+      outcome: isHealth ? "success" : "not_found",
+      statusCode,
+      durationMs: Math.max(0, dependencies.now() - startedAt),
+    }),
+  );
+
+  if (isHealth) {
+    return res.json({ status: "ok" }, statusCode, headers);
   }
 
-  return res.json({ error: "not_found" }, 404, noStore);
+  return res.json({ error: "not_found" }, statusCode, headers);
 }
+import { randomUUID } from "node:crypto";
+
+import { serializeOperationalEvent } from "./observability";

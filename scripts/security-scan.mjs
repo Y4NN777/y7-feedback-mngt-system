@@ -3,9 +3,19 @@ import { extname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repositoryRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
-const scanRoots = ["apps/web/src", "apps/web/public", "apps/web/dist", "vercel.json"];
+const scanRoots = [
+  ".env.example",
+  "apps/web/src",
+  "apps/web/public",
+  "apps/web/dist",
+  "functions/api/src",
+  "packages/config/src",
+  "packages/domain/src",
+  "vercel.json",
+];
 const textExtensions = new Set([
   ".css",
+  ".example",
   ".html",
   ".js",
   ".json",
@@ -71,7 +81,11 @@ async function collectFiles(path) {
     const child = join(absolutePath, entry.name);
     if (entry.isDirectory()) {
       files.push(...(await collectFiles(relative(repositoryRoot, child))));
-    } else if (entry.isFile() && textExtensions.has(extname(entry.name))) {
+    } else if (
+      entry.isFile() &&
+      !entry.name.includes(".test.") &&
+      textExtensions.has(extname(entry.name))
+    ) {
       files.push(child);
     }
   }

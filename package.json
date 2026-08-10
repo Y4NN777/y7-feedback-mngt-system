@@ -8,11 +8,12 @@
     "node": ">=24 <25"
   },
   "scripts": {
-    "build": "pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build && pnpm --filter @y7-feedback/web build",
+    "build": "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build && pnpm --filter @y7-feedback/web build",
     "dev": "pnpm --filter @y7-feedback/web dev",
     "format": "prettier --write \"apps/**/*.{html,json,ts,tsx,css}\" \"functions/**/*.{json,ts}\" \"packages/**/*.{json,ts}\" \"scripts/**/*.mjs\" \"tests/**/*.mjs\" \"*.{json,js,yaml}\"",
     "format:check": "prettier --check \"apps/**/*.{html,json,ts,tsx,css}\" \"functions/**/*.{json,ts}\" \"packages/**/*.{json,ts}\" \"scripts/**/*.mjs\" \"tests/**/*.mjs\" \"*.{json,js,yaml}\"",
     "lint": "eslint . --max-warnings 0",
+    "probe": "node scripts/probe.mjs",
     "security:scan": "node scripts/security-scan.mjs",
     "test": "node --test tests/*.test.mjs && pnpm -r --if-present test",
     "test:coverage": "node --test tests/*.test.mjs && pnpm -r --if-present test:coverage",
