@@ -96,7 +96,7 @@ function optionalSource(value: string | undefined): string | undefined {
   return value === undefined ? undefined : requiredSource(value);
 }
 
-function validateSource(source: FeedbackSource): FeedbackSource {
+export function validateFeedbackSource(source: FeedbackSource): FeedbackSource {
   if (source.type === "bug") {
     const expectedBehavior = optionalSource(source.expectedBehavior);
     const observedBehavior = optionalSource(source.observedBehavior);
@@ -211,7 +211,7 @@ export function validateFeedbackDraft(
     projectId: config.projectId,
     workspaceId: config.workspaceId,
     type: draft.type,
-    originalSource: validateSource(draft.source),
+    originalSource: validateFeedbackSource(draft.source),
     reporter: draft.reporter,
     context: validateContext(config, draft.context),
     attachmentNames: [...draft.attachmentNames],
