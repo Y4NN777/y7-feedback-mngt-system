@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">Y7 Feedback</title>
+  <rect width="512" height="512" rx="128" fill="#606c38"/>
+  <path d="M104 130h76l76 112 76-112h76L290 300v82h-68v-82L104 130Z" fill="#e8dcc7"/>
+  <path d="M319 231h89v59l-67 92h-78l76-96h-20v-55Z" fill="#c66b3d"/>
+</svg>

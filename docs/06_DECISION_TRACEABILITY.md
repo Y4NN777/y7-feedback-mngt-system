@@ -18,7 +18,7 @@ owners in `04_RESPONSIBILITIES.md`, and behavior and relationships in
 
 | Decision | Requirements | Contract | Primary responsibilities | Model evidence |
 | --- | --- | --- | --- | --- |
-| **PD-001** Independent multi-project feedback-loop product | FR-OWN-007; FR-PROJ-006..007; FR-FDB-001, 006..009; NFR-CON-001..004; NFR-EVO-001 | Observable Operations 3.1..3.5; Acceptance and Consistency; INV-ACCEPT-001 | Project Registry; Feedback Intake Coordination; Feedback Record Stewardship; Public and Maintainer Experiences | System Context; UC-01..11; Intake Activity and Sequence; Conceptual Information Model |
+| **PD-001** Independent multi-project feedback-loop product | FR-OWN-007; FR-PROJ-006..007; FR-FDB-001, 006..009; NFR-CON-001..004; NFR-EVO-001 | Observable Operations 3.1..3.5; Acceptance and Consistency; INV-ACCEPT-001 | Project Registry; Feedback Intake Coordination; Feedback Record Stewardship; Public and Maintainer Experiences | System Context; UC-01..12; Intake Activity and Sequence; Conceptual Information Model |
 | **PD-002** Workspace ownership and SaaS isolation | FR-OWN-001, 003..007; FR-REP-006; FR-INT-008; NFR-SEC-001..003, 006; NFR-EVO-002 | INV-OWN-001, 003..006; Isolation behavior in Observable Operations | Workspace Ownership Policy | System Context; WORKSPACE ownership relationships; Ownership and Mutability Summary |
 | **PD-003** Workspace-scoped Reporter distinct from authentication | FR-OWN-002..003; FR-REP-001..009; FR-PRIV-001; NFR-EVO-005 | INV-OWN-002..003; Reporter Attribution; INV-REP-001 | Reporter Attribution | Reporter Attribution Model; REPORTER and REPORTER_IDENTIFIER relationships |
 | **PD-004** Accountless continuity, conversation, lifecycle, history, reopening | FR-FDB-007, 009; FR-ACC-001..007; FR-CONV-001, 003..005; FR-LIFE-001..010 | Reference and Access; Conversation and Visibility; Feedback Lifecycle; INV-ACCESS-001, INV-SOURCE-001, INV-VIS-001, INV-LIFE-001..002 | Reporter Feedback Access; Conversation Coordination; Feedback Lifecycle; Feedback Record Stewardship | Accountless Retrieval; Clarification Sequence; Lifecycle Diagram; ACCESS_GRANT, VISIBLE_MESSAGE, LIFECYCLE_EVENT |
@@ -32,12 +32,13 @@ owners in `04_RESPONSIBILITIES.md`, and behavior and relationships in
 | **PD-012** Immediate anonymization/soft deletion, pre-purge restore, 30-day purge | FR-ACC-007; FR-LIFE-010; FR-OPS-007; FR-PRIV-002..009; FR-INT-009; NFR-REC-003 | Anonymization, Soft Deletion, and Retention; INV-DELETE-001; restore and purge events | Data Lifecycle and Privacy; Backup and Recovery | Deletion/recovery states and recovery activity; DELETION_RECORD; ATTACHMENT lifecycle |
 | **PD-013** Global mutable project slug with historical redirect | FR-PROJ-001..005; FR-OPS-003 | Project Route Contract; INV-ROUTE-001; ProjectSlugChanged | Project Registry | Intake route activity; PROJECT_SLUG relationship and state |
 | **PD-014** Bilingual orientation root without public discovery | FR-PROJ-008..010; NFR-UX-001 | Project Route Contract and Explicit Non-Guarantees | Public Feedback Experience; Project Registry | Root intent description; direct-route intake behavior; accepted root study |
-| **PD-015** French and English MVP | NFR-UX-001..002 | User Experience Contract | Public Feedback Experience; Maintainer Feedback Experience; Notification Coordination | Applies across UC-01..10; no localization implementation model introduced |
+| **PD-015** French and English MVP | NFR-UX-001..002 | User Experience Contract | Public Feedback Experience; Maintainer Feedback Experience; Notification Coordination | Applies across UC-01..12; no localization implementation model introduced |
 | **PD-016** SaaS without unrequested commercial or complex-team scope | FR-OWN-007; FR-OPS-001, 010; NFR-EVO-004 | Evolvability Contract and Explicit Non-Guarantees | Workspace Ownership Policy; Workspace Access Control | Workspace ownership and fixed-role model; no billing, plan, marketplace, or custom-domain entity |
 | **PD-017** Exact Attachment formats, limits, actual-content validation, and atomicity | FR-ATT-006..013; NFR-SEC-008; NFR-CON-001 | Acceptance and Consistency; Attachment Contract; INV-ATT-002..003; Anti-Abuse Contract | Attachment Policy and Coordination; Feedback Intake Coordination | Intake rejection/cleanup path; staged-to-accepted ATTACHMENT state |
 | **PD-018** Daily 30-day backups, RPO 24 h, RTO 4 h | NFR-REC-001..003 | Anonymization, Soft Deletion, and Retention; User Experience and Internal SLO Contract | Backup and Recovery; Data Lifecycle and Privacy; Safe Observability | Backup/recovery activity and deletion replay gate |
 | **PD-019** Quantitative anti-abuse without permanent tracking | NFR-SEC-004, 007..011; ERR-015 | Anti-Abuse Contract; INV-ABUSE-001 | Anti-Abuse Policy; Feedback Intake Coordination; Reporter Feedback Access | Intake validation/rejection branch; no persistent Reporter identity inferred |
 | **PD-020** Internal availability, Web Vitals, operation, notification, capacity, and viewport objectives | NFR-UX-006; NFR-SLO-001..011 | User Experience and Internal SLO Contract | Safe Observability and each measured operation owner | System context measurement boundary; 320 px and load envelope remain constraints, not domain entities |
+| **PD-021** Optional GitHub/GitLab.com connections and bidirectional linked-issue synchronization | FR-OWN-008; FR-SRC-001..006; FR-SYNC-001..013; ERR-017..019 | Observable Operations 3.7..3.8; Source Connection and External Issue Contract; INV-SRC-001, INV-SYNC-001, INV-PUB-001 | Source Connection Registry; External Issue Coordination; Conversation Publication Policy | UC-12; Source Connection and External Issue Model; SOURCE_CONNECTION, EXTERNAL_ISSUE_LINK, PUBLICATION_CONSENT, EXTERNAL_SYNC_FACT |
 
 ## 3. Invariant Ownership Check
 
@@ -59,6 +60,9 @@ owners in `04_RESPONSIBILITIES.md`, and behavior and relationships in
 | INV-INTEL-001..002 | FR-INT-001..010 | Product Intelligence | THEME, associations, relationships, Context |
 | INV-DELETE-001 | FR-PRIV-002..009; NFR-REC-003 | Data Lifecycle and Privacy | Deletion/recovery states and DELETION_RECORD |
 | INV-ABUSE-001 | NFR-SEC-004, 007..011 | Anti-Abuse Policy | Intake validation and rejection path |
+| INV-SRC-001 | FR-SRC-001..006 | Source Connection Registry | SOURCE_CONNECTION and connection lifecycle |
+| INV-SYNC-001 | FR-SYNC-001..006, 010..013 | External Issue Coordination | EXTERNAL_ISSUE_LINK and EXTERNAL_SYNC_FACT |
+| INV-PUB-001 | FR-SYNC-007..009 | Conversation Publication Policy | PUBLICATION_CONSENT and public-repository branch |
 
 ## 4. Resolved Contradictions
 
@@ -74,6 +78,7 @@ owners in `04_RESPONSIBILITIES.md`, and behavior and relationships in
 | The root page was in scope without defined behavior. | PD-014 and FR-PROJ-008..010 now define the accepted bilingual orientation pattern and preserve direct routes without discovery. |
 | SRS requirements had only broad proof categories. | Every normative requirement now has its own acceptance condition. |
 | Immediate anonymization appeared compatible with full pre-purge restoration. | FR-PRIV-009 and the Contract make explicit that restoration cannot recreate already anonymized identity. |
+| External issue integration was excluded while the product loop stopped before development workflow. | PD-021 adds optional GitHub/GitLab.com connections without making a repository the Project identity, and preserves consent, audience, source, and Workspace invariants. |
 
 ## 5. Closed Pre-Architecture Parameter Matrix
 
@@ -87,10 +92,12 @@ All six previously open parameter groups are now validated and traced.
 | Anti-abuse | PD-019; PRD 14.4 | NFR-SEC-004, 007..011 | INV-ABUSE-001 | Anti-Abuse Policy | Intake limit rejection path |
 | Internal SLOs | PD-020; PRD 14.5 | NFR-UX-006; NFR-SLO-001..011 | User Experience and Internal SLO Contract | Safe Observability and measured-operation owners | Recovery gate and cross-cutting model constraints |
 | Root experience | PD-014; root study | FR-PROJ-008..010 | Project Route Contract | Public Feedback Experience | Root intent description and direct-route bypass |
+| Development integration | PD-021 | FR-OWN-008; FR-SRC-001..006; FR-SYNC-001..013 | INV-SRC-001; INV-SYNC-001; INV-PUB-001 | Source Connection Registry; External Issue Coordination; Conversation Publication Policy | Connection, consent, issue-link, state mapping, and synchronization models |
 
 ## 6. Architecture Gate Result
 
-The Intent-to-Modeling chain is complete and the six former blockers are closed.
+The Intent-to-Modeling chain is complete, the six former blockers are closed,
+and the later validated development-integration decision is fully traced.
 Architecture is authorized and derived in `07_ARCHITECTURE.md`; important
 allocation decisions and alternatives are recorded in
 `08_ARCHITECTURE_DECISIONS.md`. Architecture remains subordinate to this chain:

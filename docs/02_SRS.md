@@ -32,6 +32,13 @@ acceptance conditions.
   feedback item; it is distinct from the confirmation reference.
 - **Platform Owner / Super Administrator** - the authority that independently
   approves exceptional Platform Operator access.
+- **Source connection** - an authorized, Project-scoped association with one
+  selected GitHub or GitLab.com repository; it is not the Project identity.
+- **External issue link** - the attributable association between one Feedback
+  and one issue in a connected repository.
+- **Conversation publication consent** - the Reporter decision authorizing
+  continuing publication of reporter-visible content to one public external
+  issue; it does not authorize Internal Notes or protected data.
 
 ## 3. Ownership and Isolation
 
@@ -44,6 +51,7 @@ acceptance conditions.
 | FR-OWN-005 | PD-002 | Accepted Workspace and Project ownership MUST NOT be reassigned by an ordinary update. | Attempts to change workspace or project ownership through edit operations are rejected and leave ownership unchanged. |
 | FR-OWN-006 | PD-002 | An actor authorized in one Workspace MUST NOT access another Workspace's business data. | A cross-workspace read, write, search, aggregate, attachment, or notification test returns no protected data. |
 | FR-OWN-007 | PD-001, PD-016 | Adding a Project or Workspace MUST NOT require a separate copy of Y7 Feedback. | A second project and a second workspace use the same product behavior and ownership model. |
+| FR-OWN-008 | PD-002, PD-021 | Every Source Connection MUST belong to exactly one Project and Workspace; every External Issue Link and publication consent MUST inherit the owning Feedback scope. | Cross-Workspace repository, issue-link, consent, webhook, and synchronization operations are rejected without disclosure. |
 
 ## 4. Project Routes and Lifecycle
 
@@ -201,7 +209,31 @@ Allowed primary transitions are:
 | FR-INT-009 | PD-009, PD-012 | Soft-deleted Feedback MUST be excluded from ordinary Product Intelligence results. | The same query ceases to include an item after soft deletion. |
 | FR-INT-010 | PD-009 | MVP compliance MUST NOT depend on automated or AI classification. | All required intelligence acceptance scenarios pass with accountable structured and manual classifications. |
 
-## 13. Privacy, Deletion, Security, and Consistency
+## 13. Source-Control and Issue Integration
+
+| ID | Source | Requirement | Acceptance condition |
+| --- | --- | --- | --- |
+| FR-SRC-001 | PD-021 | A Project MUST remain usable without a Source Connection and MAY connect multiple selected GitHub or GitLab.com repositories. | Manual Project creation and all core Feedback flows work with zero connections; two authorized repositories can be connected without changing Project identity. |
+| FR-SRC-002 | PD-006, PD-021 | Only a Workspace Owner MUST be able to create, select, suspend, reconnect, or disconnect a Source Connection for a Project in that Workspace. | A Maintainer, Reporter, actor from another Workspace, or forged Project identifier cannot change a connection. |
+| FR-SRC-003 | PD-021 | Repository discovery and import MUST expose only repositories authorized by the provider grant and explicitly selected for the Project. | Unselected, revoked, and provider-inaccessible repositories cannot be imported or used by synchronization. |
+| FR-SRC-004 | PD-021 | Imported repository metadata and release/version data MUST retain provider and repository provenance and MUST NOT reassign Project ownership or overwrite submitted Feedback Context. | Refreshing imported data changes only derived provider data; Project ownership and source Context remain unchanged. |
+| FR-SRC-005 | PD-021 | Y7 MUST provide a badge or link snippet for the Project without requiring repository-content write permission or modifying repository files. | The snippet resolves to the current Y7 Project route and installation performs no commit or repository file mutation. |
+| FR-SRC-006 | PD-002, PD-021 | Provider credentials and webhook secrets MUST remain server-side, encrypted at rest, scoped to the granting Workspace, and revocable. | Client bundles, browser storage, logs, and cross-Workspace operations expose no credential; revocation prevents subsequent provider access. |
+| FR-SYNC-001 | PD-004, PD-021 | An assigned Project Maintainer or Workspace Owner MUST be able to create or link at most one active external issue for a Feedback in a repository connected to its Project. | A second active link, unassigned actor, disconnected repository, or cross-Project target is rejected; historical links remain attributable. |
+| FR-SYNC-002 | PD-021 | Y7 states MUST map outward as follows: `received`, `under_review`, and `awaiting_reporter` keep the issue open with the corresponding Y7 label; `resolved` closes it as completed; `closed` closes it as not planned where supported; reopening reopens it. | Provider fixtures for every Y7 transition produce the specified issue state and label exactly once. |
+| FR-SYNC-003 | PD-004, PD-021 | Verified external state changes MUST map inward as follows: GitHub `completed` to `resolved`, GitHub `not_planned` or `duplicate` to `closed`, GitLab closure to `resolved`, and either provider's reopening to `under_review`. | Each signed provider event produces one attributable Y7 transition and the corresponding Reporter-visible external-treatment statement. |
+| FR-SYNC-004 | PD-004, PD-021 | A verified external closure MUST retain provider, repository, issue, external actor, reason when supplied, and time, and MUST constitute the Reporter-visible treatment conclusion required by the resulting state. | The lifecycle event and visible history expose that provenance without exposing provider credentials or workspace-only data. |
+| FR-SYNC-005 | PD-005, PD-021 | Reporter-visible Messages MUST synchronize in both directions for an active link, while Internal Notes MUST never be sent to or created from a provider. | Visible-message fixtures appear once on both sides; Internal Note creation and representative exports produce no provider payload. |
+| FR-SYNC-006 | PD-006, PD-021 | A provider comment MUST become Reporter-visible only when its author currently has verified repository write access; unverifiable or insufficiently authorized comments MUST be ignored from Reporter conversation and auditable. | Public outsider, stale collaborator, and provider-unavailable cases create no Reporter-visible Message; an eligible collaborator does. |
+| FR-SYNC-007 | PD-003, PD-021 | Publishing Reporter content to an issue in a public repository MUST require explicit, informed, Feedback-specific consent before the first publication. | Without consent only a non-secret reference, protected workspace link, and non-sensitive metadata can be sent; consent enables future visible-message publication for that link. |
+| FR-SYNC-008 | PD-003, PD-021 | Revoking publication consent MUST stop future Reporter-content publication and trigger a best-effort removal of Y7-controlled external content without claiming deletion of already public copies. | A post-revocation message remains only in Y7; removal outcome and the non-guarantee are recorded and disclosed. |
+| FR-SYNC-009 | PD-003, PD-005, PD-010, PD-021 | Automatic provider payloads MUST exclude Reporter identifiers and contact, Access Proofs, Internal Notes, Attachment bytes and access URLs, and unrelated Context. | Payload and log inspection across issue creation, comments, status changes, retry, and reconciliation finds none of the prohibited data. |
+| FR-SYNC-010 | PD-004, PD-021 | Provider-originated edits or deletions MUST create attributable revisions or tombstones and MUST NOT silently overwrite accepted source or Message history. | Editing and deleting an external comment preserves the prior Y7 value, provider actor, provider event, and time. |
+| FR-SYNC-011 | PD-001, PD-021 | Provider callbacks, retries, and reconciliation MUST be idempotent, replay-safe, and robust to duplicate, delayed, and out-of-order events. | Duplicate and reordered signed fixtures converge to one issue link, one message per external fact, and the latest valid lifecycle state without loops. |
+| FR-SYNC-012 | PD-001, PD-021 | Provider failure or rate limiting MUST leave synchronization visibly pending or failed without rolling back an accepted Y7 domain action; retry MUST honor provider guidance and reconciliation MUST repair recoverable divergence. | Simulated timeout, revocation, rate limit, and recovery preserve Y7 history, create no duplicate external effect, and expose the current sync outcome. |
+| FR-SYNC-013 | PD-012, PD-021 | Disconnecting a Source Connection or deleting its Feedback MUST stop synchronization and revoke active provider use while retaining only the minimal link and audit evidence required by policy; external copies are not represented as guaranteed deleted. | Later provider events cause no business mutation, credentials are unusable, and ordinary Y7 deletion views remain compliant. |
+
+## 14. Privacy, Deletion, Security, and Consistency
 
 | ID | Source | Requirement | Acceptance condition |
 | --- | --- | --- | --- |
@@ -233,7 +265,7 @@ Allowed primary transitions are:
 | NFR-CON-003 | PD-001 | A failed operation MUST NOT be presented as accepted. | Every simulated failure lacks a success outcome and preserves invariants. |
 | NFR-CON-004 | PD-004 | Domain history MUST remain ordered and attributable despite retry or notification failure. | Controlled concurrent and retry scenarios produce one coherent ordered history. |
 
-## 14. Accessibility, Localization, and Evolvability
+## 15. Accessibility, Localization, and Evolvability
 
 | ID | Source | Requirement | Acceptance condition |
 | --- | --- | --- | --- |
@@ -249,7 +281,7 @@ Allowed primary transitions are:
 | NFR-EVO-004 | PD-016 | Commercial or complex-team concepts MUST NOT be required for core Workspace ownership, feedback work, or Product Intelligence. | Core use cases complete with no billing, plan, invitation, or custom-role record. |
 | NFR-EVO-005 | PD-003 | Reporter attribution MUST remain independent of the workspace-actor authentication mechanism. | Changing an administrative authentication mechanism does not change Reporter meaning or ownership. |
 
-### 14.1 Internal Service-Level Objectives
+### 15.1 Internal Service-Level Objectives
 
 These are internal SLOs, not commercial SLAs. Percentiles apply to eligible
 production observations over the monthly reporting window; upload time is
@@ -269,7 +301,7 @@ excluded from Feedback creation latency.
 | NFR-SLO-010 | PD-020 | Email notification handoff to the configured provider MUST have P95 <= 30 seconds after its source event commits. | Source-event-to-provider-acceptance observations satisfy the monthly threshold; end-recipient delivery is not implied. |
 | NFR-SLO-011 | PD-020 | Supported capacity MUST be established and revised through load tests rather than an invented product threshold. | Before release, a reproducible load report states the envelope within which NFR-SLO-005..010 hold. |
 
-## 15. Error Outcomes
+## 16. Error Outcomes
 
 | ID | Condition | Required outcome |
 | --- | --- | --- |
@@ -289,8 +321,11 @@ excluded from Feedback creation latency.
 | ERR-014 | Dependency is unavailable | Return a safe retryable outcome when retry can succeed without duplicating effects. |
 | ERR-015 | An anti-abuse bound is exceeded | Return HTTP 429 with a safe retry indication; create no excess domain effect. |
 | ERR-016 | Restore is unauthorized or purge already occurred | Reject restoration; preserve audit and purge state. |
+| ERR-017 | Provider authorization, repository selection, or webhook authenticity is invalid | Reject without changing Workspace, Project, Feedback, conversation, or lifecycle state. |
+| ERR-018 | Public-repository publication lacks active Reporter consent | Publish no Reporter content; retain the Y7 action and expose the blocked synchronization outcome. |
+| ERR-019 | Provider state conflicts, arrives out of order, or cannot be verified | Preserve authoritative history, quarantine the event when needed, and reconcile without duplicate effects. |
 
-## 16. Architecture Readiness
+## 17. Architecture Readiness
 
 All product parameters previously identified as architecture blockers are now
 normative in this SRS. Architecture may choose mechanisms for persistence,

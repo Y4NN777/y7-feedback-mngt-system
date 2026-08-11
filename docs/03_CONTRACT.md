@@ -17,6 +17,7 @@ API, database, component, deployment, or vendor specification.
 | Project Maintainer | Work with Feedback, Attachments, Messages, Internal Notes, lifecycle, and Product Intelligence for assigned Projects. | Has no authority in unassigned Projects or another Workspace. |
 | Platform Operator | Operate and diagnose the shared platform using operational data. | Has no standing right to Workspace business content; exceptional content access requires a grant. |
 | Platform Owner / Super Administrator | Independently approve or deny exceptional Platform Operator access and review critical break-glass use. | Cannot approve a request in which it is the requesting operator; approval grants only the declared scope and duration. |
+| Connected Source Provider | Return authorized repository and release metadata; accept issue operations; emit signed repository, issue, and comment events. | Grants no Y7 authority by itself, cannot choose Workspace scope, and cannot expose unselected repositories through Y7. |
 
 Reporter attribution is not administrative authentication. A person may act as
 a Reporter and as a workspace actor through different, independently authorized
@@ -79,6 +80,26 @@ interactions.
 - **Failure:** no result, aggregate, identifier, or existence disclosure from an
   unauthorized scope.
 
+### 3.7 Source connection management
+
+- **Input:** an authorized Workspace Owner, one Project, a valid GitHub App or
+  GitLab.com OAuth grant, and explicitly selected repositories.
+- **Success:** Project-scoped Source Connections containing provider provenance,
+  current authorization state, selected repository identity, and imported
+  metadata without changing Project ownership.
+- **Failure:** no connection, no credential disclosure, and no visibility of an
+  unselected or cross-Workspace repository.
+
+### 3.8 External issue synchronization
+
+- **Input:** an authorized assigned Maintainer or Owner action, one Feedback,
+  one connected repository, any required public-publication consent, or an
+  authenticated provider event.
+- **Success:** at most one active External Issue Link, one attributable state or
+  visible-conversation effect, and an observable synchronization outcome.
+- **Failure:** the accepted Y7 fact remains intact, prohibited content is not
+  transferred, and retry or reconciliation cannot duplicate the effect.
+
 ## 4. Ownership Invariants
 
 - **INV-OWN-001** Every Project belongs to exactly one Workspace.
@@ -92,6 +113,9 @@ interactions.
   ownership.
 - **INV-OWN-006** Reporter matching, Feedback relationships, Product Intelligence,
   and access never cross Workspace boundaries.
+- **INV-OWN-007** Every Source Connection belongs to one Project and Workspace;
+  every External Issue Link and publication consent belongs through one Feedback
+  to that same Project and Workspace.
 
 Reporter attribution may be linked, corrected, merged, or anonymized only
 through a controlled, attributable operation inside the same Workspace. This is
@@ -205,6 +229,12 @@ no continuing real-person identity.
   `under_review`.
 - Reporter outputs and notifications reveal neither Internal Note content nor
   its existence.
+- Provider-originated visible Messages retain provider, repository, issue,
+  external author, external event, and time provenance.
+- Only a provider author whose current repository write authority is verified
+  may contribute a Reporter-visible Message through synchronization.
+- Provider edits and deletions create revisions or tombstones; they never erase
+  the accepted Message history.
 
 ## 11. Feedback Lifecycle Contract
 
@@ -215,16 +245,20 @@ no continuing real-person identity.
 | `received` | Accepted and awaiting active maintainer treatment. |
 | `under_review` | An authorized maintainer is understanding, analyzing, or acting. |
 | `awaiting_reporter` | A visible information request is waiting for Reporter clarification. |
-| `resolved` | A maintainer recorded a substantive reporter-visible conclusion and no current treatment action is expected. |
+| `resolved` | A maintainer recorded a substantive reporter-visible conclusion, or a verified linked issue was completed under the integration contract, and no current treatment action is expected. |
 | `closed` | No active treatment or exchange is expected; data remains preserved. |
 
 ### 11.2 Transition guarantees
 
 - New Feedback starts in `received`.
-- A Project Maintainer or Workspace Owner controls treatment state.
+- A Project Maintainer or Workspace Owner controls treatment state; a verified
+  linked-issue event may apply only the exact automatic transitions defined by
+  the Source Connection and External Issue Contract.
 - `awaiting_reporter` requires an associated reporter-visible information
   request.
-- `resolved` requires an associated reporter-visible resolution statement.
+- `resolved` requires an associated reporter-visible resolution statement or an
+  attributable external-treatment conclusion produced from a verified issue
+  closure.
 - `resolved` or `closed` can be reopened into `under_review` by an assigned
   Project Maintainer or Workspace Owner with a reason.
 - **INV-LIFE-001** Every transition retains previous state, next state, actor,
@@ -357,7 +391,54 @@ no continuing real-person identity.
   tracking.
 - CAPTCHA is not a required MVP step.
 
-## 18. Semantic Events
+## 18. Source Connection and External Issue Contract
+
+- **INV-SRC-001** A Source Connection is optional, belongs to exactly one
+  Project and Workspace, identifies one selected GitHub or GitLab.com
+  repository, and never becomes the Project identity.
+- A Workspace Owner alone connects, selects, suspends, reconnects, or disconnects
+  repositories. An assigned Maintainer may use an active connection for
+  Feedback work but cannot grant provider access.
+- Repository metadata and release/version data are derived provider facts with
+  provenance. They never overwrite submitted Context or accepted source.
+- Y7 generates a Project badge/link without repository-content write permission
+  and never commits a README or source-file change.
+- Provider credentials and webhook secrets remain confidential, server-side,
+  Workspace-scoped, revocable, and absent from browser state and logs.
+- **INV-SYNC-001** One Feedback has at most one active External Issue Link.
+  Replacing a link closes the active association but preserves historical link
+  and audit evidence.
+- Y7 `received`, `under_review`, and `awaiting_reporter` keep the issue open and
+  set the corresponding Y7-managed label. Y7 `resolved` closes it as completed;
+  Y7 `closed` closes it as not planned where supported; Y7 reopening reopens it.
+- A verified GitHub `completed` closure resolves Feedback; `not_planned` or
+  `duplicate` closes it. A verified GitLab closure resolves Feedback. A verified
+  reopening from either provider returns Feedback to `under_review`.
+- Every provider-driven transition creates a Reporter-visible treatment
+  statement with provider, repository, issue, external actor, reason when
+  available, and time.
+- **INV-PUB-001** Reporter content is not published to a public repository
+  without active, informed, Feedback-specific publication consent.
+- Without that consent, synchronization may send only a non-secret reference,
+  a protected Workspace link, and non-sensitive treatment metadata.
+- Active consent permits continuing synchronization of Reporter-visible Messages
+  for the linked issue. Revocation stops future Reporter-content publication and
+  requests best-effort removal of Y7-controlled external content; it cannot
+  guarantee erasure of public copies already made.
+- Internal Notes, Reporter identifiers and contact, Access Proofs, Attachment
+  bytes and access URLs, and unrelated Context never enter automatic provider
+  payloads.
+- Signed provider events and outbound operations are idempotent, replay-safe,
+  loop-safe, and reconcilable after duplicate, delayed, reordered, failed, or
+  rate-limited delivery.
+- An event whose authenticity, scope, order, or author authority cannot be
+  established creates no Reporter-visible or lifecycle effect and remains
+  available for safe audit or reconciliation.
+- Disconnect, provider revocation, or Feedback deletion stops active
+  synchronization and provider use. Minimal link and audit evidence follow Y7
+  retention policy; Y7 does not promise deletion of provider-held copies.
+
+## 19. Semantic Events
 
 These events describe observable domain facts and required audit evidence. They
 do not require an event bus, event sourcing, or any transport technology.
@@ -388,8 +469,15 @@ do not require an event bus, event sourcing, or any transport technology.
 | `ExceptionalAccessUsed` | Grant, operator, accessed scope, purpose, time. |
 | `ExceptionalAccessRevoked` | Grant, revoker, reason, time. |
 | `BreakGlassReviewCompleted` | Grant, critical incident, independent reviewer, findings, follow-up, time. |
+| `SourceConnectionEstablished` | Workspace, Project, provider, selected repository, granting Owner, authorization scope, time. |
+| `SourceConnectionSuspended` | Connection, reason, actor or provider event, time, reconciliation state. |
+| `ExternalIssueLinked` | Feedback, connection, provider issue identity, initiating actor, public/private visibility, consent state, time. |
+| `ExternalIssueStateObserved` | Link, provider state and reason, external actor, provider event identity, time, resulting Y7 effect. |
+| `ExternalMessageObserved` | Link, provider comment identity, verified author authority, revision state, time, resulting visible-message identity if accepted. |
+| `PublicationConsentChanged` | Feedback, Reporter authorization, prior and next consent state, disclosure version, time. |
+| `ExternalSyncOutcomeRecorded` | Link or connection, logical operation/event, success, pending or failure outcome, retry/reconciliation evidence, time. |
 
-## 19. User Experience and Internal SLO Contract
+## 20. User Experience and Internal SLO Contract
 
 - Public intake, Reporter follow-up, workspace operation, validation outcomes,
   in-product notifications, email notifications, and errors are available in
@@ -414,7 +502,7 @@ do not require an event bus, event sourcing, or any transport technology.
   arbitrary untested capacity number is part of this contract.
 - These objectives are internal SLOs and not commercial SLAs.
 
-## 20. Evolvability Contract
+## 21. Evolvability Contract
 
 - Core feedback behavior and source meaning contain no WiseMoney-specific rule.
 - Additional Projects and Workspaces use the same ownership, Reporter,
@@ -428,14 +516,18 @@ do not require an event bus, event sourcing, or any transport technology.
   customer code.
 - Reporter attribution remains independent of the chosen workspace-actor
   authentication mechanism.
+- GitHub and GitLab.com use provider adapters behind the same Source Connection
+  and External Issue contracts; adding another provider cannot weaken Workspace,
+  consent, visibility, history, or lifecycle invariants.
 
-## 21. Explicit Non-Guarantees
+## 22. Explicit Non-Guarantees
 
 This contract does not guarantee:
 
 - a Y7 Feedback account for Reporters;
 - access to all Feedback linked to one Reporter through one Feedback Access Proof;
-- public Feedback, public reviews, voting, or community discussion;
+- a public Feedback catalog, public reviews, voting, or community discussion;
+- public issue content without the required Feedback-specific consent;
 - real-time chat unrelated to a Feedback item;
 - automatic prioritization, classification, or resolution;
 - a structured numeric Review rating;
@@ -444,4 +536,7 @@ This contract does not guarantee:
   hosting platform, CDN, region, process boundary, or deployment topology;
 - project or Workspace discovery from `/`;
 - end-recipient email delivery within the provider-handoff SLO;
+- GitHub or GitLab availability, immediate synchronization during provider
+  failure, deletion of copies already published externally, GitLab self-managed,
+  or portfolio integration;
 - a commercial SLA or an untested capacity promise.

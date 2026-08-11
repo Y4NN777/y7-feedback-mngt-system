@@ -16,6 +16,8 @@
 | ADR-010 | Independently approved exceptional-access control plane | Accepted |
 | ADR-011 | SLO-driven observability and evidence-based capacity | Accepted |
 | ADR-012 | Vercel hosts the Vite PWA | Accepted |
+| ADR-013 | Provider-native GitHub and GitLab.com connections behind server adapters | Accepted |
+| ADR-014 | Durable consent-aware bidirectional external-issue synchronization | Accepted |
 
 An ADR is subordinate to `01_PRD.md` through `06_DECISION_TRACEABILITY.md`.
 “Accepted” means selected for the proposed architecture; it does not claim that
@@ -564,6 +566,150 @@ access.
   exposure and stale authorization.
 - **Immutable service-worker/HTML caching:** can prevent safe PWA rollout and
   recovery.
+
+## ADR-013 - Provider-Native GitHub and GitLab.com Connections
+
+**Status:** Accepted
+
+**Decision drivers:** PD-021; FR-OWN-008; FR-SRC-001..006; NFR-SEC-001..006;
+INV-SRC-001; least privilege; optional provider-independent Project identity.
+
+### Context
+
+Y7 must discover and select authorized repositories, import metadata and
+releases, manage issues and comments, and receive provider events. GitHub and
+GitLab.com expose different authorization and webhook models. Credentials must
+never reach the Vercel PWA, and connecting a repository must not redefine a Y7
+Project or grant Workspace authority.
+
+### Decision
+
+Implement one Source Connection Registry behind provider adapters in trusted
+Appwrite Functions.
+
+Use a GitHub App with Metadata read, Contents read solely for private release
+metadata, Issues read/write, and required installation, repository-selection,
+issue, and issue-comment events. Allow-list metadata and release endpoints in
+the adapter and never request files, blobs, trees, archives, or Git content. Use
+short-lived installation tokens restricted to repositories selected during
+installation. Do not request repository-content write permission.
+
+Use a GitLab.com OAuth application with the API authorization required for
+project discovery, issue/comment/state operations, and project-webhook
+management. Enforce an additional Y7 allow-list of Project-scoped GitLab project
+IDs because the provider grant is broader than one selected project.
+
+Bind installation/OAuth callbacks to the initiating Workspace Owner, Workspace,
+Project, nonce, and safe return location. Encrypt provider tokens and signing
+material at rest with a backend-only key, support rotation/revocation, and
+exclude secrets from browser state, logs, and telemetry. Store immutable
+provider/repository IDs and provenance rather than treating mutable repository
+names or URLs as identity.
+
+### Consequences
+
+- Manual Project creation and operation remain available with zero connections.
+- One Project can connect multiple repositories through the same domain
+  contract.
+- GitHub obtains fine-grained installation scope; GitLab.com's broader OAuth
+  grant requires explicit Y7 selection and stronger server-side minimization.
+- Provider-specific code stays at the adapter boundary; Workspace, Project,
+  consent, Feedback, conversation, and lifecycle rules remain shared.
+- App ownership, callback URLs, secret rotation, and provider outage handling
+  become production-readiness work.
+
+### Alternatives not selected
+
+- **GitHub user OAuth application:** broader user-coupled access and weaker
+  repository installation control than a GitHub App.
+- **Personal access tokens:** inappropriate credential ownership, rotation, and
+  onboarding for a multi-Workspace SaaS.
+- **Repository as Project identity:** fails for multiple repositories,
+  monorepos, provider migration, and Projects without Git.
+- **Automatic README commit:** requires source write permission for a badge that
+  can be delivered as a snippet.
+- **GitLab self-managed in this delivery:** adds arbitrary-instance trust,
+  version, network, and SSRF concerns not required by PD-021.
+- **Portfolio catalog adapter:** explicitly excluded by the validated decision.
+
+## ADR-014 - Durable Consent-Aware Bidirectional External-Issue Synchronization
+
+**Status:** Accepted
+
+**Decision drivers:** PD-003..005, PD-012, PD-021; FR-SYNC-001..013;
+INV-SYNC-001; INV-PUB-001; NFR-CON-002..004; auditable lifecycle and source
+preservation.
+
+### Context
+
+Provider APIs and webhooks are asynchronous, duplicated, delayed, reordered,
+rate-limited, and occasionally unavailable. Directly applying an unverified
+comment could expose an outsider's content to a Reporter. Publishing Reporter
+conversation to a public issue can make it permanently public. Provider state
+must influence Y7 exactly as approved without allowing webhook loops or silent
+source mutation.
+
+### Decision
+
+Use a TablesDB-backed outbound operation outbox and inbound provider-event
+inbox. Webhook ingress verifies signature, freshness, replay identity, provider
+installation/project scope, and stores one normalized event before returning.
+An async worker leases events, checks current repository selection and external
+author write authority, then applies one idempotent domain transaction or records
+an ignored/quarantined outcome. A scheduled worker reconciles active links and
+repairs recoverable divergence.
+
+Allow one active External Issue Link per Feedback. Stable logical operation,
+provider event, issue, comment, direction, and origin identifiers deduplicate
+effects and prevent echo loops. Provider edits append revisions and deletions
+append tombstones.
+
+Apply the exact lifecycle mapping in FR-SYNC-002..004. Provider-driven
+transitions use the ordinary lifecycle transaction and create an attributable
+Reporter-visible external-treatment statement.
+
+Synchronize visible Messages only. Before Reporter content enters a public
+repository, require active, versioned, Feedback-specific consent. Revocation
+stops new publication and queues best-effort removal of Y7-controlled external
+content without claiming erasure of already public copies. Explicit payload
+allow-lists make Reporter identifiers/contact, Access Proofs, Internal Notes,
+Attachments and URLs, unrelated Context, and credentials unserializable to
+provider operations.
+
+Provider failure leaves accepted Y7 facts intact and exposes a pending, failed,
+or suspended sync outcome. Retry honors provider guidance; disconnect,
+revocation, repository removal, and Feedback deletion stop business mutation
+from later events.
+
+### Consequences
+
+- Y7 remains the durable source for Feedback and history while approved provider
+  events can apply bounded lifecycle transitions.
+- External convergence is eventual; provider acceptance is never inferred from
+  local IndexedDB or an uncommitted outbound operation.
+- Public synchronization requires an additional Reporter consent flow and clear
+  irreversibility disclosure.
+- Permission checks, inbox/outbox cleanup, reconciliation, and provider
+  observability add operational work but avoid a separate broker or service.
+- External provider copies fall outside Y7's definitive purge guarantee.
+
+### Alternatives not selected
+
+- **Synchronous API call as the domain transaction:** provider failure would
+  couple or partially apply accepted Y7 work.
+- **Provider as Feedback source of truth:** loses Y7 audience, Reporter,
+  lifecycle, deletion, and Workspace invariants.
+- **Automatically import every public comment:** permits untrusted outsiders to
+  enter Reporter conversation.
+- **Publish public content on Maintainer authority alone:** bypasses the approved
+  Reporter consent boundary.
+- **Synchronize Internal Notes or Attachments:** creates confidentiality and
+  access-control leakage.
+- **Multiple active issues per Feedback:** creates conflicting external
+  lifecycle authorities.
+- **Dedicated integration microservice or message broker:** not justified while
+  Appwrite Functions, TablesDB inbox/outbox records, and schedules meet the
+  required behavior.
 
 ## 2. Deferred Implementation Records
 

@@ -150,6 +150,14 @@ A Platform Operator diagnoses and operates the service without ordinary access
 to workspace business content. Exceptional access is explicitly granted,
 justified, limited, and audited.
 
+### UC-12 - Connect feedback to development work
+
+A Workspace Owner connects selected GitHub or GitLab.com repositories to a
+Project. An assigned Project Maintainer can create one linked external issue
+from a Feedback item and keep its treatment state and reporter-visible
+conversation synchronized without exposing Internal Notes, Access Proofs,
+Attachments, or Reporter identifiers.
+
 ## 6. MVP Product Scope
 
 - One initial Y7 Labs workspace with multiple projects, beginning with
@@ -177,6 +185,11 @@ justified, limited, and audited.
 - A bilingual root orientation experience at `/` for starting feedback,
   retrieving existing feedback, or entering Workspace management, without
   project discovery or Workspace exposure.
+- Optional GitHub and GitLab.com source connections for repository metadata,
+  releases, a Y7 Feedback badge/link, and one active external issue per Feedback.
+- Bidirectional synchronization of the linked issue state and reporter-visible
+  conversation, subject to Workspace authorization, provider-author checks, and
+  explicit Reporter consent before publication to a public repository.
 
 The service root `/` is a bilingual orientation point, not a directory. Direct
 Project URLs remain the normal contextual entry into intake. The observations
@@ -245,14 +258,14 @@ SaaS does not currently imply:
 - custom domains;
 - marketplaces;
 - public review widgets or public feedback boards;
-- external issue-tracker integrations;
 - contractual service-level agreements.
 
 ## 11. Explicitly Out of Scope
 
 - Y7 Feedback acting as the client application's identity provider.
 - Hidden fingerprinting or behavioral surveillance.
-- Public publication of feedback, reviews, conversations, or reporter profiles.
+- Automatic or unconsented public publication of feedback, reviews,
+  conversations, or reporter profiles.
 - Community comments and voting.
 - A real-time chat product unrelated to a feedback item.
 - Product roadmaps generated automatically from feedback.
@@ -309,6 +322,7 @@ SaaS does not currently imply:
 | PD-018 | Daily backups are retained for 30 days and recovery targets are RPO 24 hours and RTO 4 hours. |
 | PD-019 | Public abuse controls are 60 requests/minute/IP, 10 feedback submissions/minute/IP, 20 uploaded files/minute/IP, and 30 feedback/hour/external identity/project, with HTTP 429 on excess and no unnecessary permanent tracking. |
 | PD-020 | Internal SLOs are 99.9% monthly availability, approved Web Vitals and P95 operation targets, with capacity established by load testing and a 320 px minimum viewport. |
+| PD-021 | A Project may optionally connect selected GitHub and GitLab.com repositories. One Feedback may have one active linked issue with bidirectional state and reporter-visible conversation synchronization. Public-repository content publication requires explicit Reporter consent; Y7 never synchronizes Internal Notes, Access Proofs, Reporter identifiers, or Attachments automatically. The portfolio is not an integration source. |
 
 ## 14. Validated Operating Parameters
 
@@ -337,3 +351,8 @@ agreements.
    excluding upload; Dashboard P95 <= 1 s; upload processing P95 <= 2 s after
    receipt; in-product notification P95 <= 5 s; email-provider handoff P95 <= 30
    s; minimum viewport 320 px. Capacity is established by load testing.
+6. Development integration: GitHub and GitLab.com connections are optional and
+   restricted to repositories selected by a Workspace Owner. A linked issue is
+   synchronized bidirectionally with one Feedback, while Y7 preserves source
+   history, audience boundaries, explicit public-publication consent, and
+   provider-independent Project identity.

@@ -25,6 +25,9 @@ initially live in one implementation.
 | Deletion record | Owns evidence of request, anonymization, soft deletion, retention, and eventual purge outcome. |
 | Exceptional access grant | Owns one independently approved, narrowly scoped and expiring authority plus its immutable audit evidence. |
 | Backup set | Owns one recoverable daily snapshot, its creation evidence, 30-day expiry, and recovery validation state. |
+| Source Connection | Owns the authorized association between one Project and one selected GitHub or GitLab.com repository, including provider provenance and connection state. |
+| External Issue Link | Owns the active and historical association between one Feedback and one provider issue, including state, message, and synchronization provenance. |
+| Conversation Publication Consent | Owns the Reporter decision and disclosure evidence governing publication of visible content to one public external issue. |
 
 ## 3. Actor Responsibilities
 
@@ -34,6 +37,8 @@ initially live in one implementation.
 - Protects the confidential accountless Access Proof supplied for a Feedback.
 - Uses authorized access to view, clarify, revise permitted information, and
   request deletion.
+- Gives or revokes informed, Feedback-specific consent before Reporter content
+  can be synchronized to a public repository issue.
 - Does not decide ownership, trusted identity state, lifecycle state, internal
   visibility, or Product Intelligence classification.
 
@@ -49,6 +54,8 @@ initially live in one implementation.
 - Owns project creation, configuration, activation, deactivation, and slug
   changes within the Workspace.
 - Assigns and removes Project Maintainers.
+- Connects, selects, suspends, reconnects, and disconnects GitHub and GitLab.com
+  repositories for Projects in the Workspace.
 - Can perform Project Maintainer feedback work throughout the Workspace.
 - Authorizes deletion when policy grants that capability.
 - Has no authority in another Workspace.
@@ -59,6 +66,8 @@ initially live in one implementation.
 - Understands Feedback, reviews evidence and Context, communicates with the
   Reporter, requests clarification, adds Internal Notes, and manages lifecycle.
 - Records resolution, closure, reopening, themes, and Feedback relationships.
+- Creates or links an external issue through an active Project connection and
+  works with its synchronized state and Reporter-visible conversation.
 - Uses deletion only when explicitly authorized.
 
 ### Platform Operator
@@ -84,7 +93,8 @@ initially live in one implementation.
 
 - Defines Workspace as the root business ownership and isolation boundary.
 - Validates that Project, Reporter, Feedback, child data, search, aggregates, and
-  notifications remain inside one Workspace.
+  notifications, Source Connections, External Issue Links, consents, and
+  provider events remain inside one Workspace.
 - Prevents public or ordinary update input from reassigning Workspace or Project
   ownership.
 - Owns cross-workspace isolation guarantees; it does not authenticate actors.
@@ -263,6 +273,48 @@ initially live in one implementation.
 - Prevents derived interpretation from rewriting source Feedback.
 - Delivers MVP value without depending on automated or AI classification.
 
+### Source Connection Registry
+
+- Owns Project-scoped GitHub and GitLab.com connection records, selected
+  repositories, provider provenance, imported repository metadata, releases,
+  and authorization state.
+- Lets only a Workspace Owner grant, select, suspend, reconnect, or disconnect a
+  repository.
+- Keeps Project identity independent from repositories and preserves manual
+  Project creation with zero connections.
+- Produces the Project badge/link without writing repository content.
+- Keeps credentials server-side, encrypted, revocable, and isolated by
+  Workspace.
+- Does not own Feedback lifecycle, conversation audience, or Reporter consent.
+
+### Conversation Publication Policy
+
+- Presents the public-repository disclosure and records active, versioned,
+  Feedback-specific Reporter consent.
+- Prevents Reporter-content publication before consent and stops future
+  publication after revocation.
+- Coordinates best-effort removal of Y7-controlled external content while
+  clearly preserving the non-guarantee for already public copies.
+- Never expands consent to Internal Notes, Reporter identifiers, Access Proofs,
+  Attachments, or unrelated Context.
+
+### External Issue Coordination
+
+- Owns creation, linking, suspension, and historical identity for at most one
+  active external issue per Feedback.
+- Maps Y7 lifecycle states to provider issue state and Y7-managed labels, and
+  applies only the approved verified provider-to-Y7 transitions.
+- Synchronizes Reporter-visible Messages while preserving source, revision,
+  deletion tombstone, provider, issue, event, author, and time provenance.
+- Verifies current repository write authority before an external comment can
+  enter Reporter conversation.
+- Deduplicates, orders, retries, and reconciles provider events and operations
+  without loops or rollback of accepted Y7 facts.
+- Excludes Internal Notes and all protected payload categories from provider
+  requests and operational logs.
+- Does not own Source Connection grants, Feedback source truth, or deletion
+  policy.
+
 ### Data Lifecycle and Privacy
 
 - Receives deletion requests and applies approved authorization.
@@ -275,6 +327,8 @@ initially live in one implementation.
 - Purges Feedback-owned business data and Attachments after 30 days and makes
   business restoration impossible thereafter.
 - Preserves only the approved minimal deletion and purge evidence.
+- Stops active external synchronization on deletion and records best-effort
+  external cleanup without claiming control of provider-held copies.
 
 ### Backup and Recovery
 
@@ -320,6 +374,7 @@ Every invariant has exactly one primary responsibility owner.
 | INV-OWN-004 | Workspace Ownership Policy | All child-data responsibilities |
 | INV-OWN-005 | Feedback Record Stewardship | Workspace Ownership Policy |
 | INV-OWN-006 | Workspace Ownership Policy | Workspace Access Control, Reporter Attribution, Product Intelligence |
+| INV-OWN-007 | Workspace Ownership Policy | Source Connection Registry, External Issue Coordination, Conversation Publication Policy |
 | INV-ROUTE-001 | Project Registry | Workspace Ownership Policy |
 | INV-REP-001 | Reporter Attribution | Context Policy |
 | INV-ACCESS-001 | Reporter Feedback Access | Safe Observability |
@@ -341,6 +396,9 @@ Every invariant has exactly one primary responsibility owner.
 | INV-INTEL-002 | Product Intelligence | Context Policy, Reporter Attribution |
 | INV-DELETE-001 | Data Lifecycle and Privacy | Reporter Attribution, Product Intelligence |
 | INV-ABUSE-001 | Anti-Abuse Policy | Feedback Intake Coordination, Reporter Feedback Access |
+| INV-SRC-001 | Source Connection Registry | Workspace Access Control, Workspace Ownership Policy |
+| INV-SYNC-001 | External Issue Coordination | Feedback Lifecycle, Conversation Coordination, Source Connection Registry |
+| INV-PUB-001 | Conversation Publication Policy | Reporter Feedback Access, External Issue Coordination, Data Lifecycle and Privacy |
 
 ## 6. Requirement-to-Responsibility Coverage
 
@@ -358,6 +416,8 @@ Every invariant has exactly one primary responsibility owner.
 | FR-OPS-* | Workspace Access Control, Project Registry, Maintainer Feedback Experience, Exceptional Access Control |
 | FR-NOT-* | Notification Coordination |
 | FR-INT-* | Product Intelligence |
+| FR-SRC-* | Source Connection Registry, Workspace Access Control |
+| FR-SYNC-* | External Issue Coordination, Conversation Publication Policy, Feedback Lifecycle, Conversation Coordination |
 | FR-PRIV-* | Data Lifecycle and Privacy |
 | NFR-REC-* | Backup and Recovery; Data Lifecycle and Privacy for deletion replay |
 | NFR-SEC-* | Workspace Ownership Policy, Workspace Access Control, Anti-Abuse Policy, Safe Observability |
@@ -383,6 +443,10 @@ Every invariant has exactly one primary responsibility owner.
   lifecycle `closed` does not.
 - Safe Observability stores operational evidence, not an unrestricted copy of
   business content.
+- Source Connection Registry owns provider grants and repositories; External
+  Issue Coordination owns Feedback-to-issue synchronization.
+- Conversation Publication Policy owns public publication consent; a provider
+  repository's visibility does not override it.
 
 ## 8. Architectural Allocation Boundary
 
@@ -393,6 +457,8 @@ These responsibility definitions do not themselves decide:
 - database, search, object storage, queue, or email products;
 - workspace-actor authentication provider or Reporter proof technology;
 - anti-abuse provider or algorithm;
+- provider SDK, credential-vault product, webhook transport, or reconciliation
+  schedule;
 - hosting, region, CDN, or deployment topology;
 - whether responsibilities become modules, processes, or services;
 - the exact page composition or interaction design of the validated root intents.

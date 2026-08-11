@@ -18,6 +18,8 @@ status, answer Maintainer questions, and request deletion.
 - treatment lifecycle, resolution, closure, and reopening;
 - in-product and email notifications;
 - themes, relationships, trends, and Product Intelligence;
+- optional GitHub and GitLab.com repository connections with linked issue and
+  visible-conversation synchronization;
 - strict Workspace and Project isolation;
 - French and English experiences;
 - offline-aware PWA behavior.
@@ -35,6 +37,9 @@ status, answer Maintainer questions, and request deletion.
 
 ```text
 Workspace 1 --- * Project 1 --- * Feedback 1 --- 0..* Attachment
+                     |              |
+                     0..* Source    0..1 active External Issue
+                          Connection
 ```
 
 A Reporter belongs to a Workspace and remains distinct from an authentication

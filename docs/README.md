@@ -12,6 +12,10 @@ The platform captures structured feedback and its relevant Context, preserves
 the conversation and treatment history, and supports analysis across Reporters,
 versions, screens, features, themes, and time.
 
+Projects may optionally connect selected GitHub or GitLab.com repositories and
+link a Feedback item to one synchronized external issue without making the
+repository the Project identity.
+
 Projects use direct public routes under `feedback.y7labs.studio`. Workspace data
 is isolated, Reporter identity remains independent from authentication, and the
 service root exposes no public Project or Workspace directory.
@@ -28,6 +32,10 @@ Workspace 1 --- * Project 1 --- * Feedback 1 --- 0..* Attachment
 - **Feedback** contains source content, Context, conversation, lifecycle,
   history, Attachments, notifications, and derived analysis.
 - **Attachment** is private evidence owned by one Feedback item.
+- **Source Connection** associates a Project with a selected GitHub or
+  GitLab.com repository.
+- **External Issue Link** connects one Feedback to at most one active provider
+  issue under the visibility and consent contract.
 
 ## Document Map
 
@@ -60,6 +68,8 @@ Supporting research:
 - Vercel for frontend delivery;
 - Appwrite for authentication, trusted Functions, TablesDB, private Storage,
   scheduled work, and Realtime.
+- GitHub App and GitLab.com OAuth integrations for selected repository metadata
+  and issue synchronization.
 
 ## Product Boundaries
 

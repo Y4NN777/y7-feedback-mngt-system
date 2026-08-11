@@ -1,2 +1,20 @@
 # Local delivery planning
 docs/09_ONE_WEEK_SPRINT_PLAN.md
+
+# Raw Codex transcripts can contain prompts, tool output, and sensitive metadata
+docs/sessions/raw/*.jsonl
+
+# Dependencies and generated output
+node_modules/
+.pnpm-store/
+dist/
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+
+# Local environment and tooling
+.env
+.env.*
+!.env.example
+.DS_Store
