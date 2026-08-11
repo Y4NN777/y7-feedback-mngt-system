@@ -38,3 +38,15 @@ test("BDD-CI-001 runs the complete pull-request gate with pinned least-privilege
 
   assert.doesNotMatch(workflow, /\$\{\{\s*secrets\./u);
 });
+
+test("BDD-CI-002 builds runtime workspace dependencies before the E2E server", async () => {
+  const playwrightConfig = await readFile(
+    new URL("../apps/web/playwright.config.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(
+    playwrightConfig,
+    /command:\s*"pnpm --filter @y7-feedback\/config build && pnpm build && pnpm preview --host 127\.0\.0\.1"/u,
+  );
+});
