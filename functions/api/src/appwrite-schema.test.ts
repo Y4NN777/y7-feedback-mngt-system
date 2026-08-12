@@ -35,15 +35,26 @@ describe("Appwrite infrastructure manifest", () => {
       .filter(([key]) => key.endsWith("TableId"))
       .map(([, id]) => id);
 
-    expect(manifest.database).toEqual({ id: "feedback", name: "Y7 Feedback" });
+    expect(manifest.database).toEqual({
+      id: "feedback",
+      name: "Y7 Feedback",
+      enabled: true,
+    });
     expect(manifest.tables.map(({ id }) => id)).toEqual(expected);
     expect(new Set(manifest.tables.map(({ id }) => id)).size).toBe(expected.length);
     expect(
-      manifest.tables.map(({ permissions, rowSecurity }) => ({
+      manifest.tables.map(({ permissions, rowSecurity, enabled }) => ({
+        enabled,
         permissions,
         rowSecurity,
       })),
-    ).toEqual(manifest.tables.map(() => ({ permissions: [], rowSecurity: true })));
+    ).toEqual(
+      manifest.tables.map(() => ({
+        enabled: true,
+        permissions: [],
+        rowSecurity: true,
+      })),
+    );
   });
 
   it("BDD-INFRA-002 declares indexes for every concrete adapter query", () => {
@@ -116,8 +127,10 @@ describe("Appwrite infrastructure manifest", () => {
       name: "Private attachments",
       permissions: [],
       fileSecurity: true,
+      enabled: true,
       maximumFileSize: 10 * 1024 * 1024,
       allowedFileExtensions: [],
+      compression: "none",
       encryption: true,
       antivirus: true,
       transformations: false,

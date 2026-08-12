@@ -15,6 +15,7 @@
     "lint": "eslint . --max-warnings 0",
     "probe": "node scripts/probe.mjs",
     "probe:ingress": "node scripts/ingress-probe.mjs",
+    "provision:appwrite": "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build && pnpm --filter @y7-feedback/api provision:appwrite",
     "security:scan": "node scripts/security-scan.mjs",
     "test": "node --test tests/*.test.mjs && pnpm -r --if-present test",
     "test:coverage": "node --test tests/*.test.mjs && pnpm -r --if-present test:coverage",
