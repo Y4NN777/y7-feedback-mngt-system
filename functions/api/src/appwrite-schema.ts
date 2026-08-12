@@ -126,6 +126,60 @@ export function createAppwriteInfrastructureManifest(
     database: { id: schema.databaseId, name: "Y7 Feedback", enabled: true },
     tables: [
       table(
+        schema.workspacesTableId,
+        "Workspaces",
+        [varchar("name", 128), boolean("active"), datetime("createdAt")],
+        [index("active", ["active"])],
+      ),
+      table(
+        schema.workspaceMembershipsTableId,
+        "Workspace memberships",
+        [
+          varchar("workspaceId", 36),
+          varchar("userId", 36),
+          varchar("role", 32),
+          varchar("status", 16),
+          datetime("createdAt"),
+          datetime("updatedAt"),
+        ],
+        [
+          index("workspace_user_unique", ["workspaceId", "userId"], "unique"),
+          index("user_status", ["userId", "status"]),
+        ],
+      ),
+      table(
+        schema.projectAssignmentsTableId,
+        "Project assignments",
+        [
+          varchar("workspaceId", 36),
+          varchar("projectId", 36),
+          varchar("userId", 36),
+          varchar("status", 16),
+          datetime("createdAt"),
+          datetime("updatedAt"),
+        ],
+        [
+          index("project_user_unique", ["projectId", "userId"], "unique"),
+          index("workspace_user_status", ["workspaceId", "userId", "status"]),
+        ],
+      ),
+      table(
+        schema.projectSlugsTableId,
+        "Project slug reservations",
+        [
+          varchar("slug", 63),
+          varchar("workspaceId", 36),
+          varchar("projectId", 36),
+          boolean("current"),
+          datetime("claimedAt"),
+        ],
+        [
+          index("slug_unique", ["slug"], "unique"),
+          index("project_current", ["projectId", "current"]),
+          index("workspace", ["workspaceId"]),
+        ],
+      ),
+      table(
         schema.projectsTableId,
         "Projects",
         [
@@ -286,6 +340,25 @@ export function createAppwriteInfrastructureManifest(
         "Provider grant vault",
         [varchar("provider", 16), text("envelope", { encrypt: true })],
         [index("provider", ["provider"])],
+      ),
+      table(
+        schema.sourceConnectionsTableId,
+        "Source connections",
+        [
+          varchar("workspaceId", 36),
+          varchar("projectId", 36),
+          varchar("provider", 16),
+          varchar("ownerUserId", 36),
+          varchar("status", 16),
+          varchar("encryptedGrantRef", 36),
+          text("selectedRepositoriesJson", { encrypt: true }),
+          datetime("createdAt"),
+          datetime("updatedAt"),
+        ],
+        [
+          index("project_provider_unique", ["projectId", "provider"], "unique"),
+          index("workspace_status", ["workspaceId", "status"]),
+        ],
       ),
     ],
     attachmentBucket: {

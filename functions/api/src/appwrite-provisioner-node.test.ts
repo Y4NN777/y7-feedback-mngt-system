@@ -5,6 +5,10 @@ import { createAppwriteInfrastructureManifest } from "./appwrite-schema";
 
 const manifest = createAppwriteInfrastructureManifest({
   databaseId: "feedback",
+  workspacesTableId: "workspaces",
+  workspaceMembershipsTableId: "workspace_memberships",
+  projectAssignmentsTableId: "project_assignments",
+  projectSlugsTableId: "project_slugs",
   projectsTableId: "projects",
   reportersTableId: "reporters",
   feedbackTableId: "feedback_items",
@@ -17,6 +21,7 @@ const manifest = createAppwriteInfrastructureManifest({
   attachmentStagingTableId: "attachment_staging",
   attachmentsTableId: "attachments",
   providerGrantsTableId: "provider_grants",
+  sourceConnectionsTableId: "source_connections",
 });
 
 function projectsTable() {

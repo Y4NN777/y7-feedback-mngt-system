@@ -17,6 +17,10 @@ const config: ServerConfig = {
   appwriteApiKey: "server-only-key",
   appwriteSchema: {
     databaseId: "feedback",
+    workspacesTableId: "workspaces",
+    workspaceMembershipsTableId: "workspace_memberships",
+    projectAssignmentsTableId: "project_assignments",
+    projectSlugsTableId: "project_slugs",
     projectsTableId: "projects",
     reportersTableId: "reporters",
     feedbackTableId: "feedback",
@@ -29,6 +33,7 @@ const config: ServerConfig = {
     attachmentStagingTableId: "attachment_staging",
     attachmentsTableId: "attachments",
     providerGrantsTableId: "provider_grants",
+    sourceConnectionsTableId: "source_connections",
   },
   accessProofEnvelopeKey: "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc",
   providerGrantEnvelopeKey: "CAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg",
