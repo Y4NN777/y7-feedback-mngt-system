@@ -15,6 +15,10 @@ export interface ServerConfig {
   readonly appwriteApiKey: string;
   readonly appwriteSchema: {
     readonly databaseId: string;
+    readonly workspacesTableId: string;
+    readonly workspaceMembershipsTableId: string;
+    readonly projectAssignmentsTableId: string;
+    readonly projectSlugsTableId: string;
     readonly projectsTableId: string;
     readonly reportersTableId: string;
     readonly feedbackTableId: string;
@@ -27,6 +31,7 @@ export interface ServerConfig {
     readonly attachmentStagingTableId: string;
     readonly attachmentsTableId: string;
     readonly providerGrantsTableId: string;
+    readonly sourceConnectionsTableId: string;
   };
   readonly accessProofEnvelopeKey: string;
   readonly providerGrantEnvelopeKey: string;
@@ -45,6 +50,14 @@ function requireAppwriteId(value: string | undefined): string {
 function parseAppwriteSchema(input: Readonly<Record<string, string | undefined>>) {
   const databaseId = requireAppwriteId(input.APPWRITE_DATABASE_ID);
   const tableIds = {
+    workspacesTableId: requireAppwriteId(input.APPWRITE_WORKSPACES_TABLE_ID),
+    workspaceMembershipsTableId: requireAppwriteId(
+      input.APPWRITE_WORKSPACE_MEMBERSHIPS_TABLE_ID,
+    ),
+    projectAssignmentsTableId: requireAppwriteId(
+      input.APPWRITE_PROJECT_ASSIGNMENTS_TABLE_ID,
+    ),
+    projectSlugsTableId: requireAppwriteId(input.APPWRITE_PROJECT_SLUGS_TABLE_ID),
     projectsTableId: requireAppwriteId(input.APPWRITE_PROJECTS_TABLE_ID),
     reportersTableId: requireAppwriteId(input.APPWRITE_REPORTERS_TABLE_ID),
     feedbackTableId: requireAppwriteId(input.APPWRITE_FEEDBACK_TABLE_ID),
@@ -59,6 +72,9 @@ function parseAppwriteSchema(input: Readonly<Record<string, string | undefined>>
     ),
     attachmentsTableId: requireAppwriteId(input.APPWRITE_ATTACHMENTS_TABLE_ID),
     providerGrantsTableId: requireAppwriteId(input.APPWRITE_PROVIDER_GRANTS_TABLE_ID),
+    sourceConnectionsTableId: requireAppwriteId(
+      input.APPWRITE_SOURCE_CONNECTIONS_TABLE_ID,
+    ),
   };
   if (new Set(Object.values(tableIds)).size !== Object.values(tableIds).length) {
     throw new ConfigError("APPWRITE_SCHEMA_INVALID");

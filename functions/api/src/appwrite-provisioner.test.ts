@@ -14,6 +14,10 @@ import { createAppwriteInfrastructureManifest } from "./appwrite-schema";
 
 const schema: ServerConfig["appwriteSchema"] = {
   databaseId: "feedback",
+  workspacesTableId: "workspaces",
+  workspaceMembershipsTableId: "workspace_memberships",
+  projectAssignmentsTableId: "project_assignments",
+  projectSlugsTableId: "project_slugs",
   projectsTableId: "projects",
   reportersTableId: "reporters",
   feedbackTableId: "feedback_items",
@@ -26,6 +30,7 @@ const schema: ServerConfig["appwriteSchema"] = {
   attachmentStagingTableId: "attachment_staging",
   attachmentsTableId: "attachments",
   providerGrantsTableId: "provider_grants",
+  sourceConnectionsTableId: "source_connections",
 };
 
 class MemoryProvisioningPort implements AppwriteProvisioningPort {
@@ -69,9 +74,10 @@ describe("Appwrite infrastructure provisioner", () => {
   it("BDD-INFRA-005 creates every absent resource from the manifest", async () => {
     const port = new MemoryProvisioningPort();
     const manifest = createAppwriteInfrastructureManifest(schema);
+    const resourceCount = manifest.tables.length + 2;
 
     await expect(provisionAppwriteInfrastructure(port, manifest)).resolves.toEqual({
-      created: 13,
+      created: resourceCount,
       verified: 0,
     });
     expect(port.mutations).toEqual([
@@ -84,12 +90,13 @@ describe("Appwrite infrastructure provisioner", () => {
   it("BDD-INFRA-006 verifies a conforming replay without mutation", async () => {
     const port = new MemoryProvisioningPort();
     const manifest = createAppwriteInfrastructureManifest(schema);
+    const resourceCount = manifest.tables.length + 2;
     await provisionAppwriteInfrastructure(port, manifest);
     port.mutations.length = 0;
 
     await expect(provisionAppwriteInfrastructure(port, manifest)).resolves.toEqual({
       created: 0,
-      verified: 13,
+      verified: resourceCount,
     });
     expect(port.mutations).toEqual([]);
   });

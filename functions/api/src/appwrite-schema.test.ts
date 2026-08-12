@@ -6,6 +6,10 @@ import { createAppwriteInfrastructureManifest } from "./appwrite-schema";
 
 const schema: ServerConfig["appwriteSchema"] = {
   databaseId: "feedback",
+  workspacesTableId: "workspaces",
+  workspaceMembershipsTableId: "workspace_memberships",
+  projectAssignmentsTableId: "project_assignments",
+  projectSlugsTableId: "project_slugs",
   projectsTableId: "projects",
   reportersTableId: "reporters",
   feedbackTableId: "feedback_items",
@@ -18,6 +22,7 @@ const schema: ServerConfig["appwriteSchema"] = {
   attachmentStagingTableId: "attachment_staging",
   attachmentsTableId: "attachments",
   providerGrantsTableId: "provider_grants",
+  sourceConnectionsTableId: "source_connections",
 };
 
 function table(id: string) {
@@ -59,6 +64,12 @@ describe("Appwrite infrastructure manifest", () => {
 
   it("BDD-INFRA-002 declares indexes for every concrete adapter query", () => {
     const requirements = [
+      [schema.workspaceMembershipsTableId, ["workspaceId", "userId"]],
+      [schema.workspaceMembershipsTableId, ["userId", "status"]],
+      [schema.projectAssignmentsTableId, ["projectId", "userId"]],
+      [schema.projectAssignmentsTableId, ["workspaceId", "userId", "status"]],
+      [schema.projectSlugsTableId, ["slug"]],
+      [schema.projectSlugsTableId, ["projectId", "current"]],
       [schema.projectsTableId, ["slug"]],
       [schema.accessGrantsTableId, ["reference"]],
       [schema.idempotencyTableId, ["scopeKey", "clientOperationId"]],
@@ -66,6 +77,8 @@ describe("Appwrite infrastructure manifest", () => {
       [schema.attachmentStagingTableId, ["objectId", "operationId"]],
       [schema.attachmentStagingTableId, ["stagedAt"]],
       [schema.attachmentsTableId, ["objectId"]],
+      [schema.sourceConnectionsTableId, ["projectId", "provider"]],
+      [schema.sourceConnectionsTableId, ["workspaceId", "status"]],
     ] as const;
 
     for (const [tableId, queriedColumns] of requirements) {
@@ -109,6 +122,7 @@ describe("Appwrite infrastructure manifest", () => {
         "intake_idempotency.proofVerifier",
         "attachments.displayName",
         "provider_grants.envelope",
+        "source_connections.selectedRepositoriesJson",
       ]),
     );
     for (const definition of manifest.tables) {
