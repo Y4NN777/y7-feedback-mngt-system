@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "pnpm --filter @y7-feedback/web build",
+  "buildCommand": "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/web build",
   "outputDirectory": "apps/web/dist",
   "framework": "vite",
   "rewrites": [
