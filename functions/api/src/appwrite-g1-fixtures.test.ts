@@ -5,6 +5,7 @@ import type { ServerConfig } from "@y7-feedback/config/server";
 import {
   createG1FixtureRows,
   seedG1Fixtures,
+  type G1FixtureRow,
   type G1FixtureStore,
 } from "./appwrite-g1-fixtures";
 
@@ -51,11 +52,37 @@ class MemoryFixtureStore implements G1FixtureStore {
     return Promise.resolve();
   }
 
-  commitTransaction() {
+  commitTransaction(_transactionId: string) {
+    void _transactionId;
     return Promise.resolve();
   }
 
-  rollbackTransaction() {
+  rollbackTransaction(_transactionId: string) {
+    void _transactionId;
+    return Promise.resolve();
+  }
+}
+
+class FailingFixtureStore extends MemoryFixtureStore {
+  readonly rolledBack: string[] = [];
+  failCommit = false;
+  failCreate = false;
+  failRollback = false;
+
+  override createRow(input: Parameters<MemoryFixtureStore["createRow"]>[0]) {
+    if (this.failCreate) return Promise.reject(new Error("create failed"));
+    return super.createRow(input);
+  }
+
+  override commitTransaction(_transactionId: string) {
+    void _transactionId;
+    if (this.failCommit) return Promise.reject(new Error("commit failed"));
+    return Promise.resolve();
+  }
+
+  override rollbackTransaction(transactionId: string) {
+    this.rolledBack.push(transactionId);
+    if (this.failRollback) return Promise.reject(new Error("rollback failed"));
     return Promise.resolve();
   }
 }
@@ -108,5 +135,49 @@ describe("real-service G1 fixtures", () => {
       "APPWRITE_G1_FIXTURE_DRIFT:workspaces:workspace_alpha",
     );
     expect(store.created).toEqual([]);
+  });
+
+  it("BDD-G1-FIX-003A compares nested fixture values canonically", async () => {
+    const store = new MemoryFixtureStore();
+    const rows: readonly G1FixtureRow[] = [
+      {
+        tableId: "projects",
+        rowId: "project_nested",
+        permissions: [],
+        data: { context: [{ enabled: true, key: "route" }] },
+      },
+    ];
+    store.rows.set("projects:project_nested", {
+      context: [{ key: "route", enabled: true }],
+    });
+
+    await expect(seedG1Fixtures(store, rows)).resolves.toEqual({
+      created: 0,
+      verified: 1,
+    });
+  });
+
+  it("BDD-G1-FIX-007 rolls back failed row creation and commit", async () => {
+    const rows = createG1FixtureRows(schema);
+    const createFailure = new FailingFixtureStore();
+    createFailure.failCreate = true;
+    const commitFailure = new FailingFixtureStore();
+    commitFailure.failCommit = true;
+
+    await expect(seedG1Fixtures(createFailure, rows)).rejects.toThrow("create failed");
+    await expect(seedG1Fixtures(commitFailure, rows)).rejects.toThrow("commit failed");
+    expect(createFailure.rolledBack).toEqual(["transaction_1"]);
+    expect(commitFailure.rolledBack).toEqual(["transaction_1"]);
+  });
+
+  it("BDD-G1-FIX-008 preserves the originating failure when rollback also fails", async () => {
+    const store = new FailingFixtureStore();
+    store.failCreate = true;
+    store.failRollback = true;
+
+    await expect(seedG1Fixtures(store, createG1FixtureRows(schema))).rejects.toThrow(
+      "create failed",
+    );
+    expect(store.rolledBack).toEqual(["transaction_1"]);
   });
 });

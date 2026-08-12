@@ -46,6 +46,31 @@ function clients() {
 }
 
 describe("Node Appwrite provisioning adapter", () => {
+  it("BDD-INFRA-007 reads and creates a database without widening its definition", async () => {
+    const sdk = clients();
+    sdk.tables.get.mockResolvedValue({
+      $id: "feedback",
+      name: "Feedback",
+      enabled: true,
+    });
+    sdk.tables.create.mockResolvedValue({});
+    const port = createNodeAppwriteProvisioningPort(sdk.tables, sdk.storage);
+
+    await expect(port.getDatabase("feedback")).resolves.toEqual({
+      id: "feedback",
+      name: "Feedback",
+      enabled: true,
+    });
+    await port.createDatabase(manifest.database);
+
+    expect(sdk.tables.get).toHaveBeenCalledWith({ databaseId: "feedback" });
+    expect(sdk.tables.create).toHaveBeenCalledWith({
+      databaseId: "feedback",
+      name: "Y7 Feedback",
+      enabled: true,
+    });
+  });
+
   it("BDD-INFRA-008 maps only a 404 to an absent resource", async () => {
     const sdk = clients();
     sdk.tables.get.mockRejectedValueOnce({ code: 404 });
@@ -109,6 +134,274 @@ describe("Node Appwrite provisioning adapter", () => {
     await expect(port.getTable("feedback", "projects")).resolves.toEqual(definition);
   });
 
+  it("BDD-INFRA-010A normalizes every supported column and index variant", async () => {
+    const sdk = clients();
+    sdk.tables.getTable.mockResolvedValue({
+      $id: "all_types",
+      name: "All types",
+      $permissions: [],
+      rowSecurity: true,
+      enabled: true,
+      columns: [
+        { key: "active", type: "boolean", required: true },
+        { key: "count", type: "integer", required: false },
+        { key: "createdAt", type: "datetime", required: true },
+        { key: "slug", type: "varchar", size: 64, required: true },
+        { key: "proof", type: "varchar", size: 128, required: true, encrypt: true },
+        { key: "description", type: "text", required: false },
+        { key: "secret", type: "text", required: true, encrypt: true },
+      ],
+      indexes: [
+        { key: "by_slug", type: "key", columns: ["slug"] },
+        { key: "unique_proof", type: "unique", columns: ["proof"] },
+      ],
+    });
+    const port = createNodeAppwriteProvisioningPort(sdk.tables, sdk.storage);
+
+    await expect(port.getTable("feedback", "all_types")).resolves.toEqual({
+      id: "all_types",
+      name: "All types",
+      permissions: [],
+      rowSecurity: true,
+      enabled: true,
+      columns: [
+        { key: "active", type: "boolean", required: true },
+        { key: "count", type: "integer", required: false },
+        { key: "createdAt", type: "datetime", required: true },
+        { key: "slug", type: "varchar", size: 64, required: true },
+        { key: "proof", type: "varchar", size: 128, required: true, encrypt: true },
+        { key: "description", type: "text", required: false },
+        { key: "secret", type: "text", required: true, encrypt: true },
+      ],
+      indexes: [
+        { key: "by_slug", type: "key", columns: ["slug"] },
+        { key: "unique_proof", type: "unique", columns: ["proof"] },
+      ],
+    });
+  });
+
+  it.each([
+    ["database record", "database", null],
+    ["database identifier", "database", { $id: 7, name: "Feedback", enabled: true }],
+    ["database name", "database", { $id: "feedback", name: 7, enabled: true }],
+    [
+      "database enabled flag",
+      "database",
+      { $id: "feedback", name: "Feedback", enabled: "yes" },
+    ],
+    ["table record", "table", null],
+    ["table columns", "table", { columns: {}, indexes: [] }],
+    ["table indexes", "table", { columns: [], indexes: {} }],
+    [
+      "table permissions",
+      "table",
+      {
+        $id: "items",
+        name: "Items",
+        $permissions: [7],
+        rowSecurity: true,
+        enabled: true,
+        columns: [],
+        indexes: [],
+      },
+    ],
+    [
+      "column record",
+      "table",
+      {
+        $id: "items",
+        name: "Items",
+        $permissions: [],
+        rowSecurity: true,
+        enabled: true,
+        columns: [null],
+        indexes: [],
+      },
+    ],
+    [
+      "column key",
+      "table",
+      {
+        $id: "items",
+        name: "Items",
+        $permissions: [],
+        rowSecurity: true,
+        enabled: true,
+        columns: [{ key: 7, type: "text", required: true }],
+        indexes: [],
+      },
+    ],
+    [
+      "column type",
+      "table",
+      {
+        $id: "items",
+        name: "Items",
+        $permissions: [],
+        rowSecurity: true,
+        enabled: true,
+        columns: [{ key: "value", type: 7, required: true }],
+        indexes: [],
+      },
+    ],
+    [
+      "column required flag",
+      "table",
+      {
+        $id: "items",
+        name: "Items",
+        $permissions: [],
+        rowSecurity: true,
+        enabled: true,
+        columns: [{ key: "value", type: "text", required: "yes" }],
+        indexes: [],
+      },
+    ],
+    [
+      "varchar size type",
+      "table",
+      {
+        $id: "items",
+        name: "Items",
+        $permissions: [],
+        rowSecurity: true,
+        enabled: true,
+        columns: [{ key: "value", type: "varchar", size: "64", required: true }],
+        indexes: [],
+      },
+    ],
+    [
+      "varchar unsafe size",
+      "table",
+      {
+        $id: "items",
+        name: "Items",
+        $permissions: [],
+        rowSecurity: true,
+        enabled: true,
+        columns: [
+          {
+            key: "value",
+            type: "varchar",
+            size: Number.MAX_SAFE_INTEGER + 1,
+            required: true,
+          },
+        ],
+        indexes: [],
+      },
+    ],
+    [
+      "unsupported column",
+      "table",
+      {
+        $id: "items",
+        name: "Items",
+        $permissions: [],
+        rowSecurity: true,
+        enabled: true,
+        columns: [{ key: "value", type: "float", required: true }],
+        indexes: [],
+      },
+    ],
+    [
+      "index record",
+      "table",
+      {
+        $id: "items",
+        name: "Items",
+        $permissions: [],
+        rowSecurity: true,
+        enabled: true,
+        columns: [],
+        indexes: [null],
+      },
+    ],
+    [
+      "index type",
+      "table",
+      {
+        $id: "items",
+        name: "Items",
+        $permissions: [],
+        rowSecurity: true,
+        enabled: true,
+        columns: [],
+        indexes: [{ key: "by_value", type: 7, columns: ["value"] }],
+      },
+    ],
+    [
+      "unsupported index",
+      "table",
+      {
+        $id: "items",
+        name: "Items",
+        $permissions: [],
+        rowSecurity: true,
+        enabled: true,
+        columns: [],
+        indexes: [{ key: "by_value", type: "fulltext", columns: ["value"] }],
+      },
+    ],
+    [
+      "index columns type",
+      "table",
+      {
+        $id: "items",
+        name: "Items",
+        $permissions: [],
+        rowSecurity: true,
+        enabled: true,
+        columns: [],
+        indexes: [{ key: "by_value", type: "key", columns: {} }],
+      },
+    ],
+    [
+      "index column value",
+      "table",
+      {
+        $id: "items",
+        name: "Items",
+        $permissions: [],
+        rowSecurity: true,
+        enabled: true,
+        columns: [],
+        indexes: [{ key: "by_value", type: "key", columns: [7] }],
+      },
+    ],
+    ["bucket record", "bucket", null],
+    [
+      "bucket file size",
+      "bucket",
+      {
+        $id: "files",
+        name: "Files",
+        $permissions: [],
+        fileSecurity: true,
+        enabled: true,
+        maximumFileSize: 1.5,
+        allowedFileExtensions: [],
+        compression: "none",
+        encryption: true,
+        antivirus: true,
+        transformations: false,
+      },
+    ],
+  ])("BDD-INFRA-010B rejects invalid %s metadata", async (_case, resource, value) => {
+    const sdk = clients();
+    if (resource === "database") sdk.tables.get.mockResolvedValue(value);
+    if (resource === "table") sdk.tables.getTable.mockResolvedValue(value);
+    if (resource === "bucket") sdk.storage.getBucket.mockResolvedValue(value);
+    const port = createNodeAppwriteProvisioningPort(sdk.tables, sdk.storage);
+    const request =
+      resource === "database"
+        ? port.getDatabase("feedback")
+        : resource === "table"
+          ? port.getTable("feedback", "items")
+          : port.getBucket("files");
+
+    await expect(request).rejects.toThrow("APPWRITE_INFRASTRUCTURE_INVALID");
+  });
+
   it("BDD-INFRA-011 creates a private encrypted antivirus bucket", async () => {
     const sdk = clients();
     const port = createNodeAppwriteProvisioningPort(sdk.tables, sdk.storage);
@@ -129,5 +422,31 @@ describe("Node Appwrite provisioning adapter", () => {
       antivirus: true,
       transformations: false,
     });
+  });
+
+  it("BDD-INFRA-012 reads bucket metadata and rejects unsupported compression on creation", async () => {
+    const sdk = clients();
+    sdk.storage.getBucket.mockResolvedValue({
+      $id: "private_attachments",
+      name: "Private attachments",
+      $permissions: [],
+      fileSecurity: true,
+      enabled: true,
+      maximumFileSize: 10 * 1024 * 1024,
+      allowedFileExtensions: [],
+      compression: "none",
+      encryption: true,
+      antivirus: true,
+      transformations: false,
+    });
+    const port = createNodeAppwriteProvisioningPort(sdk.tables, sdk.storage);
+
+    await expect(port.getBucket("private_attachments")).resolves.toEqual(
+      manifest.attachmentBucket,
+    );
+    await expect(
+      port.createBucket({ ...manifest.attachmentBucket, compression: "gzip" }),
+    ).rejects.toThrow("APPWRITE_INFRASTRUCTURE_INVALID");
+    expect(sdk.storage.createBucket).not.toHaveBeenCalled();
   });
 });

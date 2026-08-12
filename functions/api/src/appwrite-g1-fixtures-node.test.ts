@@ -43,6 +43,28 @@ describe("Node Appwrite G1 fixture adapter", () => {
     });
   });
 
+  it("BDD-G1-FIX-005A rejects malformed row and transaction metadata", async () => {
+    const tables = client();
+    tables.getRow.mockResolvedValueOnce([]);
+    tables.createTransaction.mockResolvedValueOnce(null);
+    tables.createTransaction.mockResolvedValueOnce({ $id: 7 });
+    tables.createTransaction.mockResolvedValueOnce({ $id: "   " });
+    const store = createNodeAppwriteG1FixtureStore(tables, "feedback");
+
+    await expect(store.getRow("workspaces", "workspace_alpha")).rejects.toThrow(
+      "APPWRITE_G1_FIXTURE_INVALID",
+    );
+    await expect(store.createTransaction()).rejects.toThrow(
+      "APPWRITE_G1_TRANSACTION_INVALID",
+    );
+    await expect(store.createTransaction()).rejects.toThrow(
+      "APPWRITE_G1_TRANSACTION_INVALID",
+    );
+    await expect(store.createTransaction()).rejects.toThrow(
+      "APPWRITE_G1_TRANSACTION_INVALID",
+    );
+  });
+
   it("BDD-G1-FIX-006 maps transaction and private row operations exactly", async () => {
     const tables = client();
     tables.createTransaction.mockResolvedValue({ $id: "transaction_1" });
