@@ -31,20 +31,27 @@ export interface AppwriteTableDefinition {
   readonly name: string;
   readonly permissions: readonly [];
   readonly rowSecurity: true;
+  readonly enabled: true;
   readonly columns: readonly AppwriteColumn[];
   readonly indexes: readonly AppwriteIndex[];
 }
 
 export interface AppwriteInfrastructureManifest {
-  readonly database: { readonly id: string; readonly name: string };
+  readonly database: {
+    readonly id: string;
+    readonly name: string;
+    readonly enabled: true;
+  };
   readonly tables: readonly AppwriteTableDefinition[];
   readonly attachmentBucket: {
     readonly id: string;
     readonly name: string;
     readonly permissions: readonly [];
     readonly fileSecurity: true;
+    readonly enabled: true;
     readonly maximumFileSize: number;
     readonly allowedFileExtensions: readonly [];
+    readonly compression: "none";
     readonly encryption: true;
     readonly antivirus: true;
     readonly transformations: false;
@@ -107,6 +114,7 @@ const table = (
   name,
   permissions: [],
   rowSecurity: true,
+  enabled: true,
   columns,
   indexes,
 });
@@ -115,7 +123,7 @@ export function createAppwriteInfrastructureManifest(
   schema: ServerConfig["appwriteSchema"],
 ): AppwriteInfrastructureManifest {
   return {
-    database: { id: schema.databaseId, name: "Y7 Feedback" },
+    database: { id: schema.databaseId, name: "Y7 Feedback", enabled: true },
     tables: [
       table(
         schema.projectsTableId,
@@ -285,8 +293,10 @@ export function createAppwriteInfrastructureManifest(
       name: "Private attachments",
       permissions: [],
       fileSecurity: true,
+      enabled: true,
       maximumFileSize: 10 * 1024 * 1024,
       allowedFileExtensions: [],
+      compression: "none",
       encryption: true,
       antivirus: true,
       transformations: false,
