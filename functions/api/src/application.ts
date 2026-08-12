@@ -2,20 +2,20 @@ import type { TablesDB } from "node-appwrite";
 
 import type { ServerConfig } from "@y7-feedback/config/server";
 
-import { createAccountlessAccessCoordinator } from "./accountless-access";
-import { createNodeAppwriteAccountlessRepository } from "./appwrite-accountless-repository";
-import { createNodeAppwriteIntakeStore } from "./appwrite-intake-store";
-import { createNodeAppwritePublicProjectReader } from "./appwrite-public-project-reader";
-import type { HttpDependencies } from "./http";
-import { createIntakeCoordinator } from "./intake";
+import { createAccountlessAccessCoordinator } from "./accountless-access.js";
+import { createNodeAppwriteAccountlessRepository } from "./appwrite-accountless-repository.js";
+import { createNodeAppwriteIntakeStore } from "./appwrite-intake-store.js";
+import { createNodeAppwritePublicProjectReader } from "./appwrite-public-project-reader.js";
+import type { HttpDependencies } from "./http.js";
+import { createIntakeCoordinator } from "./intake.js";
 import {
   createAccessProof,
   createProofProtector,
   digestValidatedDraft,
   hashAccessProof,
   matchesAccessProof,
-} from "./proof-crypto";
-import { createPublicApi } from "./public-api";
+} from "./proof-crypto.js";
+import { createPublicApi } from "./public-api.js";
 
 export interface ApplicationRuntime {
   readonly tables: TablesDB;

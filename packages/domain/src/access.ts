@@ -1,4 +1,4 @@
-import { validateFeedbackSource, type FeedbackSource } from "./feedback";
+import { validateFeedbackSource, type FeedbackSource } from "./feedback.js";
 
 export type FeedbackLifecycleState =
   "received" | "under_review" | "awaiting_reporter" | "resolved" | "closed";

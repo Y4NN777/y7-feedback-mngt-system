@@ -5,10 +5,10 @@ import {
   parseEnvironment,
   requireValue,
   type ApplicationEnvironment,
-} from "./shared";
+} from "./shared.js";
 
-export { ConfigError } from "./shared";
-export type { ApplicationEnvironment } from "./shared";
+export { ConfigError } from "./shared.js";
+export type { ApplicationEnvironment } from "./shared.js";
 
 export interface PublicConfig {
   readonly environment: ApplicationEnvironment;

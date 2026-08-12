@@ -5,7 +5,7 @@ import {
   parseEnvironment,
   requireValue,
   type ApplicationEnvironment,
-} from "./shared";
+} from "./shared.js";
 
 export interface ServerConfig {
   readonly environment: ApplicationEnvironment;

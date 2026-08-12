@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
-import { serializeOperationalEvent } from "./observability";
-import type { PublicApi } from "./public-api";
+import { serializeOperationalEvent } from "./observability.js";
+import type { PublicApi } from "./public-api.js";
 
 export interface FunctionRequest {
   readonly method: string;

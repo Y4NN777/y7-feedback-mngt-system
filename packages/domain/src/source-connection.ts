@@ -1,5 +1,5 @@
-import type { ActorAccess } from "./authorization";
-import type { Project } from "./policy";
+import type { ActorAccess } from "./authorization.js";
+import type { Project } from "./policy.js";
 
 export type SourceProvider = "github" | "gitlab";
 export type SourceConnectionState = "active" | "suspended" | "disconnected";

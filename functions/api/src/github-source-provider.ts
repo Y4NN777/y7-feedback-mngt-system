@@ -4,7 +4,7 @@ import type {
   ProviderGrantMaterial,
   ProviderGrantVault,
   SourceProviderAdapter,
-} from "./source-provider";
+} from "./source-provider.js";
 
 export interface GitHubProviderConfig {
   readonly clientId: string;

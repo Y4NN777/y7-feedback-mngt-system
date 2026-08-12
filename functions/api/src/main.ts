@@ -4,8 +4,8 @@ import { Client, ID, TablesDB } from "node-appwrite";
 
 import { parseServerConfig } from "@y7-feedback/config/server";
 
-import { createHttpApplication } from "./application";
-import { routeRequest, type FunctionContext } from "./http";
+import { createHttpApplication } from "./application.js";
+import { routeRequest, type FunctionContext } from "./http.js";
 
 const config = parseServerConfig(process.env);
 const client = new Client()
