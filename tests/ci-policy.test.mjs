@@ -50,3 +50,14 @@ test("BDD-CI-002 builds runtime workspace dependencies before the E2E server", a
     /command:\s*"pnpm --filter @y7-feedback\/config build && pnpm build && pnpm preview --host 127\.0\.0\.1"/u,
   );
 });
+
+test("BDD-CI-004 loads ignored Appwrite credentials without shell export", async () => {
+  const rootPackage = JSON.parse(
+    await readFile(new URL("../package.json", import.meta.url), "utf8"),
+  );
+
+  assert.equal(
+    rootPackage.scripts["provision:appwrite"],
+    "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build && node --env-file=.env.appwrite-preview functions/api/dist/provision-appwrite.js --apply",
+  );
+});
