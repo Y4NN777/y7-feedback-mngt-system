@@ -3,11 +3,11 @@ import { createHash } from "node:crypto";
 import { Query, type Storage, type TablesDB } from "node-appwrite";
 import { InputFile } from "node-appwrite/file";
 
-import type { PrivateAttachmentReader } from "./attachment-download";
+import type { PrivateAttachmentReader } from "./attachment-download.js";
 import type {
   PrivateAttachmentStorage,
   StagedAttachmentObject,
-} from "./attachment-saga";
+} from "./attachment-saga.js";
 
 export interface AppwritePrivateAttachmentSchema {
   readonly bucketId: string;

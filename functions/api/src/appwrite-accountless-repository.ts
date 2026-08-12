@@ -13,7 +13,7 @@ import {
   type SourceRevision,
 } from "@y7-feedback/domain";
 
-import type { AccountlessAccessRepository } from "./accountless-access";
+import type { AccountlessAccessRepository } from "./accountless-access.js";
 
 export interface AppwriteAccountlessSchema {
   readonly databaseId: string;

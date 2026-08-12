@@ -1,4 +1,4 @@
-import type { Project } from "./policy";
+import type { Project } from "./policy.js";
 
 export type Responsibility =
   "workspace_owner" | "project_maintainer" | "platform_operator" | "platform_owner";

@@ -10,8 +10,8 @@ import {
   type ReporterAttribution,
 } from "@y7-feedback/domain";
 
-import type { AccountlessAccessCoordinator } from "./accountless-access";
-import type { IntakeCoordinator, IntakeOutcome } from "./intake";
+import type { AccountlessAccessCoordinator } from "./accountless-access.js";
+import type { IntakeCoordinator, IntakeOutcome } from "./intake.js";
 
 export interface PublicProject {
   readonly slug: string;

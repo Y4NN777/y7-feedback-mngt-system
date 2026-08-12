@@ -8,7 +8,7 @@ import {
 import type {
   AttachmentCandidate,
   AttachmentValidationOutcome,
-} from "./attachment-validation";
+} from "./attachment-validation.js";
 
 export interface StagedAttachmentObject {
   readonly objectId: string;

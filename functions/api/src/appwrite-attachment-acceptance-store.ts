@@ -7,8 +7,8 @@ import {
   type AttachmentSourceEntry,
 } from "@y7-feedback/domain";
 
-import type { AttachmentMetadataReader } from "./attachment-download";
-import type { AttachmentAcceptanceStore } from "./attachment-saga";
+import type { AttachmentMetadataReader } from "./attachment-download.js";
+import type { AttachmentAcceptanceStore } from "./attachment-saga.js";
 
 export interface AppwriteAttachmentAcceptanceSchema {
   readonly databaseId: string;

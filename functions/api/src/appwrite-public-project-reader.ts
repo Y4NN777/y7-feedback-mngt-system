@@ -7,7 +7,7 @@ import {
   type ProjectFeedbackConfig,
 } from "@y7-feedback/domain";
 
-import type { PublicProject, PublicProjectReader } from "./public-api";
+import type { PublicProject, PublicProjectReader } from "./public-api.js";
 
 export interface AppwritePublicProjectSchema {
   readonly databaseId: string;

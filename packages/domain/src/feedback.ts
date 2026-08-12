@@ -1,4 +1,4 @@
-import type { ReporterAttribution } from "./reporter";
+import type { ReporterAttribution } from "./reporter.js";
 
 export type FeedbackType = "bug" | "suggestion" | "review";
 export type ContextType = "string" | "number" | "boolean";

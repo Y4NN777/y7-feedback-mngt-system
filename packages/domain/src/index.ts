@@ -1,9 +1,9 @@
-export { isLocale, supportedLocales, type Locale } from "./locale";
-export * from "./access";
-export * from "./attachment";
-export * from "./authorization";
-export * from "./feedback";
-export * from "./policy";
-export * from "./project-routing";
-export * from "./reporter";
-export * from "./source-connection";
+export { isLocale, supportedLocales, type Locale } from "./locale.js";
+export * from "./access.js";
+export * from "./attachment.js";
+export * from "./authorization.js";
+export * from "./feedback.js";
+export * from "./policy.js";
+export * from "./project-routing.js";
+export * from "./reporter.js";
+export * from "./source-connection.js";

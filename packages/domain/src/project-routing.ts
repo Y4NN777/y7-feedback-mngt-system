@@ -1,4 +1,4 @@
-import { DomainPolicyError, type Project } from "./policy";
+import { DomainPolicyError, type Project } from "./policy.js";
 
 interface RegisteredProject {
   readonly project: Project;

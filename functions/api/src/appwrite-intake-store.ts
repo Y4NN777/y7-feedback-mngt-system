@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 
 import { Query, type TablesDB } from "node-appwrite";
 
-import type { AcceptanceCommit, IdempotencyRecord, IntakeStore } from "./intake";
+import type { AcceptanceCommit, IdempotencyRecord, IntakeStore } from "./intake.js";
 
 export interface AppwriteIntakeSchema {
   readonly databaseId: string;

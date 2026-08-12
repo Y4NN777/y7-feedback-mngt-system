@@ -4,7 +4,7 @@ import type { TablesDB } from "node-appwrite";
 
 import type { SourceProvider } from "@y7-feedback/domain";
 
-import type { ProviderGrantMaterial, ProviderGrantVault } from "./source-provider";
+import type { ProviderGrantMaterial, ProviderGrantVault } from "./source-provider.js";
 
 export interface AppwriteProviderGrantSchema {
   readonly databaseId: string;
