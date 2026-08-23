@@ -115,21 +115,12 @@ describe("Appwrite infrastructure manifest", () => {
       "provider_grants.envelope",
       "source_connections.selectedRepositoriesJson",
     ]);
-    const declaredEnvelopeColumns = new Set(
-      manifest.tables.flatMap(({ id, columns }) =>
-        columns
-          .filter((column) => "encrypt" in column && !column.encrypt)
-          .map((column) => `${id}.${column.key}`),
-      ),
-    );
-    expect(declaredEnvelopeColumns).toEqual(envelopeColumns);
-
     for (const definition of manifest.tables) {
       const indexed = new Set(definition.indexes.flatMap(({ columns }) => columns));
       for (const column of definition.columns) {
         const qualified = `${definition.id}.${column.key}`;
         if (!envelopeColumns.has(qualified)) continue;
-        expect("encrypt" in column && column.encrypt).toBe(false);
+        expect("encrypt" in column).toBe(false);
         expect(indexed.has(column.key)).toBe(false);
       }
     }
