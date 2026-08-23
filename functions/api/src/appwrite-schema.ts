@@ -61,23 +61,21 @@ export interface AppwriteInfrastructureManifest {
 const varchar = (
   key: string,
   size: number,
-  options: { readonly required?: boolean; readonly encrypt?: boolean } = {},
+  options: { readonly required?: boolean } = {},
 ): AppwriteColumn => ({
   key,
   type: "varchar",
   size,
   required: options.required ?? true,
-  ...(options.encrypt === undefined ? {} : { encrypt: options.encrypt }),
 });
 
 const text = (
   key: string,
-  options: { readonly required?: boolean; readonly encrypt?: boolean } = {},
+  options: { readonly required?: boolean } = {},
 ): AppwriteColumn => ({
   key,
   type: "text",
   required: options.required ?? true,
-  ...(options.encrypt === undefined ? {} : { encrypt: options.encrypt }),
 });
 
 const datetime = (key: string): AppwriteColumn => ({
@@ -196,7 +194,7 @@ export function createAppwriteInfrastructureManifest(
       table(
         schema.reportersTableId,
         "Reporters",
-        [varchar("workspaceId", 36), text("attributionJson", { encrypt: false })],
+        [varchar("workspaceId", 36), text("attributionJson")],
         [index("workspace", ["workspaceId"])],
       ),
       table(
@@ -207,19 +205,19 @@ export function createAppwriteInfrastructureManifest(
           varchar("workspaceId", 36),
           varchar("reporterId", 36),
           varchar("type", 16),
-          text("originalSourceJson", { encrypt: false }),
-          text("currentSourceJson", { encrypt: false }),
-          text("contextJson", { encrypt: false }),
-          text("attachmentNamesJson", { encrypt: false }),
+          text("originalSourceJson"),
+          text("currentSourceJson"),
+          text("contextJson"),
+          text("attachmentNamesJson"),
           varchar("state", 32),
           datetime("acceptedAt"),
-          text("reporterHistoryJson", { encrypt: false }),
-          text("reporterMessagesJson", { encrypt: false }),
-          text("reporterAttachmentsJson", { encrypt: false }),
-          text("sourceRevisionsJson", { encrypt: false }),
-          text("deletionRequestsJson", { encrypt: false }),
-          text("internalNotesJson", { encrypt: false }),
-          text("workspaceClassification", { required: false, encrypt: false }),
+          text("reporterHistoryJson"),
+          text("reporterMessagesJson"),
+          text("reporterAttachmentsJson"),
+          text("sourceRevisionsJson"),
+          text("deletionRequestsJson"),
+          text("internalNotesJson"),
+          text("workspaceClassification", { required: false }),
         ],
         [
           index("project", ["projectId"]),
@@ -247,7 +245,7 @@ export function createAppwriteInfrastructureManifest(
         [
           varchar("feedbackId", 36),
           varchar("reference", 100),
-          varchar("verifier", 200, { encrypt: false }),
+          varchar("verifier", 200),
           integer("generation"),
           varchar("status", 16),
         ],
@@ -273,7 +271,7 @@ export function createAppwriteInfrastructureManifest(
           varchar("channel", 32),
           varchar("status", 32),
           datetime("createdAt"),
-          text("payloadJson", { encrypt: false }),
+          text("payloadJson"),
         ],
         [index("status_created", ["status", "createdAt"])],
       ),
@@ -286,8 +284,8 @@ export function createAppwriteInfrastructureManifest(
           varchar("payloadDigest", 128),
           varchar("feedbackId", 36),
           varchar("reference", 100),
-          text("protectedProof", { encrypt: false }),
-          varchar("proofVerifier", 200, { encrypt: false }),
+          text("protectedProof"),
+          varchar("proofVerifier", 200),
           datetime("createdAt"),
         ],
         [index("scope_operation_unique", ["scopeKey", "clientOperationId"], "unique")],
@@ -319,7 +317,7 @@ export function createAppwriteInfrastructureManifest(
           varchar("audience", 16),
           varchar("sourceKind", 32),
           varchar("sourceEntryId", 200),
-          varchar("displayName", 255, { encrypt: false }),
+          varchar("displayName", 255),
           varchar("mediaType", 100),
           integer("size"),
           varchar("sha256", 200),
@@ -338,7 +336,7 @@ export function createAppwriteInfrastructureManifest(
       table(
         schema.providerGrantsTableId,
         "Provider grant vault",
-        [varchar("provider", 16), text("envelope", { encrypt: false })],
+        [varchar("provider", 16), text("envelope")],
         [index("provider", ["provider"])],
       ),
       table(
@@ -351,7 +349,7 @@ export function createAppwriteInfrastructureManifest(
           varchar("ownerUserId", 36),
           varchar("status", 16),
           varchar("encryptedGrantRef", 36),
-          text("selectedRepositoriesJson", { encrypt: false }),
+          text("selectedRepositoriesJson"),
           datetime("createdAt"),
           datetime("updatedAt"),
         ],

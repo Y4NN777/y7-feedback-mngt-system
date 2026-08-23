@@ -33,7 +33,16 @@ function isAbsent(error: unknown): boolean {
 function fixtureData(value: unknown): Readonly<Record<string, unknown>> {
   if (!isRecord(value)) throw new Error("APPWRITE_G1_FIXTURE_INVALID");
   return Object.fromEntries(
-    Object.entries(value).filter(([key]) => !key.startsWith("$")),
+    Object.entries(value)
+      .filter(([key]) => !key.startsWith("$"))
+      .map(([key, item]) => [
+        key,
+        key.endsWith("At") &&
+        typeof item === "string" &&
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}\+00:00$/u.test(item)
+          ? `${item.slice(0, -6)}Z`
+          : item,
+      ]),
   );
 }
 

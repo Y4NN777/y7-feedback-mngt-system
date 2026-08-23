@@ -34,10 +34,10 @@ Keys for sensitive data, accountless Access Proof envelopes, and provider grants
 must be distinct. They remain server-only and are never exposed through
 `VITE_*`, logs, session summaries, or committed environment files.
 
-Appwrite columns that contain application envelopes explicitly declare native
-encryption as disabled, matching the Education project metadata. They remain
-unindexed. The private attachment bucket continues to require Appwrite storage
-encryption and antivirus scanning.
+Appwrite columns that contain application envelopes omit native column
+encryption, matching the Education project metadata and the SDK's canonical
+representation of its default. They remain unindexed. The private attachment
+bucket continues to require Appwrite storage encryption and antivirus scanning.
 
 ## Consequences
 

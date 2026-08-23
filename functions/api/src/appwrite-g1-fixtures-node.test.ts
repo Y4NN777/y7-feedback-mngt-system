@@ -32,7 +32,7 @@ describe("Node Appwrite G1 fixture adapter", () => {
       $permissions: [],
       name: "Alpha Workspace",
       active: true,
-      createdAt: "2026-08-10T00:00:00.000Z",
+      createdAt: "2026-08-10T00:00:00.000+00:00",
     });
     const store = createNodeAppwriteG1FixtureStore(tables, "feedback");
 
