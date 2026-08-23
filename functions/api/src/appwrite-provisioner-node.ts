@@ -195,8 +195,9 @@ export function createNodeAppwriteProvisioningPort(
         enabled: definition.enabled,
         columns: definition.columns.map((item) => ({ ...item })),
         indexes: definition.indexes.map((item) => ({
-          ...item,
-          columns: [...item.columns],
+          key: item.key,
+          type: item.type,
+          attributes: [...item.columns],
         })),
       });
     },
