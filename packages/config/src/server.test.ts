@@ -29,6 +29,9 @@ const validServer = {
   APPWRITE_SOURCE_CONNECTIONS_TABLE_ID: "source_connections",
   ACCESS_PROOF_ENVELOPE_KEY: "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc",
   PROVIDER_GRANT_ENVELOPE_KEY: "CAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg",
+  SENSITIVE_DATA_ACTIVE_KEY_ID: "data_2026_08",
+  SENSITIVE_DATA_ENVELOPE_KEYS:
+    '{"data_2026_07":"CQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk","data_2026_08":"CgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgo"}',
   RELEASE: "commit-123",
 };
 
@@ -62,6 +65,11 @@ describe("trusted environment contract", () => {
       },
       accessProofEnvelopeKey: "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc",
       providerGrantEnvelopeKey: "CAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg",
+      sensitiveDataActiveKeyId: "data_2026_08",
+      sensitiveDataEnvelopeKeys: {
+        data_2026_07: "CQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk",
+        data_2026_08: "CgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgo",
+      },
       release: "commit-123",
     });
   });
@@ -109,5 +117,29 @@ describe("trusted environment contract", () => {
         PROVIDER_GRANT_ENVELOPE_KEY: validServer.ACCESS_PROOF_ENVELOPE_KEY,
       }),
     ).toThrow(new ConfigError("PROVIDER_GRANT_KEY_INVALID"));
+  });
+
+  it("BDD-DATA-ENC-005 requires a rotation-ready keyring separated by purpose", () => {
+    for (const override of [
+      { SENSITIVE_DATA_ACTIVE_KEY_ID: "missing" },
+      { SENSITIVE_DATA_ACTIVE_KEY_ID: "bad/key" },
+      { SENSITIVE_DATA_ENVELOPE_KEYS: "not-json" },
+      { SENSITIVE_DATA_ENVELOPE_KEYS: "[]" },
+      {
+        SENSITIVE_DATA_ENVELOPE_KEYS: JSON.stringify({
+          data_2026_08: validServer.ACCESS_PROOF_ENVELOPE_KEY,
+        }),
+      },
+      {
+        SENSITIVE_DATA_ENVELOPE_KEYS: JSON.stringify({
+          data_2026_07: "CgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgo",
+          data_2026_08: "CgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgo",
+        }),
+      },
+    ]) {
+      expect(() => parseServerConfig({ ...validServer, ...override })).toThrow(
+        new ConfigError("SENSITIVE_DATA_KEYS_INVALID"),
+      );
+    }
   });
 });

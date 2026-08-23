@@ -15,6 +15,13 @@ const schema = {
   attachmentsTableId: "attachments",
 };
 const operationId = "123e4567-e89b-42d3-a456-426614174000";
+const sensitive = {
+  environment: "test",
+  protector: {
+    seal: (_context: unknown, plaintext: string) => plaintext,
+    open: (_context: unknown, envelope: string) => envelope,
+  },
+};
 
 function attachment(
   overrides: Partial<Omit<AttachmentRecord, "lifecycle">> = {},
@@ -80,7 +87,7 @@ function setup(rows: readonly unknown[] = []) {
     createRow,
     createTransaction,
     listRows,
-    store: createAppwriteAttachmentAcceptanceStore(tables, schema, queries),
+    store: createAppwriteAttachmentAcceptanceStore(tables, schema, queries, sensitive),
     updateTransaction,
   };
 }
@@ -283,6 +290,7 @@ describe("Appwrite Attachment acceptance store", () => {
         },
         { ...schema, attachmentsTableId: "attachment_staging" },
         { equal: vi.fn(), limit: vi.fn() },
+        sensitive,
       ),
     ).toThrow("APPWRITE_ATTACHMENT_SCHEMA_INVALID");
 
@@ -328,6 +336,7 @@ describe("Appwrite Attachment acceptance store", () => {
     const store = createNodeAppwriteAttachmentAcceptanceStore(
       tables as unknown as import("node-appwrite").TablesDB,
       schema,
+      sensitive,
     );
     await store.commit({
       operationId,
