@@ -9,6 +9,7 @@ import {
 
 import type { AttachmentMetadataReader } from "./attachment-download.js";
 import type { AttachmentAcceptanceStore } from "./attachment-saga.js";
+import type { AppwriteSensitivePersistence } from "./sensitive-data-protector.js";
 
 export interface AppwriteAttachmentAcceptanceSchema {
   readonly databaseId: string;
@@ -92,12 +93,17 @@ function lifecycle(value: unknown): AttachmentLifecycle {
   return value;
 }
 
-function parseMetadata(value: unknown): AttachmentRecord {
+function parseMetadata(
+  value: unknown,
+  schema: AppwriteAttachmentAcceptanceSchema,
+  sensitive: AppwriteSensitivePersistence,
+): AttachmentRecord {
   if (!isObject(value)) throw new Error("APPWRITE_ATTACHMENT_METADATA_INVALID");
   try {
     const parsedLifecycle = lifecycle(value.lifecycle);
+    const id = requiredString(value.$id, 36);
     const record = createAttachmentRecord({
-      id: requiredString(value.$id, 36),
+      id,
       objectId: requiredString(value.objectId, 500),
       feedbackId: requiredString(value.feedbackId, 200),
       workspaceId: requiredString(value.workspaceId, 200),
@@ -109,7 +115,15 @@ function parseMetadata(value: unknown): AttachmentRecord {
               throw new Error("APPWRITE_ATTACHMENT_METADATA_INVALID");
             })(),
       sourceEntry: sourceEntry(value),
-      displayName: requiredString(value.displayName, 255),
+      displayName: sensitive.protector.open(
+        {
+          environment: sensitive.environment,
+          tableId: schema.attachmentsTableId,
+          rowId: id,
+          field: "displayName",
+        },
+        requiredString(value.displayName, 1_000),
+      ),
       mediaType: requiredString(value.mediaType, 100),
       size:
         typeof value.size === "number" && Number.isInteger(value.size)
@@ -172,6 +186,8 @@ function validateCommit(input: {
 function metadataData(
   record: AttachmentRecord,
   operationId: string,
+  schema: AppwriteAttachmentAcceptanceSchema,
+  sensitive: AppwriteSensitivePersistence,
 ): Readonly<Record<string, unknown>> {
   return {
     objectId: record.objectId,
@@ -181,7 +197,15 @@ function metadataData(
     audience: record.audience,
     sourceKind: record.sourceEntry.kind,
     sourceEntryId: record.sourceEntry.id,
-    displayName: record.displayName,
+    displayName: sensitive.protector.seal(
+      {
+        environment: sensitive.environment,
+        tableId: schema.attachmentsTableId,
+        rowId: record.id,
+        field: "displayName",
+      },
+      record.displayName,
+    ),
     mediaType: record.mediaType,
     size: record.size,
     sha256: record.sha256,
@@ -194,7 +218,8 @@ function metadataData(
 export function createAppwriteAttachmentAcceptanceStore(
   tables: AppwriteAttachmentAcceptanceTablesPort,
   schema: AppwriteAttachmentAcceptanceSchema,
-  queries: AppwriteAttachmentAcceptanceQueryPort = defaultQueries,
+  queries: AppwriteAttachmentAcceptanceQueryPort,
+  sensitive: AppwriteSensitivePersistence,
 ): AppwriteAttachmentAcceptanceStore {
   validateSchema(schema);
 
@@ -216,7 +241,7 @@ export function createAppwriteAttachmentAcceptanceStore(
     if (result.rows.length !== 1) {
       throw new Error("APPWRITE_ATTACHMENT_METADATA_INCONSISTENT");
     }
-    const record = parseMetadata(result.rows[0]);
+    const record = parseMetadata(result.rows[0], schema, sensitive);
     if (
       (attribute === "$id" && record.id !== value) ||
       (attribute === "objectId" && record.objectId !== value)
@@ -264,7 +289,7 @@ export function createAppwriteAttachmentAcceptanceStore(
             databaseId: schema.databaseId,
             tableId: schema.attachmentsTableId,
             rowId: attachment.id,
-            data: metadataData(attachment, input.operationId),
+            data: metadataData(attachment, input.operationId, schema, sensitive),
             permissions: [],
             transactionId: transaction.$id,
           });
@@ -302,6 +327,7 @@ export function createAppwriteAttachmentAcceptanceStore(
 export function createNodeAppwriteAttachmentAcceptanceStore(
   tables: TablesDB,
   schema: AppwriteAttachmentAcceptanceSchema,
+  sensitive: AppwriteSensitivePersistence,
 ): AppwriteAttachmentAcceptanceStore {
   return createAppwriteAttachmentAcceptanceStore(
     {
@@ -318,5 +344,7 @@ export function createNodeAppwriteAttachmentAcceptanceStore(
       },
     },
     schema,
+    defaultQueries,
+    sensitive,
   );
 }

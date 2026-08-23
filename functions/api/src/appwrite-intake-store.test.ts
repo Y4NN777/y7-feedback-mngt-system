@@ -7,6 +7,7 @@ import {
   type AppwriteIntakeSchema,
   type AppwriteTablesDbPort,
 } from "./appwrite-intake-store";
+import { createSensitiveDataProtector } from "./sensitive-data-protector";
 
 const schema: AppwriteIntakeSchema = {
   databaseId: "y7",
@@ -152,11 +153,42 @@ const queries = {
     `equal:${attribute}:${values.join(":")}`,
   limit: (limit: number) => `limit:${String(limit)}`,
 };
+const sensitive = {
+  environment: "test",
+  protector: {
+    seal: (_context: unknown, plaintext: string) => plaintext,
+    open: (_context: unknown, envelope: string) => envelope,
+  },
+};
 
 describe("Appwrite transactional intake adapter", () => {
+  it("BDD-DATA-ENC-006 persists sensitive intake values only as contextual envelopes", async () => {
+    const tables = new FakeTablesDb();
+    const protectedStore = createAppwriteIntakeStore(tables, schema, queries, {
+      environment: "preview",
+      protector: createSensitiveDataProtector(
+        "data_1",
+        [{ id: "data_1", material: Buffer.alloc(32, 10) }],
+        () => Buffer.alloc(12, 11),
+      ),
+    });
+
+    await protectedStore.commit(acceptance());
+
+    const persisted = JSON.stringify(tables.createdRows);
+    for (const plaintext of [
+      "Le solde est incorrect.",
+      "safe-verifier",
+      "encrypted-proof-envelope",
+    ]) {
+      expect(persisted).not.toContain(plaintext);
+    }
+    expect(persisted).toContain("v1.data_1.");
+  });
+
   it("BDD-APPWRITE-INTAKE-001 stages every acceptance fact and commits once", async () => {
     const tables = new FakeTablesDb();
-    const store = createAppwriteIntakeStore(tables, schema, queries);
+    const store = createAppwriteIntakeStore(tables, schema, queries, sensitive);
 
     await store.commit(acceptance());
 
@@ -199,7 +231,7 @@ describe("Appwrite transactional intake adapter", () => {
   it("BDD-APPWRITE-INTAKE-002 rolls back an incomplete transaction", async () => {
     const tables = new FakeTablesDb();
     tables.failTableId = "lifecycle";
-    const store = createAppwriteIntakeStore(tables, schema, queries);
+    const store = createAppwriteIntakeStore(tables, schema, queries, sensitive);
 
     await expect(store.commit(acceptance())).rejects.toThrow("row failure");
     expect(tables.createdRows).toHaveLength(3);
@@ -212,12 +244,22 @@ describe("Appwrite transactional intake adapter", () => {
     const rollbackFailure = new FakeTablesDb();
     rollbackFailure.failTableId = "lifecycle";
     rollbackFailure.failRollback = true;
-    const rollbackStore = createAppwriteIntakeStore(rollbackFailure, schema, queries);
+    const rollbackStore = createAppwriteIntakeStore(
+      rollbackFailure,
+      schema,
+      queries,
+      sensitive,
+    );
     await expect(rollbackStore.commit(acceptance())).rejects.toThrow("row failure");
 
     const commitFailure = new FakeTablesDb();
     commitFailure.failCommit = true;
-    const commitStore = createAppwriteIntakeStore(commitFailure, schema, queries);
+    const commitStore = createAppwriteIntakeStore(
+      commitFailure,
+      schema,
+      queries,
+      sensitive,
+    );
     await expect(commitStore.commit(acceptance())).rejects.toThrow(
       "commit uncertainty",
     );
@@ -228,7 +270,7 @@ describe("Appwrite transactional intake adapter", () => {
 
   it("BDD-APPWRITE-INTAKE-003 reads one exact idempotency result and rejects ambiguity", async () => {
     const tables = new FakeTablesDb();
-    const store = createAppwriteIntakeStore(tables, schema, queries);
+    const store = createAppwriteIntakeStore(tables, schema, queries, sensitive);
     const record = acceptance().idempotency;
     tables.listedRows = [{ $id: "row-1", ...record }];
 
@@ -264,7 +306,7 @@ describe("Appwrite transactional intake adapter", () => {
 
   it("returns no idempotency record and rejects duplicate or malformed schema IDs", async () => {
     const tables = new FakeTablesDb();
-    const store = createAppwriteIntakeStore(tables, schema, queries);
+    const store = createAppwriteIntakeStore(tables, schema, queries, sensitive);
     await expect(
       store.findIdempotency(
         "workspace-1:project-1",
@@ -277,10 +319,16 @@ describe("Appwrite transactional intake adapter", () => {
         tables,
         { ...schema, feedbackTableId: schema.reportersTableId },
         queries,
+        sensitive,
       ),
     ).toThrow("APPWRITE_INTAKE_SCHEMA_INVALID");
     expect(() =>
-      createAppwriteIntakeStore(tables, { ...schema, databaseId: " " }, queries),
+      createAppwriteIntakeStore(
+        tables,
+        { ...schema, databaseId: " " },
+        queries,
+        sensitive,
+      ),
     ).toThrow("APPWRITE_INTAKE_SCHEMA_INVALID");
   });
 
@@ -290,6 +338,7 @@ describe("Appwrite transactional intake adapter", () => {
     const store = createNodeAppwriteIntakeStore(
       tables as unknown as import("node-appwrite").TablesDB,
       schema,
+      sensitive,
     );
     await expect(
       store.findIdempotency(
@@ -305,6 +354,7 @@ describe("Appwrite transactional intake adapter", () => {
     const invalidStore = createNodeAppwriteIntakeStore(
       invalidTables as unknown as import("node-appwrite").TablesDB,
       schema,
+      sensitive,
     );
     await expect(invalidStore.commit(acceptance())).rejects.toThrow(
       "APPWRITE_TRANSACTION_INVALID",

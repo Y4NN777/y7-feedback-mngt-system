@@ -8,11 +8,19 @@ import {
   type AppwriteAccountlessQueryPort,
   type AppwriteAccountlessTablesPort,
 } from "./appwrite-accountless-repository";
+import { createSensitiveDataProtector } from "./sensitive-data-protector";
 
 const schema = {
   databaseId: "feedback",
   accessGrantsTableId: "access_grants",
   feedbackTableId: "feedback",
+};
+const sensitive = {
+  environment: "test",
+  protector: {
+    seal: (_context: unknown, plaintext: string) => plaintext,
+    open: (_context: unknown, envelope: string) => envelope,
+  },
 };
 
 const grantRow = {
@@ -117,7 +125,7 @@ function setup(
   return {
     getRow,
     listRows,
-    repository: createAppwriteAccountlessRepository(tables, schema, queries),
+    repository: createAppwriteAccountlessRepository(tables, schema, queries, sensitive),
     updateRow,
   };
 }
@@ -149,6 +157,42 @@ function record(): ReporterFeedbackRecord {
 }
 
 describe("Appwrite accountless access repository", () => {
+  it("BDD-DATA-ENC-007 persists accountless mutations only as contextual envelopes", async () => {
+    const updateRow = vi.fn(() => Promise.resolve({}));
+    const repository = createAppwriteAccountlessRepository(
+      {
+        listRows: vi.fn(() => Promise.resolve({ rows: [] })),
+        getRow: vi.fn(),
+        updateRow,
+      },
+      schema,
+      { equal: () => "query", limit: () => "limit" },
+      {
+        environment: "preview",
+        protector: createSensitiveDataProtector(
+          "data_1",
+          [{ id: "data_1", material: Buffer.alloc(32, 10) }],
+          () => Buffer.alloc(12, 11),
+        ),
+      },
+    );
+
+    await repository.saveGrant({
+      feedbackId: "feedback-1",
+      reference: "Y7-2026-000001",
+      verifier: "sha256:verifier",
+      generation: 1,
+      status: "active",
+    });
+    await repository.saveRecord(record());
+
+    const persisted = JSON.stringify(updateRow.mock.calls);
+    expect(persisted).not.toContain("sha256:verifier");
+    expect(persisted).not.toContain("Updated detail");
+    expect(persisted).not.toContain("Need clarification");
+    expect(persisted).toContain("v1.data_1.");
+  });
+
   it("BDD-ACC-APPWRITE-001 resolves one grant and its exact Feedback", async () => {
     const { repository, listRows, getRow } = setup();
 
@@ -363,6 +407,7 @@ describe("Appwrite accountless access repository", () => {
         setup().repository as unknown as AppwriteAccountlessTablesPort,
         { ...schema, feedbackTableId: schema.accessGrantsTableId },
         { equal: () => "query", limit: () => "limit" },
+        sensitive,
       ),
     ).toThrow("APPWRITE_ACCOUNTLESS_SCHEMA_INVALID");
     expect(() =>
@@ -374,6 +419,7 @@ describe("Appwrite accountless access repository", () => {
         },
         { ...schema, databaseId: "bad/id" },
         { equal: () => "query", limit: () => "limit" },
+        sensitive,
       ),
     ).toThrow("APPWRITE_ACCOUNTLESS_SCHEMA_INVALID");
 
@@ -387,6 +433,7 @@ describe("Appwrite accountless access repository", () => {
         updateRow,
       } as unknown as import("node-appwrite").TablesDB,
       schema,
+      sensitive,
     );
     await expect(repository.loadByReference("Y7-2026-000001")).resolves.toMatchObject({
       grant: { feedbackId: "feedback-1" },

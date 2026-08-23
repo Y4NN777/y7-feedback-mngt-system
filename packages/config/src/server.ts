@@ -35,11 +35,14 @@ export interface ServerConfig {
   };
   readonly accessProofEnvelopeKey: string;
   readonly providerGrantEnvelopeKey: string;
+  readonly sensitiveDataActiveKeyId: string;
+  readonly sensitiveDataEnvelopeKeys: Readonly<Record<string, string>>;
   readonly release: string;
 }
 
 const appwriteId = /^[A-Za-z0-9][A-Za-z0-9._-]{0,35}$/u;
 const proofKey = /^[A-Za-z0-9_-]{43}$/u;
+const keyId = /^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$/u;
 
 function requireAppwriteId(value: string | undefined): string {
   const id = requireValue(value);
@@ -99,6 +102,52 @@ function parseProviderGrantKey(
   return key;
 }
 
+function parseSensitiveDataKeys(
+  value: string | undefined,
+  activeKeyIdValue: string | undefined,
+  prohibitedKeys: readonly string[],
+): {
+  readonly activeKeyId: string;
+  readonly keys: Readonly<Record<string, string>>;
+} {
+  const activeKeyId = requireValue(activeKeyIdValue);
+  if (!keyId.test(activeKeyId)) throw new ConfigError("SENSITIVE_DATA_KEYS_INVALID");
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(requireValue(value)) as unknown;
+  } catch {
+    throw new ConfigError("SENSITIVE_DATA_KEYS_INVALID");
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new ConfigError("SENSITIVE_DATA_KEYS_INVALID");
+  }
+  const entries = Object.entries(parsed as Readonly<Record<string, unknown>>);
+  const materials = new Set<string>();
+  if (
+    entries.length === 0 ||
+    entries.some(([id, material]) => {
+      if (
+        !keyId.test(id) ||
+        typeof material !== "string" ||
+        !proofKey.test(material) ||
+        materials.has(material) ||
+        prohibitedKeys.includes(material)
+      ) {
+        return true;
+      }
+      materials.add(material);
+      return false;
+    }) ||
+    !Object.hasOwn(parsed, activeKeyId)
+  ) {
+    throw new ConfigError("SENSITIVE_DATA_KEYS_INVALID");
+  }
+  return {
+    activeKeyId,
+    keys: Object.fromEntries(entries) as Readonly<Record<string, string>>,
+  };
+}
+
 export function parseServerConfig(
   input: Readonly<Record<string, string | undefined>>,
 ): ServerConfig {
@@ -107,6 +156,15 @@ export function parseServerConfig(
   assertMatchingEnvironment(environment, backendEnvironment);
 
   const accessProofEnvelopeKey = parseProofKey(input.ACCESS_PROOF_ENVELOPE_KEY);
+  const providerGrantEnvelopeKey = parseProviderGrantKey(
+    input.PROVIDER_GRANT_ENVELOPE_KEY,
+    accessProofEnvelopeKey,
+  );
+  const sensitiveDataKeys = parseSensitiveDataKeys(
+    input.SENSITIVE_DATA_ENVELOPE_KEYS,
+    input.SENSITIVE_DATA_ACTIVE_KEY_ID,
+    [accessProofEnvelopeKey, providerGrantEnvelopeKey],
+  );
   return {
     environment,
     backendEnvironment,
@@ -115,10 +173,9 @@ export function parseServerConfig(
     appwriteApiKey: requireValue(input.APPWRITE_API_KEY),
     appwriteSchema: parseAppwriteSchema(input),
     accessProofEnvelopeKey,
-    providerGrantEnvelopeKey: parseProviderGrantKey(
-      input.PROVIDER_GRANT_ENVELOPE_KEY,
-      accessProofEnvelopeKey,
-    ),
+    providerGrantEnvelopeKey,
+    sensitiveDataActiveKeyId: sensitiveDataKeys.activeKeyId,
+    sensitiveDataEnvelopeKeys: sensitiveDataKeys.keys,
     release: requireValue(input.RELEASE),
   };
 }

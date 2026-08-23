@@ -92,46 +92,46 @@ describe("Appwrite infrastructure manifest", () => {
     }
   });
 
-  it("BDD-INFRA-003 keeps secrets private, encrypted, and unqueryable", () => {
+  it("BDD-INFRA-003 reserves unqueryable columns for application envelopes", () => {
     const manifest = createAppwriteInfrastructureManifest(schema);
-    const encrypted = new Set(
+    const envelopeColumns = new Set([
+      "reporters.attributionJson",
+      "feedback_items.originalSourceJson",
+      "feedback_items.currentSourceJson",
+      "feedback_items.contextJson",
+      "feedback_items.attachmentNamesJson",
+      "feedback_items.reporterHistoryJson",
+      "feedback_items.reporterMessagesJson",
+      "feedback_items.reporterAttachmentsJson",
+      "feedback_items.sourceRevisionsJson",
+      "feedback_items.deletionRequestsJson",
+      "feedback_items.internalNotesJson",
+      "feedback_items.workspaceClassification",
+      "access_grants.verifier",
+      "notification_outbox.payloadJson",
+      "intake_idempotency.protectedProof",
+      "intake_idempotency.proofVerifier",
+      "attachments.displayName",
+      "provider_grants.envelope",
+      "source_connections.selectedRepositoriesJson",
+    ]);
+    const declaredEnvelopeColumns = new Set(
       manifest.tables.flatMap(({ id, columns }) =>
         columns
-          .filter((column) => "encrypt" in column && column.encrypt)
+          .filter((column) => "encrypt" in column && !column.encrypt)
           .map((column) => `${id}.${column.key}`),
       ),
     );
+    expect(declaredEnvelopeColumns).toEqual(envelopeColumns);
 
-    expect(encrypted).toEqual(
-      new Set([
-        "reporters.attributionJson",
-        "feedback_items.originalSourceJson",
-        "feedback_items.currentSourceJson",
-        "feedback_items.contextJson",
-        "feedback_items.attachmentNamesJson",
-        "feedback_items.reporterHistoryJson",
-        "feedback_items.reporterMessagesJson",
-        "feedback_items.reporterAttachmentsJson",
-        "feedback_items.sourceRevisionsJson",
-        "feedback_items.deletionRequestsJson",
-        "feedback_items.internalNotesJson",
-        "feedback_items.workspaceClassification",
-        "access_grants.verifier",
-        "notification_outbox.payloadJson",
-        "intake_idempotency.protectedProof",
-        "intake_idempotency.proofVerifier",
-        "attachments.displayName",
-        "provider_grants.envelope",
-        "source_connections.selectedRepositoriesJson",
-      ]),
-    );
     for (const definition of manifest.tables) {
       const indexed = new Set(definition.indexes.flatMap(({ columns }) => columns));
-      expect(
-        definition.columns.some(
-          (column) => "encrypt" in column && column.encrypt && indexed.has(column.key),
-        ),
-      ).toBe(false);
+      for (const column of definition.columns) {
+        const qualified = `${definition.id}.${column.key}`;
+        if (!envelopeColumns.has(qualified)) continue;
+        expect("encrypt" in column && column.encrypt).toBe(false);
+        expect(indexed.has(column.key)).toBe(false);
+      }
     }
   });
 

@@ -14,6 +14,7 @@ import {
 } from "@y7-feedback/domain";
 
 import type { AccountlessAccessRepository } from "./accountless-access.js";
+import type { AppwriteSensitivePersistence } from "./sensitive-data-protector.js";
 
 export interface AppwriteAccountlessSchema {
   readonly databaseId: string;
@@ -74,11 +75,6 @@ function required(value: unknown, maximum = 1_000): string {
   const normalized = value.trim();
   if (!normalized || normalized.length > maximum) return invalid();
   return normalized;
-}
-
-function optional(value: unknown, maximum = 1_000): string | null {
-  if (value === null) return null;
-  return required(value, maximum);
 }
 
 function optionalSource(value: unknown): string | undefined {
@@ -213,7 +209,12 @@ function internalNotes(value: unknown): readonly string[] {
   return jsonArray(value).map((entry) => required(entry, 10_000));
 }
 
-function parseGrant(value: unknown, expectedReference: string): AccessGrant {
+function parseGrant(
+  value: unknown,
+  expectedReference: string,
+  schema: AppwriteAccountlessSchema,
+  sensitive: AppwriteSensitivePersistence,
+): AccessGrant {
   if (!isObject(value)) return invalid();
   const rowId = required(value.$id, 36);
   const feedbackId = required(value.feedbackId, 36);
@@ -230,19 +231,46 @@ function parseGrant(value: unknown, expectedReference: string): AccessGrant {
   return {
     feedbackId,
     reference,
-    verifier: required(value.verifier),
+    verifier: sensitive.protector.open(
+      {
+        environment: sensitive.environment,
+        tableId: schema.accessGrantsTableId,
+        rowId,
+        field: "verifier",
+      },
+      required(value.verifier),
+    ),
     generation: value.generation,
     status: value.status,
   };
 }
 
-function parseRecord(value: unknown, grant: AccessGrant): ReporterFeedbackRecord {
+function parseRecord(
+  value: unknown,
+  grant: AccessGrant,
+  schema: AppwriteAccountlessSchema,
+  sensitive: AppwriteSensitivePersistence,
+): ReporterFeedbackRecord {
   if (!isObject(value) || required(value.$id, 36) !== grant.feedbackId) {
     return invalid();
   }
   try {
-    const originalSource = feedbackSource(json(value.originalSourceJson));
-    const currentSource = feedbackSource(json(value.currentSourceJson));
+    const open = (field: string, envelope: unknown) =>
+      sensitive.protector.open(
+        {
+          environment: sensitive.environment,
+          tableId: schema.feedbackTableId,
+          rowId: grant.feedbackId,
+          field,
+        },
+        required(envelope, 1_000_000),
+      );
+    const originalSource = feedbackSource(
+      json(open("originalSourceJson", value.originalSourceJson)),
+    );
+    const currentSource = feedbackSource(
+      json(open("currentSourceJson", value.currentSourceJson)),
+    );
     if (!lifecycleStates.has(value.state as FeedbackLifecycleState)) return invalid();
     return {
       feedbackId: grant.feedbackId,
@@ -250,13 +278,22 @@ function parseRecord(value: unknown, grant: AccessGrant): ReporterFeedbackRecord
       originalSource,
       currentSource,
       currentState: value.state as FeedbackLifecycleState,
-      history: history(value.reporterHistoryJson),
-      messages: messages(value.reporterMessagesJson),
-      attachments: attachments(value.reporterAttachmentsJson),
-      sourceRevisions: sourceRevisions(value.sourceRevisionsJson),
-      deletionRequests: deletionRequests(value.deletionRequestsJson),
-      internalNotes: internalNotes(value.internalNotesJson),
-      workspaceClassification: optional(value.workspaceClassification),
+      history: history(open("reporterHistoryJson", value.reporterHistoryJson)),
+      messages: messages(open("reporterMessagesJson", value.reporterMessagesJson)),
+      attachments: attachments(
+        open("reporterAttachmentsJson", value.reporterAttachmentsJson),
+      ),
+      sourceRevisions: sourceRevisions(
+        open("sourceRevisionsJson", value.sourceRevisionsJson),
+      ),
+      deletionRequests: deletionRequests(
+        open("deletionRequestsJson", value.deletionRequestsJson),
+      ),
+      internalNotes: internalNotes(open("internalNotesJson", value.internalNotesJson)),
+      workspaceClassification:
+        value.workspaceClassification === null
+          ? null
+          : required(open("workspaceClassification", value.workspaceClassification)),
     };
   } catch {
     return invalid();
@@ -273,7 +310,8 @@ function validateSchema(schema: AppwriteAccountlessSchema): void {
 export function createAppwriteAccountlessRepository(
   tables: AppwriteAccountlessTablesPort,
   schema: AppwriteAccountlessSchema,
-  queries: AppwriteAccountlessQueryPort = defaultQueries,
+  queries: AppwriteAccountlessQueryPort,
+  sensitive: AppwriteSensitivePersistence,
 ): AccountlessAccessRepository {
   validateSchema(schema);
   return {
@@ -290,13 +328,13 @@ export function createAppwriteAccountlessRepository(
       if (result.rows.length !== 1) {
         throw new Error("APPWRITE_ACCOUNTLESS_INCONSISTENT");
       }
-      const grant = parseGrant(result.rows[0], normalizedReference);
+      const grant = parseGrant(result.rows[0], normalizedReference, schema, sensitive);
       const feedback = await tables.getRow({
         databaseId: schema.databaseId,
         tableId: schema.feedbackTableId,
         rowId: grant.feedbackId,
       });
-      return { grant, record: parseRecord(feedback, grant) };
+      return { grant, record: parseRecord(feedback, grant, schema, sensitive) };
     },
     async saveGrant(grant) {
       await tables.updateRow({
@@ -305,25 +343,61 @@ export function createAppwriteAccountlessRepository(
         rowId: required(grant.feedbackId, 36),
         data: {
           reference: required(grant.reference, 100),
-          verifier: required(grant.verifier),
+          verifier: sensitive.protector.seal(
+            {
+              environment: sensitive.environment,
+              tableId: schema.accessGrantsTableId,
+              rowId: required(grant.feedbackId, 36),
+              field: "verifier",
+            },
+            required(grant.verifier),
+          ),
           generation: grant.generation,
           status: grant.status,
         },
       });
     },
     async saveRecord(record) {
+      const seal = (field: string, plaintext: string) =>
+        sensitive.protector.seal(
+          {
+            environment: sensitive.environment,
+            tableId: schema.feedbackTableId,
+            rowId: required(record.feedbackId, 36),
+            field,
+          },
+          plaintext,
+        );
       await tables.updateRow({
         databaseId: schema.databaseId,
         tableId: schema.feedbackTableId,
         rowId: required(record.feedbackId, 36),
         data: {
-          currentSourceJson: JSON.stringify(record.currentSource),
+          currentSourceJson: seal(
+            "currentSourceJson",
+            JSON.stringify(record.currentSource),
+          ),
           state: record.currentState,
-          reporterHistoryJson: JSON.stringify(record.history),
-          reporterMessagesJson: JSON.stringify(record.messages),
-          reporterAttachmentsJson: JSON.stringify(record.attachments),
-          sourceRevisionsJson: JSON.stringify(record.sourceRevisions),
-          deletionRequestsJson: JSON.stringify(record.deletionRequests),
+          reporterHistoryJson: seal(
+            "reporterHistoryJson",
+            JSON.stringify(record.history),
+          ),
+          reporterMessagesJson: seal(
+            "reporterMessagesJson",
+            JSON.stringify(record.messages),
+          ),
+          reporterAttachmentsJson: seal(
+            "reporterAttachmentsJson",
+            JSON.stringify(record.attachments),
+          ),
+          sourceRevisionsJson: seal(
+            "sourceRevisionsJson",
+            JSON.stringify(record.sourceRevisions),
+          ),
+          deletionRequestsJson: seal(
+            "deletionRequestsJson",
+            JSON.stringify(record.deletionRequests),
+          ),
         },
       });
     },
@@ -333,6 +407,7 @@ export function createAppwriteAccountlessRepository(
 export function createNodeAppwriteAccountlessRepository(
   tables: TablesDB,
   schema: AppwriteAccountlessSchema,
+  sensitive: AppwriteSensitivePersistence,
 ): AccountlessAccessRepository {
   return createAppwriteAccountlessRepository(
     {
@@ -344,5 +419,7 @@ export function createNodeAppwriteAccountlessRepository(
       updateRow: (input) => tables.updateRow(input),
     },
     schema,
+    defaultQueries,
+    sensitive,
   );
 }

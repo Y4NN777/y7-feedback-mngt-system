@@ -17,6 +17,11 @@ export interface SensitiveDataProtector {
   readonly open: (context: SensitiveFieldContext, envelope: string) => string;
 }
 
+export interface AppwriteSensitivePersistence {
+  readonly environment: string;
+  readonly protector: SensitiveDataProtector;
+}
+
 const keyLength = 32;
 const nonceLength = 12;
 const authTagLength = 16;

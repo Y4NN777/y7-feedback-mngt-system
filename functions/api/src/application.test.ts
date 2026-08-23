@@ -37,6 +37,10 @@ const config: ServerConfig = {
   },
   accessProofEnvelopeKey: "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc",
   providerGrantEnvelopeKey: "CAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg",
+  sensitiveDataActiveKeyId: "data_2026_08",
+  sensitiveDataEnvelopeKeys: {
+    data_2026_08: "CgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgo",
+  },
   release: "commit-application",
 };
 
@@ -155,6 +159,7 @@ describe("trusted Function composition root", () => {
     );
     const persisted = JSON.stringify(tables.rows);
     expect(persisted).not.toContain(proof);
+    expect(persisted).not.toContain("Le solde est incorrect.");
     expect(persisted).toContain("v1.");
   });
 });

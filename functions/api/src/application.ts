@@ -16,6 +16,7 @@ import {
   matchesAccessProof,
 } from "./proof-crypto.js";
 import { createPublicApi } from "./public-api.js";
+import { createSensitiveDataProtector } from "./sensitive-data-protector.js";
 
 export interface ApplicationRuntime {
   readonly tables: TablesDB;
@@ -34,9 +35,20 @@ export function createHttpApplication(
   const protector = createProofProtector(
     Buffer.from(config.accessProofEnvelopeKey, "base64url"),
   );
+  const sensitive = {
+    environment: config.environment,
+    protector: createSensitiveDataProtector(
+      config.sensitiveDataActiveKeyId,
+      Object.entries(config.sensitiveDataEnvelopeKeys).map(([id, material]) => ({
+        id,
+        material: Buffer.from(material, "base64url"),
+      })),
+    ),
+  };
   const intakeStore = createNodeAppwriteIntakeStore(
     runtime.tables,
     config.appwriteSchema,
+    sensitive,
   );
   const intake = createIntakeCoordinator(intakeStore, {
     createFeedbackId: runtime.createId,
@@ -55,6 +67,7 @@ export function createHttpApplication(
   const accountlessRepository = createNodeAppwriteAccountlessRepository(
     runtime.tables,
     config.appwriteSchema,
+    sensitive,
   );
   const accountless = createAccountlessAccessCoordinator(accountlessRepository, {
     matchesProof: matchesAccessProof,
