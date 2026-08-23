@@ -99,7 +99,11 @@ describe("Node Appwrite provisioning adapter", () => {
       rowSecurity: true,
       enabled: true,
       columns: definition.columns,
-      indexes: definition.indexes,
+      indexes: definition.indexes.map(({ key, type, columns }) => ({
+        key,
+        type,
+        attributes: columns,
+      })),
     });
   });
 
