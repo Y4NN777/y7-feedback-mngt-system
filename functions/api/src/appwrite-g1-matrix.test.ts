@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import type { AccountlessAccessCoordinator } from "./accountless-access";
 import { runAppwriteG1Matrix, type AppwriteG1MatrixTables } from "./appwrite-g1-matrix";
 import type { PublicApi, PublicApiResponse } from "./public-api";
 
@@ -22,6 +23,19 @@ const ids = {
 };
 const operationId = "123e4567-e89b-42d3-a456-426614174000";
 const proof = "P".repeat(43);
+const rotatedProof = "R".repeat(43);
+const reporterView = {
+  feedbackId: "g1f_test",
+  reference: "Y7-G1-TEST",
+  originalSource: { type: "bug" as const, problem: "Problem" },
+  currentSource: { type: "bug" as const, problem: "Problem" },
+  currentState: "received" as const,
+  history: [],
+  messages: [],
+  attachments: [],
+  sourceRevisions: [],
+  deletionRequests: [],
+};
 const protectedRows: readonly unknown[] = [
   { attributionJson: "v1.key.nonce.cipher.tag" },
   {
@@ -39,6 +53,7 @@ const protectedRows: readonly unknown[] = [
 function setup(
   responses: readonly PublicApiResponse[],
   rows: readonly unknown[] = protectedRows,
+  accountlessOverrides: Partial<AccountlessAccessCoordinator> = {},
 ) {
   const handle = vi.fn(() => {
     const response = responses[handle.mock.calls.length - 1];
@@ -46,7 +61,24 @@ function setup(
   });
   const getRow = vi.fn(() => Promise.resolve(rows[getRow.mock.calls.length - 1]));
   const deleteRow = vi.fn(() => Promise.resolve({}));
+  const accountless: AccountlessAccessCoordinator = {
+    rotate: () =>
+      Promise.resolve({
+        status: "ok",
+        reference: "Y7-G1-TEST",
+        accessProof: rotatedProof,
+      }),
+    retrieve: vi
+      .fn()
+      .mockResolvedValueOnce({ status: "denied", code: "ACCESS_DENIED" })
+      .mockResolvedValueOnce({ status: "ok", view: reporterView })
+      .mockResolvedValueOnce({ status: "denied", code: "ACCESS_DENIED" }),
+    revoke: () => Promise.resolve({ status: "ok" }),
+    act: () => Promise.resolve({ status: "denied", code: "ACCESS_DENIED" }),
+    ...accountlessOverrides,
+  };
   return {
+    accountless,
     api: { handle } satisfies PublicApi,
     deleteRow,
     getRow,
@@ -87,26 +119,39 @@ function responsesWith(index: number, response: PublicApiResponse) {
 async function expectFailure(
   responses: readonly PublicApiResponse[],
   rows: readonly unknown[] = protectedRows,
+  accountlessOverrides: Partial<AccountlessAccessCoordinator> = {},
 ) {
-  const setupResult = setup(responses, rows);
+  const setupResult = setup(responses, rows, accountlessOverrides);
   await expect(
-    runAppwriteG1Matrix(setupResult.api, setupResult.tables, schema, ids, operationId),
+    runAppwriteG1Matrix(
+      setupResult.api,
+      setupResult.tables,
+      schema,
+      ids,
+      operationId,
+      setupResult.accountless,
+    ),
   ).rejects.toThrow(/^APPWRITE_G1_[A-Z_]+_FAILED$/u);
   expect(setupResult.deleteRow).toHaveBeenCalledTimes(7);
 }
 
 describe("real Appwrite G1 matrix", () => {
   it("BDD-G1-REAL-001 proves acceptance, replay, denial, retrieval, envelopes, and cleanup", async () => {
-    const { api, tables, deleteRow, getRow } = setup(successfulResponses);
+    const { accountless, api, tables, deleteRow, getRow } = setup(successfulResponses);
 
     await expect(
-      runAppwriteG1Matrix(api, tables, schema, ids, operationId),
+      runAppwriteG1Matrix(api, tables, schema, ids, operationId, accountless),
     ).resolves.toEqual({
       accepted: true,
       replayed: true,
       conflictDenied: true,
       invalidProofDenied: true,
       authorizedRetrieval: true,
+      rotated: true,
+      oldProofDenied: true,
+      rotatedProofAuthorized: true,
+      revoked: true,
+      revokedProofDenied: true,
       sensitiveRowsEncrypted: true,
       cleanedRows: 7,
     });
@@ -124,14 +169,59 @@ describe("real Appwrite G1 matrix", () => {
     const first = setup([]);
     first.deleteRow.mockRejectedValue({ code: 404 });
     await expect(
-      runAppwriteG1Matrix(first.api, first.tables, schema, ids, operationId),
+      runAppwriteG1Matrix(
+        first.api,
+        first.tables,
+        schema,
+        ids,
+        operationId,
+        first.accountless,
+      ),
     ).rejects.toThrow("APPWRITE_G1_INTAKE_FAILED");
 
     const second = setup([]);
     second.deleteRow.mockRejectedValueOnce(new Error("cleanup failed"));
     await expect(
-      runAppwriteG1Matrix(second.api, second.tables, schema, ids, operationId),
+      runAppwriteG1Matrix(
+        second.api,
+        second.tables,
+        schema,
+        ids,
+        operationId,
+        second.accountless,
+      ),
     ).rejects.toThrow("cleanup failed");
+  });
+
+  it("BDD-G1-REAL-007 rejects inconsistent rotation and revocation outcomes", async () => {
+    for (const rotate of [
+      { status: "denied", code: "ACCESS_DENIED" } as const,
+      { status: "ok", reference: "wrong", accessProof: rotatedProof } as const,
+      { status: "ok", reference: "Y7-G1-TEST", accessProof: proof } as const,
+    ]) {
+      await expectFailure(successfulResponses, protectedRows, {
+        rotate: () => Promise.resolve(rotate),
+      });
+    }
+    await expectFailure(successfulResponses, protectedRows, {
+      retrieve: () => Promise.resolve({ status: "ok", view: reporterView }),
+    });
+    await expectFailure(successfulResponses, protectedRows, {
+      retrieve: vi
+        .fn()
+        .mockResolvedValueOnce({ status: "denied", code: "ACCESS_DENIED" })
+        .mockResolvedValueOnce({ status: "denied", code: "ACCESS_DENIED" }),
+    });
+    await expectFailure(successfulResponses, protectedRows, {
+      revoke: () => Promise.resolve({ status: "denied", code: "ACCESS_DENIED" }),
+    });
+    await expectFailure(successfulResponses, protectedRows, {
+      retrieve: vi
+        .fn()
+        .mockResolvedValueOnce({ status: "denied", code: "ACCESS_DENIED" })
+        .mockResolvedValueOnce({ status: "ok", view: reporterView })
+        .mockResolvedValueOnce({ status: "ok", view: reporterView }),
+    });
   });
 
   it("BDD-G1-REAL-004 rejects every inconsistent service outcome", async () => {
@@ -209,13 +299,27 @@ describe("real Appwrite G1 matrix", () => {
     const first = setup(successfulResponses);
     first.getRow.mockRejectedValue("database failure");
     await expect(
-      runAppwriteG1Matrix(first.api, first.tables, schema, ids, operationId),
+      runAppwriteG1Matrix(
+        first.api,
+        first.tables,
+        schema,
+        ids,
+        operationId,
+        first.accountless,
+      ),
     ).rejects.toThrow("APPWRITE_G1_ENVELOPES_FAILED");
 
     const second = setup(successfulResponses);
     second.deleteRow.mockRejectedValue("cleanup failure");
     await expect(
-      runAppwriteG1Matrix(second.api, second.tables, schema, ids, operationId),
+      runAppwriteG1Matrix(
+        second.api,
+        second.tables,
+        schema,
+        ids,
+        operationId,
+        second.accountless,
+      ),
     ).rejects.toThrow("APPWRITE_G1_CLEANUP_FAILED");
   });
 });
