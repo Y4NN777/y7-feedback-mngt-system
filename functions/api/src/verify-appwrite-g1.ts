@@ -4,8 +4,16 @@ import { Client, TablesDB } from "node-appwrite";
 
 import { parseServerConfig } from "@y7-feedback/config/server";
 
+import { createAccountlessAccessCoordinator } from "./accountless-access.js";
 import { createHttpApplication } from "./application.js";
+import { createNodeAppwriteAccountlessRepository } from "./appwrite-accountless-repository.js";
 import { runAppwriteG1Matrix, type AppwriteG1MatrixIds } from "./appwrite-g1-matrix.js";
+import {
+  createAccessProof,
+  hashAccessProof,
+  matchesAccessProof,
+} from "./proof-crypto.js";
+import { createSensitiveDataProtector } from "./sensitive-data-protector.js";
 
 interface SafeServiceFailure {
   readonly status: number | null;
@@ -118,12 +126,30 @@ async function main(): Promise<void> {
     startedAt: Date.now,
   });
   if (!dependencies.publicApi) throw new Error("APPWRITE_G1_API_INVALID");
+  const sensitive = {
+    environment: config.environment,
+    protector: createSensitiveDataProtector(
+      config.sensitiveDataActiveKeyId,
+      Object.entries(config.sensitiveDataEnvelopeKeys).map(([id, material]) => ({
+        id,
+        material: Buffer.from(material, "base64url"),
+      })),
+    ),
+  };
+  const accountless = createAccountlessAccessCoordinator(
+    createNodeAppwriteAccountlessRepository(tables, config.appwriteSchema, sensitive),
+    {
+      matchesProof: matchesAccessProof,
+      rotation: { createProof: createAccessProof, hashProof: hashAccessProof },
+    },
+  );
   const result = await runAppwriteG1Matrix(
     dependencies.publicApi,
     tables,
     config.appwriteSchema,
     ids,
     randomUUID(),
+    accountless,
   );
   if (idQueue.length !== 0) throw new Error("APPWRITE_G1_ID_SEQUENCE_INVALID");
   process.stdout.write(

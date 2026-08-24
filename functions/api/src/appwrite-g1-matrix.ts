@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 
+import type { AccountlessAccessCoordinator } from "./accountless-access.js";
 import type { PublicApi, PublicApiResponse } from "./public-api.js";
 
 export interface AppwriteG1MatrixSchema {
@@ -40,6 +41,11 @@ export interface AppwriteG1MatrixResult {
   readonly conflictDenied: true;
   readonly invalidProofDenied: true;
   readonly authorizedRetrieval: true;
+  readonly rotated: true;
+  readonly oldProofDenied: true;
+  readonly rotatedProofAuthorized: true;
+  readonly revoked: true;
+  readonly revokedProofDenied: true;
   readonly sensitiveRowsEncrypted: true;
   readonly cleanedRows: number;
 }
@@ -109,6 +115,7 @@ export async function runAppwriteG1Matrix(
   schema: AppwriteG1MatrixSchema,
   ids: AppwriteG1MatrixIds,
   clientOperationId: string,
+  accountless: AccountlessAccessCoordinator,
 ): Promise<AppwriteG1MatrixResult> {
   const rows = [
     [schema.reportersTableId, ids.reporterId],
@@ -207,6 +214,49 @@ export async function runAppwriteG1Matrix(
       throw new Error("APPWRITE_G1_MATRIX_FAILED");
     }
 
+    stage = "ROTATION";
+    const rotated = await accountless.rotate({ reference, proof: accessProof });
+    if (
+      rotated.status !== "ok" ||
+      rotated.reference !== reference ||
+      rotated.accessProof === accessProof
+    ) {
+      throw new Error("APPWRITE_G1_MATRIX_FAILED");
+    }
+
+    stage = "OLD_PROOF_DENIAL";
+    const oldProof = await accountless.retrieve({ reference, proof: accessProof });
+    if (oldProof.status !== "denied") {
+      throw new Error("APPWRITE_G1_MATRIX_FAILED");
+    }
+
+    stage = "ROTATED_RETRIEVAL";
+    const rotatedProof = await accountless.retrieve({
+      reference,
+      proof: rotated.accessProof,
+    });
+    if (rotatedProof.status !== "ok") {
+      throw new Error("APPWRITE_G1_MATRIX_FAILED");
+    }
+
+    stage = "REVOCATION";
+    const revoked = await accountless.revoke({
+      reference,
+      proof: rotated.accessProof,
+    });
+    if (revoked.status !== "ok") {
+      throw new Error("APPWRITE_G1_MATRIX_FAILED");
+    }
+
+    stage = "REVOKED_PROOF_DENIAL";
+    const revokedProof = await accountless.retrieve({
+      reference,
+      proof: rotated.accessProof,
+    });
+    if (revokedProof.status !== "denied") {
+      throw new Error("APPWRITE_G1_MATRIX_FAILED");
+    }
+
     stage = "ENVELOPES";
     const [reporter, feedback, grant, outbox, idempotency] = await Promise.all([
       tables.getRow({
@@ -256,6 +306,11 @@ export async function runAppwriteG1Matrix(
       conflictDenied: true,
       invalidProofDenied: true,
       authorizedRetrieval: true,
+      rotated: true,
+      oldProofDenied: true,
+      rotatedProofAuthorized: true,
+      revoked: true,
+      revokedProofDenied: true,
       sensitiveRowsEncrypted: true,
     };
   } catch (error: unknown) {
