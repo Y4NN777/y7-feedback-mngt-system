@@ -18,9 +18,10 @@
     "provision:appwrite": "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build && node --env-file=.env.appwrite-preview functions/api/dist/provision-appwrite.js --apply",
     "verify:appwrite:g1": "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build && node --env-file=.env.appwrite-preview functions/api/dist/verify-appwrite-g1.js --apply",
     "security:scan": "node scripts/security-scan.mjs",
-    "test": "node --test tests/*.test.mjs && pnpm -r --if-present test",
-    "test:coverage": "node --test tests/*.test.mjs && pnpm -r --if-present test:coverage",
+    "test": "pnpm test:runtime-deps && node --test tests/*.test.mjs && pnpm -r --if-present test",
+    "test:coverage": "pnpm test:runtime-deps && node --test tests/*.test.mjs && pnpm -r --if-present test:coverage",
     "test:e2e": "pnpm --filter @y7-feedback/web test:e2e",
+    "test:runtime-deps": "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build",
     "typecheck": "pnpm -r --if-present typecheck"
   },
   "devDependencies": {

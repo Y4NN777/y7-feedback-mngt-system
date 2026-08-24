@@ -4,6 +4,7 @@ import { glob } from "node:fs/promises";
 import test from "node:test";
 
 import domainPackage from "../packages/domain/package.json" with { type: "json" };
+import rootPackage from "../package.json" with { type: "json" };
 
 test("BDD-CI-003 keeps emitted server imports executable under Node ESM", async () => {
   const roots = ["packages/config/src", "packages/domain/src", "functions/api/src"];
@@ -33,4 +34,13 @@ test("BDD-CI-005 resolves the domain workspace to emitted Node ESM", () => {
       default: "./dist/index.js",
     },
   });
+});
+
+test("BDD-CI-006 builds runtime workspace dependencies before clean-runner tests", () => {
+  assert.equal(
+    rootPackage.scripts["test:runtime-deps"],
+    "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build",
+  );
+  assert.match(rootPackage.scripts.test, /^pnpm test:runtime-deps && /u);
+  assert.match(rootPackage.scripts["test:coverage"], /^pnpm test:runtime-deps && /u);
 });
