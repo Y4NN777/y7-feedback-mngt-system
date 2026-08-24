@@ -3,6 +3,8 @@ import { readFile } from "node:fs/promises";
 import { glob } from "node:fs/promises";
 import test from "node:test";
 
+import domainPackage from "../packages/domain/package.json" with { type: "json" };
+
 test("BDD-CI-003 keeps emitted server imports executable under Node ESM", async () => {
   const roots = ["packages/config/src", "packages/domain/src", "functions/api/src"];
   const offenders = [];
@@ -22,4 +24,13 @@ test("BDD-CI-003 keeps emitted server imports executable under Node ESM", async 
   }
 
   assert.deepEqual(offenders, []);
+});
+
+test("BDD-CI-005 resolves the domain workspace to emitted Node ESM", () => {
+  assert.deepEqual(domainPackage.exports, {
+    ".": {
+      types: "./src/index.ts",
+      default: "./dist/index.js",
+    },
+  });
 });
