@@ -50,6 +50,13 @@ export interface AppwriteG1MatrixResult {
   readonly cleanedRows: number;
 }
 
+export interface AppwriteG1RollbackResult {
+  readonly failureReturnedRetryable: true;
+  readonly partialRowsAbsent: true;
+  readonly checkedRows: 7;
+  readonly cleanedRows: 0;
+}
+
 const projectId = "project_alpha";
 const workspaceId = "workspace_alpha";
 const projectSlug = "wisemoney";
@@ -95,6 +102,22 @@ function idempotencyRowId(clientOperationId: string): string {
   return `idem_${digest.slice(0, 31)}`;
 }
 
+export function appwriteG1SyntheticRows(
+  schema: AppwriteG1MatrixSchema,
+  ids: AppwriteG1MatrixIds,
+  clientOperationId: string,
+) {
+  return [
+    [schema.reportersTableId, ids.reporterId],
+    [schema.feedbackTableId, ids.feedbackId],
+    [schema.lifecycleTableId, ids.lifecycleId],
+    [schema.accessGrantsTableId, ids.feedbackId],
+    [schema.notificationsTableId, ids.notificationId],
+    [schema.outboxTableId, ids.outboxId],
+    [schema.idempotencyTableId, idempotencyRowId(clientOperationId)],
+  ] as const;
+}
+
 function envelope(row: unknown, field: string): boolean {
   return (
     isObject(row) && typeof row[field] === "string" && row[field].startsWith("v1.")
@@ -117,15 +140,7 @@ export async function runAppwriteG1Matrix(
   clientOperationId: string,
   accountless: AccountlessAccessCoordinator,
 ): Promise<AppwriteG1MatrixResult> {
-  const rows = [
-    [schema.reportersTableId, ids.reporterId],
-    [schema.feedbackTableId, ids.feedbackId],
-    [schema.lifecycleTableId, ids.lifecycleId],
-    [schema.accessGrantsTableId, ids.feedbackId],
-    [schema.notificationsTableId, ids.notificationId],
-    [schema.outboxTableId, ids.outboxId],
-    [schema.idempotencyTableId, idempotencyRowId(clientOperationId)],
-  ] as const;
+  const rows = appwriteG1SyntheticRows(schema, ids, clientOperationId);
   let cleanedRows = 0;
   let matrixFailure: unknown;
   let result: Omit<AppwriteG1MatrixResult, "cleanedRows"> | undefined;
@@ -337,5 +352,65 @@ export async function runAppwriteG1Matrix(
   return {
     ...(result as Omit<AppwriteG1MatrixResult, "cleanedRows">),
     cleanedRows,
+  };
+}
+
+export async function runAppwriteG1RollbackMatrix(
+  api: PublicApi,
+  tables: AppwriteG1MatrixTables,
+  schema: AppwriteG1MatrixSchema,
+  ids: AppwriteG1MatrixIds,
+  clientOperationId: string,
+): Promise<AppwriteG1RollbackResult> {
+  const rows = appwriteG1SyntheticRows(schema, ids, clientOperationId);
+  let failure: unknown;
+  let checkedRows = 0;
+  let cleanedRows = 0;
+  try {
+    const response = expectStatus(
+      await api.handle({
+        method: "POST",
+        path: `/v1/projects/${projectSlug}/feedback`,
+        headers: { "content-type": "application/json" },
+        body: intakeBody(clientOperationId, "G1 forced rollback marker"),
+      }),
+      503,
+    );
+    if (response.error !== "ERR-INTAKE-UNAVAILABLE") {
+      throw new Error("APPWRITE_G1_ROLLBACK_FAILED");
+    }
+    for (const [tableId, rowId] of rows) {
+      try {
+        await tables.getRow({ databaseId: schema.databaseId, tableId, rowId });
+        throw new Error("APPWRITE_G1_PARTIAL_ROW_VISIBLE");
+      } catch (error: unknown) {
+        if (!absent(error)) throw error;
+        checkedRows += 1;
+      }
+    }
+  } catch (error: unknown) {
+    failure = error;
+  }
+
+  let cleanupFailure: unknown;
+  for (const [tableId, rowId] of [...rows].reverse()) {
+    try {
+      await tables.deleteRow({ databaseId: schema.databaseId, tableId, rowId });
+      cleanedRows += 1;
+    } catch (error: unknown) {
+      if (!absent(error) && cleanupFailure === undefined) cleanupFailure = error;
+    }
+  }
+  if (cleanupFailure !== undefined) {
+    throw asError(cleanupFailure, "APPWRITE_G1_ROLLBACK_CLEANUP_FAILED");
+  }
+  if (failure !== undefined || cleanedRows !== 0) {
+    throw new Error("APPWRITE_G1_ROLLBACK_FAILED", { cause: failure });
+  }
+  return {
+    failureReturnedRetryable: true,
+    partialRowsAbsent: true,
+    checkedRows: checkedRows as 7,
+    cleanedRows: 0,
   };
 }
