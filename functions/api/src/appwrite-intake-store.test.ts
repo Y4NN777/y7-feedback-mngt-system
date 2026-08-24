@@ -225,6 +225,8 @@ describe("Appwrite transactional intake adapter", () => {
       internalNotesJson: "[]",
       workspaceClassification: null,
     });
+    expect(tables.createdRows[2]?.data).not.toHaveProperty("id");
+    expect(tables.createdRows[4]?.data).not.toHaveProperty("id");
     expect(JSON.stringify(tables.createdRows)).not.toContain('"accessProof"');
   });
 
