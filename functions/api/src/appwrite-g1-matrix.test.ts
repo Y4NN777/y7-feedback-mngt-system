@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { AccountlessAccessCoordinator } from "./accountless-access";
-import { runAppwriteG1Matrix, type AppwriteG1MatrixTables } from "./appwrite-g1-matrix";
+import {
+  runAppwriteG1Matrix,
+  runAppwriteG1RollbackMatrix,
+  type AppwriteG1MatrixTables,
+} from "./appwrite-g1-matrix";
 import type { PublicApi, PublicApiResponse } from "./public-api";
 
 const schema = {
@@ -321,5 +325,115 @@ describe("real Appwrite G1 matrix", () => {
         second.accountless,
       ),
     ).rejects.toThrow("APPWRITE_G1_CLEANUP_FAILED");
+  });
+});
+
+describe("real Appwrite G1 rollback matrix", () => {
+  function missingRow(): Error & { readonly code: 404 } {
+    return Object.assign(new Error("missing"), { code: 404 as const });
+  }
+
+  function rollbackSetup(response: PublicApiResponse) {
+    const api: PublicApi = { handle: () => Promise.resolve(response) };
+    const getRow = vi.fn<AppwriteG1MatrixTables["getRow"]>(() =>
+      Promise.reject(missingRow()),
+    );
+    const deleteRow = vi.fn<AppwriteG1MatrixTables["deleteRow"]>(() =>
+      Promise.reject(missingRow()),
+    );
+    return {
+      api,
+      deleteRow,
+      getRow,
+      tables: { getRow, deleteRow } satisfies AppwriteG1MatrixTables,
+    };
+  }
+
+  it("BDD-G1-REAL-008 proves forced failure leaves no partial Appwrite row", async () => {
+    const context = rollbackSetup({
+      statusCode: 503,
+      body: { error: "ERR-INTAKE-UNAVAILABLE" },
+    });
+
+    await expect(
+      runAppwriteG1RollbackMatrix(
+        context.api,
+        context.tables,
+        schema,
+        ids,
+        operationId,
+      ),
+    ).resolves.toEqual({
+      failureReturnedRetryable: true,
+      partialRowsAbsent: true,
+      checkedRows: 7,
+      cleanedRows: 0,
+    });
+    expect(context.getRow).toHaveBeenCalledTimes(7);
+    expect(context.deleteRow).toHaveBeenCalledTimes(7);
+  });
+
+  it("BDD-G1-REAL-009 fails if the response or rollback state is inconsistent", async () => {
+    const wrongResponse = rollbackSetup({
+      statusCode: 503,
+      body: { error: "wrong" },
+    });
+    await expect(
+      runAppwriteG1RollbackMatrix(
+        wrongResponse.api,
+        wrongResponse.tables,
+        schema,
+        ids,
+        operationId,
+      ),
+    ).rejects.toThrow("APPWRITE_G1_ROLLBACK_FAILED");
+
+    const visible = rollbackSetup({
+      statusCode: 503,
+      body: { error: "ERR-INTAKE-UNAVAILABLE" },
+    });
+    visible.getRow.mockResolvedValueOnce({ $id: ids.reporterId });
+    visible.deleteRow.mockResolvedValueOnce({});
+    await expect(
+      runAppwriteG1RollbackMatrix(
+        visible.api,
+        visible.tables,
+        schema,
+        ids,
+        operationId,
+      ),
+    ).rejects.toThrow("APPWRITE_G1_ROLLBACK_FAILED");
+
+    const unavailable = rollbackSetup({
+      statusCode: 503,
+      body: { error: "ERR-INTAKE-UNAVAILABLE" },
+    });
+    unavailable.getRow.mockRejectedValueOnce(new Error("read unavailable"));
+    await expect(
+      runAppwriteG1RollbackMatrix(
+        unavailable.api,
+        unavailable.tables,
+        schema,
+        ids,
+        operationId,
+      ),
+    ).rejects.toThrow("APPWRITE_G1_ROLLBACK_FAILED");
+  });
+
+  it("BDD-G1-REAL-010 preserves a rollback cleanup failure", async () => {
+    const context = rollbackSetup({
+      statusCode: 503,
+      body: { error: "ERR-INTAKE-UNAVAILABLE" },
+    });
+    context.deleteRow.mockRejectedValueOnce("cleanup unavailable");
+    await expect(
+      runAppwriteG1RollbackMatrix(
+        context.api,
+        context.tables,
+        schema,
+        ids,
+        operationId,
+      ),
+    ).rejects.toThrow("APPWRITE_G1_ROLLBACK_CLEANUP_FAILED");
   });
 });
