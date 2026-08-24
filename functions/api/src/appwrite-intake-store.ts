@@ -189,7 +189,14 @@ function rowsForCommit(
     {
       tableId: schema.lifecycleTableId,
       rowId: input.lifecycle.id,
-      data: { ...input.lifecycle },
+      data: {
+        feedbackId: input.lifecycle.feedbackId,
+        priorState: input.lifecycle.priorState,
+        state: input.lifecycle.state,
+        actor: input.lifecycle.actor,
+        occurredAt: input.lifecycle.occurredAt,
+        sequence: input.lifecycle.sequence,
+      },
     },
     {
       tableId: schema.accessGrantsTableId,
@@ -207,7 +214,13 @@ function rowsForCommit(
     {
       tableId: schema.notificationsTableId,
       rowId: input.notification.id,
-      data: { ...input.notification },
+      data: {
+        feedbackId: input.notification.feedbackId,
+        reporterId: input.notification.reporterId,
+        kind: input.notification.kind,
+        reference: input.notification.reference,
+        createdAt: input.notification.createdAt,
+      },
     },
     {
       tableId: schema.outboxTableId,
