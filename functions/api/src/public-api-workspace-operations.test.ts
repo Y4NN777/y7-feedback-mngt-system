@@ -144,4 +144,64 @@ describe("trusted Workspace operation HTTP boundary", () => {
     }
     expect(target.method).not.toHaveBeenCalled();
   });
+
+  it("returns a successful operation response without inventing result data", async () => {
+    const target = setup();
+    target.method.mockResolvedValueOnce({ status: "ok" } as never);
+    await expect(
+      target.api.handle({
+        method: "POST",
+        path: `${base}/realtime/authorize`,
+        headers,
+        body: {},
+      }),
+    ).resolves.toEqual({ statusCode: 200, body: { status: "ok" } });
+  });
+
+  it("fails closed when the operation body or dependency is unavailable", async () => {
+    const target = setup();
+    await expect(
+      target.api.handle({
+        method: "POST",
+        path: `${base}/feedback/read`,
+        headers,
+        body: null,
+      }),
+    ).resolves.toEqual({
+      statusCode: 404,
+      body: { error: "ERR-WORKSPACE-DENIED" },
+    });
+
+    const withoutOperations = createPublicApi(
+      {
+        findBySlug: () => Promise.resolve(null),
+        resolve: () => Promise.resolve({ kind: "unavailable" }),
+      },
+      {
+        accept: () =>
+          Promise.resolve({
+            status: "retryable" as const,
+            code: "INTAKE_UNAVAILABLE" as const,
+          }),
+      },
+      {
+        retrieve: unavailable,
+        authorize: unavailable,
+        rotate: unavailable,
+        revoke: unavailable,
+        act: unavailable,
+      },
+    );
+    await expect(
+      withoutOperations.handle({
+        method: "POST",
+        path: `${base}/feedback/read`,
+        headers,
+        body: { feedbackId: "feedback-a" },
+      }),
+    ).resolves.toEqual({
+      statusCode: 503,
+      body: { error: "ERR-WORKSPACE-UNAVAILABLE" },
+    });
+  });
 });
