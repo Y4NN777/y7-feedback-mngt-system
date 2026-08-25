@@ -9,6 +9,7 @@ import type {
 import type { AccountlessAccessCoordinator } from "./accountless-access";
 import type { IntakeCommand, IntakeCoordinator } from "./intake";
 import type { ReporterAttachmentDownload } from "./reporter-attachment-download";
+import type { WorkspaceAttachmentDownload } from "./workspace-attachment-download";
 import {
   createPublicApi,
   type PublicProject,
@@ -99,6 +100,9 @@ function setup(
       ReturnType<AccountlessAccessCoordinator["revoke"]>
     >;
     readonly attachmentOutcome?: Awaited<ReturnType<ReporterAttachmentDownload>>;
+    readonly workspaceAttachmentOutcome?: Awaited<
+      ReturnType<WorkspaceAttachmentDownload>
+    >;
   } = {},
 ) {
   const accept = vi.fn<
@@ -140,6 +144,17 @@ function setup(
       },
     ),
   );
+  const workspaceAttachmentDownload = vi.fn<WorkspaceAttachmentDownload>(() =>
+    Promise.resolve(
+      options.workspaceAttachmentOutcome ?? {
+        status: "available",
+        attachmentId: "attachment-1",
+        displayName: "internal.txt",
+        mediaType: "text/plain; charset=utf-8",
+        bytes: new TextEncoder().encode("internal evidence"),
+      },
+    ),
+  );
   const findBySlug = vi.fn(() =>
     Promise.resolve(
       options.resolvedProject === undefined ? project : options.resolvedProject,
@@ -157,13 +172,20 @@ function setup(
   return {
     access,
     accept,
-    api: createPublicApi(projects, intake, access, reporterAttachmentDownload),
+    api: createPublicApi(
+      projects,
+      intake,
+      access,
+      reporterAttachmentDownload,
+      workspaceAttachmentDownload,
+    ),
     findBySlug,
     projects,
     retrieve,
     rotate,
     revoke,
     reporterAttachmentDownload,
+    workspaceAttachmentDownload,
   };
 }
 
@@ -595,6 +617,117 @@ describe("trusted public Function boundary", () => {
       },
     });
     expect(JSON.stringify(response)).not.toContain("forged-body-proof");
+  });
+
+  it("BDD-AUTH-ATT-004 forwards only JWT and route-derived Workspace scope", async () => {
+    const { api, workspaceAttachmentDownload } = setup();
+    const jwt = "header.payload.signature";
+    const response = await api.handle({
+      method: "POST",
+      path: "/v1/workspaces/workspace-a/projects/project-a/attachments/download",
+      headers: {
+        authorization: `Bearer ${jwt}`,
+        "x-appwrite-user-id": "user-a",
+      },
+      body: {
+        attachmentId: "attachment-1",
+        workspaceId: "forged-workspace",
+        projectId: "forged-project",
+      },
+    });
+
+    expect(workspaceAttachmentDownload).toHaveBeenCalledWith({
+      jwt,
+      claimedPrincipalId: "user-a",
+      workspaceId: "workspace-a",
+      projectId: "project-a",
+      attachmentId: "attachment-1",
+    });
+    expect(response).toMatchObject({ statusCode: 200 });
+    expect(JSON.stringify(response)).not.toContain(jwt);
+  });
+
+  it("uses one Workspace Attachment denial for malformed identity, scope, and input", async () => {
+    for (const request of [
+      {
+        path: "/v1/workspaces/workspace-a/projects/project-a/attachments/download",
+        headers: {},
+        body: { attachmentId: "attachment-1" },
+      },
+      {
+        path: "/v1/workspaces/workspace-a/projects/project-a/attachments/download",
+        headers: { authorization: "FeedbackProof unrelated" },
+        body: { attachmentId: "attachment-1" },
+      },
+      {
+        path: "/v1/workspaces/workspace-a/projects/project-a/attachments/download",
+        headers: {
+          authorization: "Bearer header.payload.signature",
+          "x-appwrite-user-id": "bad/id",
+        },
+        body: { attachmentId: "attachment-1" },
+      },
+      {
+        path: "/v1/workspaces/workspace-a/projects/project-a/attachments/download",
+        headers: { authorization: "Bearer header.payload.signature" },
+        body: null,
+      },
+    ]) {
+      const target = setup();
+      await expect(target.api.handle({ method: "POST", ...request })).resolves.toEqual({
+        statusCode: 404,
+        body: { error: "ERR-ATTACHMENT-DENIED" },
+      });
+      expect(target.workspaceAttachmentDownload).not.toHaveBeenCalled();
+    }
+  });
+
+  it.each(["denied", "retryable"] as const)(
+    "maps Workspace Attachment %s without disclosing the cause",
+    async (status) => {
+      const target = setup({
+        workspaceAttachmentOutcome:
+          status === "denied"
+            ? { status, code: "ATTACHMENT_ACCESS_DENIED" }
+            : { status, code: "ATTACHMENT_DOWNLOAD_UNAVAILABLE" },
+      });
+      await expect(
+        target.api.handle({
+          method: "POST",
+          path: "/v1/workspaces/workspace-a/projects/project-a/attachments/download",
+          headers: { authorization: "Bearer header.payload.signature" },
+          body: { attachmentId: "attachment-1" },
+        }),
+      ).resolves.toEqual(
+        status === "denied"
+          ? { statusCode: 404, body: { error: "ERR-ATTACHMENT-DENIED" } }
+          : {
+              statusCode: 503,
+              body: { error: "ERR-ATTACHMENT-UNAVAILABLE" },
+            },
+      );
+    },
+  );
+
+  it("fails closed when the Workspace Attachment capability is unavailable", async () => {
+    const current = setup();
+    const api = createPublicApi(
+      current.projects,
+      { accept: current.accept },
+      current.access,
+      current.reporterAttachmentDownload,
+    );
+    await expect(
+      api.handle({
+        method: "POST",
+        path: "/v1/workspaces/workspace-a/projects/project-a/attachments/download",
+        headers: { authorization: "Bearer header.payload.signature" },
+        body: { attachmentId: "attachment-1" },
+      }),
+    ).resolves.toEqual({
+      statusCode: 503,
+      body: { error: "ERR-ATTACHMENT-UNAVAILABLE" },
+    });
   });
 
   it("uses one Attachment denial for malformed, invalid proof, missing, and sibling access", async () => {

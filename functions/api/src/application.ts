@@ -7,7 +7,9 @@ import { createNodeAppwriteAccountlessRepository } from "./appwrite-accountless-
 import { createNodeAppwriteAttachmentAcceptanceStore } from "./appwrite-attachment-acceptance-store.js";
 import { createNodeAppwriteIntakeStore } from "./appwrite-intake-store.js";
 import { createNodeAppwritePrivateAttachmentStorage } from "./appwrite-private-attachment-storage.js";
+import { createNodeAppwritePrincipalVerifier } from "./appwrite-principal-verifier.js";
 import { createNodeAppwritePublicProjectReader } from "./appwrite-public-project-reader.js";
+import { createNodeAppwriteWorkspaceAttachmentScopeResolver } from "./appwrite-workspace-attachment-scope.js";
 import type { HttpDependencies } from "./http.js";
 import { createIntakeCoordinator } from "./intake.js";
 import { createAttachmentDownload } from "./attachment-download.js";
@@ -21,6 +23,7 @@ import {
 import { createPublicApi } from "./public-api.js";
 import { createReporterAttachmentDownload } from "./reporter-attachment-download.js";
 import { createSensitiveDataProtector } from "./sensitive-data-protector.js";
+import { createWorkspaceAttachmentDownload } from "./workspace-attachment-download.js";
 
 export interface ApplicationRuntime {
   readonly tables: TablesDB;
@@ -107,6 +110,19 @@ export function createHttpApplication(
     accountless,
     createAttachmentDownload(attachmentMetadata, attachmentStorage),
   );
+  const workspaceAttachmentDownload = createWorkspaceAttachmentDownload(
+    createNodeAppwritePrincipalVerifier({
+      endpoint: config.appwriteEndpoint,
+      projectId: config.appwriteProjectId,
+    }),
+    createNodeAppwriteWorkspaceAttachmentScopeResolver(runtime.tables, {
+      databaseId: config.appwriteSchema.databaseId,
+      projectsTableId: config.appwriteSchema.projectsTableId,
+      workspaceMembershipsTableId: config.appwriteSchema.workspaceMembershipsTableId,
+      projectAssignmentsTableId: config.appwriteSchema.projectAssignmentsTableId,
+    }),
+    createAttachmentDownload(attachmentMetadata, attachmentStorage),
+  );
 
   return {
     createCorrelationId: runtime.createCorrelationId,
@@ -117,6 +133,7 @@ export function createHttpApplication(
       intake,
       accountless,
       reporterAttachmentDownload,
+      workspaceAttachmentDownload,
     ),
     release: config.release,
     startedAt: runtime.startedAt,

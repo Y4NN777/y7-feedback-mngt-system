@@ -13,6 +13,7 @@ import {
 import type { AccountlessAccessCoordinator } from "./accountless-access.js";
 import type { IntakeCoordinator, IntakeOutcome } from "./intake.js";
 import type { ReporterAttachmentDownload } from "./reporter-attachment-download.js";
+import type { WorkspaceAttachmentDownload } from "./workspace-attachment-download.js";
 
 export interface PublicProject {
   readonly slug: string;
@@ -58,6 +59,9 @@ const operationIdPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const intakePath =
   /^\/v1\/projects\/([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)\/feedback$/u;
+const workspaceAttachmentPath =
+  /^\/v1\/workspaces\/([A-Za-z0-9][A-Za-z0-9._-]{0,35})\/projects\/([A-Za-z0-9][A-Za-z0-9._-]{0,35})\/attachments\/download$/u;
+const appwriteId = /^[A-Za-z0-9][A-Za-z0-9._-]{0,35}$/u;
 
 function isObject(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -234,9 +238,75 @@ export function createPublicApi(
   intake: IntakeCoordinator,
   access: AccountlessAccessCoordinator,
   reporterAttachmentDownload?: ReporterAttachmentDownload,
+  workspaceAttachmentDownload?: WorkspaceAttachmentDownload,
 ): PublicApi {
   return {
     async handle(request) {
+      const workspaceAttachmentMatch = workspaceAttachmentPath.exec(request.path);
+      if (request.method === "POST" && workspaceAttachmentMatch) {
+        const [, workspaceId, projectId] = workspaceAttachmentMatch;
+        let jwt: string;
+        let attachmentId: string;
+        let claimedPrincipalId: string | undefined;
+        try {
+          if (!workspaceId || !projectId || !isObject(request.body)) {
+            throw new Error("WORKSPACE_ACCESS_INVALID");
+          }
+          const match = /^Bearer ([^\s]+)$/u.exec(
+            header(request.headers, "authorization") ?? "",
+          );
+          if (!match) throw new Error("WORKSPACE_ACCESS_INVALID");
+          jwt = requiredString(match[1], 4_096, "WORKSPACE_ACCESS_INVALID");
+          attachmentId = requiredString(
+            request.body.attachmentId,
+            200,
+            "WORKSPACE_ACCESS_INVALID",
+          );
+          const claimed = header(request.headers, "x-appwrite-user-id");
+          claimedPrincipalId =
+            claimed === undefined
+              ? undefined
+              : requiredString(claimed, 36, "WORKSPACE_ACCESS_INVALID");
+          if (
+            claimedPrincipalId !== undefined &&
+            !appwriteId.test(claimedPrincipalId)
+          ) {
+            throw new Error("WORKSPACE_ACCESS_INVALID");
+          }
+        } catch {
+          return { statusCode: 404, body: { error: "ERR-ATTACHMENT-DENIED" } };
+        }
+        if (!workspaceAttachmentDownload) {
+          return {
+            statusCode: 503,
+            body: { error: "ERR-ATTACHMENT-UNAVAILABLE" },
+          };
+        }
+        const outcome = await workspaceAttachmentDownload({
+          jwt,
+          workspaceId,
+          projectId,
+          attachmentId,
+          ...(claimedPrincipalId === undefined ? {} : { claimedPrincipalId }),
+        });
+        if (outcome.status === "available") {
+          return {
+            statusCode: 200,
+            binary: {
+              bytes: outcome.bytes,
+              displayName: outcome.displayName,
+              mediaType: outcome.mediaType,
+            },
+          };
+        }
+        return outcome.status === "denied"
+          ? { statusCode: 404, body: { error: "ERR-ATTACHMENT-DENIED" } }
+          : {
+              statusCode: 503,
+              body: { error: "ERR-ATTACHMENT-UNAVAILABLE" },
+            };
+      }
+
       if (
         request.method === "POST" &&
         request.path === "/v1/feedback/attachments/download"
