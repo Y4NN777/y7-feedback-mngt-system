@@ -28,3 +28,12 @@ test("BDD-VER-002 builds runtime config before the web app on Vercel", async () 
     "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/web build",
   );
 });
+
+test("BDD-VER-003 never serves the SPA shell for reserved API paths", async () => {
+  const policy = JSON.parse(
+    await readFile(new URL("../vercel.json", import.meta.url), "utf8"),
+  );
+  const fallback = policy.rewrites.find((entry) => entry.destination === "/index.html");
+
+  assert.equal(fallback.source, "/((?!assets/|api/).*)");
+});
