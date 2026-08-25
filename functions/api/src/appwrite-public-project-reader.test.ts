@@ -9,6 +9,7 @@ import {
 
 const schema = {
   databaseId: "feedback",
+  projectSlugsTableId: "project_slugs",
   projectsTableId: "projects",
 };
 
@@ -44,6 +45,122 @@ function setup(rows: readonly unknown[] = [row]) {
 }
 
 describe("Appwrite public Project registry adapter", () => {
+  it("BDD-PROJ-APPWRITE-002 resolves current and historical reservations", async () => {
+    const listRows = vi
+      .fn<AppwriteProjectTablesPort["listRows"]>()
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            slug: "wisemoney-legacy",
+            projectId: "project-authoritative",
+            current: false,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [row] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            slug: "wisemoney",
+            projectId: "project-authoritative",
+            current: true,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [row] });
+    const reader = createAppwritePublicProjectReader({ listRows }, schema, {
+      equal: (attribute, values) => `equal:${attribute}:${values.join(",")}`,
+      limit: (limit) => `limit:${String(limit)}`,
+    });
+
+    await expect(reader.resolve("wisemoney-legacy")).resolves.toEqual({
+      kind: "redirect",
+      canonicalSlug: "wisemoney",
+    });
+    await expect(reader.resolve("wisemoney")).resolves.toMatchObject({
+      kind: "current",
+      project: { slug: "wisemoney" },
+    });
+    expect(listRows.mock.calls[0]?.[0]).toMatchObject({
+      tableId: "project_slugs",
+      queries: ["equal:slug:wisemoney-legacy", "limit:2"],
+    });
+    expect(listRows.mock.calls[1]?.[0]).toMatchObject({
+      tableId: "projects",
+      queries: ["equal:$id:project-authoritative", "limit:2"],
+    });
+  });
+
+  it("BDD-PROJ-APPWRITE-003 fails closed for absent or inconsistent routing rows", async () => {
+    const cases: readonly (readonly (readonly unknown[])[])[] = [
+      [[]],
+      [[{}, {}]],
+      [[null]],
+      [[{ slug: "other", projectId: "project-authoritative", current: true }]],
+      [[{ slug: "wisemoney", projectId: "bad/id", current: true }]],
+      [[{ slug: "wisemoney", projectId: "project-authoritative", current: "yes" }]],
+      [[{ slug: "wisemoney", projectId: "project-authoritative", current: true }], []],
+      [
+        [{ slug: "wisemoney", projectId: "project-authoritative", current: true }],
+        [null],
+      ],
+    ];
+
+    for (const responses of cases) {
+      const queue = [...responses];
+      const { reader } = setup();
+      const listRows = vi.fn(() => Promise.resolve({ rows: queue.shift() ?? [] }));
+      const candidate = createAppwritePublicProjectReader({ listRows }, schema, {
+        equal: (attribute, values) => `equal:${attribute}:${values.join(",")}`,
+        limit: (limit) => `limit:${String(limit)}`,
+      });
+      const outcome = candidate.resolve("wisemoney");
+      if (responses[0]?.length === 0 || responses.length > 1) {
+        await expect(outcome).resolves.toEqual({ kind: "unavailable" });
+      } else {
+        await expect(outcome).rejects.toThrow("APPWRITE_PROJECT_ROW_INVALID");
+      }
+      expect(reader).toBeDefined();
+    }
+  });
+
+  it("returns unavailable for inactive Projects and redirects inconsistent current flags", async () => {
+    const listRows = vi
+      .fn<AppwriteProjectTablesPort["listRows"]>()
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            slug: "wisemoney",
+            projectId: "project-authoritative",
+            current: true,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [{ ...row, active: false }] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            slug: "wisemoney-legacy",
+            projectId: "project-authoritative",
+            current: true,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [row] });
+    const reader = createAppwritePublicProjectReader({ listRows }, schema, {
+      equal: () => "equal",
+      limit: () => "limit",
+    });
+
+    await expect(reader.resolve("wisemoney")).resolves.toEqual({
+      kind: "unavailable",
+    });
+    await expect(reader.resolve("wisemoney-legacy")).resolves.toEqual({
+      kind: "redirect",
+      canonicalSlug: "wisemoney",
+    });
+  });
+
   it("BDD-PROJ-APPWRITE-001 derives Project identity from the exact authoritative row", async () => {
     const { listRows, reader } = setup();
 
@@ -110,11 +227,15 @@ describe("Appwrite public Project registry adapter", () => {
     await expect(reader.findBySlug("../wisemoney")).rejects.toThrow(
       "APPWRITE_PROJECT_SLUG_INVALID",
     );
+    await expect(reader.resolve("../wisemoney")).rejects.toThrow(
+      "APPWRITE_PROJECT_SLUG_INVALID",
+    );
     expect(listRows).not.toHaveBeenCalled();
 
     for (const invalidSchema of [
       { ...schema, databaseId: "" },
       { ...schema, projectsTableId: "bad/table" },
+      { ...schema, projectSlugsTableId: "bad/table" },
     ]) {
       expect(() =>
         createAppwritePublicProjectReader({ listRows }, invalidSchema, {

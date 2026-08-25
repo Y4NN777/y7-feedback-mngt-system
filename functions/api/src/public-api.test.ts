@@ -103,6 +103,9 @@ function setup(
     readonly workspaceAttachmentOutcome?: Awaited<
       ReturnType<WorkspaceAttachmentDownload>
     >;
+    readonly projectResolutions?: readonly Awaited<
+      ReturnType<PublicProjectReader["resolve"]>
+    >[];
   } = {},
 ) {
   const accept = vi.fn<
@@ -160,7 +163,11 @@ function setup(
       options.resolvedProject === undefined ? project : options.resolvedProject,
     ),
   );
-  const projects: PublicProjectReader = { findBySlug };
+  const resolutions = [...(options.projectResolutions ?? [])];
+  const resolve = vi.fn<PublicProjectReader["resolve"]>(() =>
+    Promise.resolve(resolutions.shift() ?? { kind: "current", project }),
+  );
+  const projects: PublicProjectReader = { findBySlug, resolve };
   const intake: IntakeCoordinator = { accept };
   const access: AccountlessAccessCoordinator = {
     authorize: () => Promise.resolve({ status: "denied", code: "ACCESS_DENIED" }),
@@ -185,11 +192,95 @@ function setup(
     rotate,
     revoke,
     reporterAttachmentDownload,
+    resolve,
     workspaceAttachmentDownload,
   };
 }
 
 describe("trusted public Function boundary", () => {
+  it("BDD-PROJ-002 resolves current, historical, and unavailable routes", async () => {
+    const { api } = setup({
+      projectResolutions: [
+        { kind: "current", project },
+        { kind: "redirect", canonicalSlug: "wisemoney" },
+        { kind: "unavailable" },
+      ],
+    });
+
+    await expect(
+      api.handle({
+        method: "GET",
+        path: "/v1/projects/wisemoney",
+        headers: {},
+        body: undefined,
+      }),
+    ).resolves.toEqual({
+      statusCode: 200,
+      body: {
+        status: "current",
+        slug: "wisemoney",
+        purpose: project.reporterPurpose,
+      },
+    });
+    await expect(
+      api.handle({
+        method: "GET",
+        path: "/v1/projects/wisemoney-legacy",
+        headers: {},
+        body: undefined,
+      }),
+    ).resolves.toEqual({
+      statusCode: 200,
+      body: { status: "redirect", canonicalSlug: "wisemoney" },
+    });
+    await expect(
+      api.handle({
+        method: "GET",
+        path: "/v1/projects/unknown",
+        headers: {},
+        body: undefined,
+      }),
+    ).resolves.toEqual({
+      statusCode: 404,
+      body: { error: "ERR-PROJECT-UNAVAILABLE" },
+    });
+  });
+
+  it("BDD-PROJ-003 hides inactive Projects and registry failures", async () => {
+    const inactive = setup({
+      projectResolutions: [
+        {
+          kind: "current",
+          project: { ...project, feedbackConfig: { ...projectConfig, active: false } },
+        },
+      ],
+    });
+    const failed = setup();
+    failed.resolve.mockRejectedValueOnce(new Error("database unavailable"));
+
+    await expect(
+      inactive.api.handle({
+        method: "GET",
+        path: "/v1/projects/wisemoney",
+        headers: {},
+        body: undefined,
+      }),
+    ).resolves.toEqual({
+      statusCode: 404,
+      body: { error: "ERR-PROJECT-UNAVAILABLE" },
+    });
+    await expect(
+      failed.api.handle({
+        method: "GET",
+        path: "/v1/projects/wisemoney",
+        headers: {},
+        body: undefined,
+      }),
+    ).resolves.toEqual({
+      statusCode: 503,
+      body: { error: "ERR-PROJECT-UNAVAILABLE" },
+    });
+  });
   it("BDD-PUBLIC-INTAKE-001 derives scope and trust before transactional acceptance", async () => {
     const { api, accept, findBySlug } = setup();
 
@@ -508,6 +599,7 @@ describe("trusted public Function boundary", () => {
 
     const failedReader: PublicProjectReader = {
       findBySlug: () => Promise.reject(new Error("database unavailable")),
+      resolve: () => Promise.reject(new Error("database unavailable")),
     };
     const available = setup();
     const api = createPublicApi(

@@ -17,6 +17,8 @@ interface FeedbackIntakeProps {
   readonly gateway: IntakeGateway;
   readonly locale: Locale;
   readonly onLocaleChange: (locale: Locale) => void;
+  readonly projectPurpose?: Readonly<Record<Locale, string>>;
+  readonly projectSlug?: string;
 }
 
 interface DraftFields {
@@ -240,6 +242,7 @@ function Review({
   onSend,
   outcome,
   pending,
+  projectSlug,
 }: {
   readonly data: ValidatedFeedbackDraft;
   readonly locale: Locale;
@@ -247,13 +250,16 @@ function Review({
   readonly onSend: () => void;
   readonly outcome: IntakeGatewayOutcome | null;
   readonly pending: boolean;
+  readonly projectSlug: string;
 }) {
   const copy = intakeMessages[locale];
   const contact =
     data.reporter.kind === "contact" ? data.reporter.value : copy.contactNone;
   return (
     <section className="review-panel" aria-labelledby="review-title">
-      <p className="eyebrow">WiseMoney · {copy.review}</p>
+      <p className="eyebrow">
+        {projectSlug} · {copy.review}
+      </p>
       <h1 id="review-title">{copy.reviewTitle}</h1>
       <p className="review-hint">{copy.reviewHint}</p>
 
@@ -262,7 +268,7 @@ function Review({
         <dl className="review-facts">
           <div>
             <dt>{copy.project}</dt>
-            <dd>WiseMoney</dd>
+            <dd>{projectSlug}</dd>
           </div>
           <div>
             <dt>{copy.type}</dt>
@@ -318,14 +324,16 @@ function Review({
 function Confirmation({
   locale,
   outcome,
+  projectSlug,
 }: {
   readonly locale: Locale;
   readonly outcome: Extract<IntakeGatewayOutcome, { readonly status: "accepted" }>;
+  readonly projectSlug: string;
 }) {
   const copy = intakeMessages[locale];
   return (
     <section className="review-panel" aria-labelledby="confirmation-title">
-      <p className="eyebrow">WiseMoney · Y7 Feedback</p>
+      <p className="eyebrow">{projectSlug} · Y7 Feedback</p>
       <h1 id="confirmation-title">{copy.confirmationTitle}</h1>
       <p>{copy.confirmationHint}</p>
       <dl className="review-facts">
@@ -348,6 +356,11 @@ export function FeedbackIntake({
   gateway,
   locale,
   onLocaleChange,
+  projectPurpose = {
+    fr: "Partager un retour sur WiseMoney.",
+    en: "Share feedback about WiseMoney.",
+  },
+  projectSlug = "wisemoney",
 }: FeedbackIntakeProps) {
   const copy = intakeMessages[locale];
   const [draft, setDraft] = useState<DraftFields>(initialDraft);
@@ -381,8 +394,8 @@ export function FeedbackIntake({
     try {
       const validated = validateFeedbackDraft(
         {
-          projectId: "wisemoney",
-          workspaceId: "personal",
+          projectId: projectSlug,
+          workspaceId: "public-projection",
           active: true,
           enabledTypes: ["bug", "suggestion", "review"],
           contextDeclarations: [
@@ -424,7 +437,7 @@ export function FeedbackIntake({
     try {
       setOutcome(
         await gateway.accept({
-          projectSlug: "wisemoney",
+          projectSlug,
           clientOperationId: operationId,
           locale,
           draft: review,
@@ -470,7 +483,7 @@ export function FeedbackIntake({
       </header>
 
       {outcome?.status === "accepted" ? (
-        <Confirmation locale={locale} outcome={outcome} />
+        <Confirmation locale={locale} outcome={outcome} projectSlug={projectSlug} />
       ) : review ? (
         <Review
           data={review}
@@ -485,12 +498,13 @@ export function FeedbackIntake({
           }}
           outcome={outcome}
           pending={pending}
+          projectSlug={projectSlug}
         />
       ) : (
         <>
           <section className="intake-introduction" aria-labelledby="intake-title">
-            <p className="eyebrow">WiseMoney · Y7 Feedback</p>
-            <h1 id="intake-title">{copy.title}</h1>
+            <p className="eyebrow">{projectSlug} · Y7 Feedback</p>
+            <h1 id="intake-title">{projectPurpose[locale]}</h1>
             <p className="lede">{copy.intro}</p>
           </section>
           <form className="intake-form" noValidate onSubmit={prepareReview}>

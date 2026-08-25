@@ -81,9 +81,29 @@ export async function routeRequest(
   const startedAt = dependencies.startedAt();
   const correlationId = dependencies.createCorrelationId();
   const headers = {
+    "access-control-allow-headers": "authorization, content-type, x-appwrite-user-id",
+    "access-control-allow-methods": "GET, POST, OPTIONS",
+    "access-control-allow-origin": "*",
+    "access-control-max-age": "600",
     "cache-control": "no-store",
     "x-correlation-id": correlationId,
   } as const;
+
+  if (method === "OPTIONS") {
+    log(
+      serializeOperationalEvent({
+        event: "api.request.completed",
+        correlationId,
+        environment: dependencies.environment,
+        release: dependencies.release,
+        operation: "public_api",
+        outcome: "success",
+        statusCode: 204,
+        durationMs: Math.max(0, dependencies.now() - startedAt),
+      }),
+    );
+    return res.json(null, 204, headers);
+  }
 
   const isHealth = method === "GET" && req.path === "/health";
   const isIngressProbe =
@@ -98,9 +118,10 @@ export async function routeRequest(
           method,
           path: req.path,
           headers: requestHeaders,
-          body: contentType.startsWith("multipart/form-data")
-            ? undefined
-            : req.bodyJson,
+          body:
+            method === "POST" && !contentType.startsWith("multipart/form-data")
+              ? req.bodyJson
+              : undefined,
         });
   const statusCode = isHealth
     ? 200

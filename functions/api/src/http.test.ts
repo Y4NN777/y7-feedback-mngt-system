@@ -98,10 +98,14 @@ describe("trusted API entrypoint", () => {
     await routeRequest(context, dependencies);
 
     expect(json).toHaveBeenCalledOnce();
-    expect(json).toHaveBeenCalledWith({ status: "ok" }, 200, {
-      "cache-control": "no-store",
-      "x-correlation-id": correlationId,
-    });
+    expect(json).toHaveBeenCalledWith(
+      { status: "ok" },
+      200,
+      expect.objectContaining({
+        "cache-control": "no-store",
+        "x-correlation-id": correlationId,
+      }),
+    );
     expect(context.log).toHaveBeenCalledWith(
       JSON.stringify({
         event: "api.request.completed",
@@ -114,6 +118,52 @@ describe("trusted API entrypoint", () => {
         durationMs: 4,
       }),
     );
+  });
+
+  it("BDD-PROJ-HTTP-001 does not parse an absent JSON body for GET routing", async () => {
+    const handle = vi.fn(() =>
+      Promise.resolve({ statusCode: 200, body: { status: "current" } }),
+    );
+    const { context, json } = createContext("GET", "/v1/projects/wisemoney");
+    Object.defineProperty(context.req, "bodyJson", {
+      get() {
+        throw new Error("GET body must not be parsed");
+      },
+    });
+
+    await routeRequest(context, {
+      ...dependencies,
+      publicApi: { handle },
+    });
+
+    expect(handle).toHaveBeenCalledWith(
+      expect.objectContaining({ method: "GET", body: undefined }),
+    );
+    expect(json).toHaveBeenCalledWith(
+      { status: "current" },
+      200,
+      expect.objectContaining({ "access-control-allow-origin": "*" }),
+    );
+  });
+
+  it("BDD-PROJ-HTTP-002 answers the public browser preflight without delegation", async () => {
+    const handle = vi.fn<PublicApi["handle"]>();
+    const { context, json } = createContext("OPTIONS", "/v1/projects/wisemoney");
+
+    await routeRequest(context, {
+      ...dependencies,
+      publicApi: { handle },
+    });
+
+    expect(handle).not.toHaveBeenCalled();
+    expect(json).toHaveBeenCalledWith(null, 204, {
+      "access-control-allow-headers": "authorization, content-type, x-appwrite-user-id",
+      "access-control-allow-methods": "GET, POST, OPTIONS",
+      "access-control-allow-origin": "*",
+      "access-control-max-age": "600",
+      "cache-control": "no-store",
+      "x-correlation-id": correlationId,
+    });
   });
 
   it("BDD-API-002 fails closed for an unknown operation", async () => {
@@ -132,10 +182,14 @@ describe("trusted API entrypoint", () => {
     });
 
     expect(json).toHaveBeenCalledOnce();
-    expect(json).toHaveBeenCalledWith({ error: "not_found" }, 404, {
-      "cache-control": "no-store",
-      "x-correlation-id": correlationId,
-    });
+    expect(json).toHaveBeenCalledWith(
+      { error: "not_found" },
+      404,
+      expect.objectContaining({
+        "cache-control": "no-store",
+        "x-correlation-id": correlationId,
+      }),
+    );
     expect(context.log).toHaveBeenCalledWith(expect.not.stringContaining("/unknown"));
   });
 
@@ -160,10 +214,14 @@ describe("trusted API entrypoint", () => {
       headers: { Authorization: "FeedbackProof secret-proof" },
       body,
     });
-    expect(json).toHaveBeenCalledWith({ status: "accepted" }, 201, {
-      "cache-control": "no-store",
-      "x-correlation-id": correlationId,
-    });
+    expect(json).toHaveBeenCalledWith(
+      { status: "accepted" },
+      201,
+      expect.objectContaining({
+        "cache-control": "no-store",
+        "x-correlation-id": correlationId,
+      }),
+    );
     const event = vi.mocked(context.log).mock.calls[0]?.[0] ?? "";
     expect(event).toContain('"operation":"public_api"');
     expect(event).not.toContain("wisemoney");
@@ -213,14 +271,18 @@ describe("trusted API entrypoint", () => {
     await routeRequest(context, { ...dependencies, publicApi });
 
     expect(json).not.toHaveBeenCalled();
-    expect(binary).toHaveBeenCalledWith(Buffer.from(bytes), 200, {
-      "cache-control": "no-store",
-      "content-disposition":
-        "attachment; filename*=UTF-8''preuve%20%C3%A9pargne%20%22ao%C3%BBt%22.txt",
-      "content-length": String(bytes.byteLength),
-      "content-type": "text/plain; charset=utf-8",
-      "x-correlation-id": correlationId,
-    });
+    expect(binary).toHaveBeenCalledWith(
+      Buffer.from(bytes),
+      200,
+      expect.objectContaining({
+        "cache-control": "no-store",
+        "content-disposition":
+          "attachment; filename*=UTF-8''preuve%20%C3%A9pargne%20%22ao%C3%BBt%22.txt",
+        "content-length": String(bytes.byteLength),
+        "content-type": "text/plain; charset=utf-8",
+        "x-correlation-id": correlationId,
+      }),
+    );
     expect(context.log).toHaveBeenCalledWith(
       expect.not.stringMatching(/private evidence|preuve|attachment\/download/u),
     );

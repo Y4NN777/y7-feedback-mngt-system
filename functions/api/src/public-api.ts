@@ -26,6 +26,13 @@ export interface PublicProject {
 
 export interface PublicProjectReader {
   findBySlug(slug: string): Promise<PublicProject | null>;
+  resolve(
+    slug: string,
+  ): Promise<
+    | { readonly kind: "current"; readonly project: PublicProject }
+    | { readonly kind: "redirect"; readonly canonicalSlug: string }
+    | { readonly kind: "unavailable" }
+  >;
 }
 
 export interface PublicApiRequest {
@@ -59,6 +66,7 @@ const operationIdPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const intakePath =
   /^\/v1\/projects\/([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)\/feedback$/u;
+const projectPath = /^\/v1\/projects\/([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)$/u;
 const workspaceAttachmentPath =
   /^\/v1\/workspaces\/([A-Za-z0-9][A-Za-z0-9._-]{0,35})\/projects\/([A-Za-z0-9][A-Za-z0-9._-]{0,35})\/attachments\/download$/u;
 const appwriteId = /^[A-Za-z0-9][A-Za-z0-9._-]{0,35}$/u;
@@ -242,6 +250,39 @@ export function createPublicApi(
 ): PublicApi {
   return {
     async handle(request) {
+      const projectMatch = projectPath.exec(request.path);
+      if (request.method === "GET" && projectMatch) {
+        try {
+          const resolution = await projects.resolve(
+            requiredString(projectMatch[1], 63),
+          );
+          if (resolution.kind === "current") {
+            return resolution.project.feedbackConfig.active
+              ? {
+                  statusCode: 200,
+                  body: {
+                    status: "current",
+                    slug: resolution.project.slug,
+                    purpose: resolution.project.reporterPurpose,
+                  },
+                }
+              : { statusCode: 404, body: { error: "ERR-PROJECT-UNAVAILABLE" } };
+          }
+          if (resolution.kind === "redirect") {
+            return {
+              statusCode: 200,
+              body: {
+                status: "redirect",
+                canonicalSlug: resolution.canonicalSlug,
+              },
+            };
+          }
+          return { statusCode: 404, body: { error: "ERR-PROJECT-UNAVAILABLE" } };
+        } catch {
+          return { statusCode: 503, body: { error: "ERR-PROJECT-UNAVAILABLE" } };
+        }
+      }
+
       const workspaceAttachmentMatch = workspaceAttachmentPath.exec(request.path);
       if (request.method === "POST" && workspaceAttachmentMatch) {
         const [, workspaceId, projectId] = workspaceAttachmentMatch;
