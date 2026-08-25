@@ -33,6 +33,15 @@ function assetPathFrom(shell) {
   return match[1];
 }
 
+function applicationShell(shell) {
+  return shell
+    .replace(
+      /\s*<script async data-explicit-opt-in="true" data-deployment-id="[^"]+" src="https:\/\/vercel\.live\/_next-live\/feedback\/feedback\.js"><\/script>\s*$/u,
+      "",
+    )
+    .trimEnd();
+}
+
 export function inspectVercelPreview({
   root,
   rootBody,
@@ -54,7 +63,7 @@ export function inspectVercelPreview({
 
   const checks = {
     deepLink:
-      rootBody === deepLinkBody &&
+      applicationShell(rootBody) === applicationShell(deepLinkBody) &&
       root.headers.get("content-type")?.includes("text/html") === true &&
       deepLink.headers.get("content-type")?.includes("text/html") === true,
     shellRevalidated: isRevalidated(root) && isRevalidated(deepLink),
