@@ -14,6 +14,10 @@ import type { AccountlessAccessCoordinator } from "./accountless-access.js";
 import type { IntakeCoordinator, IntakeOutcome } from "./intake.js";
 import type { ReporterAttachmentDownload } from "./reporter-attachment-download.js";
 import type { WorkspaceAttachmentDownload } from "./workspace-attachment-download.js";
+import type {
+  WorkspaceOperationOutcome,
+  WorkspaceProjectOperations,
+} from "./workspace-project-operations.js";
 
 export interface PublicProject {
   readonly slug: string;
@@ -69,6 +73,8 @@ const intakePath =
 const projectPath = /^\/v1\/projects\/([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)$/u;
 const workspaceAttachmentPath =
   /^\/v1\/workspaces\/([A-Za-z0-9][A-Za-z0-9._-]{0,35})\/projects\/([A-Za-z0-9][A-Za-z0-9._-]{0,35})\/attachments\/download$/u;
+const workspaceOperationPath =
+  /^\/v1\/workspaces\/([A-Za-z0-9][A-Za-z0-9._-]{0,35})\/projects\/([A-Za-z0-9][A-Za-z0-9._-]{0,35})\/operations\/(feedback\/(?:read|search|aggregate)|notifications\/list|realtime\/authorize)$/u;
 const appwriteId = /^[A-Za-z0-9][A-Za-z0-9._-]{0,35}$/u;
 
 function isObject(value: unknown): value is Readonly<Record<string, unknown>> {
@@ -247,9 +253,96 @@ export function createPublicApi(
   access: AccountlessAccessCoordinator,
   reporterAttachmentDownload?: ReporterAttachmentDownload,
   workspaceAttachmentDownload?: WorkspaceAttachmentDownload,
+  workspaceOperations?: WorkspaceProjectOperations,
 ): PublicApi {
   return {
     async handle(request) {
+      const operationMatch = workspaceOperationPath.exec(request.path);
+      if (request.method === "POST" && operationMatch) {
+        const [, workspaceId, projectId, action] = operationMatch;
+        let jwt: string;
+        let body: Readonly<Record<string, unknown>>;
+        try {
+          if (!workspaceId || !projectId || !action || !isObject(request.body)) {
+            throw new Error("WORKSPACE_OPERATION_INVALID");
+          }
+          const bearer = /^Bearer ([^\s]+)$/u.exec(
+            header(request.headers, "authorization") ?? "",
+          );
+          if (!bearer || header(request.headers, "x-appwrite-user-id") !== undefined) {
+            throw new Error("WORKSPACE_OPERATION_INVALID");
+          }
+          jwt = requiredString(bearer[1], 4_096, "WORKSPACE_OPERATION_INVALID");
+          body = request.body;
+        } catch {
+          return { statusCode: 404, body: { error: "ERR-WORKSPACE-DENIED" } };
+        }
+        if (!workspaceOperations) {
+          return {
+            statusCode: 503,
+            body: { error: "ERR-WORKSPACE-UNAVAILABLE" },
+          };
+        }
+        const scoped = { jwt, workspaceId, projectId };
+        let outcome: WorkspaceOperationOutcome;
+        try {
+          switch (action) {
+            case "feedback/read": {
+              const feedbackId = requiredString(
+                body.feedbackId,
+                36,
+                "WORKSPACE_OPERATION_INVALID",
+              );
+              if (!appwriteId.test(feedbackId)) throw new Error("INVALID");
+              outcome = await workspaceOperations.readFeedback({
+                ...scoped,
+                feedbackId,
+              });
+              break;
+            }
+            case "feedback/search": {
+              outcome = await workspaceOperations.searchFeedback({
+                ...scoped,
+                query: requiredString(body.query, 100, "WORKSPACE_OPERATION_INVALID"),
+              });
+              break;
+            }
+            case "feedback/aggregate": {
+              outcome = await workspaceOperations.aggregateFeedback(scoped);
+              break;
+            }
+            case "notifications/list": {
+              outcome = await workspaceOperations.listNotifications(scoped);
+              break;
+            }
+            case "realtime/authorize": {
+              outcome = await workspaceOperations.authorizeRealtime(scoped);
+              break;
+            }
+            default: {
+              return null;
+            }
+          }
+        } catch {
+          return { statusCode: 404, body: { error: "ERR-WORKSPACE-DENIED" } };
+        }
+        if (outcome.status === "ok") {
+          return {
+            statusCode: 200,
+            body: {
+              status: "ok",
+              ...(outcome.data === undefined ? {} : { data: outcome.data }),
+            },
+          };
+        }
+        return outcome.status === "denied"
+          ? { statusCode: 404, body: { error: "ERR-WORKSPACE-DENIED" } }
+          : {
+              statusCode: 503,
+              body: { error: "ERR-WORKSPACE-UNAVAILABLE" },
+            };
+      }
+
       const projectMatch = projectPath.exec(request.path);
       if (request.method === "GET" && projectMatch) {
         try {
