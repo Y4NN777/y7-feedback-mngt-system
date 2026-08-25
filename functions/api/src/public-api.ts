@@ -224,6 +224,59 @@ export function createPublicApi(
 ): PublicApi {
   return {
     async handle(request) {
+      if (
+        request.method === "POST" &&
+        request.path === "/v1/feedback/access-proof/rotate"
+      ) {
+        let authorizedRequest: { readonly reference: string; readonly proof: string };
+        try {
+          authorizedRequest = accessRequest(request);
+        } catch {
+          return { statusCode: 404, body: { error: "ERR-ACCESS-DENIED" } };
+        }
+        let outcome: Awaited<ReturnType<AccountlessAccessCoordinator["rotate"]>>;
+        try {
+          outcome = await access.rotate(authorizedRequest);
+        } catch {
+          return { statusCode: 503, body: { error: "ERR-ACCESS-UNAVAILABLE" } };
+        }
+        return outcome.status === "ok"
+          ? {
+              statusCode: 200,
+              body: {
+                status: "ok",
+                reference: outcome.reference,
+                accessProof: outcome.accessProof,
+              },
+            }
+          : outcome.status === "denied"
+            ? { statusCode: 404, body: { error: "ERR-ACCESS-DENIED" } }
+            : { statusCode: 503, body: { error: "ERR-ACCESS-UNAVAILABLE" } };
+      }
+
+      if (
+        request.method === "POST" &&
+        request.path === "/v1/feedback/access-proof/revoke"
+      ) {
+        let authorizedRequest: { readonly reference: string; readonly proof: string };
+        try {
+          authorizedRequest = accessRequest(request);
+        } catch {
+          return { statusCode: 404, body: { error: "ERR-ACCESS-DENIED" } };
+        }
+        let outcome: Awaited<ReturnType<AccountlessAccessCoordinator["revoke"]>>;
+        try {
+          outcome = await access.revoke(authorizedRequest);
+        } catch {
+          return { statusCode: 503, body: { error: "ERR-ACCESS-UNAVAILABLE" } };
+        }
+        return outcome.status === "ok"
+          ? { statusCode: 200, body: { status: "ok" } }
+          : outcome.status === "denied"
+            ? { statusCode: 404, body: { error: "ERR-ACCESS-DENIED" } }
+            : { statusCode: 503, body: { error: "ERR-ACCESS-UNAVAILABLE" } };
+      }
+
       if (request.method === "POST" && request.path === "/v1/feedback/retrieve") {
         let authorizedRequest: { readonly reference: string; readonly proof: string };
         try {

@@ -20,6 +20,7 @@
     "provision:appwrite": "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build && node --env-file=.env.appwrite-preview functions/api/dist/provision-appwrite.js --apply",
     "verify:appwrite:g1": "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build && node --env-file=.env.appwrite-preview functions/api/dist/verify-appwrite-g1.js --apply",
     "verify:appwrite:deployed:g1": "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build && node --env-file=.env.appwrite-preview functions/api/dist/verify-appwrite-deployed-g1.js --apply",
+    "verify:appwrite:deployed:g1:domain": "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build && node --env-file=.env.appwrite-preview functions/api/dist/verify-appwrite-deployed-g1.js --apply --domain",
     "verify:appwrite:g2:attachments": "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build && node --env-file=.env.appwrite-preview functions/api/dist/verify-appwrite-g2-attachment.js --apply",
     "security:scan": "node scripts/security-scan.mjs",
     "test": "pnpm test:runtime-deps && node --test tests/*.test.mjs && pnpm -r --if-present test",

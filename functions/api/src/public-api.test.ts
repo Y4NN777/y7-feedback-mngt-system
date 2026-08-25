@@ -91,6 +91,12 @@ function setup(
     readonly retrieveOutcome?: Awaited<
       ReturnType<AccountlessAccessCoordinator["retrieve"]>
     >;
+    readonly rotateOutcome?: Awaited<
+      ReturnType<AccountlessAccessCoordinator["rotate"]>
+    >;
+    readonly revokeOutcome?: Awaited<
+      ReturnType<AccountlessAccessCoordinator["revoke"]>
+    >;
   } = {},
 ) {
   const accept = vi.fn<
@@ -109,6 +115,18 @@ function setup(
   const retrieve = vi.fn<AccountlessAccessCoordinator["retrieve"]>(() =>
     Promise.resolve(options.retrieveOutcome ?? { status: "ok", view: reporterView() }),
   );
+  const rotate = vi.fn<AccountlessAccessCoordinator["rotate"]>(() =>
+    Promise.resolve(
+      options.rotateOutcome ?? {
+        status: "ok",
+        reference: "Y7-2026-000001",
+        accessProof: "rotated_abcdefghijklmnopqrstuvwxyz_0123456789ABCDE",
+      },
+    ),
+  );
+  const revoke = vi.fn<AccountlessAccessCoordinator["revoke"]>(() =>
+    Promise.resolve(options.revokeOutcome ?? { status: "ok" }),
+  );
   const findBySlug = vi.fn(() =>
     Promise.resolve(
       options.resolvedProject === undefined ? project : options.resolvedProject,
@@ -118,8 +136,8 @@ function setup(
   const intake: IntakeCoordinator = { accept };
   const access: AccountlessAccessCoordinator = {
     retrieve,
-    rotate: () => Promise.resolve({ status: "denied", code: "ACCESS_DENIED" }),
-    revoke: () => Promise.resolve({ status: "denied", code: "ACCESS_DENIED" }),
+    rotate,
+    revoke,
     act: () => Promise.resolve({ status: "denied", code: "ACCESS_DENIED" }),
   };
   return {
@@ -129,6 +147,8 @@ function setup(
     findBySlug,
     projects,
     retrieve,
+    rotate,
+    revoke,
   };
 }
 
@@ -586,6 +606,126 @@ describe("trusted public Function boundary", () => {
     const failed = setup();
     failed.retrieve.mockRejectedValueOnce(new Error("database unavailable"));
     await expect(failed.api.handle(request)).resolves.toEqual({
+      statusCode: 503,
+      body: { error: "ERR-ACCESS-UNAVAILABLE" },
+    });
+  });
+
+  it("BDD-PUBLIC-ACCESS-002 rotates proof through the same non-disclosing authorization", async () => {
+    const { api, rotate } = setup();
+
+    const response = await api.handle({
+      method: "POST",
+      path: "/v1/feedback/access-proof/rotate",
+      headers: {
+        authorization:
+          "FeedbackProof proof_abcdefghijklmnopqrstuvwxyz_0123456789ABCDEFG",
+      },
+      body: { reference: "Y7-2026-000001" },
+    });
+
+    expect(rotate).toHaveBeenCalledWith({
+      reference: "Y7-2026-000001",
+      proof: "proof_abcdefghijklmnopqrstuvwxyz_0123456789ABCDEFG",
+    });
+    expect(response).toEqual({
+      statusCode: 200,
+      body: {
+        status: "ok",
+        reference: "Y7-2026-000001",
+        accessProof: "rotated_abcdefghijklmnopqrstuvwxyz_0123456789ABCDE",
+      },
+    });
+  });
+
+  it("BDD-PUBLIC-ACCESS-003 revokes proof and maps denial or failure without disclosure", async () => {
+    const successful = setup();
+    const denied = setup({
+      revokeOutcome: { status: "denied", code: "ACCESS_DENIED" },
+    });
+    const retryable = setup({
+      revokeOutcome: { status: "retryable", code: "ACCESS_UNAVAILABLE" },
+    });
+    const request = {
+      method: "POST",
+      path: "/v1/feedback/access-proof/revoke",
+      headers: {
+        authorization:
+          "FeedbackProof proof_abcdefghijklmnopqrstuvwxyz_0123456789ABCDEFG",
+      },
+      body: { reference: "Y7-2026-000001" },
+    };
+
+    await expect(successful.api.handle(request)).resolves.toEqual({
+      statusCode: 200,
+      body: { status: "ok" },
+    });
+    expect(successful.revoke).toHaveBeenCalledWith({
+      reference: "Y7-2026-000001",
+      proof: "proof_abcdefghijklmnopqrstuvwxyz_0123456789ABCDEFG",
+    });
+    await expect(denied.api.handle(request)).resolves.toEqual({
+      statusCode: 404,
+      body: { error: "ERR-ACCESS-DENIED" },
+    });
+    await expect(retryable.api.handle(request)).resolves.toEqual({
+      statusCode: 503,
+      body: { error: "ERR-ACCESS-UNAVAILABLE" },
+    });
+  });
+
+  it("fails closed for malformed, denied, retryable, and thrown proof mutations", async () => {
+    for (const path of [
+      "/v1/feedback/access-proof/rotate",
+      "/v1/feedback/access-proof/revoke",
+    ]) {
+      const invalid = setup();
+      await expect(
+        invalid.api.handle({ method: "POST", path, headers: {}, body: {} }),
+      ).resolves.toEqual({
+        statusCode: 404,
+        body: { error: "ERR-ACCESS-DENIED" },
+      });
+    }
+
+    const request = {
+      method: "POST",
+      path: "/v1/feedback/access-proof/rotate",
+      headers: {
+        authorization:
+          "FeedbackProof proof_abcdefghijklmnopqrstuvwxyz_0123456789ABCDEFG",
+      },
+      body: { reference: "Y7-2026-000001" },
+    };
+    const denied = setup({
+      rotateOutcome: { status: "denied", code: "ACCESS_DENIED" },
+    });
+    const retryable = setup({
+      rotateOutcome: { status: "retryable", code: "ACCESS_UNAVAILABLE" },
+    });
+    await expect(denied.api.handle(request)).resolves.toEqual({
+      statusCode: 404,
+      body: { error: "ERR-ACCESS-DENIED" },
+    });
+    await expect(retryable.api.handle(request)).resolves.toEqual({
+      statusCode: 503,
+      body: { error: "ERR-ACCESS-UNAVAILABLE" },
+    });
+
+    const failedRotate = setup();
+    failedRotate.rotate.mockRejectedValueOnce(new Error("private database detail"));
+    await expect(failedRotate.api.handle(request)).resolves.toEqual({
+      statusCode: 503,
+      body: { error: "ERR-ACCESS-UNAVAILABLE" },
+    });
+    const failedRevoke = setup();
+    failedRevoke.revoke.mockRejectedValueOnce(new Error("private database detail"));
+    await expect(
+      failedRevoke.api.handle({
+        ...request,
+        path: "/v1/feedback/access-proof/revoke",
+      }),
+    ).resolves.toEqual({
       statusCode: 503,
       body: { error: "ERR-ACCESS-UNAVAILABLE" },
     });
