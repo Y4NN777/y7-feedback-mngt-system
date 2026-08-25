@@ -75,6 +75,12 @@ const workspaceAttachmentPath =
   /^\/v1\/workspaces\/([A-Za-z0-9][A-Za-z0-9._-]{0,35})\/projects\/([A-Za-z0-9][A-Za-z0-9._-]{0,35})\/attachments\/download$/u;
 const workspaceOperationPath =
   /^\/v1\/workspaces\/([A-Za-z0-9][A-Za-z0-9._-]{0,35})\/projects\/([A-Za-z0-9][A-Za-z0-9._-]{0,35})\/operations\/(feedback\/(?:read|search|aggregate)|notifications\/list|realtime\/authorize)$/u;
+type WorkspaceOperationAction =
+  | "feedback/read"
+  | "feedback/search"
+  | "feedback/aggregate"
+  | "notifications/list"
+  | "realtime/authorize";
 const appwriteId = /^[A-Za-z0-9][A-Za-z0-9._-]{0,35}$/u;
 
 function isObject(value: unknown): value is Readonly<Record<string, unknown>> {
@@ -259,11 +265,12 @@ export function createPublicApi(
     async handle(request) {
       const operationMatch = workspaceOperationPath.exec(request.path);
       if (request.method === "POST" && operationMatch) {
-        const [, workspaceId, projectId, action] = operationMatch;
+        const [, workspaceId, projectId, rawAction] = operationMatch;
+        const action = rawAction as WorkspaceOperationAction;
         let jwt: string;
         let body: Readonly<Record<string, unknown>>;
         try {
-          if (!workspaceId || !projectId || !action || !isObject(request.body)) {
+          if (!workspaceId || !projectId || !rawAction || !isObject(request.body)) {
             throw new Error("WORKSPACE_OPERATION_INVALID");
           }
           const bearer = /^Bearer ([^\s]+)$/u.exec(
@@ -318,9 +325,6 @@ export function createPublicApi(
             case "realtime/authorize": {
               outcome = await workspaceOperations.authorizeRealtime(scoped);
               break;
-            }
-            default: {
-              return null;
             }
           }
         } catch {

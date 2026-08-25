@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   createAppwriteWorkspaceProjectOperationPorts,
+  createNodeAppwriteWorkspaceProjectOperationPorts,
   type AppwriteWorkspaceProjectTablesPort,
 } from "./appwrite-workspace-project-ports";
 import { WorkspaceOperationDeniedError } from "./workspace-project-operations";
@@ -260,5 +261,202 @@ describe("Appwrite Workspace Project operation ports", () => {
     await expect(target.ports.feedback.search(scope, "foreign")).rejects.toThrow(
       "APPWRITE_WORKSPACE_OPERATION_UNAVAILABLE",
     );
+  });
+
+  it("rejects invalid schemas, scopes, commands, and identifiers", async () => {
+    const tables = setup();
+    for (const invalidSchema of [
+      { ...schema, databaseId: "bad id" },
+      { ...schema, feedbackTableId: "bad id" },
+      { ...schema, notificationsTableId: "bad id" },
+      { ...schema, notificationsTableId: schema.feedbackTableId },
+    ]) {
+      expect(() =>
+        createAppwriteWorkspaceProjectOperationPorts(
+          {
+            createRow: tables.createRow,
+            listRows: tables.listRows,
+            createTransaction: tables.createTransaction,
+            updateRow: tables.updateRow,
+            deleteRow: tables.deleteRow,
+            updateTransaction: tables.updateTransaction,
+          },
+          invalidSchema,
+          { equal: vi.fn(), limit: vi.fn() },
+          () => "feedback-a",
+        ),
+      ).toThrow("APPWRITE_WORKSPACE_OPERATION_SCHEMA_INVALID");
+    }
+
+    for (const invalidScope of [
+      { ...scope, principalId: "bad id" },
+      { ...scope, workspaceId: "bad id" },
+      { ...scope, projectId: "bad id" },
+    ]) {
+      await expect(setup().ports.feedback.aggregate(invalidScope)).rejects.toThrow(
+        "APPWRITE_WORKSPACE_OPERATION_INPUT_INVALID",
+      );
+    }
+
+    const target = setup();
+    await expect(target.ports.feedback.create(scope, {})).rejects.toThrow(
+      "APPWRITE_WORKSPACE_OPERATION_INPUT_INVALID",
+    );
+    await expect(
+      target.ports.feedback.create(
+        scope,
+        Object.fromEntries(
+          Array.from({ length: 33 }, (_, index) => [`key${String(index)}`, index]),
+        ),
+      ),
+    ).rejects.toThrow("APPWRITE_WORKSPACE_OPERATION_INPUT_INVALID");
+    await expect(
+      target.ports.feedback.create(scope, { $private: true }),
+    ).rejects.toThrow("APPWRITE_WORKSPACE_OPERATION_INPUT_INVALID");
+    await expect(target.ports.feedback.read(scope, "bad id")).rejects.toThrow(
+      "APPWRITE_WORKSPACE_OPERATION_INPUT_INVALID",
+    );
+    await expect(target.ports.feedback.search(scope, " ")).rejects.toThrow(
+      "APPWRITE_WORKSPACE_OPERATION_INPUT_INVALID",
+    );
+    await expect(target.ports.feedback.search(scope, "x".repeat(101))).rejects.toThrow(
+      "APPWRITE_WORKSPACE_OPERATION_INPUT_INVALID",
+    );
+    expect(() =>
+      target.ports.realtime.authorize({ ...scope, projectId: "bad id" }),
+    ).toThrow("APPWRITE_WORKSPACE_OPERATION_INPUT_INVALID");
+  });
+
+  it("fails closed for malformed create, transaction, aggregate, and notification results", async () => {
+    const invalidId = setup();
+    const invalidIdPorts = createAppwriteWorkspaceProjectOperationPorts(
+      {
+        createRow: invalidId.createRow,
+        listRows: invalidId.listRows,
+        createTransaction: invalidId.createTransaction,
+        updateRow: invalidId.updateRow,
+        deleteRow: invalidId.deleteRow,
+        updateTransaction: invalidId.updateTransaction,
+      },
+      schema,
+      {
+        equal: (attribute, values) => `${attribute}=${values.join(",")}`,
+        limit: (value) => `limit=${String(value)}`,
+      },
+      () => "bad id",
+    );
+    await expect(
+      invalidIdPorts.feedback.create(scope, { type: "bug" }),
+    ).rejects.toThrow("APPWRITE_WORKSPACE_OPERATION_UNAVAILABLE");
+
+    for (const row of [{}, { $id: "other-id" }, { $id: "bad id" }]) {
+      const target = setup();
+      target.createRow.mockResolvedValueOnce(row as never);
+      await expect(
+        target.ports.feedback.create(scope, { type: "bug" }),
+      ).rejects.toThrow("APPWRITE_WORKSPACE_OPERATION_UNAVAILABLE");
+    }
+    const rejectedCreate = setup();
+    rejectedCreate.createRow.mockRejectedValueOnce(new Error("private"));
+    await expect(
+      rejectedCreate.ports.feedback.create(scope, { type: "bug" }),
+    ).rejects.toThrow("APPWRITE_WORKSPACE_OPERATION_UNAVAILABLE");
+
+    const transaction = setup();
+    transaction.createTransaction.mockResolvedValueOnce({ $id: "bad id" });
+    await expect(
+      transaction.ports.feedback.update(scope, "feedback-a", { state: "closed" }),
+    ).rejects.toThrow("APPWRITE_WORKSPACE_OPERATION_UNAVAILABLE");
+
+    const rollback = setup();
+    rollback.listRows.mockResolvedValueOnce({ rows: [], total: 0 });
+    rollback.updateTransaction.mockRejectedValueOnce(new Error("rollback failed"));
+    await expect(rollback.ports.feedback.delete(scope, "feedback-a")).rejects.toEqual(
+      new WorkspaceOperationDeniedError(),
+    );
+
+    for (const total of [-1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+      const target = setup();
+      target.listRows.mockResolvedValueOnce({ rows: [], total });
+      await expect(target.ports.feedback.aggregate(scope)).rejects.toThrow(
+        "APPWRITE_WORKSPACE_OPERATION_UNAVAILABLE",
+      );
+    }
+
+    const empty = setup();
+    await expect(empty.ports.notifications.list(scope)).resolves.toEqual({ ids: [] });
+
+    const badFeedback = setup();
+    badFeedback.listRows.mockResolvedValueOnce({ rows: [{}], total: 1 });
+    await expect(badFeedback.ports.notifications.list(scope)).rejects.toThrow(
+      "APPWRITE_WORKSPACE_OPERATION_UNAVAILABLE",
+    );
+
+    for (const notification of [
+      {},
+      { $id: "bad id", feedbackId: "feedback-a" },
+      { $id: "notification-a", feedbackId: 7 },
+      { $id: "notification-a", feedbackId: "feedback-b" },
+    ]) {
+      const target = setup();
+      target.listRows
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              $id: "feedback-a",
+              workspaceId: scope.workspaceId,
+              projectId: scope.projectId,
+            },
+          ],
+          total: 1,
+        })
+        .mockResolvedValueOnce({ rows: [notification], total: 1 });
+      await expect(target.ports.notifications.list(scope)).rejects.toThrow(
+        "APPWRITE_WORKSPACE_OPERATION_UNAVAILABLE",
+      );
+    }
+  });
+
+  it("adapts the Node Appwrite TablesDB surface without leaking mutable arrays", async () => {
+    const createRow = vi.fn(() => Promise.resolve({ $id: "feedback-new" }));
+    const listRows = vi.fn(() =>
+      Promise.resolve({
+        rows: [
+          {
+            $id: "feedback-a",
+            workspaceId: scope.workspaceId,
+            projectId: scope.projectId,
+          },
+        ],
+        total: 1,
+      }),
+    );
+    const createTransaction = vi.fn(() => Promise.resolve({ $id: "transaction-a" }));
+    const updateRow = vi.fn(() => Promise.resolve({ $id: "feedback-a" }));
+    const deleteRow = vi.fn(() => Promise.resolve());
+    const updateTransaction = vi.fn(() => Promise.resolve({}));
+    const ports = createNodeAppwriteWorkspaceProjectOperationPorts(
+      {
+        createRow,
+        listRows,
+        createTransaction,
+        updateRow,
+        deleteRow,
+        updateTransaction,
+      } as never,
+      schema,
+      () => "feedback-new",
+    );
+
+    await ports.feedback.create(scope, { type: "bug" });
+    await ports.feedback.read(scope, "feedback-a");
+    await ports.feedback.update(scope, "feedback-a", { state: "closed" });
+    await ports.feedback.delete(scope, "feedback-a");
+    expect(createRow).toHaveBeenCalledOnce();
+    expect(listRows).toHaveBeenCalledTimes(3);
+    expect(createTransaction).toHaveBeenCalledTimes(2);
+    expect(updateRow).toHaveBeenCalledOnce();
+    expect(deleteRow).toHaveBeenCalledOnce();
+    expect(updateTransaction).toHaveBeenCalledTimes(2);
   });
 });
