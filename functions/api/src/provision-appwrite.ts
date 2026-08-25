@@ -10,15 +10,17 @@ import {
 import { createAppwriteInfrastructureManifest } from "./appwrite-schema.js";
 import { createNodeAppwriteG1FixtureStore } from "./appwrite-g1-fixtures-node.js";
 import { createG1FixtureRows, seedG1Fixtures } from "./appwrite-g1-fixtures.js";
+import { resolveAppwriteProvisioningMode } from "./appwrite-provisioning-mode.js";
 
 async function main(): Promise<void> {
   if (!process.argv.includes("--apply")) {
     throw new Error("APPWRITE_PROVISION_APPLY_REQUIRED");
   }
   const config = parseServerConfig(process.env);
-  if (config.environment === "production") {
-    throw new Error("APPWRITE_PROVISION_NON_PRODUCTION_REQUIRED");
-  }
+  const mode = resolveAppwriteProvisioningMode(
+    config.environment,
+    process.argv.includes("--production"),
+  );
 
   const client = new Client()
     .setEndpoint(config.appwriteEndpoint)
@@ -30,10 +32,12 @@ async function main(): Promise<void> {
     port,
     createAppwriteInfrastructureManifest(config.appwriteSchema),
   );
-  const fixtures = await seedG1Fixtures(
-    createNodeAppwriteG1FixtureStore(tables, config.appwriteSchema.databaseId),
-    createG1FixtureRows(config.appwriteSchema),
-  );
+  const fixtures = mode.seedFixtures
+    ? await seedG1Fixtures(
+        createNodeAppwriteG1FixtureStore(tables, config.appwriteSchema.databaseId),
+        createG1FixtureRows(config.appwriteSchema),
+      )
+    : null;
   process.stdout.write(
     `${JSON.stringify({
       status: "ok",
