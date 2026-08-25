@@ -6,6 +6,7 @@ import { parseServerConfig } from "@y7-feedback/config/server";
 
 import { createAppwriteFunctionPublicApi } from "./appwrite-function-public-api.js";
 import { previewFunctionId } from "./appwrite-function-variables.js";
+import { createHttpFunctionPublicApi } from "./http-function-public-api.js";
 import type { PublicApiResponse } from "./public-api.js";
 
 const workspaceId = "workspace_alpha";
@@ -68,28 +69,35 @@ async function main(): Promise<void> {
     throw new Error("APPWRITE_DEPLOYED_G1_NON_PRODUCTION_REQUIRED");
   }
 
+  const directDomain = process.argv.includes("--domain");
+
   const publicFunctions = new Functions(
     new Client()
       .setEndpoint(config.appwriteEndpoint)
       .setProject(config.appwriteProjectId),
   );
-  const api = createAppwriteFunctionPublicApi({
-    execute: async ({ body, method, path, headers }) => {
-      const execution = await publicFunctions.createExecution({
-        functionId: previewFunctionId,
-        body,
-        async: false,
-        xpath: path,
-        method: method as ExecutionMethod,
-        headers,
+  const api = directDomain
+    ? createHttpFunctionPublicApi({
+        baseUrl: process.env.Y7_FUNCTION_DOMAIN_URL ?? "",
+        fetch,
+      })
+    : createAppwriteFunctionPublicApi({
+        execute: async ({ body, method, path, headers }) => {
+          const execution = await publicFunctions.createExecution({
+            functionId: previewFunctionId,
+            body,
+            async: false,
+            xpath: path,
+            method: method as ExecutionMethod,
+            headers,
+          });
+          return {
+            status: execution.status,
+            responseStatusCode: execution.responseStatusCode,
+            responseBody: execution.responseBody,
+          };
+        },
       });
-      return {
-        status: execution.status,
-        responseStatusCode: execution.responseStatusCode,
-        responseBody: execution.responseBody,
-      };
-    },
-  });
   const tables = new TablesDB(
     new Client()
       .setEndpoint(config.appwriteEndpoint)
@@ -291,6 +299,77 @@ async function main(): Promise<void> {
       throw new Error("APPWRITE_DEPLOYED_G1_RETRIEVAL_INVALID");
     }
 
+    const rotated = expectResponse(
+      await api.handle({
+        method: "POST",
+        path: "/v1/feedback/access-proof/rotate",
+        headers: { authorization: `FeedbackProof ${accessProof}` },
+        body: { reference },
+      }),
+      200,
+    );
+    if (
+      rotated.status !== "ok" ||
+      rotated.reference !== reference ||
+      typeof rotated.accessProof !== "string" ||
+      rotated.accessProof === accessProof
+    ) {
+      throw new Error("APPWRITE_DEPLOYED_G1_ROTATION_INVALID");
+    }
+
+    const oldProof = expectResponse(
+      await api.handle({
+        method: "POST",
+        path: "/v1/feedback/retrieve",
+        headers: { authorization: `FeedbackProof ${accessProof}` },
+        body: { reference },
+      }),
+      404,
+    );
+    if (oldProof.error !== "ERR-ACCESS-DENIED") {
+      throw new Error("APPWRITE_DEPLOYED_G1_OLD_PROOF_INVALID");
+    }
+
+    const rotatedProof = rotated.accessProof;
+    const rotatedRetrieval = expectResponse(
+      await api.handle({
+        method: "POST",
+        path: "/v1/feedback/retrieve",
+        headers: { authorization: `FeedbackProof ${rotatedProof}` },
+        body: { reference },
+      }),
+      200,
+    );
+    if (rotatedRetrieval.status !== "ok") {
+      throw new Error("APPWRITE_DEPLOYED_G1_ROTATED_PROOF_INVALID");
+    }
+
+    const revoked = expectResponse(
+      await api.handle({
+        method: "POST",
+        path: "/v1/feedback/access-proof/revoke",
+        headers: { authorization: `FeedbackProof ${rotatedProof}` },
+        body: { reference },
+      }),
+      200,
+    );
+    if (revoked.status !== "ok") {
+      throw new Error("APPWRITE_DEPLOYED_G1_REVOCATION_INVALID");
+    }
+
+    const revokedProof = expectResponse(
+      await api.handle({
+        method: "POST",
+        path: "/v1/feedback/retrieve",
+        headers: { authorization: `FeedbackProof ${rotatedProof}` },
+        body: { reference },
+      }),
+      404,
+    );
+    if (revokedProof.error !== "ERR-ACCESS-DENIED") {
+      throw new Error("APPWRITE_DEPLOYED_G1_REVOKED_PROOF_INVALID");
+    }
+
     const discovered = await discover();
     const { feedback, grant, idempotency, outbox, reporter } = discovered;
     const serialized = JSON.stringify([reporter, feedback, grant, outbox, idempotency]);
@@ -341,7 +420,7 @@ async function main(): Promise<void> {
   process.stdout.write(
     `${JSON.stringify({
       status: "ok",
-      publicExecution: true,
+      transport: directDomain ? "direct-domain" : "public-execution",
       unavailableProjectDenied: true,
       invalidInputDenied: true,
       accepted: true,
@@ -350,6 +429,11 @@ async function main(): Promise<void> {
       referenceOnlyDenied: true,
       invalidProofDenied: true,
       authorizedRetrieval: true,
+      rotated: true,
+      oldProofDenied: true,
+      rotatedProofAuthorized: true,
+      revoked: true,
+      revokedProofDenied: true,
       sensitiveRowsEncrypted: true,
       cleanedRows,
     })}\n`,
