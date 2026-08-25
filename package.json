@@ -24,6 +24,8 @@
     "verify:appwrite:deployed:g1:domain": "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build && node --env-file=.env.appwrite-preview functions/api/dist/verify-appwrite-deployed-g1.js --apply --domain",
     "verify:appwrite:g2:attachments": "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build && node --env-file=.env.appwrite-preview functions/api/dist/verify-appwrite-g2-attachment.js --apply",
     "verify:appwrite:direct-access": "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build && node --env-file=.env.appwrite-preview functions/api/dist/verify-appwrite-direct-access.js --apply",
+    "verify:appwrite:workspace-operations": "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build && node --env-file=.env.appwrite-preview functions/api/dist/verify-appwrite-workspace-operations.js --apply",
+    "verify:appwrite:workspace-operations:domain": "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build && node --env-file=.env.appwrite-preview functions/api/dist/verify-appwrite-workspace-operations.js --apply --domain",
     "security:scan": "node scripts/security-scan.mjs",
     "test": "pnpm test:runtime-deps && node --test tests/*.test.mjs && pnpm -r --if-present test",
     "test:coverage": "pnpm test:runtime-deps && node --test tests/*.test.mjs && pnpm -r --if-present test:coverage",
