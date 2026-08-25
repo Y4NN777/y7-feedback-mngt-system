@@ -37,14 +37,16 @@ test("BDD-VER-DEPLOYED-001 accepts a public SPA deep link with safe cache policy
       });
     }
 
-    return response(
-      '<!doctype html><script type="module" src="/assets/index-a1b2c3.js"></script>',
-      {
-        ...securityHeaders,
-        "cache-control": "public, max-age=0, must-revalidate",
-        "content-type": "text/html; charset=utf-8",
-      },
-    );
+    const shell =
+      '<!doctype html><script type="module" src="/assets/index-a1b2c3.js"></script>';
+    const vercelToolbar =
+      '<script async data-explicit-opt-in="true" data-deployment-id="deployment" src="https://vercel.live/_next-live/feedback/feedback.js"></script>';
+
+    return response(path === "/" ? `${shell}\n${vercelToolbar}` : `${shell}\n`, {
+      ...securityHeaders,
+      "cache-control": "public, max-age=0, must-revalidate",
+      "content-type": "text/html; charset=utf-8",
+    });
   };
 
   const result = await runVercelPreviewProbe({
