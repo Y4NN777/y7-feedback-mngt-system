@@ -12,6 +12,7 @@ import {
 
 import type { AccountlessAccessCoordinator } from "./accountless-access.js";
 import type { IntakeCoordinator, IntakeOutcome } from "./intake.js";
+import type { ReporterAttachmentDownload } from "./reporter-attachment-download.js";
 
 export interface PublicProject {
   readonly slug: string;
@@ -33,10 +34,21 @@ export interface PublicApiRequest {
   readonly body: unknown;
 }
 
-export interface PublicApiResponse {
-  readonly statusCode: number;
-  readonly body: unknown;
-}
+export type PublicApiResponse =
+  | {
+      readonly statusCode: number;
+      readonly body: unknown;
+      readonly binary?: never;
+    }
+  | {
+      readonly statusCode: 200;
+      readonly body?: never;
+      readonly binary: {
+        readonly bytes: Uint8Array;
+        readonly displayName: string;
+        readonly mediaType: string;
+      };
+    };
 
 export interface PublicApi {
   handle(request: PublicApiRequest): Promise<PublicApiResponse | null>;
@@ -221,9 +233,57 @@ export function createPublicApi(
   projects: PublicProjectReader,
   intake: IntakeCoordinator,
   access: AccountlessAccessCoordinator,
+  reporterAttachmentDownload?: ReporterAttachmentDownload,
 ): PublicApi {
   return {
     async handle(request) {
+      if (
+        request.method === "POST" &&
+        request.path === "/v1/feedback/attachments/download"
+      ) {
+        let authorizedRequest: {
+          readonly attachmentId: string;
+          readonly reference: string;
+          readonly proof: string;
+        };
+        try {
+          if (!isObject(request.body)) throw new Error("PUBLIC_ACCESS_INVALID");
+          authorizedRequest = {
+            ...accessRequest(request),
+            attachmentId: requiredString(
+              request.body.attachmentId,
+              200,
+              "PUBLIC_ACCESS_INVALID",
+            ),
+          };
+        } catch {
+          return { statusCode: 404, body: { error: "ERR-ATTACHMENT-DENIED" } };
+        }
+        if (!reporterAttachmentDownload) {
+          return {
+            statusCode: 503,
+            body: { error: "ERR-ATTACHMENT-UNAVAILABLE" },
+          };
+        }
+        const outcome = await reporterAttachmentDownload(authorizedRequest);
+        if (outcome.status === "available") {
+          return {
+            statusCode: 200,
+            binary: {
+              bytes: outcome.bytes,
+              displayName: outcome.displayName,
+              mediaType: outcome.mediaType,
+            },
+          };
+        }
+        return outcome.status === "denied"
+          ? { statusCode: 404, body: { error: "ERR-ATTACHMENT-DENIED" } }
+          : {
+              statusCode: 503,
+              body: { error: "ERR-ATTACHMENT-UNAVAILABLE" },
+            };
+      }
+
       if (
         request.method === "POST" &&
         request.path === "/v1/feedback/access-proof/rotate"

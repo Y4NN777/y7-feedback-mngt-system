@@ -8,6 +8,7 @@ import type {
 
 import type { AccountlessAccessCoordinator } from "./accountless-access";
 import type { IntakeCommand, IntakeCoordinator } from "./intake";
+import type { ReporterAttachmentDownload } from "./reporter-attachment-download";
 import {
   createPublicApi,
   type PublicProject,
@@ -97,6 +98,7 @@ function setup(
     readonly revokeOutcome?: Awaited<
       ReturnType<AccountlessAccessCoordinator["revoke"]>
     >;
+    readonly attachmentOutcome?: Awaited<ReturnType<ReporterAttachmentDownload>>;
   } = {},
 ) {
   const accept = vi.fn<
@@ -127,6 +129,17 @@ function setup(
   const revoke = vi.fn<AccountlessAccessCoordinator["revoke"]>(() =>
     Promise.resolve(options.revokeOutcome ?? { status: "ok" }),
   );
+  const reporterAttachmentDownload = vi.fn<ReporterAttachmentDownload>(() =>
+    Promise.resolve(
+      options.attachmentOutcome ?? {
+        status: "available",
+        attachmentId: "attachment-1",
+        displayName: "preuve épargne.txt",
+        mediaType: "text/plain; charset=utf-8",
+        bytes: new TextEncoder().encode("evidence"),
+      },
+    ),
+  );
   const findBySlug = vi.fn(() =>
     Promise.resolve(
       options.resolvedProject === undefined ? project : options.resolvedProject,
@@ -135,6 +148,7 @@ function setup(
   const projects: PublicProjectReader = { findBySlug };
   const intake: IntakeCoordinator = { accept };
   const access: AccountlessAccessCoordinator = {
+    authorize: () => Promise.resolve({ status: "denied", code: "ACCESS_DENIED" }),
     retrieve,
     rotate,
     revoke,
@@ -143,12 +157,13 @@ function setup(
   return {
     access,
     accept,
-    api: createPublicApi(projects, intake, access),
+    api: createPublicApi(projects, intake, access, reporterAttachmentDownload),
     findBySlug,
     projects,
     retrieve,
     rotate,
     revoke,
+    reporterAttachmentDownload,
   };
 }
 
@@ -548,6 +563,123 @@ describe("trusted public Function boundary", () => {
       body: { status: "ok", feedback: reporterView() },
     });
     expect(JSON.stringify(response)).not.toContain("forged-body-proof");
+  });
+
+  it("BDD-ATT-DEPLOYED-004 returns a bounded binary response after proof authorization", async () => {
+    const { api, reporterAttachmentDownload } = setup();
+    const response = await api.handle({
+      method: "POST",
+      path: "/v1/feedback/attachments/download",
+      headers: {
+        authorization:
+          "FeedbackProof proof_abcdefghijklmnopqrstuvwxyz_0123456789ABCDEFG",
+      },
+      body: {
+        reference: "Y7-2026-000001",
+        attachmentId: "attachment-1",
+        proof: "forged-body-proof",
+      },
+    });
+
+    expect(reporterAttachmentDownload).toHaveBeenCalledWith({
+      reference: "Y7-2026-000001",
+      proof: "proof_abcdefghijklmnopqrstuvwxyz_0123456789ABCDEFG",
+      attachmentId: "attachment-1",
+    });
+    expect(response).toEqual({
+      statusCode: 200,
+      binary: {
+        bytes: new TextEncoder().encode("evidence"),
+        displayName: "preuve épargne.txt",
+        mediaType: "text/plain; charset=utf-8",
+      },
+    });
+    expect(JSON.stringify(response)).not.toContain("forged-body-proof");
+  });
+
+  it("uses one Attachment denial for malformed, invalid proof, missing, and sibling access", async () => {
+    for (const request of [
+      { headers: {}, body: { reference: "Y7-2026-000001", attachmentId: "a" } },
+      {
+        headers: {
+          authorization:
+            "FeedbackProof proof_abcdefghijklmnopqrstuvwxyz_0123456789ABCDEFG",
+        },
+        body: null,
+      },
+      {
+        headers: {
+          authorization:
+            "FeedbackProof proof_abcdefghijklmnopqrstuvwxyz_0123456789ABCDEFG",
+        },
+        body: { reference: "Y7-2026-000001", attachmentId: " " },
+      },
+    ]) {
+      const { api, reporterAttachmentDownload } = setup();
+      await expect(
+        api.handle({
+          method: "POST",
+          path: "/v1/feedback/attachments/download",
+          ...request,
+        }),
+      ).resolves.toEqual({
+        statusCode: 404,
+        body: { error: "ERR-ATTACHMENT-DENIED" },
+      });
+      expect(reporterAttachmentDownload).not.toHaveBeenCalled();
+    }
+
+    for (const attachmentOutcome of [
+      { status: "denied" as const, code: "ATTACHMENT_ACCESS_DENIED" as const },
+      {
+        status: "retryable" as const,
+        code: "ATTACHMENT_DOWNLOAD_UNAVAILABLE" as const,
+      },
+    ]) {
+      const { api } = setup({ attachmentOutcome });
+      await expect(
+        api.handle({
+          method: "POST",
+          path: "/v1/feedback/attachments/download",
+          headers: {
+            authorization:
+              "FeedbackProof proof_abcdefghijklmnopqrstuvwxyz_0123456789ABCDEFG",
+          },
+          body: { reference: "Y7-2026-000001", attachmentId: "attachment-1" },
+        }),
+      ).resolves.toEqual(
+        attachmentOutcome.status === "denied"
+          ? { statusCode: 404, body: { error: "ERR-ATTACHMENT-DENIED" } }
+          : {
+              statusCode: 503,
+              body: { error: "ERR-ATTACHMENT-UNAVAILABLE" },
+            },
+      );
+    }
+  });
+
+  it("fails closed when the Reporter Attachment capability is unavailable", async () => {
+    const current = setup();
+    const api = createPublicApi(
+      current.projects,
+      { accept: current.accept },
+      current.access,
+    );
+
+    await expect(
+      api.handle({
+        method: "POST",
+        path: "/v1/feedback/attachments/download",
+        headers: {
+          authorization:
+            "FeedbackProof proof_abcdefghijklmnopqrstuvwxyz_0123456789ABCDEFG",
+        },
+        body: { reference: "Y7-2026-000001", attachmentId: "attachment-1" },
+      }),
+    ).resolves.toEqual({
+      statusCode: 503,
+      body: { error: "ERR-ATTACHMENT-UNAVAILABLE" },
+    });
   });
 
   it("uses one denial for malformed, reference-only, and unknown access, with distinct retry", async () => {

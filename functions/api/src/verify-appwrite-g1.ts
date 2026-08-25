@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID } from "node:crypto";
 
-import { Client, TablesDB } from "node-appwrite";
+import { Client, Storage, TablesDB } from "node-appwrite";
 
 import { parseServerConfig } from "@y7-feedback/config/server";
 
@@ -147,8 +147,10 @@ async function main(): Promise<void> {
     .setProject(config.appwriteProjectId)
     .setKey(config.appwriteApiKey);
   const tables = instrument(new TablesDB(client));
+  const storage = new Storage(client);
   const dependencies = createHttpApplication(config, {
     tables,
+    storage,
     createId: () => {
       const id = idQueue.shift();
       if (!id) throw new Error("APPWRITE_G1_ID_SEQUENCE_INVALID");
@@ -197,6 +199,7 @@ async function main(): Promise<void> {
   );
   const rollbackDependencies = createHttpApplication(config, {
     tables: rollbackTables,
+    storage,
     createId: () => {
       const id = rollbackIdQueue.shift();
       if (!id) throw new Error("APPWRITE_G1_ID_SEQUENCE_INVALID");
@@ -228,6 +231,7 @@ async function main(): Promise<void> {
   let referenceIndex = 0;
   const outboxDependencies = createHttpApplication(config, {
     tables,
+    storage,
     createId: () => {
       const id = outboxIdQueue.shift();
       if (!id) throw new Error("APPWRITE_G1_ID_SEQUENCE_INVALID");

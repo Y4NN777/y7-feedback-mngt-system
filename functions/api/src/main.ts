@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID } from "node:crypto";
 
-import { Client, ID, TablesDB } from "node-appwrite";
+import { Client, ID, Storage, TablesDB } from "node-appwrite";
 
 import { parseServerConfig } from "@y7-feedback/config/server";
 
@@ -21,6 +21,7 @@ export default function handler(context: FunctionContext): Promise<unknown> {
   const tables = new TablesDB(client);
   const dependencies = createHttpApplication(config, {
     tables,
+    storage: new Storage(client),
     createId: () => ID.unique(),
     createReference: () =>
       `Y7-${String(new Date().getUTCFullYear())}-${randomBytes(6).toString("hex").toUpperCase()}`,

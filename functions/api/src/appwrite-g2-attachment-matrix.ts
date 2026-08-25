@@ -44,6 +44,22 @@ export interface AppwriteG2AttachmentResult {
   readonly siblingDenied: true;
   readonly removedObject: true;
   readonly cleanedRows: 8;
+  readonly deployedAuthorizedDownload?: true;
+  readonly deployedSiblingDenied?: true;
+}
+
+export interface AppwriteG2DeployedAttachmentFixture {
+  readonly attachmentId: string;
+  readonly reference: string;
+  readonly accessProof: string;
+  readonly bytes: Uint8Array;
+  readonly displayName: string;
+  readonly mediaType: string;
+}
+
+export interface AppwriteG2DeployedAttachmentResult {
+  readonly authorizedDownload: boolean;
+  readonly siblingDenied: boolean;
 }
 
 const bytes = new TextEncoder().encode("Y7 attachment evidence\n");
@@ -63,7 +79,7 @@ function derivedId(prefix: "att" | "stg", objectId: string): string {
 async function acceptFeedback(
   api: PublicApi,
   clientOperationId: string,
-): Promise<void> {
+): Promise<{ readonly reference: string; readonly accessProof: string }> {
   const response = await api.handle({
     method: "POST",
     path: "/v1/projects/wisemoney/feedback",
@@ -84,10 +100,16 @@ async function acceptFeedback(
     response?.statusCode !== 201 ||
     !isObject(response.body) ||
     response.body.status !== "accepted" ||
-    response.body.replayed !== false
+    response.body.replayed !== false ||
+    typeof response.body.reference !== "string" ||
+    typeof response.body.accessProof !== "string"
   ) {
     throw new Error("APPWRITE_G2_ATTACHMENT_PARENT_FAILED");
   }
+  return {
+    reference: response.body.reference,
+    accessProof: response.body.accessProof,
+  };
 }
 
 export async function runAppwriteG2AttachmentMatrix(
@@ -98,6 +120,9 @@ export async function runAppwriteG2AttachmentMatrix(
   artifacts: AppwriteG2AttachmentArtifacts,
   schema: AppwriteG2AttachmentSchema,
   input: AppwriteG2AttachmentInput,
+  deployedEvidence?: (
+    fixture: AppwriteG2DeployedAttachmentFixture,
+  ) => Promise<AppwriteG2DeployedAttachmentResult>,
 ): Promise<AppwriteG2AttachmentResult> {
   const feedbackRows = appwriteG1SyntheticRows(
     schema,
@@ -113,7 +138,7 @@ export async function runAppwriteG2AttachmentMatrix(
   let result:
     Omit<AppwriteG2AttachmentResult, "removedObject" | "cleanedRows"> | undefined;
   try {
-    await acceptFeedback(api, input.intakeOperationId);
+    const access = await acceptFeedback(api, input.intakeOperationId);
     const acceptance = await saga.accept({
       operationId: input.attachmentOperationId,
       feedbackId: input.intakeIds.feedbackId,
@@ -190,12 +215,34 @@ export async function runAppwriteG2AttachmentMatrix(
     if (sibling.status !== "denied") {
       throw new Error("APPWRITE_G2_ATTACHMENT_DENIAL_FAILED");
     }
+    const deployed = deployedEvidence
+      ? await deployedEvidence({
+          attachmentId: input.attachmentId,
+          reference: access.reference,
+          accessProof: access.accessProof,
+          bytes,
+          displayName: "evidence.txt",
+          mediaType: "text/plain; charset=utf-8",
+        })
+      : undefined;
+    if (
+      deployed !== undefined &&
+      (!deployed.authorizedDownload || !deployed.siblingDenied)
+    ) {
+      throw new Error("APPWRITE_G2_ATTACHMENT_DEPLOYED_FAILED");
+    }
     result = {
       accepted: true,
       privateFile: true,
       metadataEncrypted: true,
       authorizedDownload: true,
       siblingDenied: true,
+      ...(deployed === undefined
+        ? {}
+        : {
+            deployedAuthorizedDownload: true as const,
+            deployedSiblingDenied: true as const,
+          }),
     };
   } catch (error: unknown) {
     failure = error;

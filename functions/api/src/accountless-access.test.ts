@@ -93,6 +93,17 @@ function setup() {
 }
 
 describe("trusted accountless access coordination", () => {
+  it("BDD-ATT-DEPLOYED-001 derives an authorized Feedback identity without exposing the proof", async () => {
+    const { coordinator } = setup();
+
+    await expect(
+      coordinator.authorize({ reference: "Y7-2026-000001", proof: proofA }),
+    ).resolves.toEqual({ status: "ok", feedbackId: "feedback-1" });
+    await expect(
+      coordinator.authorize({ reference: "Y7-2026-000001", proof: proofB }),
+    ).resolves.toEqual({ status: "denied", code: "ACCESS_DENIED" });
+  });
+
   it("retrieves only the Reporter-safe projection with a valid Feedback proof", async () => {
     const { coordinator } = setup();
 
