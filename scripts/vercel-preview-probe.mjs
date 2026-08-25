@@ -50,6 +50,8 @@ export function inspectVercelPreview({
   manifest,
   serviceWorker,
   asset,
+  reservedApi,
+  reservedApiBody,
 }) {
   for (const [name, response] of Object.entries({
     root,
@@ -74,6 +76,9 @@ export function inspectVercelPreview({
     securityHeaders: [root, deepLink, manifest, serviceWorker, asset].every(
       hasSecurityHeaders,
     ),
+    reservedApiDenied:
+      reservedApi.status === 404 &&
+      applicationShell(reservedApiBody) !== applicationShell(rootBody),
   };
 
   if (Object.values(checks).some((passed) => !passed)) {
@@ -100,6 +105,8 @@ export async function runVercelPreviewProbe({ baseUrl, deepLink, fetchImpl = fet
   const manifest = await request("/manifest.webmanifest");
   const serviceWorker = await request("/sw.js");
   const asset = await request(assetPathFrom(rootBody));
+  const reservedApi = await request("/api/private");
+  const reservedApiBody = await reservedApi.text();
 
   return inspectVercelPreview({
     root,
@@ -109,6 +116,8 @@ export async function runVercelPreviewProbe({ baseUrl, deepLink, fetchImpl = fet
     manifest,
     serviceWorker,
     asset,
+    reservedApi,
+    reservedApiBody,
   });
 }
 
