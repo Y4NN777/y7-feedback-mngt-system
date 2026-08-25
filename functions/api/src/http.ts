@@ -8,6 +8,7 @@ export interface FunctionRequest {
   readonly path: string;
   readonly headers?: Readonly<Record<string, string | undefined>>;
   readonly bodyJson?: unknown;
+  readonly bodyBinary?: Uint8Array;
 }
 
 export interface FunctionResponse {
@@ -42,10 +43,36 @@ const defaultDependencies: HttpDependencies = {
   startedAt: Date.now,
 };
 
+const TEN_MEBIBYTES = 10 * 1024 * 1024;
+
+function ingressProbe(
+  req: FunctionRequest,
+):
+  | { readonly statusCode: 200; readonly body: unknown }
+  | { readonly statusCode: 400; readonly body: unknown } {
+  const contentType = req.headers?.["content-type"] ?? "";
+  const fileBytes = Number(req.headers?.["x-y7-ingress-file-bytes"]);
+  const totalBytes = Number(req.headers?.["x-y7-ingress-total-bytes"]);
+  const actualBytes = req.bodyBinary?.byteLength;
+  const valid =
+    contentType.startsWith("multipart/form-data; boundary=") &&
+    fileBytes === TEN_MEBIBYTES &&
+    Number.isSafeInteger(totalBytes) &&
+    totalBytes > fileBytes &&
+    actualBytes === totalBytes;
+
+  return valid
+    ? { statusCode: 200, body: { accepted: true, fileBytes, totalBytes } }
+    : { statusCode: 400, body: { error: "ERR-INGRESS-PROBE-INVALID" } };
+}
+
 export async function routeRequest(
   { req, res, log }: FunctionContext,
   dependencies: HttpDependencies = defaultDependencies,
 ): Promise<unknown> {
+  const method = req.method.toUpperCase();
+  const requestHeaders = req.headers ?? {};
+  const contentType = requestHeaders["content-type"] ?? "";
   const startedAt = dependencies.startedAt();
   const correlationId = dependencies.createCorrelationId();
   const headers = {
@@ -53,20 +80,36 @@ export async function routeRequest(
     "x-correlation-id": correlationId,
   } as const;
 
-  const isHealth = req.method === "GET" && req.path === "/health";
-  const publicResponse = isHealth
-    ? null
-    : await dependencies.publicApi?.handle({
-        method: req.method,
-        path: req.path,
-        headers: req.headers ?? {},
-        body: req.bodyJson,
-      });
-  const statusCode = isHealth ? 200 : (publicResponse?.statusCode ?? 404);
-  const operation = isHealth ? "health" : publicResponse ? "public_api" : "unknown";
+  const isHealth = method === "GET" && req.path === "/health";
+  const isIngressProbe =
+    dependencies.environment === "preview" &&
+    method === "POST" &&
+    req.path === "/operational/ingress-probe";
+  const probeResponse = isIngressProbe ? ingressProbe(req) : null;
+  const publicResponse =
+    isHealth || isIngressProbe
+      ? null
+      : await dependencies.publicApi?.handle({
+          method,
+          path: req.path,
+          headers: requestHeaders,
+          body: contentType.startsWith("multipart/form-data")
+            ? undefined
+            : req.bodyJson,
+        });
+  const statusCode = isHealth
+    ? 200
+    : (probeResponse?.statusCode ?? publicResponse?.statusCode ?? 404);
+  const operation = isHealth
+    ? "health"
+    : probeResponse
+      ? "ingress_probe"
+      : publicResponse
+        ? "public_api"
+        : "unknown";
   const outcome = isHealth
     ? "success"
-    : publicResponse
+    : (probeResponse ?? publicResponse)
       ? statusCode < 400
         ? "success"
         : "rejected"
@@ -86,6 +129,10 @@ export async function routeRequest(
 
   if (isHealth) {
     return res.json({ status: "ok" }, statusCode, headers);
+  }
+
+  if (probeResponse) {
+    return res.json(probeResponse.body, probeResponse.statusCode, headers);
   }
 
   if (publicResponse) {
