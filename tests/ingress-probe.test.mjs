@@ -17,15 +17,19 @@ test("BDD-ATT-001 builds exactly 10 MiB plus deterministic multipart overhead", 
   assert.equal(first.contentType, "multipart/form-data; boundary=y7-boundary");
 });
 
-test("BDD-ATT-002 reports success without response or authorization content", async () => {
+test("BDD-ATT-002 reports success without response content", async () => {
   const fetch = async (_url, request) => {
     assert.equal(request.body.byteLength, Number(request.headers["content-length"]));
-    assert.match(request.headers.authorization, /^Bearer /u);
+    assert.equal(request.headers["x-y7-ingress-file-bytes"], String(TEN_MEBIBYTES));
+    assert.equal(
+      request.headers["x-y7-ingress-total-bytes"],
+      String(request.body.byteLength),
+    );
+    assert.equal(request.headers.authorization, undefined);
     return { ok: true, status: 202 };
   };
 
   const result = await runIngressProbe({
-    authorization: "Bearer probe-secret-do-not-report",
     boundary: "y7-boundary",
     fetch,
     url: "https://function.example/probe",
@@ -43,7 +47,6 @@ test("BDD-ATT-002 reports success without response or authorization content", as
 
 test("BDD-ATT-002 reduces rejection and timeout to bounded facts", async () => {
   const rejected = await runIngressProbe({
-    authorization: "Bearer hidden",
     boundary: "y7-boundary",
     fetch: async () => ({
       ok: false,
@@ -53,7 +56,6 @@ test("BDD-ATT-002 reduces rejection and timeout to bounded facts", async () => {
     url: "https://function.example/probe",
   });
   const timedOut = await runIngressProbe({
-    authorization: "Bearer hidden",
     boundary: "y7-boundary",
     fetch: async () => {
       throw new Error("private-timeout-do-not-report");

@@ -23,7 +23,6 @@ export function buildMultipartProbe(boundary, fileBytes = TEN_MEBIBYTES) {
 }
 
 export async function runIngressProbe({
-  authorization,
   boundary,
   fetch: fetchImplementation,
   timeoutMs = 30_000,
@@ -42,9 +41,10 @@ export async function runIngressProbe({
       method: "POST",
       body: probe.body,
       headers: {
-        authorization,
         "content-length": String(probe.body.byteLength),
         "content-type": probe.contentType,
+        "x-y7-ingress-file-bytes": String(probe.fileBytes),
+        "x-y7-ingress-total-bytes": String(probe.body.byteLength),
       },
       signal: AbortSignal.timeout(timeoutMs),
     });
@@ -56,13 +56,11 @@ export async function runIngressProbe({
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const url = process.env.Y7_INGRESS_PROBE_URL;
-  const authorization = process.env.Y7_INGRESS_PROBE_AUTHORIZATION;
-  if (!url || !authorization) {
+  if (!url) {
     console.error("ingress-probe: CONFIG_MISSING");
     process.exitCode = 1;
   } else {
     const result = await runIngressProbe({
-      authorization,
       boundary: "y7-feedback-ingress-probe",
       fetch,
       url,
