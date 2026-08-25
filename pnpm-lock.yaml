@@ -46,12 +46,6 @@ importers:
 
   apps/web:
     dependencies:
-      "@fontsource-variable/epilogue":
-        specifier: ^5.3.0
-        version: 5.3.0
-      "@fontsource-variable/fraunces":
-        specifier: ^5.3.0
-        version: 5.3.0
       "@tanstack/react-query":
         specifier: ^5.101.4
         version: 5.101.4(react@19.2.8)
@@ -1081,18 +1075,6 @@ packages:
     peerDependenciesMeta:
       "@noble/hashes":
         optional: true
-
-  "@fontsource-variable/epilogue@5.3.0":
-    resolution:
-      {
-        integrity: sha512-atoQ7bIqgDLX+zlxbxmYpNZ7nqkwwZczkhJhWdaX+UBZufhPWP3vrcKaLVaNcCbRyHeSoX/y/HJNGjKhewEsAg==,
-      }
-
-  "@fontsource-variable/fraunces@5.3.0":
-    resolution:
-      {
-        integrity: sha512-9BYGySn4AHEJdgp9Z28tQ3X+laJMEOITXkQarZXeloWQZDq5oOvXJ3kDA8c7MGIfpogIaZfjrQBqmda8POOCKA==,
-      }
 
   "@humanfs/core@0.19.2":
     resolution:
@@ -5641,10 +5623,6 @@ snapshots:
       levn: 0.4.1
 
   "@exodus/bytes@1.15.1": {}
-
-  "@fontsource-variable/epilogue@5.3.0": {}
-
-  "@fontsource-variable/fraunces@5.3.0": {}
 
   "@humanfs/core@0.19.2":
     dependencies:
