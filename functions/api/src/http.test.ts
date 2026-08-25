@@ -18,14 +18,15 @@ function createContext(
   request: Partial<FunctionContext["req"]> = {},
 ) {
   const json = vi.fn();
+  const binary = vi.fn();
   const context: FunctionContext = {
     req: { method, path, ...request },
-    res: { json },
+    res: { binary, json },
     log: vi.fn(),
     error: vi.fn(),
   };
 
-  return { context, json };
+  return { binary, context, json };
 }
 
 describe("trusted API entrypoint", () => {
@@ -188,6 +189,64 @@ describe("trusted API entrypoint", () => {
     );
     expect(context.log).toHaveBeenCalledWith(
       expect.stringContaining('"outcome":"rejected"'),
+    );
+  });
+
+  it("BDD-ATT-DEPLOYED-005 returns private bytes with safe download headers", async () => {
+    const bytes = new TextEncoder().encode("private evidence");
+    const publicApi: PublicApi = {
+      handle: () =>
+        Promise.resolve({
+          statusCode: 200,
+          binary: {
+            bytes,
+            displayName: 'preuve épargne "août".txt',
+            mediaType: "text/plain; charset=utf-8",
+          },
+        }),
+    };
+    const { binary, context, json } = createContext(
+      "POST",
+      "/v1/feedback/attachments/download",
+    );
+
+    await routeRequest(context, { ...dependencies, publicApi });
+
+    expect(json).not.toHaveBeenCalled();
+    expect(binary).toHaveBeenCalledWith(bytes, 200, {
+      "cache-control": "no-store",
+      "content-disposition":
+        "attachment; filename*=UTF-8''preuve%20%C3%A9pargne%20%22ao%C3%BBt%22.txt",
+      "content-length": String(bytes.byteLength),
+      "content-type": "text/plain; charset=utf-8",
+      "x-correlation-id": correlationId,
+    });
+    expect(context.log).toHaveBeenCalledWith(
+      expect.not.stringMatching(/private evidence|preuve|attachment\/download/u),
+    );
+  });
+
+  it("fails closed when the runtime cannot emit a binary response", async () => {
+    const publicApi: PublicApi = {
+      handle: () =>
+        Promise.resolve({
+          statusCode: 200,
+          binary: {
+            bytes: new Uint8Array([1]),
+            displayName: "evidence.txt",
+            mediaType: "text/plain; charset=utf-8",
+          },
+        }),
+    };
+    const { context, json } = createContext("POST", "/download");
+    delete (context.res as { binary?: unknown }).binary;
+
+    await routeRequest(context, { ...dependencies, publicApi });
+
+    expect(json).toHaveBeenCalledWith(
+      { error: "ERR-ATTACHMENT-UNAVAILABLE" },
+      503,
+      expect.objectContaining({ "cache-control": "no-store" }),
     );
   });
 });

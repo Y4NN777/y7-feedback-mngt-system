@@ -10,7 +10,7 @@
       "runtime": "node-22",
       "deploymentRetention": 3,
       "execute": ["any"],
-      "scopes": ["rows.read", "rows.write"],
+      "scopes": ["rows.read", "rows.write", "files.read"],
       "events": [],
       "schedule": "",
       "timeout": 15,

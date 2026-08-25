@@ -62,6 +62,212 @@ describe("direct Function-domain public API", () => {
     );
   });
 
+  it("BDD-ATT-DEPLOYED-006 accepts a bounded private binary download response", async () => {
+    const bytes = new TextEncoder().encode("private evidence");
+    const api = createHttpFunctionPublicApi({
+      baseUrl: "https://preview.example.test",
+      fetch: () =>
+        Promise.resolve(
+          new Response(bytes, {
+            status: 200,
+            headers: {
+              "cache-control": "no-store",
+              "content-disposition":
+                "attachment; filename*=UTF-8''preuve%20%C3%A9pargne.txt",
+              "content-length": String(bytes.byteLength),
+              "content-type": "text/plain; charset=utf-8",
+            },
+          }),
+        ),
+    });
+
+    await expect(
+      api.handle({
+        method: "POST",
+        path: "/v1/feedback/attachments/download",
+        headers: { authorization: "FeedbackProof private" },
+        body: { reference: "Y7-2026-000001", attachmentId: "attachment-1" },
+      }),
+    ).resolves.toEqual({
+      statusCode: 200,
+      binary: {
+        bytes,
+        displayName: "preuve épargne.txt",
+        mediaType: "text/plain; charset=utf-8",
+      },
+    });
+  });
+
+  it.each([
+    {
+      name: "malformed filename encoding",
+      headers: {
+        "cache-control": "no-store",
+        "content-disposition": "attachment; filename*=UTF-8''%ZZ",
+        "content-length": "1",
+        "content-type": "text/plain; charset=utf-8",
+      },
+      body: new Uint8Array([1]),
+      status: 200,
+    },
+    {
+      name: "missing filename",
+      headers: {
+        "cache-control": "no-store",
+        "content-disposition": "attachment",
+        "content-length": "1",
+        "content-type": "text/plain; charset=utf-8",
+      },
+      body: new Uint8Array([1]),
+      status: 200,
+    },
+    {
+      name: "wrong status",
+      headers: {
+        "cache-control": "no-store",
+        "content-disposition": "attachment; filename*=UTF-8''evidence.txt",
+        "content-length": "1",
+        "content-type": "text/plain; charset=utf-8",
+      },
+      body: new Uint8Array([1]),
+      status: 404,
+    },
+    {
+      name: "cacheable response",
+      headers: {
+        "cache-control": "public",
+        "content-disposition": "attachment; filename*=UTF-8''evidence.txt",
+        "content-length": "1",
+        "content-type": "text/plain; charset=utf-8",
+      },
+      body: new Uint8Array([1]),
+      status: 200,
+    },
+    {
+      name: "undeclared media type",
+      headers: {
+        "cache-control": "no-store",
+        "content-disposition": "attachment; filename*=UTF-8''evidence.txt",
+        "content-length": "1",
+        "content-type": "application/octet-stream",
+      },
+      body: new Uint8Array([1]),
+      status: 200,
+    },
+    {
+      name: "missing media type",
+      headers: {
+        "cache-control": "no-store",
+        "content-disposition": "attachment; filename*=UTF-8''evidence.txt",
+        "content-length": "1",
+      },
+      body: new Uint8Array([1]),
+      status: 200,
+    },
+    {
+      name: "fractional length",
+      headers: {
+        "cache-control": "no-store",
+        "content-disposition": "attachment; filename*=UTF-8''evidence.txt",
+        "content-length": "1.5",
+        "content-type": "text/plain; charset=utf-8",
+      },
+      body: new Uint8Array([1]),
+      status: 200,
+    },
+    {
+      name: "empty body",
+      headers: {
+        "cache-control": "no-store",
+        "content-disposition": "attachment; filename*=UTF-8''evidence.txt",
+        "content-length": "0",
+        "content-type": "text/plain; charset=utf-8",
+      },
+      body: new Uint8Array(),
+      status: 200,
+    },
+    {
+      name: "oversized declaration",
+      headers: {
+        "cache-control": "no-store",
+        "content-disposition": "attachment; filename*=UTF-8''evidence.txt",
+        "content-length": String(10 * 1024 * 1024 + 1),
+        "content-type": "text/plain; charset=utf-8",
+      },
+      body: new Uint8Array([1]),
+      status: 200,
+    },
+    {
+      name: "overlong filename",
+      headers: {
+        "cache-control": "no-store",
+        "content-disposition": `attachment; filename*=UTF-8''${"a".repeat(256)}`,
+        "content-length": "1",
+        "content-type": "text/plain; charset=utf-8",
+      },
+      body: new Uint8Array([1]),
+      status: 200,
+    },
+    {
+      name: "unsafe filename",
+      headers: {
+        "cache-control": "no-store",
+        "content-disposition": "attachment; filename*=UTF-8''folder%2Fevidence.txt",
+        "content-length": "1",
+        "content-type": "text/plain; charset=utf-8",
+      },
+      body: new Uint8Array([1]),
+      status: 200,
+    },
+    {
+      name: "control filename",
+      headers: {
+        "cache-control": "no-store",
+        "content-disposition": "attachment; filename*=UTF-8''evidence%00.txt",
+        "content-length": "1",
+        "content-type": "text/plain; charset=utf-8",
+      },
+      body: new Uint8Array([1]),
+      status: 200,
+    },
+    {
+      name: "delete-control filename",
+      headers: {
+        "cache-control": "no-store",
+        "content-disposition": "attachment; filename*=UTF-8''evidence%7F.txt",
+        "content-length": "1",
+        "content-type": "text/plain; charset=utf-8",
+      },
+      body: new Uint8Array([1]),
+      status: 200,
+    },
+    {
+      name: "length mismatch",
+      headers: {
+        "cache-control": "no-store",
+        "content-disposition": "attachment; filename*=UTF-8''evidence.txt",
+        "content-length": "2",
+        "content-type": "text/plain; charset=utf-8",
+      },
+      body: new Uint8Array([1]),
+      status: 200,
+    },
+  ])("rejects a $name binary response", async ({ body, headers, status }) => {
+    const api = createHttpFunctionPublicApi({
+      baseUrl: "https://preview.example.test",
+      fetch: () => Promise.resolve(new Response(body, { status, headers })),
+    });
+
+    await expect(
+      api.handle({
+        method: "POST",
+        path: "/v1/feedback/attachments/download",
+        headers: {},
+        body: {},
+      }),
+    ).rejects.toThrow("HTTP_FUNCTION_RESPONSE_INVALID");
+  });
+
   it.each([
     "not a URL",
     "http://preview.example.test",

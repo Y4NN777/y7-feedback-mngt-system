@@ -1,13 +1,16 @@
-import type { TablesDB } from "node-appwrite";
+import type { Storage, TablesDB } from "node-appwrite";
 
 import type { ServerConfig } from "@y7-feedback/config/server";
 
 import { createAccountlessAccessCoordinator } from "./accountless-access.js";
 import { createNodeAppwriteAccountlessRepository } from "./appwrite-accountless-repository.js";
+import { createNodeAppwriteAttachmentAcceptanceStore } from "./appwrite-attachment-acceptance-store.js";
 import { createNodeAppwriteIntakeStore } from "./appwrite-intake-store.js";
+import { createNodeAppwritePrivateAttachmentStorage } from "./appwrite-private-attachment-storage.js";
 import { createNodeAppwritePublicProjectReader } from "./appwrite-public-project-reader.js";
 import type { HttpDependencies } from "./http.js";
 import { createIntakeCoordinator } from "./intake.js";
+import { createAttachmentDownload } from "./attachment-download.js";
 import {
   createAccessProof,
   createProofProtector,
@@ -16,10 +19,12 @@ import {
   matchesAccessProof,
 } from "./proof-crypto.js";
 import { createPublicApi } from "./public-api.js";
+import { createReporterAttachmentDownload } from "./reporter-attachment-download.js";
 import { createSensitiveDataProtector } from "./sensitive-data-protector.js";
 
 export interface ApplicationRuntime {
   readonly tables: TablesDB;
+  readonly storage: Storage;
   readonly createId: () => string;
   readonly createReference: () => string;
   readonly createCorrelationId: () => string;
@@ -80,12 +85,39 @@ export function createHttpApplication(
     runtime.tables,
     config.appwriteSchema,
   );
+  const attachmentMetadata = createNodeAppwriteAttachmentAcceptanceStore(
+    runtime.tables,
+    {
+      databaseId: config.appwriteSchema.databaseId,
+      stagingTableId: config.appwriteSchema.attachmentStagingTableId,
+      attachmentsTableId: config.appwriteSchema.attachmentsTableId,
+    },
+    sensitive,
+  );
+  const attachmentStorage = createNodeAppwritePrivateAttachmentStorage(
+    runtime.storage,
+    runtime.tables,
+    {
+      bucketId: config.appwriteSchema.attachmentBucketId,
+      databaseId: config.appwriteSchema.databaseId,
+      stagingTableId: config.appwriteSchema.attachmentStagingTableId,
+    },
+  );
+  const reporterAttachmentDownload = createReporterAttachmentDownload(
+    accountless,
+    createAttachmentDownload(attachmentMetadata, attachmentStorage),
+  );
 
   return {
     createCorrelationId: runtime.createCorrelationId,
     environment: config.environment,
     now: runtime.nowMs,
-    publicApi: createPublicApi(projects, intake, accountless),
+    publicApi: createPublicApi(
+      projects,
+      intake,
+      accountless,
+      reporterAttachmentDownload,
+    ),
     release: config.release,
     startedAt: runtime.startedAt,
   };

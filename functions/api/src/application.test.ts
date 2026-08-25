@@ -95,6 +95,7 @@ describe("trusted Function composition root", () => {
     let sequence = 0;
     const dependencies = createHttpApplication(config, {
       tables: tables as unknown as import("node-appwrite").TablesDB,
+      storage: {} as import("node-appwrite").Storage,
       createId: () => `generated-${String(++sequence)}`,
       createReference: () => "Y7-2026-000001",
       createCorrelationId: () => "correlation-1",

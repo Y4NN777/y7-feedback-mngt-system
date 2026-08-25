@@ -41,7 +41,12 @@ const attachmentBytes = new TextEncoder().encode("Y7 attachment evidence\n");
 function setup(
   response: PublicApiResponse = {
     statusCode: 201,
-    body: { status: "accepted", replayed: false },
+    body: {
+      status: "accepted",
+      replayed: false,
+      reference: "Y7-G2-TEST",
+      accessProof: "proof_abcdefghijklmnopqrstuvwxyz_0123456789ABCDEFG",
+    },
   },
 ) {
   const api: PublicApi = { handle: () => Promise.resolve(response) };
@@ -133,11 +138,82 @@ describe("real Appwrite G2 attachment matrix", () => {
     expect(target.storage.remove).toHaveBeenCalledWith(input.objectId);
   });
 
+  it("BDD-ATT-DEPLOYED-007 binds deployed download evidence to the accepted proof and Attachment", async () => {
+    const target = setup();
+    const deployedEvidence = vi.fn(() =>
+      Promise.resolve({
+        authorizedDownload: true as const,
+        siblingDenied: true as const,
+      }),
+    );
+
+    await expect(
+      runAppwriteG2AttachmentMatrix(
+        target.api,
+        target.saga,
+        target.download,
+        target.storage,
+        target.artifacts,
+        schema,
+        input,
+        deployedEvidence,
+      ),
+    ).resolves.toMatchObject({
+      deployedAuthorizedDownload: true,
+      deployedSiblingDenied: true,
+    });
+    expect(deployedEvidence).toHaveBeenCalledWith({
+      attachmentId: input.attachmentId,
+      reference: "Y7-G2-TEST",
+      accessProof: "proof_abcdefghijklmnopqrstuvwxyz_0123456789ABCDEFG",
+      bytes: attachmentBytes,
+      displayName: "evidence.txt",
+      mediaType: "text/plain; charset=utf-8",
+    });
+  });
+
+  it("rejects incomplete deployed evidence and still cleans every parent row", async () => {
+    const target = setup();
+    await expect(
+      runAppwriteG2AttachmentMatrix(
+        target.api,
+        target.saga,
+        target.download,
+        target.storage,
+        target.artifacts,
+        schema,
+        input,
+        () =>
+          Promise.resolve({
+            authorizedDownload: false,
+            siblingDenied: true,
+          } as never),
+      ),
+    ).rejects.toThrow("APPWRITE_G2_ATTACHMENT_MATRIX_FAILED");
+    expect(target.deleteRow).toHaveBeenCalledTimes(8);
+  });
+
   it("BDD-G2-REAL-002 fails closed for parent and acceptance inconsistencies", async () => {
     for (const response of [
       { statusCode: 503, body: { error: "ERR-INTAKE-UNAVAILABLE" } },
-      { statusCode: 201, body: { status: "wrong", replayed: false } },
-      { statusCode: 201, body: { status: "accepted", replayed: true } },
+      {
+        statusCode: 201,
+        body: {
+          status: "wrong",
+          replayed: false,
+          reference: "Y7-G2-TEST",
+          accessProof: "proof",
+        },
+      },
+      {
+        statusCode: 201,
+        body: {
+          status: "accepted",
+          replayed: true,
+          reference: "Y7-G2-TEST",
+          accessProof: "proof",
+        },
+      },
       { statusCode: 201, body: null },
     ] satisfies readonly PublicApiResponse[]) {
       const target = setup(response);

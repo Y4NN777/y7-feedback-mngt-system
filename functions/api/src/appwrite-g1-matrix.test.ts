@@ -66,6 +66,7 @@ function setup(
   const getRow = vi.fn(() => Promise.resolve(rows[getRow.mock.calls.length - 1]));
   const deleteRow = vi.fn(() => Promise.resolve({}));
   const accountless: AccountlessAccessCoordinator = {
+    authorize: () => Promise.resolve({ status: "denied", code: "ACCESS_DENIED" }),
     rotate: () =>
       Promise.resolve({
         status: "ok",

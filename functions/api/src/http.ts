@@ -12,6 +12,11 @@ export interface FunctionRequest {
 }
 
 export interface FunctionResponse {
+  binary?(
+    bytes: Uint8Array,
+    statusCode?: number,
+    headers?: Readonly<Record<string, string>>,
+  ): unknown;
   json(
     body: unknown,
     statusCode?: number,
@@ -136,6 +141,17 @@ export async function routeRequest(
   }
 
   if (publicResponse) {
+    if (publicResponse.binary) {
+      if (!res.binary) {
+        return res.json({ error: "ERR-ATTACHMENT-UNAVAILABLE" }, 503, headers);
+      }
+      return res.binary(publicResponse.binary.bytes, publicResponse.statusCode, {
+        ...headers,
+        "content-disposition": `attachment; filename*=UTF-8''${encodeURIComponent(publicResponse.binary.displayName)}`,
+        "content-length": String(publicResponse.binary.bytes.byteLength),
+        "content-type": publicResponse.binary.mediaType,
+      });
+    }
     return res.json(publicResponse.body, publicResponse.statusCode, headers);
   }
 

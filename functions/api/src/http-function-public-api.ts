@@ -79,6 +79,60 @@ async function responseBody(
   return parsed as Readonly<Record<string, unknown>>;
 }
 
+const attachmentMediaTypes = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "application/pdf",
+  "text/plain; charset=utf-8",
+  "text/csv; charset=utf-8",
+]);
+
+function unsafeDisplayName(value: string): boolean {
+  if (/[\\/]/u.test(value)) return true;
+  for (const character of value) {
+    const code = character.charCodeAt(0);
+    if (code < 32 || code === 127) return true;
+  }
+  return false;
+}
+
+async function binaryResponse(response: Response) {
+  const disposition = response.headers.get("content-disposition") as string;
+  const match = /^attachment; filename\*=UTF-8''([^\s]+)$/u.exec(disposition);
+  const mediaType = response.headers.get("content-type");
+  const declaredLength = Number(response.headers.get("content-length"));
+  let displayName: string;
+  try {
+    displayName = decodeURIComponent(match?.[1] ?? "");
+  } catch {
+    throw new Error("HTTP_FUNCTION_RESPONSE_INVALID");
+  }
+  if (
+    response.status !== 200 ||
+    response.headers.get("cache-control") !== "no-store" ||
+    mediaType === null ||
+    !attachmentMediaTypes.has(mediaType) ||
+    !Number.isSafeInteger(declaredLength) ||
+    declaredLength < 1 ||
+    declaredLength > 10 * 1024 * 1024 ||
+    !displayName ||
+    displayName.length > 255 ||
+    unsafeDisplayName(displayName)
+  ) {
+    throw new Error("HTTP_FUNCTION_RESPONSE_INVALID");
+  }
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (bytes.byteLength !== declaredLength) {
+    throw new Error("HTTP_FUNCTION_RESPONSE_INVALID");
+  }
+  return {
+    statusCode: 200 as const,
+    binary: { bytes, displayName, mediaType },
+  };
+}
+
 export function createHttpFunctionPublicApi({
   baseUrl,
   fetch,
@@ -102,6 +156,9 @@ export function createHttpFunctionPublicApi({
         });
       } catch {
         throw new Error("HTTP_FUNCTION_UNAVAILABLE");
+      }
+      if (response.headers.has("content-disposition")) {
+        return binaryResponse(response);
       }
       return {
         statusCode: response.status,

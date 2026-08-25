@@ -45,7 +45,7 @@ test("BDD-DEL-APPWRITE-005 defines one reproducible Preview Function", async () 
       enabled: true,
       runtime: "node-22",
       execute: ["any"],
-      scopes: ["rows.read", "rows.write"],
+      scopes: ["rows.read", "rows.write", "files.read"],
       events: [],
       schedule: "",
       path: ".",

@@ -46,12 +46,16 @@ export type RotateOutcome =
 
 export type RevokeOutcome = { readonly status: "ok" } | AccessFailure;
 
+export type AuthorizeOutcome =
+  { readonly status: "ok"; readonly feedbackId: string } | AccessFailure;
+
 export type ReporterActionOutcome =
   | { readonly status: "ok"; readonly view: ReporterFeedbackView }
   | { readonly status: "rejected"; readonly code: "ACTION_INVALID" }
   | AccessFailure;
 
 export interface AccountlessAccessCoordinator {
+  authorize(request: AccessRequest): Promise<AuthorizeOutcome>;
   retrieve(request: AccessRequest): Promise<RetrieveOutcome>;
   rotate(request: AccessRequest): Promise<RotateOutcome>;
   revoke(request: AccessRequest): Promise<RevokeOutcome>;
@@ -82,6 +86,14 @@ export function createAccountlessAccessCoordinator(
   }
 
   return {
+    async authorize(request) {
+      try {
+        const resource = await loadAuthorized(request);
+        return { status: "ok", feedbackId: resource.grant.feedbackId };
+      } catch (error: unknown) {
+        return failure(error);
+      }
+    },
     async retrieve(request) {
       try {
         const resource = await loadAuthorized(request);
