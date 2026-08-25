@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   appwriteFunctionVariableKeys,
   planAppwriteFunctionVariables,
+  resolveAppwriteFunctionTarget,
 } from "./appwrite-function-variables";
 
 const environment = Object.fromEntries(
@@ -10,6 +11,25 @@ const environment = Object.fromEntries(
 );
 
 describe("Appwrite Function variable policy", () => {
+  it.each([
+    ["preview", "y7-feedback-api-preview", "Y7 Feedback API Preview"],
+    ["production", "y7-feedback-api-production", "Y7 Feedback API Production"],
+  ] as const)(
+    "BDD-DEL-ENV-001 resolves the isolated %s Function authority",
+    (environmentName, id, name) => {
+      expect(resolveAppwriteFunctionTarget(environmentName)).toEqual({ id, name });
+    },
+  );
+
+  it("BDD-DEL-ENV-001 refuses a development or unknown deployment target", () => {
+    expect(() => resolveAppwriteFunctionTarget("development")).toThrow(
+      "APPWRITE_FUNCTION_DEPLOYMENT_ENVIRONMENT_INVALID",
+    );
+    expect(() => resolveAppwriteFunctionTarget("staging")).toThrow(
+      "APPWRITE_FUNCTION_DEPLOYMENT_ENVIRONMENT_INVALID",
+    );
+  });
+
   it("BDD-DEL-APPWRITE-008 creates deterministic secret variables without static Appwrite authority", () => {
     const actions = planAppwriteFunctionVariables(environment, []);
 
