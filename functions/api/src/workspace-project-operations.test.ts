@@ -2,7 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { WorkspaceCapabilityScopeResolver } from "./appwrite-workspace-capability-scope";
 import type { AppwritePrincipalVerifier } from "./workspace-attachment-download";
-import { createWorkspaceProjectOperations } from "./workspace-project-operations";
+import {
+  createWorkspaceProjectOperations,
+  WorkspaceOperationDeniedError,
+} from "./workspace-project-operations";
 
 const request = {
   jwt: "header.payload.signature",
@@ -169,5 +172,14 @@ describe("trusted Workspace Project operations", () => {
         command: { state: "closed" },
       }),
     ).resolves.toEqual({ status: "retryable" });
+  });
+
+  it("BDD-OWN-FUNCTION-002 preserves a non-disclosing row-scope denial", async () => {
+    const target = setup();
+    target.feedback.read.mockRejectedValueOnce(new WorkspaceOperationDeniedError());
+
+    await expect(
+      target.operations.readFeedback({ ...request, feedbackId: "feedback-b" }),
+    ).resolves.toEqual({ status: "denied" });
   });
 });
