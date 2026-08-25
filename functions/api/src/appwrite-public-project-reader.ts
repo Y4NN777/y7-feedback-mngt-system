@@ -11,6 +11,7 @@ import type { PublicProject, PublicProjectReader } from "./public-api.js";
 
 export interface AppwritePublicProjectSchema {
   readonly databaseId: string;
+  readonly projectSlugsTableId: string;
   readonly projectsTableId: string;
 }
 
@@ -111,7 +112,11 @@ export function createAppwritePublicProjectReader(
   schema: AppwritePublicProjectSchema,
   queries: AppwriteProjectQueryPort = defaultQueries,
 ): PublicProjectReader {
-  if (!appwriteId.test(schema.databaseId) || !appwriteId.test(schema.projectsTableId)) {
+  if (
+    !appwriteId.test(schema.databaseId) ||
+    !appwriteId.test(schema.projectsTableId) ||
+    !appwriteId.test(schema.projectSlugsTableId)
+  ) {
     throw new Error("APPWRITE_PROJECT_SCHEMA_INVALID");
   }
 
@@ -130,6 +135,46 @@ export function createAppwritePublicProjectReader(
         throw new Error("APPWRITE_PROJECT_ROW_INVALID");
       }
       return parseRow(result.rows[0], slug);
+    },
+    async resolve(slug) {
+      if (!projectSlug.test(slug)) throw new Error("APPWRITE_PROJECT_SLUG_INVALID");
+      const reservations = await tables.listRows({
+        databaseId: schema.databaseId,
+        tableId: schema.projectSlugsTableId,
+        queries: [queries.equal("slug", [slug]), queries.limit(2)],
+        total: false,
+        ttl: 0,
+      });
+      if (reservations.rows.length === 0) return { kind: "unavailable" };
+      if (reservations.rows.length !== 1 || !isObject(reservations.rows[0])) {
+        throw new Error("APPWRITE_PROJECT_ROW_INVALID");
+      }
+      const reservation = reservations.rows[0];
+      const reservedSlug = requiredString(reservation.slug, 63);
+      const reservedProjectId = requiredString(reservation.projectId, 36);
+      if (
+        reservedSlug !== slug ||
+        !appwriteId.test(reservedProjectId) ||
+        typeof reservation.current !== "boolean"
+      ) {
+        throw new Error("APPWRITE_PROJECT_ROW_INVALID");
+      }
+      const projects = await tables.listRows({
+        databaseId: schema.databaseId,
+        tableId: schema.projectsTableId,
+        queries: [queries.equal("$id", [reservedProjectId]), queries.limit(2)],
+        total: false,
+        ttl: 0,
+      });
+      if (projects.rows.length !== 1 || !isObject(projects.rows[0])) {
+        return { kind: "unavailable" };
+      }
+      const currentSlug = requiredString(projects.rows[0].slug, 63);
+      const project = parseRow(projects.rows[0], currentSlug);
+      if (!project.feedbackConfig.active) return { kind: "unavailable" };
+      return reservation.current && currentSlug === slug
+        ? { kind: "current", project }
+        : { kind: "redirect", canonicalSlug: currentSlug };
     },
   };
 }

@@ -1,9 +1,34 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "./App";
 import type { IntakeGateway } from "./IntakeGateway";
+
+const projectGateway = {
+  resolve: () =>
+    Promise.resolve({
+      status: "current" as const,
+      slug: "wisemoney",
+      purpose: {
+        fr: "Partager un retour sur WiseMoney",
+        en: "Share feedback about WiseMoney",
+      },
+    }),
+};
+
+function renderApp(props: ComponentProps<typeof App> = {}) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <App projectGateway={projectGateway} {...props} />
+    </QueryClientProvider>,
+  );
+}
 
 afterEach(() => {
   cleanup();
@@ -12,7 +37,7 @@ afterEach(() => {
 
 describe("root orientation", () => {
   it("BDD-ROOT-001 shows exactly the three French intents without enumeration", () => {
-    render(<App />);
+    renderApp();
 
     expect(screen.getAllByRole("article")).toHaveLength(3);
     expect(screen.getByRole("heading", { name: "Donner un avis" })).toBeInTheDocument();
@@ -26,7 +51,7 @@ describe("root orientation", () => {
 
   it("BDD-ROOT-002 switches to English and updates the document language", async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderApp();
 
     await user.click(screen.getByRole("button", { name: "English" }));
 
@@ -45,10 +70,50 @@ describe("root orientation", () => {
 });
 
 describe("WiseMoney feedback intake", () => {
+  it("BDD-PROJ-002 redirects a historical slug to its canonical route", async () => {
+    window.history.replaceState({}, "", "/wisemoney-legacy");
+    const redirectProject = vi.fn();
+    renderApp({
+      redirectProject,
+      projectGateway: {
+        resolve: () =>
+          Promise.resolve({ status: "redirect", canonicalSlug: "wisemoney" }),
+      },
+    });
+
+    await screen.findByRole("status");
+    await waitFor(() => {
+      expect(redirectProject).toHaveBeenCalledWith("wisemoney");
+    });
+  });
+
+  it("BDD-PROJ-003 uses one bilingual neutral screen for unknown Projects", async () => {
+    window.history.replaceState({}, "", "/unknown-project");
+    const user = userEvent.setup();
+    renderApp({
+      projectGateway: {
+        resolve: () => Promise.resolve({ status: "unavailable" }),
+      },
+    });
+
+    expect(
+      await screen.findByRole("heading", { name: "Ce projet n’est pas disponible" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/unknown-project/i)).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "English" }));
+    expect(
+      screen.getByRole("heading", { name: "This project is unavailable" }),
+    ).toBeInTheDocument();
+  });
+
   it("BDD-UX-INTAKE-001 preserves a safe draft across locales and reviews every category", async () => {
     window.history.replaceState({}, "", "/wisemoney");
     const user = userEvent.setup();
-    render(<App />);
+    renderApp();
+
+    await screen.findByRole("heading", {
+      name: "Partager un retour sur WiseMoney",
+    });
 
     expect(
       screen.getByRole("heading", { name: "Partager un retour sur WiseMoney" }),
@@ -85,7 +150,7 @@ describe("WiseMoney feedback intake", () => {
     expect(
       screen.getByRole("heading", { name: "Review before continuing" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("WiseMoney", { selector: "dd" })).toBeInTheDocument();
+    expect(screen.getByText("wisemoney", { selector: "dd" })).toBeInTheDocument();
     expect(screen.getByText("Bug", { selector: "dd" })).toBeInTheDocument();
     expect(screen.getByText("Le solde ne se rafraîchit pas.")).toBeInTheDocument();
     expect(screen.getByText("personne@example.test")).toBeInTheDocument();
@@ -103,7 +168,10 @@ describe("WiseMoney feedback intake", () => {
   it("BDD-FDB-001 requires the selected type's semantic source fields", async () => {
     window.history.replaceState({}, "", "/wisemoney");
     const user = userEvent.setup();
-    render(<App />);
+    renderApp();
+    await screen.findByRole("heading", {
+      name: "Partager un retour sur WiseMoney",
+    });
 
     await user.click(screen.getByRole("radio", { name: "Suggestion" }));
     await user.click(screen.getByRole("button", { name: "Relire le retour" }));
@@ -142,7 +210,10 @@ describe("WiseMoney feedback intake", () => {
   it("reviews optional Bug fields, supports editing, and rejects executable Context", async () => {
     window.history.replaceState({}, "", "/wisemoney");
     const user = userEvent.setup();
-    render(<App />);
+    renderApp();
+    await screen.findByRole("heading", {
+      name: "Partager un retour sur WiseMoney",
+    });
 
     await user.type(
       screen.getByRole("textbox", { name: "Quel problème avez-vous rencontré ?" }),
@@ -228,12 +299,13 @@ describe("WiseMoney feedback intake", () => {
         replayed: false,
       }),
     );
-    render(
-      <App
-        createOperationId={() => "123e4567-e89b-42d3-a456-426614174000"}
-        intakeGateway={{ accept }}
-      />,
-    );
+    renderApp({
+      createOperationId: () => "123e4567-e89b-42d3-a456-426614174000",
+      intakeGateway: { accept },
+    });
+    await screen.findByRole("heading", {
+      name: "Partager un retour sur WiseMoney",
+    });
 
     await user.type(
       screen.getByRole("textbox", { name: "Quel problème avez-vous rencontré ?" }),
@@ -273,12 +345,13 @@ describe("WiseMoney feedback intake", () => {
         accessProof: "proof_abcdefghijklmnopqrstuvwxyz_0123456789ABCDEFG",
         replayed: true,
       });
-    render(
-      <App
-        createOperationId={() => "123e4567-e89b-42d3-a456-426614174000"}
-        intakeGateway={{ accept }}
-      />,
-    );
+    renderApp({
+      createOperationId: () => "123e4567-e89b-42d3-a456-426614174000",
+      intakeGateway: { accept },
+    });
+    await screen.findByRole("heading", {
+      name: "Partager un retour sur WiseMoney",
+    });
     await user.type(
       screen.getByRole("textbox", { name: "Quel problème avez-vous rencontré ?" }),
       "Le solde est incorrect.",

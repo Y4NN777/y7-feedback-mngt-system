@@ -1,6 +1,48 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => {
+  await page.route("http://127.0.0.1:8787/v1/projects/*", async (route) => {
+    const url = new URL(route.request().url());
+    if (route.request().method() !== "GET") {
+      await route.abort();
+      return;
+    }
+    const slug = url.pathname.split("/").at(-1);
+    if (slug === "wisemoney") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          status: "current",
+          slug: "wisemoney",
+          purpose: {
+            fr: "Partager un retour sur WiseMoney",
+            en: "Share feedback about WiseMoney",
+          },
+        }),
+      });
+      return;
+    }
+    if (slug === "wisemoney-legacy") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          status: "redirect",
+          canonicalSlug: "wisemoney",
+        }),
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 404,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "ERR-PROJECT-UNAVAILABLE" }),
+    });
+  });
+});
+
 function isWebManifest(value: unknown): value is { readonly display: string } {
   return (
     typeof value === "object" &&
@@ -93,12 +135,38 @@ test("BDD-UX-INTAKE-001 reviews a bilingual WiseMoney draft without losing input
   await expect(
     page.getByRole("heading", { name: "Review before continuing" }),
   ).toBeVisible();
-  await expect(page.getByText("WiseMoney", { exact: true })).toBeVisible();
+  await expect(page.getByText("wisemoney", { exact: true })).toBeVisible();
   await expect(page.getByText("Suggestion", { exact: true })).toBeVisible();
   await expect(page.getByText("Ajouter une vue mensuelle.")).toBeVisible();
   await expect(page.getByText("2.4.1")).toBeVisible();
   await expect(page.getByText("No attachments")).toBeVisible();
   await expect(page.getByText(/optional.*follow up/i)).toBeVisible();
+});
+
+test("BDD-PROJ-002 redirects a historical Project slug canonically", async ({
+  page,
+}) => {
+  await page.goto("/wisemoney-legacy");
+
+  await expect(page).toHaveURL(/\/wisemoney$/u);
+  await expect(
+    page.getByRole("heading", { name: "Partager un retour sur WiseMoney" }),
+  ).toBeVisible();
+});
+
+test("BDD-PROJ-003 keeps unavailable Project routes neutral in FR/EN", async ({
+  page,
+}) => {
+  await page.goto("/unknown-project");
+
+  await expect(
+    page.getByRole("heading", { name: "Ce projet n’est pas disponible" }),
+  ).toBeVisible();
+  await expect(page.getByText(/unknown-project/iu)).toHaveCount(0);
+  await page.getByRole("button", { name: "English" }).click();
+  await expect(
+    page.getByRole("heading", { name: "This project is unavailable" }),
+  ).toBeVisible();
 });
 
 test("BDD-UX-INTAKE-001 is accessible without overflow at 320 px", async ({ page }) => {

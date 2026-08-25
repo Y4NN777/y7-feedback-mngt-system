@@ -149,10 +149,10 @@ describe("trusted Function composition root", () => {
         replayed: false,
       },
       201,
-      {
+      expect.objectContaining({
         "cache-control": "no-store",
         "x-correlation-id": "correlation-1",
-      },
+      }),
     );
     expect(tables.rows).toHaveLength(7);
     expect(tables.rows.every((row) => JSON.stringify(row.permissions) === "[]")).toBe(

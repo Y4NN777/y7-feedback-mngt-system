@@ -16,6 +16,9 @@ interface RootMessages {
   readonly intro: string;
   readonly languageLabel: string;
   readonly title: string;
+  readonly projectLoading: string;
+  readonly projectUnavailable: string;
+  readonly projectUnavailableHint: string;
 }
 
 export const messages = {
@@ -23,6 +26,10 @@ export const messages = {
     brandLabel: "Y7 Feedback — accueil",
     eyebrow: "Y7 Feedback",
     title: "Votre retour peut faire avancer un produit.",
+    projectLoading: "Chargement du projet…",
+    projectUnavailable: "Ce projet n’est pas disponible",
+    projectUnavailableHint:
+      "Vérifiez le lien transmis par l’équipe du produit ou revenez à l’accueil.",
     intro:
       "Utilisez le lien transmis par l’équipe du produit pour envoyer un retour, ou retrouvez un retour déjà envoyé.",
     languageLabel: "Langue",
@@ -55,6 +62,10 @@ export const messages = {
     brandLabel: "Y7 Feedback — home",
     eyebrow: "Y7 Feedback",
     title: "Your feedback can move a product forward.",
+    projectLoading: "Loading project…",
+    projectUnavailable: "This project is unavailable",
+    projectUnavailableHint:
+      "Check the link shared by the product team or return to the home page.",
     intro:
       "Use the link shared by the product team to send feedback, or return to feedback you already submitted.",
     languageLabel: "Language",
