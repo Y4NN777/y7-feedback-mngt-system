@@ -37,6 +37,10 @@ test("BDD-VER-DEPLOYED-001 accepts a public SPA deep link with safe cache policy
       });
     }
 
+    if (path === "/api/private") {
+      return response("not found", securityHeaders, 404);
+    }
+
     const shell =
       '<!doctype html><script type="module" src="/assets/index-a1b2c3.js"></script>';
     const vercelToolbar =
@@ -63,6 +67,7 @@ test("BDD-VER-DEPLOYED-001 accepts a public SPA deep link with safe cache policy
     pwaRevalidated: true,
     immutableAsset: true,
     securityHeaders: true,
+    reservedApiDenied: true,
   });
   assert.deepEqual(requestedPaths, [
     "/",
@@ -70,6 +75,7 @@ test("BDD-VER-DEPLOYED-001 accepts a public SPA deep link with safe cache policy
     "/manifest.webmanifest",
     "/sw.js",
     "/assets/index-a1b2c3.js",
+    "/api/private",
   ]);
 });
 
@@ -101,6 +107,8 @@ test("BDD-VER-DEPLOYED-003 rejects a shell with incomplete security or cache hea
         manifest: response("pwa"),
         serviceWorker: response("pwa"),
         asset: response("asset"),
+        reservedApi: response("shell", { "content-type": "text/html" }),
+        reservedApiBody: "shell",
       }),
     /VERCEL_PREVIEW_POLICY_FAILED/u,
   );
