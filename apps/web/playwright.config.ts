@@ -12,7 +12,7 @@ export default defineConfig({
   },
   webServer: {
     command:
-      "pnpm --filter @y7-feedback/config build && pnpm build && pnpm preview --host 127.0.0.1",
+      "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm build && pnpm preview --host 127.0.0.1",
     env: {
       VITE_Y7_ENVIRONMENT: "development",
       VITE_APPWRITE_ENVIRONMENT: "development",
