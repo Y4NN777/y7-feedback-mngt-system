@@ -43,6 +43,12 @@ describe("accountless access experience", () => {
     );
     render(<App accountlessGateway={{ retrieve }} />);
 
+    expect(screen.getByRole("main")).toHaveAttribute("data-visual-anchor", "swiss");
+    expect(screen.getByRole("region", { name: "Retrouver un retour" })).toHaveAttribute(
+      "data-step",
+      "01",
+    );
+
     await user.type(
       screen.getByRole("textbox", { name: "Référence" }),
       "Y7-2026-000001",

@@ -39,6 +39,7 @@ describe("root orientation", () => {
   it("BDD-ROOT-001 shows exactly the three French intents without enumeration", () => {
     renderApp();
 
+    expect(screen.getByRole("main")).toHaveAttribute("data-visual-anchor", "swiss");
     expect(screen.getAllByRole("article")).toHaveLength(3);
     expect(screen.getByRole("heading", { name: "Donner un avis" })).toBeInTheDocument();
     expect(
@@ -115,6 +116,11 @@ describe("WiseMoney feedback intake", () => {
       name: "Partager un retour sur WiseMoney",
     });
 
+    expect(screen.getByRole("main")).toHaveAttribute("data-visual-anchor", "swiss");
+    expect(
+      screen.getByRole("region", { name: "Partager un retour sur WiseMoney" }),
+    ).toHaveAttribute("data-step", "01");
+
     expect(
       screen.getByRole("heading", { name: "Partager un retour sur WiseMoney" }),
     ).toBeInTheDocument();
@@ -150,6 +156,9 @@ describe("WiseMoney feedback intake", () => {
     expect(
       screen.getByRole("heading", { name: "Review before continuing" }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "Review before continuing" }),
+    ).toHaveAttribute("data-step", "02");
     expect(screen.getByText("wisemoney", { selector: "dd" })).toBeInTheDocument();
     expect(screen.getByText("Bug", { selector: "dd" })).toBeInTheDocument();
     expect(screen.getByText("Le solde ne se rafraîchit pas.")).toBeInTheDocument();
@@ -319,6 +328,10 @@ describe("WiseMoney feedback intake", () => {
     expect(
       await screen.findByRole("heading", { name: "Retour envoyé" }),
     ).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Retour envoyé" })).toHaveAttribute(
+      "data-step",
+      "03",
+    );
     expect(screen.getByText("Y7-2026-000001")).toBeInTheDocument();
     expect(
       screen.getByText("proof_abcdefghijklmnopqrstuvwxyz_0123456789ABCDEFG"),

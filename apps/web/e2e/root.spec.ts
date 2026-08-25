@@ -75,6 +75,26 @@ test("BDD-UX-001 has no serious accessibility issue or horizontal overflow", asy
 }) => {
   await page.goto("/");
 
+  await expect(page.getByRole("main")).toHaveAttribute("data-visual-anchor", "swiss");
+  const visualTokens = await page.evaluate(() => {
+    const root = getComputedStyle(document.documentElement);
+    const brandElement = document.querySelector<HTMLElement>(".brand");
+    if (!brandElement) throw new Error("Brand is missing");
+    const brand = getComputedStyle(brandElement);
+    return {
+      accent: brand.backgroundColor,
+      radius: brand.borderRadius,
+      surface: root.backgroundColor,
+      typeface: root.fontFamily,
+    };
+  });
+  expect(visualTokens).toEqual({
+    accent: "rgb(0, 47, 167)",
+    radius: "0px",
+    surface: "rgb(247, 247, 248)",
+    typeface: '"Helvetica Neue", Helvetica, Arial, sans-serif',
+  });
+
   const accessibility = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa"])
     .analyze();
@@ -114,6 +134,9 @@ test("BDD-UX-INTAKE-001 reviews a bilingual WiseMoney draft without losing input
   await expect(
     page.getByRole("heading", { name: "Partager un retour sur WiseMoney" }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Partager un retour sur WiseMoney" }),
+  ).toHaveAttribute("data-step", "01");
   await page.getByRole("radio", { name: "Suggestion" }).focus();
   await page.keyboard.press("Space");
   await page
@@ -135,6 +158,9 @@ test("BDD-UX-INTAKE-001 reviews a bilingual WiseMoney draft without losing input
   await expect(
     page.getByRole("heading", { name: "Review before continuing" }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Review before continuing" }),
+  ).toHaveAttribute("data-step", "02");
   await expect(page.getByText("wisemoney", { exact: true })).toBeVisible();
   await expect(page.getByText("Suggestion", { exact: true })).toBeVisible();
   await expect(page.getByText("Ajouter une vue mensuelle.")).toBeVisible();
@@ -191,6 +217,11 @@ test("BDD-ACC-UX-001 preserves private retrieval input and fails honestly withou
   page,
 }) => {
   await page.goto("/retrieve");
+
+  await expect(page.getByRole("main")).toHaveAttribute("data-visual-anchor", "swiss");
+  await expect(
+    page.getByRole("region", { name: "Retrouver un retour" }),
+  ).toHaveAttribute("data-step", "01");
 
   await page.getByRole("textbox", { name: "Référence" }).fill("Y7-2026-000001");
   await page

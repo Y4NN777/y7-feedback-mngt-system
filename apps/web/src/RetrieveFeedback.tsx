@@ -42,7 +42,11 @@ function ReporterView({
 }) {
   const copy = accessMessages[locale];
   return (
-    <section className="retrieved-view" aria-labelledby="retrieved-title">
+    <section
+      className="retrieved-view"
+      aria-labelledby="retrieved-title"
+      data-step="02"
+    >
       <p className="eyebrow">{view.reference}</p>
       <h1 id="retrieved-title">{copy.viewTitle}</h1>
       <div className="review-band review-band-source">
@@ -113,7 +117,7 @@ export function RetrieveFeedback({
   }
 
   return (
-    <main className="intake-page retrieve-page">
+    <main className="intake-page retrieve-page" data-visual-anchor="swiss">
       <header className="masthead intake-header">
         <a className="brand" href="/" aria-label={copy.brandLabel}>
           Y7
@@ -156,7 +160,11 @@ export function RetrieveFeedback({
           </button>
         </>
       ) : (
-        <section className="retrieve-shell" aria-labelledby="retrieve-title">
+        <section
+          className="retrieve-shell"
+          aria-labelledby="retrieve-title"
+          data-step="01"
+        >
           <p className="eyebrow">Y7 Feedback</p>
           <h1 id="retrieve-title">{copy.title}</h1>
           <p className="lede">{copy.intro}</p>

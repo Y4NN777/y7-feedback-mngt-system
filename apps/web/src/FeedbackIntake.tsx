@@ -256,7 +256,7 @@ function Review({
   const contact =
     data.reporter.kind === "contact" ? data.reporter.value : copy.contactNone;
   return (
-    <section className="review-panel" aria-labelledby="review-title">
+    <section className="review-panel" aria-labelledby="review-title" data-step="02">
       <p className="eyebrow">
         {projectSlug} · {copy.review}
       </p>
@@ -332,7 +332,11 @@ function Confirmation({
 }) {
   const copy = intakeMessages[locale];
   return (
-    <section className="review-panel" aria-labelledby="confirmation-title">
+    <section
+      className="review-panel"
+      aria-labelledby="confirmation-title"
+      data-step="03"
+    >
       <p className="eyebrow">{projectSlug} · Y7 Feedback</p>
       <h1 id="confirmation-title">{copy.confirmationTitle}</h1>
       <p>{copy.confirmationHint}</p>
@@ -451,7 +455,7 @@ export function FeedbackIntake({
   }
 
   return (
-    <main className="intake-page">
+    <main className="intake-page" data-visual-anchor="swiss">
       <header className="masthead intake-header">
         <a className="brand" href="/" aria-label={copy.brandLabel}>
           Y7
@@ -502,7 +506,11 @@ export function FeedbackIntake({
         />
       ) : (
         <>
-          <section className="intake-introduction" aria-labelledby="intake-title">
+          <section
+            className="intake-introduction"
+            aria-labelledby="intake-title"
+            data-step="01"
+          >
             <p className="eyebrow">{projectSlug} · Y7 Feedback</p>
             <h1 id="intake-title">{projectPurpose[locale]}</h1>
             <p className="lede">{copy.intro}</p>
