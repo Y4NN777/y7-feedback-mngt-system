@@ -116,6 +116,10 @@ importers:
       node-appwrite:
         specifier: 27.1.0
         version: 27.1.0
+    devDependencies:
+      appwrite:
+        specifier: 26.2.0
+        version: 26.2.0
 
   packages/config: {}
 
@@ -1959,6 +1963,13 @@ packages:
         integrity: sha512-Cxwpt2SfTzTtXcfOlzGEee8O+c+MmUgGrNiBcXnuWxuFJHe6a5Hz7qwhwe5OgaSYI0IJvkLqWX1ASG+cJOkEiA==,
       }
     engines: { node: ">=10" }
+
+  appwrite@26.2.0:
+    resolution:
+      {
+        integrity: sha512-8TCd4mMKhhUxGF9sjZ6W2V1gesnj43v1SFZoeAue/0O0ikMXIU92p96PiRn0D4nAVvFM/92bluTTb/PoXH5mnQ==,
+      }
+    engines: { node: ">=18.0.0" }
 
   argparse@2.0.1:
     resolution:
@@ -6108,6 +6119,10 @@ snapshots:
       color-convert: 2.0.1
 
   ansi-styles@5.2.0: {}
+
+  appwrite@26.2.0:
+    dependencies:
+      json-bigint: 1.0.0
 
   argparse@2.0.1: {}
 
