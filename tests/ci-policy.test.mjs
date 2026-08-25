@@ -47,7 +47,7 @@ test("BDD-CI-002 builds runtime workspace dependencies before the E2E server", a
 
   assert.match(
     playwrightConfig,
-    /command:\s*"pnpm --filter @y7-feedback\/config build && pnpm build && pnpm preview --host 127\.0\.0\.1"/u,
+    /command:\s*"pnpm --filter @y7-feedback\/config build && pnpm --filter @y7-feedback\/domain build && pnpm build && pnpm preview --host 127\.0\.0\.1"/u,
   );
 });
 
