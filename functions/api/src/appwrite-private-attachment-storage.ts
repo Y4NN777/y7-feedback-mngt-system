@@ -95,9 +95,14 @@ function requiredString(value: unknown, maximum: number): string {
   return normalized;
 }
 
-function isCanonicalInstant(value: string): boolean {
+function normalizeUtcInstant(value: string): string | undefined {
+  if (!/(?:Z|[+]00:00)$/u.test(value)) return undefined;
   const parsed = new Date(value);
-  return !Number.isNaN(parsed.getTime()) && parsed.toISOString() === value;
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
+}
+
+function isCanonicalInstant(value: string): boolean {
+  return normalizeUtcInstant(value) === value;
 }
 
 function parseStagingRow(value: unknown): StagingRow {
@@ -105,13 +110,13 @@ function parseStagingRow(value: unknown): StagingRow {
   const rowId = requiredString(value.$id, 36);
   const objectId = requiredString(value.objectId, 500);
   const parsedOperationId = requiredString(value.operationId, 36);
-  const stagedAt = requiredString(value.stagedAt, 40);
+  const stagedAt = normalizeUtcInstant(requiredString(value.stagedAt, 40));
   const fileId = requiredString(value.fileId, 36);
   if (
     !appwriteId.test(rowId) ||
     !objectId.startsWith("private/") ||
     !operationId.test(parsedOperationId) ||
-    !isCanonicalInstant(stagedAt) ||
+    stagedAt === undefined ||
     !appwriteId.test(fileId)
   ) {
     throw new Error("APPWRITE_ATTACHMENT_STAGING_INVALID");
