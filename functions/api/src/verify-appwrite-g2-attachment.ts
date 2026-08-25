@@ -7,6 +7,7 @@ import { parseServerConfig } from "@y7-feedback/config/server";
 import { createHttpApplication } from "./application.js";
 import { createNodeAppwriteAttachmentAcceptanceStore } from "./appwrite-attachment-acceptance-store.js";
 import { runAppwriteG2AttachmentMatrix } from "./appwrite-g2-attachment-matrix.js";
+import { runAppwriteG2SweeperMatrix } from "./appwrite-g2-sweeper-matrix.js";
 import type { AppwriteG1MatrixIds } from "./appwrite-g1-matrix.js";
 import { createNodeAppwritePrivateAttachmentStorage } from "./appwrite-private-attachment-storage.js";
 import { createAttachmentDownload } from "./attachment-download.js";
@@ -123,8 +124,27 @@ async function main(): Promise<void> {
     },
   );
   if (idQueue.length !== 0) throw new Error("APPWRITE_G2_ID_SEQUENCE_INVALID");
+  const sweeper = await runAppwriteG2SweeperMatrix(
+    saga,
+    privateStorage,
+    metadata,
+    {
+      getFile: (input) => nodeStorage.getFile(input),
+      getRow: (input) => tables.getRow(input),
+      deleteRow: (input) => tables.deleteRow(input),
+    },
+    config.appwriteSchema,
+    {
+      operationId: randomUUID(),
+      attachmentId: `g2a_s${suffix}`,
+      associatedObjectId: `private/g2_sweep_associated_${suffix}`,
+      orphanObjectId: `private/g2_sweep_orphan_${suffix}`,
+      stagedAt: "2000-01-01T00:00:00.000Z",
+      sweepBefore: "2000-01-01T00:00:01.000Z",
+    },
+  );
   process.stdout.write(
-    `${JSON.stringify({ status: "ok", environment: config.environment, ...result })}\n`,
+    `${JSON.stringify({ status: "ok", environment: config.environment, ...result, sweeper })}\n`,
   );
 }
 
