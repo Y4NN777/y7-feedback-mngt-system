@@ -144,6 +144,7 @@ describe("real Appwrite G2 attachment matrix", () => {
       Promise.resolve({
         authorizedDownload: true as const,
         siblingDenied: true as const,
+        siblingCleanedRows: 7,
       }),
     );
 
@@ -161,6 +162,7 @@ describe("real Appwrite G2 attachment matrix", () => {
     ).resolves.toMatchObject({
       deployedAuthorizedDownload: true,
       deployedSiblingDenied: true,
+      deployedSiblingCleanedRows: 7,
     });
     expect(deployedEvidence).toHaveBeenCalledWith({
       attachmentId: input.attachmentId,
@@ -187,6 +189,7 @@ describe("real Appwrite G2 attachment matrix", () => {
           Promise.resolve({
             authorizedDownload: false,
             siblingDenied: true,
+            siblingCleanedRows: 7,
           } as never),
       ),
     ).rejects.toThrow("APPWRITE_G2_ATTACHMENT_MATRIX_FAILED");

@@ -106,6 +106,7 @@ async function main(): Promise<void> {
     .setKey(config.appwriteApiKey);
   const tables = new TablesDB(client);
   const nodeStorage = new Storage(client);
+  let referenceIndex = 0;
   const application = createHttpApplication(config, {
     tables,
     storage: nodeStorage,
@@ -114,7 +115,7 @@ async function main(): Promise<void> {
       if (!id) throw new Error("APPWRITE_G2_ID_SEQUENCE_INVALID");
       return id;
     },
-    createReference: () => `Y7-G2-${suffix.toUpperCase()}`,
+    createReference: () => `Y7-G2-${suffix.toUpperCase()}-${String(++referenceIndex)}`,
     createCorrelationId: randomUUID,
     nowIso: () => new Date().toISOString(),
     nowMs: Date.now,
@@ -185,8 +186,7 @@ async function main(): Promise<void> {
     async (fixture: AppwriteG2DeployedAttachmentFixture) => {
       const siblingOperationId = randomUUID();
       let failure: unknown;
-      let deployedResult:
-        { readonly authorizedDownload: true; readonly siblingDenied: true } | undefined;
+      let deployedPassed = false;
       try {
         const siblingAccess = await acceptSiblingFeedback(
           publicApi,
@@ -207,14 +207,20 @@ async function main(): Promise<void> {
             attachmentId: fixture.attachmentId,
           },
         });
-        if (
-          authorized?.statusCode !== 200 ||
-          !authorized.binary ||
-          authorized.binary.displayName !== fixture.displayName ||
-          authorized.binary.mediaType !== fixture.mediaType ||
-          !Buffer.from(authorized.binary.bytes).equals(Buffer.from(fixture.bytes))
-        ) {
-          throw new Error("APPWRITE_G2_DEPLOYED_DOWNLOAD_FAILED");
+        if (authorized?.statusCode !== 200) {
+          throw new Error("APPWRITE_G2_DEPLOYED_DOWNLOAD_STATUS_FAILED");
+        }
+        if (!authorized.binary) {
+          throw new Error("APPWRITE_G2_DEPLOYED_DOWNLOAD_BINARY_FAILED");
+        }
+        if (authorized.binary.displayName !== fixture.displayName) {
+          throw new Error("APPWRITE_G2_DEPLOYED_DOWNLOAD_NAME_FAILED");
+        }
+        if (authorized.binary.mediaType !== fixture.mediaType) {
+          throw new Error("APPWRITE_G2_DEPLOYED_DOWNLOAD_MEDIA_FAILED");
+        }
+        if (!Buffer.from(authorized.binary.bytes).equals(Buffer.from(fixture.bytes))) {
+          throw new Error("APPWRITE_G2_DEPLOYED_DOWNLOAD_BYTES_FAILED");
         }
         const sibling = await deployedApi.handle({
           method: "POST",
@@ -234,10 +240,7 @@ async function main(): Promise<void> {
         ) {
           throw new Error("APPWRITE_G2_DEPLOYED_SIBLING_FAILED");
         }
-        deployedResult = {
-          authorizedDownload: true,
-          siblingDenied: true,
-        };
+        deployedPassed = true;
       } catch (error: unknown) {
         failure = error;
       }
@@ -261,10 +264,14 @@ async function main(): Promise<void> {
           if (!absent(error)) throw error;
         }
       }
-      if (failure !== undefined || cleaned !== 7 || deployedResult === undefined) {
+      if (failure !== undefined || cleaned !== 7 || !deployedPassed) {
         throw new Error("APPWRITE_G2_DEPLOYED_MATRIX_FAILED", { cause: failure });
       }
-      return deployedResult;
+      return {
+        authorizedDownload: true,
+        siblingDenied: true,
+        siblingCleanedRows: 7,
+      };
     },
   );
   if (idQueue.length !== 0) throw new Error("APPWRITE_G2_ID_SEQUENCE_INVALID");
