@@ -213,7 +213,7 @@ describe("trusted API entrypoint", () => {
     await routeRequest(context, { ...dependencies, publicApi });
 
     expect(json).not.toHaveBeenCalled();
-    expect(binary).toHaveBeenCalledWith(bytes, 200, {
+    expect(binary).toHaveBeenCalledWith(Buffer.from(bytes), 200, {
       "cache-control": "no-store",
       "content-disposition":
         "attachment; filename*=UTF-8''preuve%20%C3%A9pargne%20%22ao%C3%BBt%22.txt",
