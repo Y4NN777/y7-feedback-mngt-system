@@ -47,6 +47,10 @@ export interface AppwriteG2AttachmentResult {
   readonly deployedAuthorizedDownload?: true;
   readonly deployedSiblingDenied?: true;
   readonly deployedSiblingCleanedRows?: 7;
+  readonly deployedSoftDeleteHidden?: true;
+  readonly deployedRestoreAuthorized?: true;
+  readonly deployedPurgeHidden?: true;
+  readonly deployedPurgeRemoved?: true;
 }
 
 export interface AppwriteG2DeployedAttachmentFixture {
@@ -62,6 +66,10 @@ export interface AppwriteG2DeployedAttachmentResult {
   readonly authorizedDownload: boolean;
   readonly siblingDenied: boolean;
   readonly siblingCleanedRows: number;
+  readonly softDeleteHidden: boolean;
+  readonly restoreAuthorized: boolean;
+  readonly purgeHidden: boolean;
+  readonly purgeRemoved: boolean;
 }
 
 const bytes = new TextEncoder().encode("Y7 attachment evidence\n");
@@ -231,7 +239,11 @@ export async function runAppwriteG2AttachmentMatrix(
       deployed !== undefined &&
       (!deployed.authorizedDownload ||
         !deployed.siblingDenied ||
-        deployed.siblingCleanedRows !== 7)
+        deployed.siblingCleanedRows !== 7 ||
+        !deployed.softDeleteHidden ||
+        !deployed.restoreAuthorized ||
+        !deployed.purgeHidden ||
+        !deployed.purgeRemoved)
     ) {
       throw new Error("APPWRITE_G2_ATTACHMENT_DEPLOYED_FAILED");
     }
@@ -247,6 +259,10 @@ export async function runAppwriteG2AttachmentMatrix(
             deployedAuthorizedDownload: true as const,
             deployedSiblingDenied: true as const,
             deployedSiblingCleanedRows: 7 as const,
+            deployedSoftDeleteHidden: true as const,
+            deployedRestoreAuthorized: true as const,
+            deployedPurgeHidden: true as const,
+            deployedPurgeRemoved: true as const,
           }),
     };
   } catch (error: unknown) {

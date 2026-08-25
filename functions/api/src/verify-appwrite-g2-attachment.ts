@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 
 import { Client, Storage, TablesDB } from "node-appwrite";
 
@@ -6,6 +6,7 @@ import { parseServerConfig } from "@y7-feedback/config/server";
 
 import { createHttpApplication } from "./application.js";
 import { createNodeAppwriteAttachmentAcceptanceStore } from "./appwrite-attachment-acceptance-store.js";
+import { createNodeAppwriteAttachmentLifecycleStore } from "./appwrite-attachment-lifecycle-store.js";
 import {
   runAppwriteG2AttachmentMatrix,
   type AppwriteG2DeployedAttachmentFixture,
@@ -17,6 +18,7 @@ import {
 } from "./appwrite-g1-matrix.js";
 import { createNodeAppwritePrivateAttachmentStorage } from "./appwrite-private-attachment-storage.js";
 import { createAttachmentDownload } from "./attachment-download.js";
+import { createAttachmentLifecycleCoordinator } from "./attachment-lifecycle.js";
 import { createAttachmentSaga } from "./attachment-saga.js";
 import { validateAttachment } from "./attachment-validation.js";
 import { createHttpFunctionPublicApi } from "./http-function-public-api.js";
@@ -164,6 +166,18 @@ async function main(): Promise<void> {
         malwareScanner: { scan: () => Promise.resolve("clean") },
       }),
   });
+  const lifecycleState = createNodeAppwriteAttachmentLifecycleStore(tables, {
+    databaseId: config.appwriteSchema.databaseId,
+    attachmentsTableId: config.appwriteSchema.attachmentsTableId,
+  });
+  const lifecycle = createAttachmentLifecycleCoordinator(
+    {
+      findById: (id) => metadata.findById(id),
+      compareAndSetLifecycle: (id, expected, next) =>
+        lifecycleState.compareAndSetLifecycle(id, expected, next),
+    },
+    privateStorage,
+  );
   const result = await runAppwriteG2AttachmentMatrix(
     publicApi,
     saga,
@@ -240,6 +254,74 @@ async function main(): Promise<void> {
         ) {
           throw new Error("APPWRITE_G2_DEPLOYED_SIBLING_FAILED");
         }
+
+        const workspaceAuthorization = {
+          kind: "workspace_actor" as const,
+          authorizedWorkspaceId: "workspace_alpha",
+          authorizedProjectId: "project_alpha",
+          canReadAttachments: true,
+        };
+        const transition = async (
+          operation: "soft_delete" | "restore" | "purge",
+          expected: "soft_deleted" | "available" | "purged",
+        ) => {
+          const outcome = await lifecycle.transition({
+            attachmentId: fixture.attachmentId,
+            authorization: workspaceAuthorization,
+            operation,
+          });
+          if (outcome.status !== "ok" || outcome.lifecycle !== expected) {
+            throw new Error("APPWRITE_G2_DEPLOYED_LIFECYCLE_FAILED");
+          }
+        };
+        const reporterDownload = () =>
+          deployedApi.handle({
+            method: "POST",
+            path: "/v1/feedback/attachments/download",
+            headers: { authorization: `FeedbackProof ${fixture.accessProof}` },
+            body: {
+              reference: fixture.reference,
+              attachmentId: fixture.attachmentId,
+            },
+          });
+        const assertHidden = async () => {
+          const response = await reporterDownload();
+          if (
+            response?.statusCode !== 404 ||
+            !isObject(response.body) ||
+            response.body.error !== "ERR-ATTACHMENT-DENIED"
+          ) {
+            throw new Error("APPWRITE_G2_DEPLOYED_LIFECYCLE_VISIBILITY_FAILED");
+          }
+        };
+
+        await transition("soft_delete", "soft_deleted");
+        await assertHidden();
+        await transition("restore", "available");
+        const restored = await reporterDownload();
+        if (
+          restored?.statusCode !== 200 ||
+          !restored.binary ||
+          !Buffer.from(restored.binary.bytes).equals(Buffer.from(fixture.bytes))
+        ) {
+          throw new Error("APPWRITE_G2_DEPLOYED_RESTORE_FAILED");
+        }
+        await transition("purge", "purged");
+        await assertHidden();
+        await transition("purge", "purged");
+        const fileId = `att_${createHash("sha256")
+          .update(objectId)
+          .digest("hex")
+          .slice(0, 32)}`;
+        try {
+          await nodeStorage.getFile({
+            bucketId: config.appwriteSchema.attachmentBucketId,
+            fileId,
+          });
+          throw new Error("APPWRITE_G2_DEPLOYED_PURGE_RESIDUE");
+        } catch (error: unknown) {
+          if (!absent(error)) throw error;
+        }
         deployedPassed = true;
       } catch (error: unknown) {
         failure = error;
@@ -271,6 +353,10 @@ async function main(): Promise<void> {
         authorizedDownload: true,
         siblingDenied: true,
         siblingCleanedRows: 7,
+        softDeleteHidden: true,
+        restoreAuthorized: true,
+        purgeHidden: true,
+        purgeRemoved: true,
       };
     },
   );

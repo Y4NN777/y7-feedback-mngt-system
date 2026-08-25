@@ -144,6 +144,22 @@ export function authorizeAttachment(
   return { attachmentId: attachment.id, objectId: attachment.objectId };
 }
 
+export function authorizeAttachmentLifecycle(
+  attachment: AttachmentRecord | undefined,
+  authorization: AttachmentAuthorization,
+): AuthorizedAttachment {
+  const authorized =
+    attachment !== undefined &&
+    authorization.kind === "workspace_actor" &&
+    authorization.canReadAttachments &&
+    attachment.workspaceId === authorization.authorizedWorkspaceId &&
+    attachment.projectId === authorization.authorizedProjectId;
+  if (!attachment || !authorized) {
+    throw new AttachmentPolicyError("ATTACHMENT_ACCESS_DENIED");
+  }
+  return { attachmentId: attachment.id, objectId: attachment.objectId };
+}
+
 export function transitionAttachmentLifecycle(
   attachment: AttachmentRecord,
   operation: "soft_delete" | "restore" | "purge",
