@@ -18,14 +18,14 @@ test("BDD-VER-001 keeps Vercel shell caching public and update-safe", async () =
   assert.doesNotMatch(serialized, /authorization|cookie|access.proof/iu);
 });
 
-test("BDD-VER-002 builds runtime config before the web app on Vercel", async () => {
+test("BDD-VER-002 builds every compiled web dependency before the web app on Vercel", async () => {
   const policy = JSON.parse(
     await readFile(new URL("../vercel.json", import.meta.url), "utf8"),
   );
 
   assert.equal(
     policy.buildCommand,
-    "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/web build",
+    "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/web build",
   );
 });
 
