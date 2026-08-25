@@ -83,6 +83,13 @@ export interface WorkspaceProjectOperations {
 
 type Execute = (scope: ScopedProjectIdentity) => Promise<unknown>;
 
+export class WorkspaceOperationDeniedError extends Error {
+  constructor() {
+    super("WORKSPACE_OPERATION_DENIED");
+    this.name = "WorkspaceOperationDeniedError";
+  }
+}
+
 export function createWorkspaceProjectOperations(
   principal: AppwritePrincipalVerifier,
   scopeResolver: WorkspaceCapabilityScopeResolver,
@@ -109,8 +116,10 @@ export function createWorkspaceProjectOperations(
         projectId: authorization.project.id,
       });
       return data === undefined ? { status: "ok" } : { status: "ok", data };
-    } catch {
-      return { status: "retryable" };
+    } catch (error: unknown) {
+      return error instanceof WorkspaceOperationDeniedError
+        ? { status: "denied" }
+        : { status: "retryable" };
     }
   }
 
