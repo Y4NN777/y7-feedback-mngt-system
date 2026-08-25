@@ -145,6 +145,10 @@ describe("real Appwrite G2 attachment matrix", () => {
         authorizedDownload: true as const,
         siblingDenied: true as const,
         siblingCleanedRows: 7,
+        softDeleteHidden: true,
+        restoreAuthorized: true,
+        purgeHidden: true,
+        purgeRemoved: true,
       }),
     );
 
@@ -163,6 +167,10 @@ describe("real Appwrite G2 attachment matrix", () => {
       deployedAuthorizedDownload: true,
       deployedSiblingDenied: true,
       deployedSiblingCleanedRows: 7,
+      deployedSoftDeleteHidden: true,
+      deployedRestoreAuthorized: true,
+      deployedPurgeHidden: true,
+      deployedPurgeRemoved: true,
     });
     expect(deployedEvidence).toHaveBeenCalledWith({
       attachmentId: input.attachmentId,

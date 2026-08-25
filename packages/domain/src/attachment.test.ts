@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   AttachmentPolicyError,
   authorizeAttachment,
+  authorizeAttachmentLifecycle,
   createAttachmentRecord,
   transitionAttachmentLifecycle,
   type AttachmentRecord,
@@ -133,6 +134,31 @@ describe("Attachment ownership and authorization", () => {
 });
 
 describe("Attachment lifecycle binding", () => {
+  it("BDD-ATT-LIFECYCLE-001 permits only an exact current workspace capability", () => {
+    const hidden = transitionAttachmentLifecycle(reporterAttachment(), "soft_delete");
+    const exact = {
+      kind: "workspace_actor" as const,
+      authorizedWorkspaceId: "workspace-a",
+      authorizedProjectId: "project-a",
+      canReadAttachments: true,
+    };
+
+    expect(authorizeAttachmentLifecycle(hidden, exact)).toEqual({
+      attachmentId: "attachment-1",
+      objectId: "private/object-1",
+    });
+    for (const authorization of [
+      { ...exact, authorizedWorkspaceId: "workspace-b" },
+      { ...exact, authorizedProjectId: "project-b" },
+      { ...exact, canReadAttachments: false },
+      { kind: "reporter" as const, authorizedFeedbackId: "feedback-1" },
+      { kind: "public" as const },
+    ]) {
+      expectDenied(() => authorizeAttachmentLifecycle(hidden, authorization));
+    }
+    expectDenied(() => authorizeAttachmentLifecycle(undefined, exact));
+  });
+
   it("hides immediately on soft deletion, restores before purge, and never restores after purge", () => {
     const attachment = reporterAttachment();
     const authorization = {
