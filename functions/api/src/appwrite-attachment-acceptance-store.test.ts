@@ -210,6 +210,11 @@ describe("Appwrite Attachment acceptance store", () => {
     const row = metadataRow();
     const current = setup([row]);
     await expect(current.store.findById("attachment-1")).resolves.toEqual(attachment());
+    await expect(
+      setup([
+        { ...metadataRow(), createdAt: "2026-08-10T17:00:00+00:00" },
+      ]).store.findById("attachment-1"),
+    ).resolves.toEqual(attachment());
     await expect(current.store.isObjectAssociated("private/object-1")).resolves.toBe(
       true,
     );
@@ -264,6 +269,8 @@ describe("Appwrite Attachment acceptance store", () => {
       { ...metadataRow(), lifecycle: "deleted" },
       { ...metadataRow(), audience: "public" },
       { ...metadataRow(), size: "128" },
+      { ...metadataRow(), createdAt: "2026-08-10T17:00:00+01:00" },
+      { ...metadataRow(), createdAt: "not-a-dateZ" },
     ]) {
       await expect(setup([row]).store.findById("attachment-1")).rejects.toThrow(
         "APPWRITE_ATTACHMENT_METADATA_INVALID",

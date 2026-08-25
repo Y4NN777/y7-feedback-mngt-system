@@ -188,6 +188,13 @@ describe("private Appwrite Attachment staging adapter", () => {
     const absent = setup([]);
     await expect(absent.storage.remove("private/absent")).resolves.toBeUndefined();
     expect(absent.deleteFile).not.toHaveBeenCalled();
+
+    const equivalentUtc = setup([{ ...row, stagedAt: "2026-08-10T17:00:00+00:00" }]);
+    await expect(
+      equivalentUtc.storage.listStagedBefore("2026-08-10T18:00:00.000Z"),
+    ).resolves.toEqual([
+      expect.objectContaining({ stagedAt: "2026-08-10T17:00:00.000Z" }),
+    ]);
   });
 
   it("fails closed for malformed input, schema, duplicates, and rows", async () => {
@@ -201,6 +208,9 @@ describe("private Appwrite Attachment staging adapter", () => {
         visibility: "private",
       }),
     ).rejects.toThrow("APPWRITE_ATTACHMENT_INPUT_INVALID");
+    await expect(invalidInput.storage.listStagedBefore("not-a-dateZ")).rejects.toThrow(
+      "APPWRITE_ATTACHMENT_INPUT_INVALID",
+    );
 
     expect(() =>
       createAppwritePrivateAttachmentStorage(

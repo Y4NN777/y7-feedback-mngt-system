@@ -73,6 +73,18 @@ function requiredString(value: unknown, maximum: number): string {
   return normalized;
 }
 
+function utcInstant(value: unknown): string {
+  const candidate = requiredString(value, 40);
+  if (!/(?:Z|[+]00:00)$/u.test(candidate)) {
+    throw new Error("APPWRITE_ATTACHMENT_METADATA_INVALID");
+  }
+  const parsed = new Date(candidate);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error("APPWRITE_ATTACHMENT_METADATA_INVALID");
+  }
+  return parsed.toISOString();
+}
+
 function sourceEntry(value: Readonly<Record<string, unknown>>): AttachmentSourceEntry {
   const kind = value.sourceKind;
   const id = requiredString(value.sourceEntryId, 200);
@@ -132,7 +144,7 @@ function parseMetadata(
               throw new Error("APPWRITE_ATTACHMENT_METADATA_INVALID");
             })(),
       sha256: requiredString(value.sha256, 200),
-      createdAt: requiredString(value.createdAt, 40),
+      createdAt: utcInstant(value.createdAt),
     });
     requiredString(value.operationId, 36);
     return parsedLifecycle === "available"
