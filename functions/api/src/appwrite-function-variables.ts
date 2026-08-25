@@ -1,6 +1,24 @@
 import { createHash } from "node:crypto";
 
 export const previewFunctionId = "y7-feedback-api-preview";
+export const productionFunctionId = "y7-feedback-api-production";
+
+export interface AppwriteFunctionTarget {
+  readonly id: typeof previewFunctionId | typeof productionFunctionId;
+  readonly name: "Y7 Feedback API Preview" | "Y7 Feedback API Production";
+}
+
+export function resolveAppwriteFunctionTarget(
+  environment: string | undefined,
+): AppwriteFunctionTarget {
+  if (environment === "preview") {
+    return { id: previewFunctionId, name: "Y7 Feedback API Preview" };
+  }
+  if (environment === "production") {
+    return { id: productionFunctionId, name: "Y7 Feedback API Production" };
+  }
+  throw new Error("APPWRITE_FUNCTION_DEPLOYMENT_ENVIRONMENT_INVALID");
+}
 
 export const appwriteFunctionVariableKeys = [
   "Y7_ENVIRONMENT",

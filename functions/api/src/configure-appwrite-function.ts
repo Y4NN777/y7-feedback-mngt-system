@@ -2,7 +2,7 @@ import { Client, Functions } from "node-appwrite";
 
 import {
   planAppwriteFunctionVariables,
-  previewFunctionId,
+  resolveAppwriteFunctionTarget,
 } from "./appwrite-function-variables.js";
 
 if (!process.argv.includes("--apply")) {
@@ -15,12 +15,13 @@ const apiKey = process.env.APPWRITE_API_KEY?.trim();
 if (!endpoint || !projectId || !apiKey) {
   throw new Error("APPWRITE_FUNCTION_ADMIN_AUTHORITY_MISSING");
 }
+const target = resolveAppwriteFunctionTarget(process.env.Y7_ENVIRONMENT?.trim());
 
 const functions = new Functions(
   new Client().setEndpoint(endpoint).setProject(projectId).setKey(apiKey),
 );
 const current = await functions.listVariables({
-  functionId: previewFunctionId,
+  functionId: target.id,
   total: false,
 });
 const actions = planAppwriteFunctionVariables(
@@ -33,7 +34,7 @@ let updated = 0;
 for (const action of actions) {
   if (action.kind === "create") {
     await functions.createVariable({
-      functionId: previewFunctionId,
+      functionId: target.id,
       variableId: action.id,
       key: action.key,
       value: action.value,
@@ -42,7 +43,7 @@ for (const action of actions) {
     created += 1;
   } else {
     await functions.updateVariable({
-      functionId: previewFunctionId,
+      functionId: target.id,
       variableId: action.id,
       key: action.key,
       value: action.value,
@@ -54,7 +55,7 @@ for (const action of actions) {
 
 console.log(
   JSON.stringify({
-    functionId: previewFunctionId,
+    functionId: target.id,
     configured: actions.length,
     created,
     updated,
