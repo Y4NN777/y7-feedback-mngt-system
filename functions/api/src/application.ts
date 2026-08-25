@@ -10,6 +10,8 @@ import { createNodeAppwritePrivateAttachmentStorage } from "./appwrite-private-a
 import { createNodeAppwritePrincipalVerifier } from "./appwrite-principal-verifier.js";
 import { createNodeAppwritePublicProjectReader } from "./appwrite-public-project-reader.js";
 import { createNodeAppwriteWorkspaceAttachmentScopeResolver } from "./appwrite-workspace-attachment-scope.js";
+import { createNodeAppwriteWorkspaceCapabilityScopeResolver } from "./appwrite-workspace-capability-scope.js";
+import { createNodeAppwriteWorkspaceProjectOperationPorts } from "./appwrite-workspace-project-ports.js";
 import type { HttpDependencies } from "./http.js";
 import { createIntakeCoordinator } from "./intake.js";
 import { createAttachmentDownload } from "./attachment-download.js";
@@ -24,6 +26,7 @@ import { createPublicApi } from "./public-api.js";
 import { createReporterAttachmentDownload } from "./reporter-attachment-download.js";
 import { createSensitiveDataProtector } from "./sensitive-data-protector.js";
 import { createWorkspaceAttachmentDownload } from "./workspace-attachment-download.js";
+import { createWorkspaceProjectOperations } from "./workspace-project-operations.js";
 
 export interface ApplicationRuntime {
   readonly tables: TablesDB;
@@ -110,18 +113,38 @@ export function createHttpApplication(
     accountless,
     createAttachmentDownload(attachmentMetadata, attachmentStorage),
   );
+  const principalVerifier = createNodeAppwritePrincipalVerifier({
+    endpoint: config.appwriteEndpoint,
+    projectId: config.appwriteProjectId,
+  });
+  const workspaceScopeSchema = {
+    databaseId: config.appwriteSchema.databaseId,
+    projectsTableId: config.appwriteSchema.projectsTableId,
+    workspaceMembershipsTableId: config.appwriteSchema.workspaceMembershipsTableId,
+    projectAssignmentsTableId: config.appwriteSchema.projectAssignmentsTableId,
+  };
   const workspaceAttachmentDownload = createWorkspaceAttachmentDownload(
-    createNodeAppwritePrincipalVerifier({
-      endpoint: config.appwriteEndpoint,
-      projectId: config.appwriteProjectId,
-    }),
+    principalVerifier,
     createNodeAppwriteWorkspaceAttachmentScopeResolver(runtime.tables, {
-      databaseId: config.appwriteSchema.databaseId,
-      projectsTableId: config.appwriteSchema.projectsTableId,
-      workspaceMembershipsTableId: config.appwriteSchema.workspaceMembershipsTableId,
-      projectAssignmentsTableId: config.appwriteSchema.projectAssignmentsTableId,
+      ...workspaceScopeSchema,
     }),
     createAttachmentDownload(attachmentMetadata, attachmentStorage),
+  );
+  const workspaceOperations = createWorkspaceProjectOperations(
+    principalVerifier,
+    createNodeAppwriteWorkspaceCapabilityScopeResolver(
+      runtime.tables,
+      workspaceScopeSchema,
+    ),
+    createNodeAppwriteWorkspaceProjectOperationPorts(
+      runtime.tables,
+      {
+        databaseId: config.appwriteSchema.databaseId,
+        feedbackTableId: config.appwriteSchema.feedbackTableId,
+        notificationsTableId: config.appwriteSchema.notificationsTableId,
+      },
+      runtime.createId,
+    ),
   );
 
   return {
@@ -134,6 +157,7 @@ export function createHttpApplication(
       accountless,
       reporterAttachmentDownload,
       workspaceAttachmentDownload,
+      workspaceOperations,
     ),
     release: config.release,
     startedAt: runtime.startedAt,

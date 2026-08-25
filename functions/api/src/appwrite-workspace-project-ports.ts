@@ -67,7 +67,10 @@ function isObject(value: unknown): value is Readonly<Record<string, unknown>> {
 
 function validateSchema(schema: AppwriteWorkspaceProjectOperationSchema): void {
   const ids = [schema.databaseId, schema.feedbackTableId, schema.notificationsTableId];
-  if (ids.some((id) => !appwriteId.test(id)) || new Set(ids).size !== ids.length) {
+  if (
+    ids.some((id) => !appwriteId.test(id)) ||
+    schema.feedbackTableId === schema.notificationsTableId
+  ) {
     throw new Error("APPWRITE_WORKSPACE_OPERATION_SCHEMA_INVALID");
   }
 }
