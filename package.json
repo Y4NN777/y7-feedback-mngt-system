@@ -17,6 +17,7 @@
     "lint": "eslint . --max-warnings 0",
     "probe": "node scripts/probe.mjs",
     "probe:ingress": "node scripts/ingress-probe.mjs",
+    "probe:vercel:preview": "node scripts/vercel-preview-probe.mjs",
     "provision:appwrite": "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build && node --env-file=.env.appwrite-preview functions/api/dist/provision-appwrite.js --apply",
     "verify:appwrite:g1": "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build && node --env-file=.env.appwrite-preview functions/api/dist/verify-appwrite-g1.js --apply",
     "verify:appwrite:deployed:g1": "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build && node --env-file=.env.appwrite-preview functions/api/dist/verify-appwrite-deployed-g1.js --apply",
