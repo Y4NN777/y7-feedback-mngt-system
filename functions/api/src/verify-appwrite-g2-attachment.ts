@@ -21,6 +21,8 @@ import { createAttachmentDownload } from "./attachment-download.js";
 import { createAttachmentLifecycleCoordinator } from "./attachment-lifecycle.js";
 import { createAttachmentSaga } from "./attachment-saga.js";
 import { validateAttachment } from "./attachment-validation.js";
+import { parseClamAvHttpScannerConfig } from "./clamav-http-scanner-config.js";
+import { createClamAvHttpScanner } from "./clamav-http-scanner.js";
 import { createHttpFunctionPublicApi } from "./http-function-public-api.js";
 import type { PublicApi } from "./public-api.js";
 import { createSensitiveDataProtector } from "./sensitive-data-protector.js";
@@ -146,6 +148,9 @@ async function main(): Promise<void> {
       stagingTableId: config.appwriteSchema.attachmentStagingTableId,
     },
   );
+  const malwareScanner = createClamAvHttpScanner(
+    parseClamAvHttpScannerConfig(process.env),
+  );
   const metadata = createNodeAppwriteAttachmentAcceptanceStore(
     tables,
     {
@@ -162,10 +167,7 @@ async function main(): Promise<void> {
     now: () => stagedAt,
     createAttachmentId: () => attachmentId,
     createObjectId: () => objectId,
-    validate: (candidate) =>
-      validateAttachment(candidate, {
-        malwareScanner: { scan: () => Promise.resolve("clean") },
-      }),
+    validate: (candidate) => validateAttachment(candidate, { malwareScanner }),
   });
   const internalAttachmentId = `g2i_${suffix}`;
   const internalObjectId = `private/g2_internal_${suffix}`;
@@ -173,10 +175,7 @@ async function main(): Promise<void> {
     now: () => stagedAt,
     createAttachmentId: () => internalAttachmentId,
     createObjectId: () => internalObjectId,
-    validate: (candidate) =>
-      validateAttachment(candidate, {
-        malwareScanner: { scan: () => Promise.resolve("clean") },
-      }),
+    validate: (candidate) => validateAttachment(candidate, { malwareScanner }),
   });
   const lifecycleState = createNodeAppwriteAttachmentLifecycleStore(tables, {
     databaseId: config.appwriteSchema.databaseId,
