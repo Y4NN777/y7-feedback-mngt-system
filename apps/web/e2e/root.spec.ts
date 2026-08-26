@@ -123,7 +123,9 @@ test("BDD-PWA-001 emits a manifest and a public-only service worker", async ({
   }
   expect(manifest.display).toBe("standalone");
   expect(serviceWorkerResponse.ok()).toBe(true);
-  expect(await serviceWorkerResponse.text()).not.toContain('"/api/');
+  const serviceWorker = await serviceWorkerResponse.text();
+  expect(serviceWorker).not.toContain('"/api/');
+  expect(serviceWorker).toContain("clientsClaim");
 });
 
 test("BDD-UX-INTAKE-001 reviews a bilingual WiseMoney draft without losing input", async ({
