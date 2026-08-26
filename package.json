@@ -29,6 +29,7 @@
     "verify:appwrite:direct-access": "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build && node --env-file=.env.appwrite-preview functions/api/dist/verify-appwrite-direct-access.js --apply",
     "verify:appwrite:workspace-operations": "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build && node --env-file=.env.appwrite-preview functions/api/dist/verify-appwrite-workspace-operations.js --apply",
     "verify:appwrite:workspace-operations:domain": "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build && node --env-file=.env.appwrite-preview functions/api/dist/verify-appwrite-workspace-operations.js --apply --domain",
+    "verify:mail-catcher": "pnpm --filter @y7-feedback/api build && pnpm --filter @y7-feedback/api verify:mail-catcher",
     "security:scan": "node scripts/security-scan.mjs",
     "test": "pnpm test:runtime-deps && node --test tests/*.test.mjs && pnpm -r --if-present test",
     "test:coverage": "pnpm test:runtime-deps && node --test tests/*.test.mjs && pnpm -r --if-present test:coverage",
