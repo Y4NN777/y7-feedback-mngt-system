@@ -8,6 +8,7 @@ import { createHttpAccountlessGateway } from "./AccountlessHttpGateway";
 import { App } from "./App";
 import { createHttpIntakeGateway } from "./IntakeGateway";
 import { createHttpProjectGateway } from "./ProjectGateway";
+import { OperationalTelemetry } from "./observability/OperationalTelemetry";
 import "./styles.css";
 
 const root = document.querySelector<HTMLDivElement>("#root");
@@ -29,6 +30,7 @@ createRoot(root).render(
         intakeGateway={intakeGateway}
         projectGateway={projectGateway}
       />
+      <OperationalTelemetry />
     </QueryClientProvider>
   </StrictMode>,
 );
