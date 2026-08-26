@@ -1,0 +1,34 @@
+services:
+  gateway:
+    build:
+      context: ../..
+      dockerfile: services/antivirus/Dockerfile
+    environment:
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: "3310"
+      Y7_SCANNER_KEY_ID: ${Y7_SCANNER_KEY_ID}
+      Y7_SCANNER_HMAC_KEY: ${Y7_SCANNER_HMAC_KEY}
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      clamav:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,noexec,nosuid,nodev
+    security_opt:
+      - no-new-privileges:true
+  clamav:
+    image: clamav/clamav:1.5.4
+    ports:
+      - "127.0.0.1:3310:3310"
+    volumes:
+      - clamav-signatures:/var/lib/clamav
+    tmpfs:
+      - /tmp:size=32m,noexec,nosuid,nodev
+      - /run/clamav:size=8m,nosuid,nodev
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  clamav-signatures:

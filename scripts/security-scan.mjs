@@ -11,6 +11,10 @@ const scanRoots = [
   "functions/api/src",
   "packages/config/src",
   "packages/domain/src",
+  "services/antivirus/src",
+  "services/antivirus/compose.yaml",
+  "services/antivirus/Dockerfile",
+  "scripts/antivirus-smoke.mjs",
   "vercel.json",
 ];
 const textExtensions = new Set([
@@ -19,9 +23,11 @@ const textExtensions = new Set([
   ".html",
   ".js",
   ".json",
+  ".mjs",
   ".svg",
   ".ts",
   ".tsx",
+  ".yaml",
 ]);
 
 const prohibitedPatterns = [
@@ -71,7 +77,10 @@ async function collectFiles(path) {
     return [];
   }
   if (details.isFile()) {
-    return textExtensions.has(extname(absolutePath)) ? [absolutePath] : [];
+    return absolutePath.endsWith("/Dockerfile") ||
+      textExtensions.has(extname(absolutePath))
+      ? [absolutePath]
+      : [];
   }
 
   const entries = await readdir(absolutePath, { withFileTypes: true });
@@ -84,7 +93,7 @@ async function collectFiles(path) {
     } else if (
       entry.isFile() &&
       !entry.name.includes(".test.") &&
-      textExtensions.has(extname(entry.name))
+      (entry.name === "Dockerfile" || textExtensions.has(extname(entry.name)))
     ) {
       files.push(child);
     }

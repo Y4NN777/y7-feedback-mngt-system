@@ -51,6 +51,8 @@ jobs:
         run: pnpm test:coverage
       - name: Build
         run: pnpm build
+      - name: Run real ClamAV smoke
+        run: pnpm verify:antivirus:local
       - name: Scan prohibited data
         run: pnpm security:scan
 

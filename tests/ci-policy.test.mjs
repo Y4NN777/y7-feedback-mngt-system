@@ -29,6 +29,7 @@ test("BDD-CI-001 runs the complete pull-request gate with pinned least-privilege
     "pnpm test",
     "pnpm test:coverage",
     "pnpm build",
+    "pnpm verify:antivirus:local",
     "pnpm security:scan",
     "pnpm --filter @y7-feedback/web exec playwright install --with-deps chromium",
     "pnpm test:e2e",
