@@ -14,6 +14,7 @@ import {
 import { InputFile } from "node-appwrite/file";
 
 import { parseServerConfig } from "@y7-feedback/config/server";
+import type { ApplicationEnvironment } from "@y7-feedback/config/public";
 
 import { resolveAppwriteFunctionTarget } from "./appwrite-function-variables.js";
 
@@ -31,8 +32,11 @@ function run(command: string, args: readonly string[]): Promise<void> {
   });
 }
 
-async function ensureFunction(functions: Functions): Promise<"created" | "updated"> {
-  const target = resolveAppwriteFunctionTarget("production");
+async function ensureFunction(
+  functions: Functions,
+  environment: ApplicationEnvironment,
+): Promise<"created" | "updated"> {
+  const target = resolveAppwriteFunctionTarget(environment);
   const settings = {
     functionId: target.id,
     name: target.name,
@@ -84,9 +88,6 @@ async function main(): Promise<void> {
     throw new Error("APPWRITE_FUNCTION_DEPLOYMENT_REQUIRES_APPLY");
   }
   const config = parseServerConfig(process.env);
-  if (config.environment !== "production") {
-    throw new Error("APPWRITE_FUNCTION_PRODUCTION_REQUIRED");
-  }
   const target = resolveAppwriteFunctionTarget(config.environment);
   const functions = new Functions(
     new Client()
@@ -94,7 +95,9 @@ async function main(): Promise<void> {
       .setProject(config.appwriteProjectId)
       .setKey(config.appwriteApiKey),
   );
-  const temporaryDirectory = await mkdtemp(join(tmpdir(), "y7-appwrite-production-"));
+  const temporaryDirectory = await mkdtemp(
+    join(tmpdir(), `y7-appwrite-${config.environment}-`),
+  );
   const archivePath = join(temporaryDirectory, "function.tar.gz");
   try {
     await run("tar", [
@@ -113,7 +116,7 @@ async function main(): Promise<void> {
       archivePath,
       ".",
     ]);
-    const functionChange = await ensureFunction(functions);
+    const functionChange = await ensureFunction(functions, config.environment);
     const deployment = await functions.createDeployment({
       functionId: target.id,
       code: InputFile.fromPath(archivePath),

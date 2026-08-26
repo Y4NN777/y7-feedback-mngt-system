@@ -131,7 +131,7 @@ export function createGitLabSourceProvider(
         redirect_uri: redirectUri(input.redirectUri),
         response_type: "code",
         state: required(input.state, 1_000),
-        scope: "read_api",
+        scope: "api",
       }).toString();
       return url.toString();
     },

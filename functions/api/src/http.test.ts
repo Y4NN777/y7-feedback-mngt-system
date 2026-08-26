@@ -228,6 +228,70 @@ describe("trusted API entrypoint", () => {
     expect(event).not.toContain("secret-proof");
   });
 
+  it("BDD-SRC-REAL-002 delegates callback query fields only to the source boundary", async () => {
+    const sourceHandle = vi.fn(() =>
+      Promise.resolve({
+        statusCode: 200,
+        body: { status: "pending_selection", connectionId: "connection_1" },
+      }),
+    );
+    const publicHandle = vi.fn<PublicApi["handle"]>();
+    const { context, json } = createContext("GET", "/providers/github/callback", {
+      query: { state: "opaque.state", code: "one-use-code" },
+    });
+
+    await routeRequest(context, {
+      ...dependencies,
+      sourceConnections: { handle: sourceHandle },
+      publicApi: { handle: publicHandle },
+    });
+
+    expect(sourceHandle).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: "GET",
+        query: { state: "opaque.state", code: "one-use-code" },
+      }),
+    );
+    expect(publicHandle).not.toHaveBeenCalled();
+    expect(json).toHaveBeenCalledWith(
+      { status: "pending_selection", connectionId: "connection_1" },
+      200,
+      expect.objectContaining({ "cache-control": "no-store" }),
+    );
+    expect(context.log).toHaveBeenCalledWith(
+      expect.not.stringMatching(/opaque|one-use|callback/u),
+    );
+  });
+
+  it("BDD-SRC-REAL-005 defaults absent query and excludes multipart bodies", async () => {
+    const sourceHandle = vi.fn(() => Promise.resolve(null));
+    const { context } = createContext("POST", "/providers/upload", {
+      headers: { "content-type": "multipart/form-data; boundary=test" },
+      bodyJson: { prohibited: true },
+    });
+    await routeRequest(context, {
+      ...dependencies,
+      sourceConnections: { handle: sourceHandle },
+    });
+    expect(sourceHandle).toHaveBeenCalledWith(
+      expect.objectContaining({ method: "POST", query: {}, body: undefined }),
+    );
+    const { context: jsonContext } = createContext("POST", "/providers/upload", {
+      headers: { "content-type": "application/json" },
+      bodyJson: { repositoryIds: ["repository_1"] },
+    });
+    await routeRequest(jsonContext, {
+      ...dependencies,
+      sourceConnections: { handle: sourceHandle },
+    });
+    expect(sourceHandle).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        method: "POST",
+        body: { repositoryIds: ["repository_1"] },
+      }),
+    );
+  });
+
   it("records a rejected public outcome without requiring headers", async () => {
     const publicApi: PublicApi = {
       handle: () =>

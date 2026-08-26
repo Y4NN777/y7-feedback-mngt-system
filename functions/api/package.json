@@ -18,6 +18,7 @@
     "verify:appwrite:direct-access": "node dist/verify-appwrite-direct-access.js --apply",
     "verify:appwrite:workspace-operations": "node dist/verify-appwrite-workspace-operations.js --apply",
     "verify:mail-catcher": "node dist/verify-preview-mail-catcher.js",
+    "verify:source-provider": "node dist/verify-preview-source-provider.js",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc -p tsconfig.json --noEmit"

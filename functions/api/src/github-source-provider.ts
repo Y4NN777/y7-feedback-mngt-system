@@ -12,6 +12,10 @@ export interface GitHubProviderConfig {
 }
 
 type Fetcher = (input: string, init: RequestInit) => Promise<Response>;
+export type GitHubProviderDiagnostic = (event: {
+  readonly stage: "token_exchange" | "installations" | "repositories";
+  readonly status: number;
+}) => void;
 
 const webOrigin = new URL("https://github.com/");
 const apiOrigin = new URL("https://api.github.com/");
@@ -112,6 +116,7 @@ export function createGitHubSourceProvider(
   fetcher: Fetcher = globalThis.fetch,
   now: () => number = Date.now,
   maximumPages = 100,
+  diagnostic: GitHubProviderDiagnostic = () => undefined,
 ): SourceProviderAdapter {
   let clientId: string;
   let clientSecret: string;
@@ -139,6 +144,10 @@ export function createGitHubSourceProvider(
         cache: "no-store",
         credentials: "omit",
         headers: headers(accessToken),
+      });
+      diagnostic({
+        stage: field === "installations" ? "installations" : "repositories",
+        status: result.status,
       });
       if (result.status !== 200) return unavailable();
       ids.push(...positiveIds((await result.json()) as unknown, field));
@@ -176,6 +185,7 @@ export function createGitHubSourceProvider(
             }),
           },
         );
+        diagnostic({ stage: "token_exchange", status: exchange.status });
         if (exchange.status !== 200) return unavailable();
         const material = grant((await exchange.json()) as unknown, now());
         const installationIds = await requestIds(

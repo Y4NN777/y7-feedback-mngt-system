@@ -84,7 +84,7 @@ test("BDD-DEL-APPWRITE-006 keeps Function secrets and local artifacts out of dep
   }
 });
 
-test("BDD-DEL-APPWRITE-007 exposes an explicit non-variable deployment command", async () => {
+test("BDD-DEL-APPWRITE-007 exposes an explicit API-key deployment command", async () => {
   const rootPackage = JSON.parse(
     await readFile(new URL("../package.json", import.meta.url), "utf8"),
   );
@@ -93,7 +93,7 @@ test("BDD-DEL-APPWRITE-007 exposes an explicit non-variable deployment command",
 
   assert.equal(
     rootPackage.scripts["deploy:appwrite:function:preview"],
-    "pnpm dlx appwrite-cli@27.2.0 push functions --function-id y7-feedback-api-preview --activate --force",
+    "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build && node --env-file=.env.appwrite-preview functions/api/dist/deploy-appwrite-function.js --apply",
   );
   assert.doesNotMatch(
     rootPackage.scripts["deploy:appwrite:function:preview"],

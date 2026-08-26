@@ -83,3 +83,42 @@ only; timeout and rejection disclose no response body or authorization value.
 `TASK-SRC-001`, `TASK-ATT-001`, and Gate G1 remain blocked until the same
 contracts pass against real non-production GitHub, GitLab.com, Appwrite, and
 Vercel boundaries.
+
+## Deployed provider callback tranche
+
+### BDD-SRC-REAL-001 — trusted initiation
+
+Given a real Appwrite JWT and an authoritative Project, when a connection is
+initiated, then only the Workspace Owner receives a provider authorization URL
+whose opaque one-use state is bound to that Owner, Workspace, Project,
+provider, expiry, and safe return path. Missing, forged, Maintainer, and
+cross-scope principals receive the same non-disclosing denial.
+
+### BDD-SRC-REAL-002 — callback exchange and replay denial
+
+Given a pending state, when GitHub or GitLab returns the matching state and
+authorization code to the direct Preview Function domain, then the backend
+exchanges the code, encrypts the grant in Appwrite, and records only immutable
+authorized repository identities. Wrong, expired, cross-provider, malformed,
+or replayed callbacks create no usable connection and disclose no grant.
+
+### BDD-SRC-REAL-003 — explicit selection
+
+Given the provider-authorized repository identities, when the initiating Owner
+selects a subset through an authenticated command, then only that subset becomes
+active. Empty, duplicate, unlisted, cross-provider, and cross-scope selections
+are denied without changing the pending connection.
+
+### BDD-SRC-REAL-004 — real revocation
+
+Given an active real grant, when the owning Workspace Owner disconnects it,
+then Y7 invokes the matching provider revocation endpoint, removes the encrypted
+grant, and marks provider use disconnected. Retry and duplicate commands cannot
+produce a false success or expose credentials.
+
+### BDD-SRC-REAL-005 — prohibited-data boundary
+
+Given every success and failure above, then responses, redirect targets,
+structured logs, telemetry, browser storage, Git history, and curated evidence
+contain no authorization code, access/refresh token, client secret, raw state
+nonce, grant envelope, or provider response body.

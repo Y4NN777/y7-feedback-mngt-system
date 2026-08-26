@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 
 import { Client, ID, Storage, TablesDB } from "node-appwrite";
 
@@ -29,6 +29,12 @@ export default function handler(context: FunctionContext): Promise<unknown> {
     nowIso: () => new Date().toISOString(),
     nowMs: Date.now,
     startedAt: () => functionStartedAt,
+    createProviderNonce: () => randomBytes(24).toString("base64url"),
+    digestProviderNonce: (nonce) =>
+      createHash("sha256").update(nonce).digest("base64url"),
+    providerDiagnostic: (event) => {
+      context.log(JSON.stringify({ event: "source_provider", ...event }));
+    },
   });
   return routeRequest(context, dependencies);
 }

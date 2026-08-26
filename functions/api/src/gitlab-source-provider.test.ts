@@ -54,7 +54,7 @@ describe("GitLab OAuth source provider adapter", () => {
         redirectUri: "https://feedback.example/callback/gitlab",
       }),
     ).toBe(
-      "https://gitlab.com/oauth/authorize?client_id=application-id&redirect_uri=https%3A%2F%2Ffeedback.example%2Fcallback%2Fgitlab&response_type=code&state=opaque-state&scope=read_api",
+      "https://gitlab.com/oauth/authorize?client_id=application-id&redirect_uri=https%3A%2F%2Ffeedback.example%2Fcallback%2Fgitlab&response_type=code&state=opaque-state&scope=api",
     );
   });
 
