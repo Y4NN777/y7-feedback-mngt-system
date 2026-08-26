@@ -142,4 +142,55 @@ describe("trusted environment contract", () => {
       );
     }
   });
+
+  it("BDD-SRC-REAL-005 accepts provider authority only as a complete server-only set", () => {
+    const providerVariables = {
+      GITHUB_APP_CLIENT_ID: "github-client-id",
+      GITHUB_APP_CLIENT_SECRET: "github-client-secret",
+      GITHUB_APP_CALLBACK_URL: "https://preview-api.example/providers/github/callback",
+      GITLAB_OAUTH_CLIENT_ID: "gitlab-client-id",
+      GITLAB_OAUTH_CLIENT_SECRET: "gitlab-client-secret",
+      GITLAB_OAUTH_CALLBACK_URL:
+        "https://preview-api.example/providers/gitlab/callback",
+      GITLAB_OAUTH_ORIGIN: "https://gitlab.com",
+    };
+
+    expect(
+      parseServerConfig({ ...validServer, ...providerVariables }).providers,
+    ).toEqual({
+      github: {
+        clientId: "github-client-id",
+        clientSecret: "github-client-secret",
+        callbackUrl: "https://preview-api.example/providers/github/callback",
+      },
+      gitlab: {
+        clientId: "gitlab-client-id",
+        clientSecret: "gitlab-client-secret",
+        callbackUrl: "https://preview-api.example/providers/gitlab/callback",
+        origin: "https://gitlab.com/",
+      },
+    });
+    expect(parseServerConfig(validServer).providers).toBeUndefined();
+    expect(() =>
+      parseServerConfig({
+        ...validServer,
+        ...providerVariables,
+        GITHUB_APP_CLIENT_SECRET: undefined,
+      }),
+    ).toThrow(new ConfigError("PROVIDER_CONFIG_INVALID"));
+    expect(() =>
+      parseServerConfig({
+        ...validServer,
+        ...providerVariables,
+        GITLAB_OAUTH_CALLBACK_URL: "http://preview-api.example/callback",
+      }),
+    ).toThrow(new ConfigError("PROVIDER_CONFIG_INVALID"));
+    expect(() =>
+      parseServerConfig({
+        ...validServer,
+        ...providerVariables,
+        GITHUB_APP_CALLBACK_URL: "not-a-url",
+      }),
+    ).toThrow(new ConfigError("PROVIDER_CONFIG_INVALID"));
+  });
 });

@@ -37,6 +37,19 @@ export interface ServerConfig {
   readonly providerGrantEnvelopeKey: string;
   readonly sensitiveDataActiveKeyId: string;
   readonly sensitiveDataEnvelopeKeys: Readonly<Record<string, string>>;
+  readonly providers?: {
+    readonly github: {
+      readonly clientId: string;
+      readonly clientSecret: string;
+      readonly callbackUrl: string;
+    };
+    readonly gitlab: {
+      readonly clientId: string;
+      readonly clientSecret: string;
+      readonly callbackUrl: string;
+      readonly origin: string;
+    };
+  };
   readonly release: string;
 }
 
@@ -148,6 +161,75 @@ function parseSensitiveDataKeys(
   };
 }
 
+function parseProviders(
+  input: Readonly<Record<string, string | undefined>>,
+): ServerConfig["providers"] {
+  const keys = [
+    "GITHUB_APP_CLIENT_ID",
+    "GITHUB_APP_CLIENT_SECRET",
+    "GITHUB_APP_CALLBACK_URL",
+    "GITLAB_OAUTH_CLIENT_ID",
+    "GITLAB_OAUTH_CLIENT_SECRET",
+    "GITLAB_OAUTH_CALLBACK_URL",
+    "GITLAB_OAUTH_ORIGIN",
+  ] as const;
+  const values = keys.map((key) => input[key]?.trim() ?? "");
+  if (values.every((value) => value === "")) return undefined;
+  if (values.some((value) => value === "")) {
+    throw new ConfigError("PROVIDER_CONFIG_INVALID");
+  }
+  const [
+    githubClientId,
+    githubClientSecret,
+    githubCallback,
+    gitlabClientId,
+    gitlabClientSecret,
+    gitlabCallback,
+    gitlabOriginValue,
+  ] = values as [string, string, string, string, string, string, string];
+  let githubCallbackUrl: URL;
+  let gitlabCallbackUrl: URL;
+  let gitlabOrigin: URL;
+  try {
+    githubCallbackUrl = new URL(githubCallback);
+    gitlabCallbackUrl = new URL(gitlabCallback);
+    gitlabOrigin = new URL(gitlabOriginValue);
+  } catch {
+    throw new ConfigError("PROVIDER_CONFIG_INVALID");
+  }
+  const safeCallback = (url: URL) =>
+    url.protocol === "https:" &&
+    url.username === "" &&
+    url.password === "" &&
+    url.hash === "";
+  if (
+    !safeCallback(githubCallbackUrl) ||
+    !safeCallback(gitlabCallbackUrl) ||
+    !safeCallback(gitlabOrigin) ||
+    gitlabOrigin.pathname !== "/" ||
+    gitlabOrigin.search !== "" ||
+    githubClientId.length > 500 ||
+    githubClientSecret.length > 2_000 ||
+    gitlabClientId.length > 500 ||
+    gitlabClientSecret.length > 2_000
+  ) {
+    throw new ConfigError("PROVIDER_CONFIG_INVALID");
+  }
+  return {
+    github: {
+      clientId: githubClientId,
+      clientSecret: githubClientSecret,
+      callbackUrl: githubCallbackUrl.toString(),
+    },
+    gitlab: {
+      clientId: gitlabClientId,
+      clientSecret: gitlabClientSecret,
+      callbackUrl: gitlabCallbackUrl.toString(),
+      origin: gitlabOrigin.toString(),
+    },
+  };
+}
+
 export function parseServerConfig(
   input: Readonly<Record<string, string | undefined>>,
 ): ServerConfig {
@@ -165,6 +247,7 @@ export function parseServerConfig(
     input.SENSITIVE_DATA_ACTIVE_KEY_ID,
     [accessProofEnvelopeKey, providerGrantEnvelopeKey],
   );
+  const providers = parseProviders(input);
   return {
     environment,
     backendEnvironment,
@@ -176,6 +259,7 @@ export function parseServerConfig(
     providerGrantEnvelopeKey,
     sensitiveDataActiveKeyId: sensitiveDataKeys.activeKeyId,
     sensitiveDataEnvelopeKeys: sensitiveDataKeys.keys,
+    ...(providers === undefined ? {} : { providers }),
     release: requireValue(input.RELEASE),
   };
 }
