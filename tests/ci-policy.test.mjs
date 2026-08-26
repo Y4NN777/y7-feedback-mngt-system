@@ -52,6 +52,29 @@ test("BDD-CI-002 builds runtime workspace dependencies before the E2E server", a
   );
 });
 
+test("BDD-CI-005 publishes the antivirus image with least privilege and immutable provenance", async () => {
+  const workflow = await readFile(
+    new URL("../.github/workflows/antivirus-image.yml", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(workflow, /branches:\s+- main/u);
+  assert.match(workflow, /permissions:\s+contents: read\s+packages: write/u);
+  assert.match(workflow, /docker login .*--password-stdin/u);
+  assert.match(workflow, /services\/antivirus\/Dockerfile/u);
+  assert.match(workflow, /sha-\$GITHUB_SHA/u);
+  assert.match(workflow, /IMAGE_NAME: y4nn777\/y7-feedback-antivirus/u);
+  assert.match(workflow, /\$IMAGE_NAME:preview/u);
+  assert.doesNotMatch(workflow, /secrets\./u);
+
+  const actionReferences = [...workflow.matchAll(/^\s+(?:- )?uses: ([^\s#]+)/gmu)].map(
+    (match) => match[1],
+  );
+  assert.deepEqual(actionReferences, [
+    "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+  ]);
+});
+
 test("BDD-CI-004 loads ignored Appwrite credentials without shell export", async () => {
   const rootPackage = JSON.parse(
     await readFile(new URL("../package.json", import.meta.url), "utf8"),
