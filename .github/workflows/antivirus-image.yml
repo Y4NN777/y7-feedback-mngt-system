@@ -1,0 +1,44 @@
+name: Antivirus image
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/antivirus-image.yml"
+      - "services/antivirus/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "tsconfig.base.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: antivirus-image-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: y4nn777/y7-feedback-antivirus
+
+jobs:
+  publish:
+    name: Build and publish immutable image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Authenticate to GitHub Container Registry
+        run: echo "${{ github.token }}" | docker login "$REGISTRY" --username "${{ github.actor }}" --password-stdin
+      - name: Build scanner gateway
+        run: docker build --file services/antivirus/Dockerfile --tag "$REGISTRY/$IMAGE_NAME:sha-$GITHUB_SHA" .
+      - name: Publish immutable and Preview tags
+        run: |
+          docker push "$REGISTRY/$IMAGE_NAME:sha-$GITHUB_SHA"
+          docker tag "$REGISTRY/$IMAGE_NAME:sha-$GITHUB_SHA" "$REGISTRY/$IMAGE_NAME:preview"
+          docker push "$REGISTRY/$IMAGE_NAME:preview"
