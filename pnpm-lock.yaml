@@ -116,7 +116,13 @@ importers:
       node-appwrite:
         specifier: 27.1.0
         version: 27.1.0
+      nodemailer:
+        specifier: ^9.0.5
+        version: 9.0.5
     devDependencies:
+      "@types/nodemailer":
+        specifier: ^8.0.1
+        version: 8.0.1
       appwrite:
         specifier: 26.2.0
         version: 26.2.0
@@ -1708,6 +1714,12 @@ packages:
     resolution:
       {
         integrity: sha512-5IviulTZeRNp2vAJ514cc/HUlY5nZ9fCbq9DMyC52BrhFZACo3nI0R7qBxhQmo/d27NFe96ur/b7Wwxklda+kg==,
+      }
+
+  "@types/nodemailer@8.0.1":
+    resolution:
+      {
+        integrity: sha512-PxpaInm8V1JQDd4j0ds5HfvWQk8JupS1C0Picb96QJsrrRDjBH+DlK7L4ZdNSqNULhiZRQHc40nLVShaGxXAMw==,
       }
 
   "@types/react-dom@19.2.4":
@@ -3720,6 +3732,13 @@ packages:
         integrity: sha512-D9UOmYG3UH1V+ENW56t5QXBwJw1YEY18ruVeus89Rw+SyIgjPkCO84bRzO3uNIYosJbNwiabWVn48o3uJLjxFQ==,
       }
     engines: { node: ">=18" }
+
+  nodemailer@9.0.5:
+    resolution:
+      {
+        integrity: sha512-wvjiKvjczmsN7U/8006JOdXubgBk2XFAbioDMbT+sM7cPs0QrhJTa6KBRX7P5REGGkDcLUz/EarWidb8G8C1jQ==,
+      }
+    engines: { node: ">=6.0.0" }
 
   object-assign@4.1.1:
     resolution:
@@ -5974,6 +5993,10 @@ snapshots:
     dependencies:
       undici-types: 8.3.0
 
+  "@types/nodemailer@8.0.1":
+    dependencies:
+      "@types/node": 26.2.0
+
   "@types/react-dom@19.2.4(@types/react@19.2.18)":
     dependencies:
       "@types/react": 19.2.18
@@ -7257,6 +7280,8 @@ snapshots:
       semver: 6.3.1
 
   node-releases@2.0.53: {}
+
+  nodemailer@9.0.5: {}
 
   object-assign@4.1.1: {}
 
