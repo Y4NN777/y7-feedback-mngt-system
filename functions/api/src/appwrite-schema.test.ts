@@ -92,6 +92,8 @@ describe("Appwrite infrastructure manifest", () => {
       [schema.conversationInternalNotesTableId, ["feedbackId", "occurredAt"]],
       [schema.conversationIdempotencyTableId, ["feedbackId", "operationId"]],
       [schema.conversationLifecycleTableId, ["feedbackId", "sequence"]],
+      [schema.notificationsTableId, ["eventId", "recipientId"]],
+      [schema.notificationsTableId, ["recipientId", "workspaceId", "projectId"]],
     ] as const;
 
     for (const [tableId, queriedColumns] of requirements) {

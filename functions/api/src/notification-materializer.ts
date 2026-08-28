@@ -9,11 +9,13 @@ export interface MaterializedNotification {
   readonly id: string;
   readonly eventId: string;
   readonly feedbackId: string;
+  readonly reporterId: string;
   readonly workspaceId: string;
   readonly projectId: string;
   readonly recipientId: string;
   readonly recipientKind: NotificationRecipientKind;
   readonly kind: NotificationSourceFact["kind"];
+  readonly reference: string;
   readonly createdAt: string;
   readonly readAt: null;
 }
@@ -141,11 +143,13 @@ export function createNotificationMaterializer(
               id: notificationId,
               eventId: command.fact.eventId,
               feedbackId: command.fact.feedbackId,
+              reporterId: command.participants.reporterId,
               workspaceId: command.fact.workspaceId,
               projectId: command.fact.projectId,
               recipientId: recipient.principalId,
               recipientKind: recipient.kind,
               kind: command.fact.kind,
+              reference: command.reference,
               createdAt: command.fact.occurredAt,
               readAt: null,
             },
