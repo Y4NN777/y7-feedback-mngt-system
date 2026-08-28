@@ -3,6 +3,9 @@ import { useQuery } from "@tanstack/react-query";
 
 import type { Locale } from "@y7-feedback/domain";
 
+import { AdministrationPage } from "./AdministrationPage";
+import type { AdministrationGateway } from "./AdministrationGateway";
+import type { AdministrationSession } from "./AdministrationSession";
 import { FeedbackIntake } from "./FeedbackIntake";
 import { messages } from "./i18n/messages";
 import type { IntakeGateway } from "./IntakeGateway";
@@ -17,6 +20,14 @@ const unavailableIntakeGateway: IntakeGateway = {
 };
 const unavailableProjectGateway: ProjectGateway = {
   resolve: () => Promise.resolve({ status: "unavailable" }),
+};
+const unavailableAdministrationGateway: AdministrationGateway = {
+  execute: () => Promise.resolve({ status: "retryable" }),
+};
+const unavailableAdministrationSession: AdministrationSession = {
+  createJwt: () => Promise.reject(new Error("SESSION_UNAVAILABLE")),
+  signIn: () => Promise.resolve("denied"),
+  signOut: () => Promise.resolve(),
 };
 const projectSlugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 
@@ -102,6 +113,8 @@ function ProjectRoute({
 
 export function App({
   accountlessGateway = unavailableGateway,
+  administrationGateway = unavailableAdministrationGateway,
+  administrationSession = unavailableAdministrationSession,
   createOperationId = () => crypto.randomUUID(),
   intakeGateway = unavailableIntakeGateway,
   projectGateway = unavailableProjectGateway,
@@ -110,6 +123,8 @@ export function App({
   },
 }: {
   readonly accountlessGateway?: AccountlessGateway;
+  readonly administrationGateway?: AdministrationGateway;
+  readonly administrationSession?: AdministrationSession;
   readonly createOperationId?: () => string;
   readonly intakeGateway?: IntakeGateway;
   readonly projectGateway?: ProjectGateway;
@@ -129,6 +144,16 @@ export function App({
         gateway={accountlessGateway}
         locale={locale}
         onLocaleChange={selectLocale}
+      />
+    );
+  }
+  if (window.location.pathname === "/manage") {
+    return (
+      <AdministrationPage
+        gateway={administrationGateway}
+        locale={locale}
+        onLocaleChange={selectLocale}
+        session={administrationSession}
       />
     );
   }
