@@ -4,6 +4,7 @@ export * from "./attachment.js";
 export * from "./conversation-lifecycle.js";
 export * from "./authorization.js";
 export * from "./feedback.js";
+export * from "./external-issue-link.js";
 export * from "./policy.js";
 export * from "./project-routing.js";
 export * from "./project-administration.js";
