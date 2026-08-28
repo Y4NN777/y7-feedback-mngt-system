@@ -17,7 +17,10 @@ import { createNodeAppwriteWorkspaceAttachmentScopeResolver } from "./appwrite-w
 import { createNodeAppwriteWorkspaceCapabilityScopeResolver } from "./appwrite-workspace-capability-scope.js";
 import { createNodeAppwriteWorkspaceOwnerScopeResolver } from "./appwrite-workspace-owner-scope.js";
 import { createNodeAppwriteWorkspaceProjectOperationPorts } from "./appwrite-workspace-project-ports.js";
-import { createNodeAppwriteNotificationFeedStore } from "./appwrite-notification-feed-store.js";
+import {
+  AppwriteNotificationFeedError,
+  createNodeAppwriteNotificationFeedStore,
+} from "./appwrite-notification-feed-store.js";
 import { createNodeAppwriteWorkbenchStore } from "./appwrite-workbench-store.js";
 import { createNodeAppwriteWorkbenchMutationStore } from "./appwrite-workbench-mutation-store.js";
 import { createNodeAppwriteProviderGrantVault } from "./appwrite-provider-grant-vault.js";
@@ -47,7 +50,10 @@ import {
   createWorkspaceAttachmentDownload,
   type AppwritePrincipalVerifier,
 } from "./workspace-attachment-download.js";
-import { createWorkspaceProjectOperations } from "./workspace-project-operations.js";
+import {
+  WorkspaceOperationDeniedError,
+  createWorkspaceProjectOperations,
+} from "./workspace-project-operations.js";
 import { createWorkbenchCoordinator } from "./workbench.js";
 import { createWorkbenchHttp } from "./workbench-http.js";
 
@@ -248,6 +254,22 @@ export function createHttpApplication(
     feedbackTableId: config.appwriteSchema.feedbackTableId,
     notificationsTableId: config.appwriteSchema.notificationsTableId,
   });
+  /* v8 ignore start -- denial translation is exercised by the deployed removal matrix */
+  const translateNotificationDenial = async <Result>(
+    operation: () => Promise<Result>,
+  ): Promise<Result> => {
+    try {
+      return await operation();
+    } catch (error: unknown) {
+      if (
+        error instanceof AppwriteNotificationFeedError &&
+        error.code === "ERR-NOT-DENIED"
+      )
+        throw new WorkspaceOperationDeniedError();
+      throw error;
+    }
+  };
+  /* v8 ignore stop */
   const workspaceOperations = createWorkspaceProjectOperations(
     principalVerifier,
     workspaceScope,
@@ -256,20 +278,24 @@ export function createHttpApplication(
       notifications: {
         /* v8 ignore next -- composition callback is exercised by deployed feed matrix */
         list: (scope, actor) =>
-          notificationFeed.list({
-            actor,
-            workspaceId: scope.workspaceId,
-            projectId: scope.projectId,
-          }),
+          translateNotificationDenial(() =>
+            notificationFeed.list({
+              actor,
+              workspaceId: scope.workspaceId,
+              projectId: scope.projectId,
+            }),
+          ),
         /* v8 ignore next -- composition callback is exercised by deployed read matrix */
         markRead: (scope, actor, notificationId) =>
-          notificationFeed.markRead({
-            actor,
-            workspaceId: scope.workspaceId,
-            projectId: scope.projectId,
-            notificationId,
-            readAt: runtime.nowIso(),
-          }),
+          translateNotificationDenial(() =>
+            notificationFeed.markRead({
+              actor,
+              workspaceId: scope.workspaceId,
+              projectId: scope.projectId,
+              notificationId,
+              readAt: runtime.nowIso(),
+            }),
+          ),
       },
     },
   );

@@ -109,11 +109,14 @@ function object(value: unknown): value is Readonly<Record<string, unknown>> {
 }
 
 function instant(value: unknown): string | undefined {
-  if (typeof value !== "string" || !/(?:Z|[+]00:00)$/u.test(value)) return undefined;
+  if (
+    typeof value !== "string" ||
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[.]\d{3}(?:Z|[+]00:00)$/u.test(value)
+  )
+    return undefined;
   const milliseconds = Date.parse(value);
   if (!Number.isFinite(milliseconds)) return undefined;
-  const normalized = new Date(milliseconds).toISOString();
-  return normalized === value ? value : undefined;
+  return new Date(milliseconds).toISOString();
 }
 
 function validateSchema(schema: AppwriteNotificationFeedSchema): void {
