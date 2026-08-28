@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { ServerConfig } from "@y7-feedback/config/server";
 
-import { createHttpApplication } from "./application";
+import { createHttpApplication, deriveReporterActorId } from "./application";
 import { routeRequest, type FunctionContext } from "./http";
 
 function isObject(value: unknown): value is Readonly<Record<string, unknown>> {
@@ -99,7 +99,22 @@ class FakeTables {
     return Promise.resolve({});
   }
 
-  getRow() {
+  getRow(input: { readonly tableId: string; readonly rowId: string }) {
+    if (input.tableId === "projects" && input.rowId === "project-conversation") {
+      return Promise.resolve({
+        $id: input.rowId,
+        workspaceId: "workspace-admin",
+        active: true,
+      });
+    }
+    if (input.tableId === "feedback" && input.rowId === "feedback-conversation") {
+      return Promise.resolve({
+        $id: input.rowId,
+        workspaceId: "workspace-admin",
+        projectId: "project-conversation",
+        state: "received",
+      });
+    }
     return Promise.reject(new Error("not used"));
   }
 
@@ -109,6 +124,13 @@ class FakeTables {
 }
 
 describe("trusted Function composition root", () => {
+  it("derives a stable non-reversible Reporter actor identifier", () => {
+    const actorId = deriveReporterActorId("Y7-2026-SECRET-REFERENCE");
+    expect(actorId).toMatch(/^reporter_[a-f0-9]{27}$/u);
+    expect(actorId).not.toContain("SECRET");
+    expect(deriveReporterActorId("Y7-2026-SECRET-REFERENCE")).toBe(actorId);
+  });
+
   it("BDD-INTAKE-COMPOSE-001 accepts through HTTP and a private Appwrite transaction", async () => {
     const tables = new FakeTables();
     let sequence = 0;
@@ -241,5 +263,56 @@ describe("trusted Function composition root", () => {
       "administration_audit",
       "administration_idempotency",
     ]);
+  });
+
+  it("BDD-CONV-COMPOSE-001 commits a scoped encrypted conversation command", async () => {
+    const tables = new FakeTables();
+    const dependencies = createHttpApplication(config, {
+      tables: tables as unknown as import("node-appwrite").TablesDB,
+      storage: {} as import("node-appwrite").Storage,
+      createId: () => "generated-id",
+      createReference: () => "Y7-2026-000001",
+      createCorrelationId: () => "correlation-conversation",
+      nowIso: () => "2026-08-28T12:00:00.000Z",
+      nowMs: () => 104,
+      startedAt: () => 100,
+      principalVerifier: {
+        verify: () =>
+          Promise.resolve({ status: "verified", principalId: "owner-admin" }),
+      },
+    });
+    const json = vi.fn();
+    await routeRequest(
+      {
+        req: {
+          method: "POST",
+          path: "/v1/workspaces/workspace-admin/projects/project-conversation/feedback/feedback-conversation/conversation/commands",
+          headers: {
+            authorization: "Bearer valid.jwt.token",
+            "content-type": "application/json",
+          },
+          bodyJson: {
+            command: {
+              kind: "append_message",
+              eventId: "message-conversation",
+              audience: "reporter",
+              content: "Which version is affected?",
+            },
+          },
+        },
+        res: { json },
+        log: vi.fn(),
+        error: vi.fn(),
+      },
+      dependencies,
+    );
+    expect(json).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "applied" }),
+      201,
+      expect.objectContaining({ "cache-control": "no-store" }),
+    );
+    expect(JSON.stringify(tables.rows)).not.toContain(
+      '"content":"Which version is affected?"',
+    );
   });
 });

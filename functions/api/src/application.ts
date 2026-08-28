@@ -9,6 +9,7 @@ import { createNodeAppwriteAttachmentAcceptanceStore } from "./appwrite-attachme
 import { createNodeAppwriteIntakeStore } from "./appwrite-intake-store.js";
 import { createNodeAppwritePrivateAttachmentStorage } from "./appwrite-private-attachment-storage.js";
 import { createNodeAppwritePrincipalVerifier } from "./appwrite-principal-verifier.js";
+import { createNodeAppwriteConversationLifecycleStore } from "./appwrite-conversation-lifecycle-store.js";
 import { createNodeAppwriteProjectAdministrationStore } from "./appwrite-project-administration-store.js";
 import { createNodeAppwritePublicProjectReader } from "./appwrite-public-project-reader.js";
 import { createNodeAppwriteWorkspaceAttachmentScopeResolver } from "./appwrite-workspace-attachment-scope.js";
@@ -19,6 +20,8 @@ import { createNodeAppwriteProviderGrantVault } from "./appwrite-provider-grant-
 import { createNodeAppwriteSourceConnectionStore } from "./appwrite-source-connection-store.js";
 import type { HttpDependencies } from "./http.js";
 import { createIntakeCoordinator } from "./intake.js";
+import { createConversationLifecycleCoordinator } from "./conversation-lifecycle.js";
+import { createConversationLifecycleHttp } from "./conversation-lifecycle-http.js";
 import { createGitHubSourceProvider } from "./github-source-provider.js";
 import { createGitLabSourceProvider } from "./gitlab-source-provider.js";
 import { createAttachmentDownload } from "./attachment-download.js";
@@ -59,6 +62,10 @@ export interface ApplicationRuntime {
     readonly status: number;
   }) => void;
   readonly principalVerifier?: AppwritePrincipalVerifier;
+}
+
+export function deriveReporterActorId(reference: string): string {
+  return `reporter_${createHash("sha256").update(reference).digest("hex").slice(0, 27)}`;
 }
 
 export function createHttpApplication(
@@ -196,6 +203,31 @@ export function createHttpApplication(
       runtime.createId,
     ),
   );
+  const conversationLifecycle = createConversationLifecycleHttp(
+    createConversationLifecycleCoordinator(
+      principalVerifier,
+      workspaceScope,
+      accountless,
+      createNodeAppwriteConversationLifecycleStore(
+        runtime.tables,
+        {
+          databaseId: config.appwriteSchema.databaseId,
+          feedbackTableId: config.appwriteSchema.feedbackTableId,
+          messagesTableId: config.appwriteSchema.conversationMessagesTableId,
+          internalNotesTableId: config.appwriteSchema.conversationInternalNotesTableId,
+          lifecycleTableId: config.appwriteSchema.conversationLifecycleTableId,
+          idempotencyTableId: config.appwriteSchema.conversationIdempotencyTableId,
+        },
+        sensitive,
+      ),
+      {
+        digest: (command) =>
+          createHash("sha256").update(JSON.stringify(command)).digest("base64url"),
+        now: runtime.nowIso,
+        reporterActorId: deriveReporterActorId,
+      },
+    ),
+  );
   /* v8 ignore start -- provider composition is exercised by real Preview OAuth */
   const sourceConnections = config.providers
     ? createSourceConnectionHttp(
@@ -250,6 +282,7 @@ export function createHttpApplication(
   return {
     createCorrelationId: runtime.createCorrelationId,
     environment: config.environment,
+    conversationLifecycle,
     now: runtime.nowMs,
     projectAdministration,
     publicApi: createPublicApi(

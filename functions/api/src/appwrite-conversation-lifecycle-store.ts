@@ -84,8 +84,8 @@ export interface ConversationLifecycleQueryPort {
 
 export interface ConversationLifecycleStoreInput {
   readonly feedbackId: string;
-  readonly workspaceId: string;
-  readonly projectId: string;
+  readonly workspaceId?: string;
+  readonly projectId?: string;
   readonly payloadDigest: string;
   readonly command: Command;
 }
@@ -142,7 +142,11 @@ function validateSchema(schema: AppwriteConversationLifecycleSchema): void {
     schema.lifecycleTableId,
     schema.idempotencyTableId,
   ];
-  if (ids.some((id) => !appwriteId.test(id)) || new Set(ids).size !== ids.length) {
+  const tableIds = ids.slice(1);
+  if (
+    ids.some((id) => !appwriteId.test(id)) ||
+    new Set(tableIds).size !== tableIds.length
+  ) {
     throw new Error("APPWRITE_CONVERSATION_SCHEMA_INVALID");
   }
 }
@@ -242,13 +246,20 @@ export function createAppwriteConversationLifecycleStore(
         if (
           !object(feedback) ||
           feedback.$id !== input.feedbackId ||
-          feedback.workspaceId !== input.workspaceId ||
-          feedback.projectId !== input.projectId ||
+          typeof feedback.workspaceId !== "string" ||
+          !appwriteId.test(feedback.workspaceId) ||
+          typeof feedback.projectId !== "string" ||
+          !appwriteId.test(feedback.projectId) ||
+          (input.workspaceId !== undefined &&
+            feedback.workspaceId !== input.workspaceId) ||
+          (input.projectId !== undefined && feedback.projectId !== input.projectId) ||
           typeof feedback.state !== "string" ||
           !states.has(feedback.state as FeedbackLifecycleState)
         ) {
           throw new AppwriteConversationLifecycleError("ERR-CONV-DENIED");
         }
+        const workspaceId = feedback.workspaceId;
+        const projectId = feedback.projectId;
 
         let result: Omit<ConversationLifecycleStoreResult, "status">;
         if (
@@ -277,8 +288,8 @@ export function createAppwriteConversationLifecycleStore(
             rowId: input.command.eventId,
             data: {
               feedbackId: input.feedbackId,
-              workspaceId: input.workspaceId,
-              projectId: input.projectId,
+              workspaceId,
+              projectId,
               actorId: appended.actorId,
               actorKind: appended.actorKind,
               audience: appended.audience,
@@ -364,8 +375,8 @@ export function createAppwriteConversationLifecycleStore(
             rowId: fact.id,
             data: {
               feedbackId: fact.feedbackId,
-              workspaceId: input.workspaceId,
-              projectId: input.projectId,
+              workspaceId,
+              projectId,
               priorState: fact.priorState,
               state: fact.state,
               actorId: fact.actorId,
