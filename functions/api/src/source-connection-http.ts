@@ -1,6 +1,7 @@
 import type { SourceProvider } from "@y7-feedback/domain";
 
 import type { SourceConnectionCoordinator } from "./source-connection-coordinator.js";
+import type { SourceManagementCoordinator } from "./source-management.js";
 
 export interface SourceConnectionHttpRequest {
   readonly method: string;
@@ -81,6 +82,7 @@ function validateCallbacks(callbacks: Readonly<Record<SourceProvider, string>>):
 export function createSourceConnectionHttp(
   coordinator: SourceConnectionCoordinator,
   callbacks: Readonly<Record<SourceProvider, string>>,
+  management?: SourceManagementCoordinator,
 ) {
   validateCallbacks(callbacks);
   return {
@@ -141,8 +143,17 @@ export function createSourceConnectionHttp(
           );
         }
 
+        if (action === "manage/list") {
+          if (!management) {
+            return { statusCode: 503, body: { error: "ERR-SOURCE-UNAVAILABLE" } };
+          }
+          return mapped(await management.list({ jwt, workspaceId, projectId }));
+        }
+
         const commandMatch =
-          /^([A-Za-z0-9][A-Za-z0-9._-]{0,35})\/(select|disconnect)$/u.exec(action);
+          /^([A-Za-z0-9][A-Za-z0-9._-]{0,35})\/(select|disconnect|refresh)$/u.exec(
+            action,
+          );
         const connectionId = commandMatch?.[1];
         const command = commandMatch?.[2];
         if (!connectionId || !identifier.test(connectionId) || !command) {
@@ -162,6 +173,20 @@ export function createSourceConnectionHttp(
               projectId,
               connectionId,
               repositoryIds: request.body.repositoryIds,
+            }),
+          );
+        }
+        if (command === "refresh") {
+          if (!management || typeof request.body.repositoryId !== "string") {
+            throw new Error("SOURCE_INPUT_INVALID");
+          }
+          return mapped(
+            await management.refresh({
+              jwt,
+              workspaceId,
+              projectId,
+              connectionId,
+              repositoryId: request.body.repositoryId,
             }),
           );
         }
