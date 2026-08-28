@@ -28,12 +28,24 @@ export interface ActiveSourceManagementConnection extends SourceManagementConnec
   readonly encryptedGrantRef: string;
 }
 
+export interface PendingSourceSelection {
+  readonly id: string;
+  readonly provider: SourceProvider;
+  readonly authorizedRepositories: readonly RepositoryIdentity[];
+  readonly updatedAt: string;
+}
+
 export interface SourceManagementStore {
   list(input: {
     readonly ownerUserId: string;
     readonly workspaceId: string;
     readonly projectId: string;
   }): Promise<readonly SourceManagementConnection[]>;
+  pending(input: {
+    readonly ownerUserId: string;
+    readonly workspaceId: string;
+    readonly projectId: string;
+  }): Promise<readonly PendingSourceSelection[]>;
   active(input: {
     readonly connectionId: string;
     readonly ownerUserId: string;
@@ -124,8 +136,13 @@ export function createSourceManagementCoordinator(
       try {
         const scoped = await scope(input);
         if (scoped.status !== "authorized") return { status: scoped.status } as const;
-        const [connections, projectSlug] = await Promise.all([
+        const [connections, pendingSelections, projectSlug] = await Promise.all([
           dependencies.store.list({
+            ownerUserId: scoped.principalId,
+            workspaceId: input.workspaceId,
+            projectId: input.projectId,
+          }),
+          dependencies.store.pending({
             ownerUserId: scoped.principalId,
             workspaceId: input.workspaceId,
             projectId: input.projectId,
@@ -136,7 +153,12 @@ export function createSourceManagementCoordinator(
           }),
         ]);
         if (!slug.test(projectSlug)) return { status: "retryable" } as const;
-        return { status: "ok", projectSlug, connections } as const;
+        return {
+          status: "ok",
+          projectSlug,
+          connections,
+          pendingSelections,
+        } as const;
       } catch {
         return { status: "retryable" } as const;
       }

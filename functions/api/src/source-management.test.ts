@@ -23,6 +23,7 @@ function setup() {
   let current: SourceManagementConnection = connection;
   const store: SourceManagementStore = {
     list: vi.fn(() => Promise.resolve([current])),
+    pending: vi.fn(() => Promise.resolve([])),
     active: vi.fn(() =>
       Promise.resolve({
         ...current,
@@ -108,6 +109,7 @@ describe("source management coordinator", () => {
       status: "ok",
       projectSlug: "wise-money",
       connections: [connection],
+      pendingSelections: [],
     });
     expect(projectSlug).toHaveBeenCalledWith({
       workspaceId: "workspace_1",

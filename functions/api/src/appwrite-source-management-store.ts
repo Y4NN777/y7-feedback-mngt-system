@@ -11,6 +11,7 @@ import type {
   ActiveSourceManagementConnection,
   SourceManagementConnection,
   SourceManagementStore,
+  PendingSourceSelection,
   SourceProjectSlugPort,
 } from "./source-management.js";
 
@@ -229,6 +230,41 @@ function view(value: ActiveSourceManagementConnection): SourceManagementConnecti
   return safe;
 }
 
+function pendingSelection(
+  value: unknown,
+  expected: {
+    readonly ownerUserId: string;
+    readonly workspaceId: string;
+    readonly projectId: string;
+  },
+): PendingSourceSelection | undefined {
+  if (!object(value)) return undefined;
+  const sourceProvider = provider(value.provider);
+  const state = parseJson(value.selectedRepositoriesJson);
+  if (
+    typeof value.$id !== "string" ||
+    !identifier.test(value.$id) ||
+    value.status !== "selecting" ||
+    !sourceProvider ||
+    value.ownerUserId !== expected.ownerUserId ||
+    value.workspaceId !== expected.workspaceId ||
+    value.projectId !== expected.projectId ||
+    typeof value.updatedAt !== "string" ||
+    state?.kind !== "authorized"
+  ) {
+    return undefined;
+  }
+  const authorizedRepositories = repositories(state.repositories, sourceProvider);
+  return authorizedRepositories
+    ? {
+        id: value.$id,
+        provider: sourceProvider,
+        authorizedRepositories,
+        updatedAt: value.updatedAt,
+      }
+    : undefined;
+}
+
 export function createAppwriteSourceManagementStore(
   tables: AppwriteSourceManagementTablesPort,
   schema: AppwriteSourceManagementSchema,
@@ -255,6 +291,7 @@ export function createAppwriteSourceManagementStore(
           queries.equal("ownerUserId", [input.ownerUserId]),
           queries.equal("workspaceId", [input.workspaceId]),
           queries.equal("projectId", [input.projectId]),
+          queries.equal("status", ["active", "disconnected"]),
           queries.limit(10),
         ],
         total: false,
@@ -265,6 +302,26 @@ export function createAppwriteSourceManagementStore(
         throw new Error("APPWRITE_SOURCE_MANAGEMENT_UNAVAILABLE");
       }
       return parsed.map((item) => view(item as ActiveSourceManagementConnection));
+    },
+    async pending(input) {
+      const result = await tables.listRows({
+        databaseId: schema.databaseId,
+        tableId: schema.sourceConnectionsTableId,
+        queries: [
+          queries.equal("ownerUserId", [input.ownerUserId]),
+          queries.equal("workspaceId", [input.workspaceId]),
+          queries.equal("projectId", [input.projectId]),
+          queries.equal("status", ["selecting"]),
+          queries.limit(10),
+        ],
+        total: false,
+        ttl: 0,
+      });
+      const parsed = result.rows.map((row) => pendingSelection(row, input));
+      if (parsed.some((item) => item === undefined)) {
+        throw new Error("APPWRITE_SOURCE_MANAGEMENT_UNAVAILABLE");
+      }
+      return parsed as readonly PendingSourceSelection[];
     },
     async active(input) {
       try {
