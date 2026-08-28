@@ -13,6 +13,14 @@ interface AccessMessages {
   readonly intro: string;
   readonly languageLabel: string;
   readonly lookupAnother: string;
+  readonly publicationAudience: string;
+  readonly publicationConsent: string;
+  readonly publicationConsentHint: string;
+  readonly grantPublicationConsent: string;
+  readonly revokePublicationConsent: string;
+  readonly consentActive: string;
+  readonly consentRevoked: string;
+  readonly consentConflict: string;
   readonly messages: string;
   readonly preserve: string;
   readonly reference: string;
@@ -41,6 +49,15 @@ export const accessMessages = {
       "Saisissez la référence et la preuve confidentielle reçues après l’acceptation.",
     languageLabel: "Langue",
     lookupAnother: "Chercher un autre retour",
+    publicationAudience: "Destination publique autorisée",
+    publicationConsent: "Publication dans une issue publique",
+    publicationConsentHint:
+      "Autorisez explicitement une destination précise. Seul le contenu public autorisé pourra être publié.",
+    grantPublicationConsent: "Autoriser cette publication",
+    revokePublicationConsent: "Révoquer l’autorisation",
+    consentActive: "Autorisation active, version {version}.",
+    consentRevoked: "Autorisation révoquée, version {version}.",
+    consentConflict: "Cette demande entre en conflit avec une tentative précédente.",
     messages: "Messages visibles",
     preserve:
       "Conservez la référence et la preuve séparément. La preuve ne doit pas être placée dans une URL ni partagée par e-mail.",
@@ -74,6 +91,15 @@ export const accessMessages = {
     intro: "Enter the reference and confidential proof issued after acceptance.",
     languageLabel: "Language",
     lookupAnother: "Find other feedback",
+    publicationAudience: "Authorized public destination",
+    publicationConsent: "Publication in a public issue",
+    publicationConsentHint:
+      "Explicitly authorize one exact destination. Only authorized public content may be published.",
+    grantPublicationConsent: "Authorize this publication",
+    revokePublicationConsent: "Revoke authorization",
+    consentActive: "Authorization active, version {version}.",
+    consentRevoked: "Authorization revoked, version {version}.",
+    consentConflict: "This request conflicts with an earlier attempt.",
     messages: "Visible messages",
     preserve:
       "Keep the reference and proof separately. Do not put the proof in a URL or share it by email.",

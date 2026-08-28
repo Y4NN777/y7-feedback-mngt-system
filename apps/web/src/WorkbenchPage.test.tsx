@@ -8,11 +8,13 @@ import type { Locale } from "@y7-feedback/domain";
 
 import type { AdministrationSession } from "./AdministrationSession";
 import type { NotificationInvalidation } from "./NotificationInvalidation";
+import type { ExternalIssueGateway } from "./ExternalIssueGateway";
 import type { WorkbenchGateway } from "./WorkbenchGateway";
 import { WorkbenchPage } from "./WorkbenchPage";
 
 function setup(
   list?: WorkbenchGateway["list"],
+  externalIssueOverride?: Partial<ExternalIssueGateway>,
   notifications?: WorkbenchGateway["notifications"],
   authorizeRealtime?: WorkbenchGateway["authorizeNotificationRealtime"],
 ) {
@@ -138,6 +140,35 @@ function setup(
           })),
     ),
   };
+  const linkMock = vi.fn<ExternalIssueGateway["link"]>(() =>
+    Promise.resolve({
+      status: "ok" as const,
+      result: {
+        status: "accepted" as const,
+        linkId: "link_1",
+        synchronizationState: "pending" as const,
+      },
+    }),
+  );
+  const externalIssueGateway: ExternalIssueGateway = {
+    repositories: vi.fn(() =>
+      Promise.resolve({
+        status: "ok" as const,
+        result: [
+          {
+            connectionId: "connection_1",
+            provider: "github" as const,
+            repositoryId: "123",
+            owner: "Y4NN777",
+            name: "feedback",
+            visibility: "private" as const,
+          },
+        ],
+      }),
+    ),
+    link: linkMock,
+    ...externalIssueOverride,
+  };
   const signOutMock = vi.fn(() => Promise.resolve());
   const session: AdministrationSession = {
     createJwt: () => Promise.resolve("jwt_1"),
@@ -150,6 +181,7 @@ function setup(
       <QueryClientProvider client={new QueryClient()}>
         <WorkbenchPage
           createOperationId={() => "operation_1"}
+          externalIssueGateway={externalIssueGateway}
           gateway={gateway}
           locale={locale}
           notificationInvalidation={{ subscribe: subscribeMock }}
@@ -170,6 +202,7 @@ function setup(
     signOutMock,
     subscribeMock,
     unmount: view.unmount,
+    linkMock,
   };
 }
 
@@ -245,7 +278,9 @@ describe("Workbench experience", () => {
 
   it("shows notification retry and empty states without hiding the inbox", async () => {
     const user = userEvent.setup();
-    const target = setup(undefined, () => Promise.resolve({ status: "retryable" }));
+    const target = setup(undefined, undefined, () =>
+      Promise.resolve({ status: "retryable" }),
+    );
     await open(user);
     expect(
       await screen.findByText("Le service est indisponible. Réessayez."),
@@ -264,7 +299,7 @@ describe("Workbench experience", () => {
 
   it("keeps polling when Realtime authorization is temporarily unavailable", async () => {
     const user = userEvent.setup();
-    const target = setup(undefined, undefined, () =>
+    const target = setup(undefined, undefined, undefined, () =>
       Promise.resolve({ status: "retryable" }),
     );
     await open(user);
@@ -311,5 +346,105 @@ describe("Workbench experience", () => {
     await user.click(screen.getByRole("button", { name: "Se déconnecter" }));
     expect(target.signOutMock).toHaveBeenCalled();
     expect(await screen.findByLabelText("Adresse e-mail")).toBeVisible();
+  });
+
+  it("BDD-ISSUE-WEB-006 creates an issue only in an authorized repository", async () => {
+    const user = userEvent.setup();
+    const target = setup();
+    await open(user);
+    await user.click(await screen.findByRole("button", { name: /feedback_1/u }));
+    await screen.findByRole("heading", { name: "Upload fails" });
+    await user.selectOptions(
+      await screen.findByLabelText("Dépôt de destination"),
+      "connection_1:123",
+    );
+    await user.click(screen.getByRole("button", { name: "Créer et lier l’issue" }));
+    expect(target.linkMock).toHaveBeenCalledWith({
+      workspaceId: "workspace_1",
+      projectId: "project_1",
+      feedbackId: "feedback_1",
+      operationId: "operation_1",
+      connectionId: "connection_1",
+      repositoryId: "123",
+    });
+    expect(await screen.findByText("Création de l’issue acceptée.")).toBeVisible();
+  });
+
+  it("requires the exact active consent version for a public repository", async () => {
+    const user = userEvent.setup();
+    const target = setup(undefined, {
+      repositories: () =>
+        Promise.resolve({
+          status: "ok",
+          result: [
+            {
+              connectionId: "connection_public",
+              provider: "gitlab",
+              repositoryId: "456",
+              owner: "group",
+              name: "public-feedback",
+              visibility: "public",
+            },
+          ],
+        }),
+      link: (input) => targetLink(input),
+    });
+    function targetLink(input: Parameters<ExternalIssueGateway["link"]>[0]) {
+      return target.linkMock(input);
+    }
+    await open(user);
+    await user.click(await screen.findByRole("button", { name: /feedback_1/u }));
+    await user.selectOptions(
+      await screen.findByLabelText("Dépôt de destination"),
+      "connection_public:456",
+    );
+    const submit = screen.getByRole("button", { name: "Créer et lier l’issue" });
+    expect(submit).toBeDisabled();
+    await user.type(
+      screen.getByLabelText("Version de l’autorisation du Reporter"),
+      "2",
+    );
+    await user.click(submit);
+    expect(target.linkMock).toHaveBeenCalledWith(
+      expect.objectContaining({ consentVersion: 2, repositoryId: "456" }),
+    );
+  });
+
+  it.each([
+    ["denied", "Accès refusé"],
+    ["conflict", "conflit"],
+    ["retryable", "indisponible"],
+  ] as const)(
+    "renders the %s issue-link outcome without disclosure",
+    async (status, text) => {
+      const user = userEvent.setup();
+      setup(undefined, { link: () => Promise.resolve({ status }) });
+      await open(user);
+      await user.click(await screen.findByRole("button", { name: /feedback_1/u }));
+      await user.selectOptions(
+        await screen.findByLabelText("Dépôt de destination"),
+        "connection_1:123",
+      );
+      await user.click(screen.getByRole("button", { name: "Créer et lier l’issue" }));
+      expect(await screen.findByRole("status")).toHaveTextContent(text);
+    },
+  );
+
+  it("renders empty and retryable repository states", async () => {
+    const user = userEvent.setup();
+    setup(undefined, {
+      repositories: vi
+        .fn<ExternalIssueGateway["repositories"]>()
+        .mockResolvedValueOnce({ status: "retryable" })
+        .mockResolvedValue({ status: "ok", result: [] }),
+    });
+    await open(user);
+    await user.click(await screen.findByRole("button", { name: /feedback_1/u }));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("indisponible");
+    await user.click(screen.getByRole("button", { name: "Réessayer" }));
+    expect(
+      await screen.findByText("Aucun dépôt autorisé n’est disponible pour ce projet."),
+    ).toBeVisible();
   });
 });

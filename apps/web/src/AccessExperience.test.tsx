@@ -9,6 +9,7 @@ import type { ReporterFeedbackView } from "@y7-feedback/domain";
 import { AccessMaterial } from "./AccessMaterial";
 import { App } from "./App";
 import type { AccountlessGateway } from "./RetrieveFeedback";
+import type { PublicationConsentGateway } from "./PublicationConsentGateway";
 
 const proof = "proof_A_abcdefghijklmnopqrstuvwxyz_0123456789ABCDEFG";
 
@@ -199,5 +200,84 @@ describe("accountless access experience", () => {
     await user.type(screen.getByLabelText("Preuve d’accès"), proof);
     await user.click(screen.getByRole("button", { name: "Retrouver le retour" }));
     expect(screen.getByRole("alert")).toHaveTextContent(/temporairement indisponible/i);
+  });
+
+  it("BDD-ISSUE-WEB-011 grants and revokes versioned publication consent with the retained proof", async () => {
+    window.history.replaceState({}, "", "/retrieve");
+    const user = userEvent.setup();
+    const view: ReporterFeedbackView = {
+      feedbackId: "feedback-1",
+      reference: "Y7-2026-000001",
+      originalSource: {
+        type: "review",
+        experience: "Rapide",
+        appreciation: "Interface claire",
+      },
+      currentSource: {
+        type: "review",
+        experience: "Rapide",
+        appreciation: "Interface claire",
+      },
+      currentState: "received",
+      history: [],
+      messages: [],
+      attachments: [],
+      sourceRevisions: [],
+      deletionRequests: [],
+    };
+    const grant = vi.fn<PublicationConsentGateway["grant"]>(() =>
+      Promise.resolve({
+        status: "ok",
+        consent: {
+          version: 1,
+          state: "active",
+          disclosureVersion: "reporter-content-v1",
+          audience: "github:123",
+        },
+      }),
+    );
+    const revoke = vi.fn<PublicationConsentGateway["revoke"]>(() =>
+      Promise.resolve({
+        status: "ok",
+        consent: {
+          version: 2,
+          state: "revoked",
+          disclosureVersion: "reporter-content-v1",
+          audience: "github:123",
+        },
+      }),
+    );
+    renderApp(
+      <App
+        accountlessGateway={{ retrieve: () => Promise.resolve({ status: "ok", view }) }}
+        createOperationId={() => "operation_1"}
+        publicationConsentGateway={{ grant, revoke }}
+      />,
+    );
+    await user.type(screen.getByRole("textbox", { name: "Référence" }), view.reference);
+    await user.type(screen.getByLabelText("Preuve d’accès"), proof);
+    await user.click(screen.getByRole("button", { name: "Retrouver le retour" }));
+    await user.type(
+      screen.getByLabelText("Destination publique autorisée"),
+      "github:123",
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Autoriser cette publication" }),
+    );
+    expect(grant).toHaveBeenCalledWith({
+      operationId: "operation_1",
+      reference: view.reference,
+      proof,
+      disclosureVersion: "reporter-content-v1",
+      audience: "github:123",
+    });
+    expect(await screen.findByText("Autorisation active, version 1.")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Révoquer l’autorisation" }));
+    expect(revoke).toHaveBeenCalledWith({
+      operationId: "operation_1",
+      reference: view.reference,
+      proof,
+    });
+    expect(await screen.findByText("Autorisation révoquée, version 2.")).toBeVisible();
   });
 });
