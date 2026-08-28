@@ -78,11 +78,94 @@ describe("Appwrite source management store", () => {
         "equal:ownerUserId:owner_1",
         "equal:workspaceId:workspace_1",
         "equal:projectId:project_1",
+        "equal:status:active,disconnected",
         "limit:10",
       ],
       total: false,
       ttl: 0,
     });
+  });
+
+  it("BDD-SRC-213 exposes authorized repositories for first-party selection", async () => {
+    const target = setup();
+    target.listRows.mockResolvedValueOnce({
+      rows: [
+        {
+          ...selected,
+          status: "selecting",
+          selectedRepositoriesJson: JSON.stringify({
+            kind: "authorized",
+            repositories: [
+              { provider: "github", id: "1329343404" },
+              { provider: "github", id: "repo_2" },
+            ],
+          }),
+        },
+      ],
+    });
+    await expect(
+      target.store.pending({
+        ownerUserId: "owner_1",
+        workspaceId: "workspace_1",
+        projectId: "project_1",
+      }),
+    ).resolves.toEqual([
+      {
+        id: "connection_1",
+        provider: "github",
+        authorizedRepositories: [
+          { provider: "github", id: "1329343404" },
+          { provider: "github", id: "repo_2" },
+        ],
+        updatedAt: "2026-08-28T12:00:00.000Z",
+      },
+    ]);
+    expect(target.listRows).toHaveBeenCalledWith(
+      expect.objectContaining({
+        queries: expect.arrayContaining(["equal:status:selecting"]),
+      }),
+    );
+  });
+
+  it("fails closed for malformed pending selections", async () => {
+    const authorized = JSON.stringify({
+      kind: "authorized",
+      repositories: [{ provider: "github", id: "1329343404" }],
+    });
+    const base = {
+      ...selected,
+      status: "selecting",
+      selectedRepositoriesJson: authorized,
+    };
+    for (const row of [
+      null,
+      { ...base, $id: 7 },
+      { ...base, $id: "bad id" },
+      { ...base, status: "active" },
+      { ...base, provider: "unknown" },
+      { ...base, ownerUserId: "owner_2" },
+      { ...base, workspaceId: "workspace_2" },
+      { ...base, projectId: "project_2" },
+      { ...base, updatedAt: 7 },
+      { ...base, selectedRepositoriesJson: JSON.stringify({ kind: "pending" }) },
+      {
+        ...base,
+        selectedRepositoriesJson: JSON.stringify({
+          kind: "authorized",
+          repositories: [],
+        }),
+      },
+    ]) {
+      const target = setup();
+      target.listRows.mockResolvedValueOnce({ rows: [row] });
+      await expect(
+        target.store.pending({
+          ownerUserId: "owner_1",
+          workspaceId: "workspace_1",
+          projectId: "project_1",
+        }),
+      ).rejects.toThrow("APPWRITE_SOURCE_MANAGEMENT_UNAVAILABLE");
+    }
   });
 
   it("BDD-SRC-209 atomically saves one validated import and replays as replacement", async () => {
