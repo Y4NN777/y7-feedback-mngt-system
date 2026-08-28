@@ -110,12 +110,14 @@ function assigned(value: unknown): readonly string[] {
   return [value];
 }
 
-function canonicalTimestamp(value: unknown): value is string {
-  if (typeof value !== "string") return false;
+function normalizedTimestamp(value: unknown): string | undefined {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T/u.test(value)) {
+    return undefined;
+  }
   const milliseconds = Date.parse(value);
-  return (
-    Number.isFinite(milliseconds) && new Date(milliseconds).toISOString() === value
-  );
+  return Number.isFinite(milliseconds)
+    ? new Date(milliseconds).toISOString()
+    : undefined;
 }
 
 function storedContext(value: unknown): readonly ValidatedContext[] {
@@ -154,6 +156,7 @@ function storedContext(value: unknown): readonly ValidatedContext[] {
 }
 
 function inboxItem(value: unknown): WorkbenchInboxItem {
+  const acceptedAt = object(value) ? normalizedTimestamp(value.acceptedAt) : undefined;
   if (
     !object(value) ||
     typeof value.$id !== "string" ||
@@ -164,7 +167,7 @@ function inboxItem(value: unknown): WorkbenchInboxItem {
     !appwriteId.test(value.projectId) ||
     !feedbackTypes.has(String(value.type)) ||
     !states.has(String(value.state)) ||
-    !canonicalTimestamp(value.acceptedAt)
+    acceptedAt === undefined
   ) {
     throw new AppwriteWorkbenchError("ERR-WORK-RETRYABLE");
   }
@@ -174,7 +177,7 @@ function inboxItem(value: unknown): WorkbenchInboxItem {
     projectId: value.projectId,
     type: value.type as WorkbenchInboxItem["type"],
     state: value.state as FeedbackLifecycleState,
-    acceptedAt: value.acceptedAt,
+    acceptedAt,
     assignedPrincipalIds: assigned(value.assignedMaintainerId),
     deleted: value.deletedAt !== undefined && value.deletedAt !== null,
   };
