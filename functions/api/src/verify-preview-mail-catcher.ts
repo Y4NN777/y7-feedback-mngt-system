@@ -71,10 +71,12 @@ export async function verifyG3MailCatcher(): Promise<{
     port: account.smtp.port,
     secure: account.smtp.secure,
   });
-  const bodies: string[] = [];
+  const capturedBodies: string[] = [];
+  const sentTexts: string[] = [];
   const sender = createSmtpMailCatcherSender(
     {
       sendMail: async (message) => {
+        sentTexts.push(message.text);
         const info: SMTPTransport.SentMessageInfo = await transport.sendMail(message);
         const previewUrl = nodemailer.getTestMessageUrl(info);
         if (previewUrl === false) throw new Error("MAIL_G3_CAPTURE_FAILED");
@@ -84,7 +86,7 @@ export async function verifyG3MailCatcher(): Promise<{
         });
         const body = await response.text();
         if (!response.ok) throw new Error("MAIL_G3_CAPTURE_FAILED");
-        bodies.push(body);
+        capturedBodies.push(body);
         return info;
       },
     },
@@ -121,11 +123,12 @@ export async function verifyG3MailCatcher(): Promise<{
     "person@example",
   ];
   if (
-    bodies.length !== 6 ||
-    bodies.some((body) =>
+    capturedBodies.length !== 6 ||
+    sentTexts.length !== 6 ||
+    sentTexts.some((body) =>
       forbidden.some((sentinel) => body.toLowerCase().includes(sentinel.toLowerCase())),
     ) ||
-    bodies.some((body) => !body.includes(testReference))
+    capturedBodies.some((body) => !body.includes(testReference))
   ) {
     throw new Error("MAIL_G3_PAYLOAD_POLICY_FAILED");
   }

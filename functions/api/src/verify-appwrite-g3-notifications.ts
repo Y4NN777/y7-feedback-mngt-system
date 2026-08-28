@@ -209,12 +209,14 @@ async function main(): Promise<void> {
     await request(
       ownerJwt,
       `/v1/workspaces/${ids.workspace}/projects/${ids.project}/feedback/${ids.feedback}/conversation/commands`,
-      200,
+      201,
       {
-        kind: "append_message",
-        eventId: ids.event,
-        audience: "reporter",
-        content: "G3 public notification message",
+        command: {
+          kind: "append_message",
+          eventId: ids.event,
+          audience: "reporter",
+          content: "G3 public notification message",
+        },
       },
     );
     const notificationRows = await tables.listRows({
