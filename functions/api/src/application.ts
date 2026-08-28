@@ -169,6 +169,8 @@ export function createHttpApplication(
         databaseId: config.appwriteSchema.databaseId,
         projectsTableId: config.appwriteSchema.projectsTableId,
         projectSlugsTableId: config.appwriteSchema.projectSlugsTableId,
+        projectAssignmentsTableId: config.appwriteSchema.projectAssignmentsTableId,
+        workspaceMembershipsTableId: config.appwriteSchema.workspaceMembershipsTableId,
         administrationAuditTableId: config.appwriteSchema.administrationAuditTableId,
         administrationIdempotencyTableId:
           config.appwriteSchema.administrationIdempotencyTableId,

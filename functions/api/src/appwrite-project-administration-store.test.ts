@@ -14,6 +14,8 @@ const schema = {
   databaseId: "feedback",
   projectsTableId: "projects",
   projectSlugsTableId: "project_slugs",
+  projectAssignmentsTableId: "project_assignments",
+  workspaceMembershipsTableId: "workspace_memberships",
   administrationAuditTableId: "administration_audit",
   administrationIdempotencyTableId: "administration_idempotency",
 };
@@ -62,6 +64,10 @@ class FakeTables implements AppwriteProjectAdministrationTablesPort {
     });
   }
 
+  getRow(): Promise<unknown> {
+    return Promise.resolve({});
+  }
+
   createRow(
     input: Parameters<AppwriteProjectAdministrationTablesPort["createRow"]>[0],
   ): Promise<unknown> {
@@ -72,6 +78,10 @@ class FakeTables implements AppwriteProjectAdministrationTablesPort {
     return this.created.length === this.failCreateAt
       ? Promise.reject(new Error("forced write failure"))
       : Promise.resolve({ $id: input.rowId });
+  }
+
+  updateRow(): Promise<unknown> {
+    return Promise.resolve({});
   }
 
   updateTransaction(
