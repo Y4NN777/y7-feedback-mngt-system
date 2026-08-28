@@ -24,17 +24,18 @@ describe("additive Appwrite table migration", () => {
     const messages = table("conversation_messages");
     const notes = table("conversation_internal_notes");
     const idempotency = table("conversation_idempotency");
+    const lifecycle = table("conversation_lifecycle");
     expect(
       planAdditiveTableMigration({
         version: "day3-conversation-v1",
         currentTables: [feedback],
-        targetTables: [feedback, messages, notes, idempotency],
-        additiveTableIds: [messages.id, notes.id, idempotency.id],
+        targetTables: [feedback, messages, notes, idempotency, lifecycle],
+        additiveTableIds: [messages.id, notes.id, idempotency.id, lifecycle.id],
       }),
     ).toEqual({
       version: "day3-conversation-v1",
-      createTables: [messages, notes, idempotency],
-      rollbackTableIds: [idempotency.id, notes.id, messages.id],
+      createTables: [messages, notes, idempotency, lifecycle],
+      rollbackTableIds: [lifecycle.id, idempotency.id, notes.id, messages.id],
     });
   });
 

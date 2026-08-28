@@ -37,6 +37,7 @@ export interface ServerConfig {
     readonly conversationMessagesTableId: string;
     readonly conversationInternalNotesTableId: string;
     readonly conversationIdempotencyTableId: string;
+    readonly conversationLifecycleTableId: string;
   };
   readonly accessProofEnvelopeKey: string;
   readonly providerGrantEnvelopeKey: string;
@@ -110,6 +111,9 @@ function parseAppwriteSchema(input: Readonly<Record<string, string | undefined>>
     ),
     conversationIdempotencyTableId: requireAppwriteId(
       input.APPWRITE_CONVERSATION_IDEMPOTENCY_TABLE_ID,
+    ),
+    conversationLifecycleTableId: requireAppwriteId(
+      input.APPWRITE_CONVERSATION_LIFECYCLE_TABLE_ID,
     ),
   };
   if (new Set(Object.values(tableIds)).size !== Object.values(tableIds).length) {

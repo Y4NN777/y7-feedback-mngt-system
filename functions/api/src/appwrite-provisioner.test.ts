@@ -36,6 +36,7 @@ const schema: ServerConfig["appwriteSchema"] = {
   conversationMessagesTableId: "conversation_messages",
   conversationInternalNotesTableId: "conversation_internal_notes",
   conversationIdempotencyTableId: "conversation_idempotency",
+  conversationLifecycleTableId: "conversation_lifecycle",
 };
 
 class MemoryProvisioningPort implements AppwriteProvisioningPort {

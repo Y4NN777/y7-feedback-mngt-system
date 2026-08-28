@@ -28,6 +28,7 @@ const schema: ServerConfig["appwriteSchema"] = {
   conversationMessagesTableId: "conversation_messages",
   conversationInternalNotesTableId: "conversation_internal_notes",
   conversationIdempotencyTableId: "conversation_idempotency",
+  conversationLifecycleTableId: "conversation_lifecycle",
 };
 
 function table(id: string) {
@@ -90,6 +91,7 @@ describe("Appwrite infrastructure manifest", () => {
       [schema.conversationMessagesTableId, ["feedbackId", "occurredAt"]],
       [schema.conversationInternalNotesTableId, ["feedbackId", "occurredAt"]],
       [schema.conversationIdempotencyTableId, ["feedbackId", "operationId"]],
+      [schema.conversationLifecycleTableId, ["feedbackId", "sequence"]],
     ] as const;
 
     for (const [tableId, queriedColumns] of requirements) {
@@ -129,6 +131,7 @@ describe("Appwrite infrastructure manifest", () => {
       "conversation_messages.contentEnvelope",
       "conversation_internal_notes.contentEnvelope",
       "conversation_idempotency.resultJson",
+      "conversation_lifecycle.reasonEnvelope",
     ]);
     for (const definition of manifest.tables) {
       const indexed = new Set(definition.indexes.flatMap(({ columns }) => columns));
