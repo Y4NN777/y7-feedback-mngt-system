@@ -9,6 +9,7 @@
     "@vercel/speed-insights": "^2.0.0",
     "@y7-feedback/config": "workspace:*",
     "@y7-feedback/domain": "workspace:*",
+    "appwrite": "26.2.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "web-vitals": "^6.1.0"

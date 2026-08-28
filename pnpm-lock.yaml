@@ -61,6 +61,9 @@ importers:
       "@y7-feedback/domain":
         specifier: workspace:*
         version: link:../../packages/domain
+      appwrite:
+        specifier: 26.2.0
+        version: 26.2.0
       react:
         specifier: ^19.2.8
         version: 19.2.8
