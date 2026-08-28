@@ -34,6 +34,8 @@ const config: ServerConfig = {
     attachmentsTableId: "attachments",
     providerGrantsTableId: "provider_grants",
     sourceConnectionsTableId: "source_connections",
+    administrationAuditTableId: "administration_audit",
+    administrationIdempotencyTableId: "administration_idempotency",
   },
   accessProofEnvelopeKey: "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc",
   providerGrantEnvelopeKey: "CAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg",

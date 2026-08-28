@@ -31,6 +31,8 @@ const schema: ServerConfig["appwriteSchema"] = {
   attachmentsTableId: "attachments",
   providerGrantsTableId: "provider_grants",
   sourceConnectionsTableId: "source_connections",
+  administrationAuditTableId: "administration_audit",
+  administrationIdempotencyTableId: "administration_idempotency",
 };
 
 class MemoryProvisioningPort implements AppwriteProvisioningPort {
