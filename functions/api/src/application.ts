@@ -10,6 +10,7 @@ import { createNodeAppwriteIntakeStore } from "./appwrite-intake-store.js";
 import { createNodeAppwritePrivateAttachmentStorage } from "./appwrite-private-attachment-storage.js";
 import { createNodeAppwritePrincipalVerifier } from "./appwrite-principal-verifier.js";
 import { createNodeAppwriteConversationLifecycleStore } from "./appwrite-conversation-lifecycle-store.js";
+import { createNodeAppwriteConversationProjectionStore } from "./appwrite-conversation-projection-store.js";
 import { createNodeAppwriteProjectAdministrationStore } from "./appwrite-project-administration-store.js";
 import { createNodeAppwritePublicProjectReader } from "./appwrite-public-project-reader.js";
 import { createNodeAppwriteWorkspaceAttachmentScopeResolver } from "./appwrite-workspace-attachment-scope.js";
@@ -217,6 +218,17 @@ export function createHttpApplication(
           internalNotesTableId: config.appwriteSchema.conversationInternalNotesTableId,
           lifecycleTableId: config.appwriteSchema.conversationLifecycleTableId,
           idempotencyTableId: config.appwriteSchema.conversationIdempotencyTableId,
+        },
+        sensitive,
+      ),
+      createNodeAppwriteConversationProjectionStore(
+        runtime.tables,
+        {
+          databaseId: config.appwriteSchema.databaseId,
+          feedbackTableId: config.appwriteSchema.feedbackTableId,
+          messagesTableId: config.appwriteSchema.conversationMessagesTableId,
+          internalNotesTableId: config.appwriteSchema.conversationInternalNotesTableId,
+          lifecycleTableId: config.appwriteSchema.conversationLifecycleTableId,
         },
         sensitive,
       ),

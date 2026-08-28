@@ -2,6 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { AccountlessAccessCoordinator } from "./accountless-access";
 import {
+  AppwriteConversationProjectionError,
+  type ConversationProjectionStore,
+} from "./appwrite-conversation-projection-store";
+import {
   AppwriteConversationLifecycleError,
   type ConversationLifecycleStore,
 } from "./appwrite-conversation-lifecycle-store";
@@ -47,16 +51,36 @@ function setup() {
       action: input.command.kind,
     }),
   );
+  const readWorkspace = vi.fn<ConversationProjectionStore["readWorkspace"]>(() =>
+    Promise.resolve({
+      feedbackId: "feedback_1",
+      state: "under_review",
+      messages: [],
+      internalNotes: [],
+      lifecycle: [],
+    }),
+  );
+  const readReporter = vi.fn<ConversationProjectionStore["readReporter"]>(() =>
+    Promise.resolve({
+      feedbackId: "feedback_1",
+      state: "under_review",
+      messages: [],
+      lifecycle: [],
+    }),
+  );
   return {
     verify,
     resolve,
     authorize,
     execute,
+    readWorkspace,
+    readReporter,
     coordinator: createConversationLifecycleCoordinator(
       { verify },
       { resolve },
       { authorize } as unknown as AccountlessAccessCoordinator,
       { execute },
+      { readWorkspace, readReporter },
       {
         digest: (value) => `digest:${JSON.stringify(value)}`,
         now: () => "2026-08-28T12:00:00.000Z",
@@ -67,6 +91,127 @@ function setup() {
 }
 
 describe("trusted Conversation and lifecycle orchestration", () => {
+  it("derives read scope and keeps Reporter projection proof-bound", async () => {
+    const target = setup();
+    await expect(
+      target.coordinator.readWorkspace({
+        ...context,
+        jwt: "valid.jwt.token",
+      }),
+    ).resolves.toMatchObject({
+      status: "ok",
+      projection: { internalNotes: [] },
+    });
+    expect(target.resolve).toHaveBeenCalledWith(
+      expect.objectContaining({ capability: "feedback.read" }),
+    );
+
+    await expect(
+      target.coordinator.readReporter({
+        feedbackId: "feedback_1",
+        reference: "Y7-2026-ABC",
+        proof: "proof",
+      }),
+    ).resolves.toEqual({
+      status: "ok",
+      projection: {
+        feedbackId: "feedback_1",
+        state: "under_review",
+        messages: [],
+        lifecycle: [],
+      },
+    });
+    expect(target.readReporter).toHaveBeenCalledWith({
+      feedbackId: "feedback_1",
+    });
+  });
+
+  it("fails closed for read authentication, proof, scope and projection errors", async () => {
+    const target = setup();
+    target.verify.mockResolvedValueOnce({ status: "denied" });
+    await expect(
+      target.coordinator.readWorkspace({ ...context, jwt: "bad" }),
+    ).resolves.toEqual({ status: "denied" });
+    target.resolve.mockResolvedValueOnce({ status: "retryable" });
+    await expect(
+      target.coordinator.readWorkspace({ ...context, jwt: "valid.jwt.token" }),
+    ).resolves.toEqual({ status: "retryable" });
+    target.readWorkspace.mockRejectedValueOnce(
+      new AppwriteConversationProjectionError("ERR-CONV-DENIED"),
+    );
+    await expect(
+      target.coordinator.readWorkspace({ ...context, jwt: "valid.jwt.token" }),
+    ).resolves.toEqual({ status: "denied" });
+    target.readWorkspace.mockRejectedValueOnce(new Error("adapter"));
+    await expect(
+      target.coordinator.readWorkspace({ ...context, jwt: "valid.jwt.token" }),
+    ).resolves.toEqual({ status: "retryable" });
+    target.readWorkspace.mockRejectedValueOnce(
+      new AppwriteConversationProjectionError("ERR-CONV-RETRYABLE"),
+    );
+    await expect(
+      target.coordinator.readWorkspace({ ...context, jwt: "valid.jwt.token" }),
+    ).resolves.toEqual({ status: "retryable" });
+
+    target.authorize.mockResolvedValueOnce({
+      status: "denied",
+      code: "ACCESS_DENIED",
+    });
+    await expect(
+      target.coordinator.readReporter({
+        feedbackId: "feedback_1",
+        reference: "ref",
+        proof: "proof",
+      }),
+    ).resolves.toEqual({ status: "denied" });
+    target.authorize.mockResolvedValueOnce({
+      status: "retryable",
+      code: "ACCESS_UNAVAILABLE",
+    });
+    await expect(
+      target.coordinator.readReporter({
+        feedbackId: "feedback_1",
+        reference: "ref",
+        proof: "proof",
+      }),
+    ).resolves.toEqual({ status: "retryable" });
+    target.authorize.mockResolvedValueOnce({ status: "ok", feedbackId: "other" });
+    await expect(
+      target.coordinator.readReporter({
+        feedbackId: "feedback_1",
+        reference: "ref",
+        proof: "proof",
+      }),
+    ).resolves.toEqual({ status: "denied" });
+    target.readReporter.mockRejectedValueOnce(new Error("adapter"));
+    await expect(
+      target.coordinator.readReporter({
+        feedbackId: "feedback_1",
+        reference: "ref",
+        proof: "proof",
+      }),
+    ).resolves.toEqual({ status: "retryable" });
+    target.readReporter.mockRejectedValueOnce(
+      new AppwriteConversationProjectionError("ERR-CONV-DENIED"),
+    );
+    await expect(
+      target.coordinator.readReporter({
+        feedbackId: "feedback_1",
+        reference: "ref",
+        proof: "proof",
+      }),
+    ).resolves.toEqual({ status: "denied" });
+    target.readReporter.mockRejectedValueOnce(
+      new AppwriteConversationProjectionError("ERR-CONV-RETRYABLE"),
+    );
+    await expect(
+      target.coordinator.readReporter({
+        feedbackId: "feedback_1",
+        reference: "ref",
+        proof: "proof",
+      }),
+    ).resolves.toEqual({ status: "retryable" });
+  });
   it("BDD-CONV-001 derives Workspace actor and Project scope before commit", async () => {
     const target = setup();
     await expect(

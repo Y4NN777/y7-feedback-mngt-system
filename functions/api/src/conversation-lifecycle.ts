@@ -5,6 +5,12 @@ import type {
 
 import type { AccountlessAccessCoordinator } from "./accountless-access.js";
 import {
+  AppwriteConversationProjectionError,
+  type ConversationProjectionStore,
+  type ReporterConversationProjection,
+  type WorkspaceConversationProjection,
+} from "./appwrite-conversation-projection-store.js";
+import {
   AppwriteConversationLifecycleError,
   type ConversationLifecycleStore,
   type ConversationLifecycleStoreResult,
@@ -20,7 +26,26 @@ export type ConversationLifecycleOutcome =
       readonly status: "invalid" | "denied" | "conflict" | "stale" | "retryable";
     };
 
+export type ConversationProjectionOutcome =
+  | {
+      readonly status: "ok";
+      readonly projection:
+        ReporterConversationProjection | WorkspaceConversationProjection;
+    }
+  | { readonly status: "denied" | "retryable" };
+
 export interface ConversationLifecycleCoordinator {
+  readWorkspace(input: {
+    readonly jwt: string;
+    readonly workspaceId: string;
+    readonly projectId: string;
+    readonly feedbackId: string;
+  }): Promise<ConversationProjectionOutcome>;
+  readReporter(input: {
+    readonly reference: string;
+    readonly proof: string;
+    readonly feedbackId: string;
+  }): Promise<ConversationProjectionOutcome>;
   executeWorkspace(input: {
     readonly jwt: string;
     readonly workspaceId: string;
@@ -159,6 +184,7 @@ export function createConversationLifecycleCoordinator(
   workspaceScope: WorkspaceCapabilityScopeResolver,
   accountless: AccountlessAccessCoordinator,
   store: ConversationLifecycleStore,
+  projections: ConversationProjectionStore,
   dependencies: ConversationLifecycleDependencies,
 ): ConversationLifecycleCoordinator {
   async function commit(
@@ -186,6 +212,55 @@ export function createConversationLifecycleCoordinator(
   }
 
   return {
+    async readWorkspace(input) {
+      const verification = await principal.verify(input.jwt);
+      if (verification.status !== "verified") return verification;
+      const authorization = await workspaceScope.resolve({
+        principalId: verification.principalId,
+        workspaceId: input.workspaceId,
+        projectId: input.projectId,
+        capability: "feedback.read",
+      });
+      if (authorization.status !== "authorized") return authorization;
+      try {
+        return {
+          status: "ok",
+          projection: await projections.readWorkspace(input),
+        };
+      } catch (error: unknown) {
+        return {
+          status:
+            error instanceof AppwriteConversationProjectionError &&
+            error.code === "ERR-CONV-DENIED"
+              ? "denied"
+              : "retryable",
+        };
+      }
+    },
+    async readReporter(input) {
+      const authorization = await accountless.authorize({
+        reference: input.reference,
+        proof: input.proof,
+      });
+      if (authorization.status !== "ok") {
+        return { status: authorization.status === "denied" ? "denied" : "retryable" };
+      }
+      if (authorization.feedbackId !== input.feedbackId) return { status: "denied" };
+      try {
+        return {
+          status: "ok",
+          projection: await projections.readReporter({ feedbackId: input.feedbackId }),
+        };
+      } catch (error: unknown) {
+        return {
+          status:
+            error instanceof AppwriteConversationProjectionError &&
+            error.code === "ERR-CONV-DENIED"
+              ? "denied"
+              : "retryable",
+        };
+      }
+    },
     async executeWorkspace(input) {
       const parsed = parse(input.command);
       if (parsed === undefined) return { status: "invalid" };

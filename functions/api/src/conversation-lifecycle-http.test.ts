@@ -6,6 +6,9 @@ import { createConversationLifecycleHttp } from "./conversation-lifecycle-http";
 const workspacePath =
   "/v1/workspaces/workspace_1/projects/project_1/feedback/feedback_1/conversation/commands";
 const reporterPath = "/v1/feedback/feedback_1/conversation/commands";
+const workspaceProjectionPath =
+  "/v1/workspaces/workspace_1/projects/project_1/feedback/feedback_1/conversation";
+const reporterProjectionPath = "/v1/feedback/feedback_1/conversation/retrieve";
 const command = { kind: "append_message", eventId: "message_1" };
 
 function setup() {
@@ -31,14 +34,121 @@ function setup() {
         },
       }),
   );
+  const readWorkspace = vi.fn<ConversationLifecycleCoordinator["readWorkspace"]>(() =>
+    Promise.resolve({
+      status: "ok",
+      projection: {
+        feedbackId: "feedback_1",
+        state: "under_review",
+        messages: [],
+        internalNotes: [],
+        lifecycle: [],
+      },
+    }),
+  );
+  const readReporter = vi.fn<ConversationLifecycleCoordinator["readReporter"]>(() =>
+    Promise.resolve({
+      status: "ok",
+      projection: {
+        feedbackId: "feedback_1",
+        state: "under_review",
+        messages: [],
+        lifecycle: [],
+      },
+    }),
+  );
   return {
     executeWorkspace,
     executeReporter,
-    http: createConversationLifecycleHttp({ executeWorkspace, executeReporter }),
+    readWorkspace,
+    readReporter,
+    http: createConversationLifecycleHttp({
+      executeWorkspace,
+      executeReporter,
+      readWorkspace,
+      readReporter,
+    }),
   };
 }
 
 describe("Conversation and lifecycle HTTP boundary", () => {
+  it("serves separately authorized Workspace and Reporter projections", async () => {
+    const target = setup();
+    await expect(
+      target.http.handle({
+        method: "GET",
+        path: workspaceProjectionPath,
+        headers: { authorization: "Bearer valid.jwt.token" },
+      }),
+    ).resolves.toMatchObject({
+      statusCode: 200,
+      body: { status: "ok", conversation: { internalNotes: [] } },
+    });
+    expect(target.readWorkspace).toHaveBeenCalledWith({
+      jwt: "valid.jwt.token",
+      workspaceId: "workspace_1",
+      projectId: "project_1",
+      feedbackId: "feedback_1",
+    });
+
+    await expect(
+      target.http.handle({
+        method: "POST",
+        path: reporterProjectionPath,
+        headers: { authorization: "FeedbackProof proof-value" },
+        body: { reference: "Y7-2026-ABC" },
+      }),
+    ).resolves.toEqual({
+      statusCode: 200,
+      body: {
+        status: "ok",
+        conversation: {
+          feedbackId: "feedback_1",
+          state: "under_review",
+          messages: [],
+          lifecycle: [],
+        },
+      },
+    });
+    expect(target.readReporter).toHaveBeenCalledWith({
+      reference: "Y7-2026-ABC",
+      proof: "proof-value",
+      feedbackId: "feedback_1",
+    });
+  });
+
+  it("maps projection denial and unavailability without disclosing existence", async () => {
+    const invalid = setup();
+    await expect(
+      invalid.http.handle({
+        method: "GET",
+        path: workspaceProjectionPath,
+        headers: {},
+      }),
+    ).resolves.toEqual({ statusCode: 404, body: { error: "ERR-CONV-DENIED" } });
+    const denied = setup();
+    denied.readWorkspace.mockResolvedValueOnce({ status: "denied" });
+    await expect(
+      denied.http.handle({
+        method: "GET",
+        path: workspaceProjectionPath,
+        headers: { authorization: "Bearer valid.jwt.token" },
+      }),
+    ).resolves.toEqual({ statusCode: 404, body: { error: "ERR-CONV-DENIED" } });
+    const retryable = setup();
+    retryable.readReporter.mockResolvedValueOnce({ status: "retryable" });
+    await expect(
+      retryable.http.handle({
+        method: "POST",
+        path: reporterProjectionPath,
+        headers: { authorization: "FeedbackProof proof-value" },
+        body: { reference: "Y7-2026-ABC" },
+      }),
+    ).resolves.toEqual({
+      statusCode: 503,
+      body: { error: "ERR-CONV-RETRYABLE" },
+    });
+  });
   it("routes a bearer-authenticated Workspace command from path-derived scope", async () => {
     const target = setup();
     await expect(
