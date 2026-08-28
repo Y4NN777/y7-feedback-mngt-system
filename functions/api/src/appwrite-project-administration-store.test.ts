@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
+import type { TablesDB } from "node-appwrite";
 
 import type { ProjectAdministrationCommand } from "@y7-feedback/domain";
 
 import {
   AppwriteProjectAdministrationError,
   createAppwriteProjectAdministrationStore,
+  createNodeAppwriteProjectAdministrationStore,
   type AppwriteProjectAdministrationTablesPort,
 } from "./appwrite-project-administration-store";
 
@@ -280,5 +282,26 @@ describe("Appwrite Project administration transaction", () => {
         createAppwriteProjectAdministrationStore(new FakeTables(), candidate, queries),
       ).toThrow(new Error("APPWRITE_PROJECT_ADMINISTRATION_SCHEMA_INVALID"));
     }
+  });
+
+  it("uses the Node Appwrite transaction adapter and SDK queries", async () => {
+    const tables = new FakeTables();
+    const store = createNodeAppwriteProjectAdministrationStore(
+      tables as unknown as TablesDB,
+      schema,
+    );
+
+    await expect(
+      store.create({
+        command,
+        actorId: "owner_1",
+        auditId: "audit_1",
+        occurredAt: "2026-08-28T09:00:00.000Z",
+        payloadDigest: "digest_1",
+      }),
+    ).resolves.toMatchObject({ status: "created" });
+    expect(tables.transactions).toEqual([
+      { transactionId: "transaction_1", commit: true },
+    ]);
   });
 });

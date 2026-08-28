@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { routeRequest, type FunctionContext } from "./http";
 import type { PublicApi } from "./public-api";
+import type { ProjectAdministrationHttp } from "./project-administration-http";
 
 const correlationId = "018f4f7e-89ab-7def-8123-456789abcdef";
 const dependencies = {
@@ -164,6 +165,74 @@ describe("trusted API entrypoint", () => {
       "cache-control": "no-store",
       "x-correlation-id": correlationId,
     });
+  });
+
+  it("BDD-ADMIN-001 routes trusted administration before the public API", async () => {
+    const handle = vi.fn<ProjectAdministrationHttp["handle"]>(() =>
+      Promise.resolve({
+        statusCode: 201,
+        body: { status: "ok", project: { projectId: "project_1" } },
+      }),
+    );
+    const publicHandle = vi.fn<PublicApi["handle"]>();
+    const body = { workspaceId: "workspace_1" };
+    const { context, json } = createContext(
+      "POST",
+      "/v1/workspaces/workspace_1/projects",
+      {
+        headers: {
+          authorization: "Bearer valid-jwt",
+          "content-type": "application/json",
+        },
+        bodyJson: body,
+      },
+    );
+
+    await routeRequest(context, {
+      ...dependencies,
+      projectAdministration: { handle },
+      publicApi: { handle: publicHandle },
+    });
+
+    expect(handle).toHaveBeenCalledWith({
+      method: "POST",
+      path: "/v1/workspaces/workspace_1/projects",
+      headers: {
+        authorization: "Bearer valid-jwt",
+        "content-type": "application/json",
+      },
+      body,
+    });
+    expect(publicHandle).not.toHaveBeenCalled();
+    expect(json).toHaveBeenCalledWith(
+      { status: "ok", project: { projectId: "project_1" } },
+      201,
+      expect.any(Object),
+    );
+    expect(context.log).toHaveBeenCalledWith(
+      expect.stringContaining('"operation":"project_administration"'),
+    );
+  });
+
+  it("does not parse multipart content as an administration JSON command", async () => {
+    const handle = vi.fn<ProjectAdministrationHttp["handle"]>(() =>
+      Promise.resolve(undefined),
+    );
+    const { context } = createContext("POST", "/v1/workspaces/workspace_1/projects", {
+      headers: { "content-type": "multipart/form-data; boundary=test" },
+    });
+    Object.defineProperty(context.req, "bodyJson", {
+      get() {
+        throw new Error("multipart body must not be parsed");
+      },
+    });
+
+    await routeRequest(context, {
+      ...dependencies,
+      projectAdministration: { handle },
+    });
+
+    expect(handle).toHaveBeenCalledWith(expect.objectContaining({ body: undefined }));
   });
 
   it("BDD-API-002 fails closed for an unknown operation", async () => {

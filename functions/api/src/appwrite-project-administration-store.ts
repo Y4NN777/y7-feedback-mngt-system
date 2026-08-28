@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { Query, type TablesDB } from "node-appwrite";
 
 import type { ProjectAdministrationCommand } from "@y7-feedback/domain";
 
@@ -79,6 +80,10 @@ export interface AppwriteProjectAdministrationStore {
 }
 
 const appwriteId = /^[A-Za-z0-9][A-Za-z0-9._-]{0,35}$/u;
+const defaultQueries: AppwriteProjectAdministrationQueryPort = {
+  equal: (attribute, values) => Query.equal(attribute, [...values]),
+  limit: (limit) => Query.limit(limit),
+};
 
 function isObject(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -288,4 +293,30 @@ export function createAppwriteProjectAdministrationStore(
       }
     },
   };
+}
+
+export function createNodeAppwriteProjectAdministrationStore(
+  tables: TablesDB,
+  schema: AppwriteProjectAdministrationSchema,
+): AppwriteProjectAdministrationStore {
+  return createAppwriteProjectAdministrationStore(
+    {
+      createTransaction: (input) => tables.createTransaction(input),
+      listRows: async (input) => {
+        const result = await tables.listRows({
+          ...input,
+          queries: [...input.queries],
+        });
+        return { rows: result.rows };
+      },
+      createRow: (input) =>
+        tables.createRow({
+          ...input,
+          permissions: [...input.permissions],
+        }),
+      updateTransaction: (input) => tables.updateTransaction(input),
+    },
+    schema,
+    defaultQueries,
+  );
 }

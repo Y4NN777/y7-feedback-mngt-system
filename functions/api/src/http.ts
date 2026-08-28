@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { serializeOperationalEvent } from "./observability.js";
 import type { PublicApi } from "./public-api.js";
+import type { ProjectAdministrationHttp } from "./project-administration-http.js";
 import type { SourceConnectionHttp } from "./source-connection-http.js";
 
 export interface FunctionRequest {
@@ -38,6 +39,7 @@ export interface HttpDependencies {
   readonly environment: "development" | "preview" | "production";
   readonly now: () => number;
   readonly publicApi?: PublicApi;
+  readonly projectAdministration?: ProjectAdministrationHttp;
   readonly sourceConnections?: SourceConnectionHttp;
   readonly release: string;
   readonly startedAt: () => number;
@@ -127,10 +129,22 @@ export async function routeRequest(
               ? req.bodyJson
               : undefined,
         });
+  const administrationResponse =
+    isHealth || isIngressProbe || sourceResponse
+      ? null
+      : await dependencies.projectAdministration?.handle({
+          method,
+          path: req.path,
+          headers: requestHeaders,
+          body:
+            method === "POST" && !contentType.startsWith("multipart/form-data")
+              ? req.bodyJson
+              : undefined,
+        });
   const publicResponse =
     isHealth || isIngressProbe
       ? null
-      : sourceResponse
+      : sourceResponse || administrationResponse
         ? null
         : await dependencies.publicApi?.handle({
             method,
@@ -145,6 +159,7 @@ export async function routeRequest(
     ? 200
     : (probeResponse?.statusCode ??
       sourceResponse?.statusCode ??
+      administrationResponse?.statusCode ??
       publicResponse?.statusCode ??
       404);
   const operation = isHealth
@@ -153,12 +168,14 @@ export async function routeRequest(
       ? "ingress_probe"
       : sourceResponse
         ? "source_connection"
-        : publicResponse
-          ? "public_api"
-          : "unknown";
+        : administrationResponse
+          ? "project_administration"
+          : publicResponse
+            ? "public_api"
+            : "unknown";
   const outcome = isHealth
     ? "success"
-    : (probeResponse ?? sourceResponse ?? publicResponse)
+    : (probeResponse ?? sourceResponse ?? administrationResponse ?? publicResponse)
       ? statusCode < 400
         ? "success"
         : "rejected"
@@ -186,6 +203,14 @@ export async function routeRequest(
 
   if (sourceResponse) {
     return res.json(sourceResponse.body, sourceResponse.statusCode, headers);
+  }
+
+  if (administrationResponse) {
+    return res.json(
+      administrationResponse.body,
+      administrationResponse.statusCode,
+      headers,
+    );
   }
 
   if (publicResponse) {
