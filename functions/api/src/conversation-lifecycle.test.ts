@@ -10,7 +10,10 @@ import {
   type ConversationLifecycleStore,
 } from "./appwrite-conversation-lifecycle-store";
 import type { WorkspaceCapabilityScopeResolver } from "./appwrite-workspace-capability-scope";
-import { createConversationLifecycleCoordinator } from "./conversation-lifecycle";
+import {
+  createConversationLifecycleCoordinator,
+  type ConversationLifecycleDependencies,
+} from "./conversation-lifecycle";
 import type { AppwritePrincipalVerifier } from "./workspace-attachment-download";
 
 const message = {
@@ -68,6 +71,9 @@ function setup() {
       lifecycle: [],
     }),
   );
+  const notifyCommitted = vi.fn<
+    NonNullable<ConversationLifecycleDependencies["notifyCommitted"]>
+  >(() => Promise.resolve());
   return {
     verify,
     resolve,
@@ -75,6 +81,7 @@ function setup() {
     execute,
     readWorkspace,
     readReporter,
+    notifyCommitted,
     coordinator: createConversationLifecycleCoordinator(
       { verify },
       { resolve },
@@ -85,12 +92,40 @@ function setup() {
         digest: (value) => `digest:${JSON.stringify(value)}`,
         now: () => "2026-08-28T12:00:00.000Z",
         reporterActorId: () => "reporter_1",
+        notifyCommitted,
       },
     ),
   };
 }
 
 describe("trusted Conversation and lifecycle orchestration", () => {
+  it("BDD-NOT-RECON-004 reconciles after commit without changing a committed fact", async () => {
+    const target = setup();
+    await expect(
+      target.coordinator.executeWorkspace({
+        ...context,
+        jwt: "valid.jwt.token",
+        command: message,
+      }),
+    ).resolves.toMatchObject({ status: "ok" });
+    const notified = target.notifyCommitted.mock.calls[0]?.[0];
+    expect(notified).toMatchObject({
+      feedbackId: "feedback_1",
+      actorId: "maintainer_1",
+      actorKind: "workspace",
+    });
+    expect(notified?.command.eventId).toBe("message_1");
+
+    target.notifyCommitted.mockRejectedValueOnce(new Error("delivery unavailable"));
+    await expect(
+      target.coordinator.executeWorkspace({
+        ...context,
+        jwt: "valid.jwt.token",
+        command: { ...message, eventId: "message_2" },
+      }),
+    ).resolves.toMatchObject({ status: "ok" });
+  });
+
   it("derives read scope and keeps Reporter projection proof-bound", async () => {
     const target = setup();
     await expect(

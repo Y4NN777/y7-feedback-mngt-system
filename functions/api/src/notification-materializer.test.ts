@@ -44,7 +44,7 @@ const command = {
   },
   participants: {
     reporterId: "reporter_1",
-    ownerId: "owner_1",
+    ownerIds: ["owner_1"],
     assignedMaintainerId: "maintainer_1",
   },
   reference: "Y7-REF-12345678",

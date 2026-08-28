@@ -65,6 +65,14 @@ export interface ConversationLifecycleDependencies {
   readonly digest: (value: unknown) => string;
   readonly now: () => string;
   readonly reporterActorId: (reference: string) => string;
+  readonly notifyCommitted?: (input: {
+    readonly feedbackId: string;
+    readonly workspaceId?: string;
+    readonly projectId?: string;
+    readonly actorId: string;
+    readonly actorKind: "workspace" | "reporter";
+    readonly command: Command;
+  }) => Promise<void>;
 }
 
 type ParsedCommand =
@@ -205,6 +213,16 @@ export function createConversationLifecycleCoordinator(
         command,
         payloadDigest: dependencies.digest({ parsed, actorId, actorKind }),
       });
+      try {
+        await dependencies.notifyCommitted?.({
+          ...input,
+          actorId,
+          actorKind,
+          command,
+        });
+      } catch {
+        // The source fact is authoritative; reconciliation retries delivery later.
+      }
       return { status: "ok", result };
     } catch (error: unknown) {
       return failure(error);

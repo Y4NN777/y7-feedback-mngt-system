@@ -20,7 +20,7 @@ const publicFact: NotificationSourceFact = {
 
 const participants = {
   reporterId: "reporter-one",
-  ownerId: "owner-one",
+  ownerIds: ["owner-one"],
   assignedMaintainerId: "maintainer-one",
 } as const;
 
@@ -43,7 +43,7 @@ describe("Day 3 notification recipient policy", () => {
   it("BDD-NOT-002 derives recipients from the current assignment and removes prior access", () => {
     const unassigned = planNotificationRecipients(
       { ...publicFact, actorId: "reporter-one", actorKind: "reporter" },
-      { reporterId: "reporter-one", ownerId: "owner-one" },
+      { reporterId: "reporter-one", ownerIds: ["owner-one"] },
     );
 
     expect(unassigned.map(({ principalId }) => principalId)).toEqual(["owner-one"]);
@@ -73,7 +73,7 @@ describe("Day 3 notification recipient policy", () => {
   it("BDD-NOT-004 deduplicates Owner and assigned Maintainer identities", () => {
     const recipients = planNotificationRecipients(publicFact, {
       ...participants,
-      ownerId: "maintainer-one",
+      ownerIds: ["maintainer-one"],
     });
     expect(recipients).toEqual([
       {

@@ -254,7 +254,10 @@ export function createAppwriteInfrastructureManifest(
           integer("generation"),
           varchar("status", 16),
         ],
-        [index("reference_unique", ["reference"], "unique")],
+        [
+          index("reference_unique", ["reference"], "unique"),
+          index("feedback", ["feedbackId"]),
+        ],
       ),
       table(
         schema.notificationsTableId,

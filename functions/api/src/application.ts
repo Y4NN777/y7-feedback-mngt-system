@@ -11,6 +11,8 @@ import { createNodeAppwritePrivateAttachmentStorage } from "./appwrite-private-a
 import { createNodeAppwritePrincipalVerifier } from "./appwrite-principal-verifier.js";
 import { createNodeAppwriteConversationLifecycleStore } from "./appwrite-conversation-lifecycle-store.js";
 import { createNodeAppwriteConversationProjectionStore } from "./appwrite-conversation-projection-store.js";
+import { createNodeAppwriteConversationNotificationReconciler } from "./appwrite-conversation-notification-reconciler.js";
+import { createNodeAppwriteNotificationMaterializationStore } from "./appwrite-notification-materialization-store.js";
 import { createNodeAppwriteProjectAdministrationStore } from "./appwrite-project-administration-store.js";
 import { createNodeAppwritePublicProjectReader } from "./appwrite-public-project-reader.js";
 import { createNodeAppwriteWorkspaceAttachmentScopeResolver } from "./appwrite-workspace-attachment-scope.js";
@@ -234,6 +236,32 @@ export function createHttpApplication(
       runtime.createId,
     ),
   );
+  const notificationMaterializationStore =
+    createNodeAppwriteNotificationMaterializationStore(
+      runtime.tables,
+      {
+        databaseId: config.appwriteSchema.databaseId,
+        notificationsTableId: config.appwriteSchema.notificationsTableId,
+        outboxTableId: config.appwriteSchema.outboxTableId,
+      },
+      sensitive,
+    );
+  const conversationNotifications =
+    createNodeAppwriteConversationNotificationReconciler(
+      runtime.tables,
+      {
+        databaseId: config.appwriteSchema.databaseId,
+        feedbackTableId: config.appwriteSchema.feedbackTableId,
+        workspaceMembershipsTableId: config.appwriteSchema.workspaceMembershipsTableId,
+        accessGrantsTableId: config.appwriteSchema.accessGrantsTableId,
+      },
+      notificationMaterializationStore,
+      {
+        createNotificationId: runtime.createId,
+        createDeliveryId: runtime.createId,
+        localeFor: () => "fr",
+      },
+    );
   const conversationLifecycle = createConversationLifecycleHttp(
     createConversationLifecycleCoordinator(
       principalVerifier,
@@ -267,6 +295,9 @@ export function createHttpApplication(
           createHash("sha256").update(JSON.stringify(command)).digest("base64url"),
         now: runtime.nowIso,
         reporterActorId: deriveReporterActorId,
+        notifyCommitted: async (input) => {
+          await conversationNotifications.reconcile(input);
+        },
       },
     ),
   );

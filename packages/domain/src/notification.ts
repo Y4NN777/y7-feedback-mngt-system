@@ -12,7 +12,7 @@ export type NotificationChannel = "email" | "in_product";
 
 export interface NotificationParticipants {
   readonly reporterId: string;
-  readonly ownerId: string;
+  readonly ownerIds: readonly string[];
   readonly assignedMaintainerId?: string;
 }
 
@@ -66,16 +66,19 @@ function workspaceRecipients(
   participants: NotificationParticipants,
   channels: readonly NotificationChannel[] = ["in_product", "email"],
 ): readonly NotificationRecipient[] {
+  if (participants.ownerIds.length === 0) {
+    throw new NotificationPolicyError("ERR-NOTIFICATION-FACT-INVALID");
+  }
   const recipients: NotificationRecipient[] = [
-    {
-      principalId: required(participants.ownerId),
-      kind: "workspace_owner",
-      channels,
-    },
-  ];
+    ...new Set(participants.ownerIds.map((ownerId) => required(ownerId))),
+  ].map((principalId) => ({
+    kind: "workspace_owner",
+    channels,
+    principalId,
+  }));
   if (participants.assignedMaintainerId !== undefined) {
     const principalId = required(participants.assignedMaintainerId);
-    if (principalId !== participants.ownerId) {
+    if (!recipients.some((recipient) => recipient.principalId === principalId)) {
       recipients.push({
         principalId,
         kind: "assigned_maintainer",
@@ -105,7 +108,11 @@ export function planNotificationRecipients(
   if (fact.kind === "internal_note" && fact.visibility !== "workspace") {
     throw new NotificationPolicyError("ERR-NOTIFICATION-VISIBILITY-INVALID");
   }
-  if (fact.kind !== "internal_note" && fact.visibility !== "public") {
+  if (
+    fact.kind !== "internal_note" &&
+    fact.kind !== "conversation_message" &&
+    fact.visibility !== "public"
+  ) {
     throw new NotificationPolicyError("ERR-NOTIFICATION-VISIBILITY-INVALID");
   }
 
