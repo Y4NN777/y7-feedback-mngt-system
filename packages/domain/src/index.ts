@@ -11,4 +11,5 @@ export * from "./project-administration-state.js";
 export * from "./reporter.js";
 export * from "./notification.js";
 export * from "./source-connection.js";
+export * from "./source-import.js";
 export * from "./workbench.js";
