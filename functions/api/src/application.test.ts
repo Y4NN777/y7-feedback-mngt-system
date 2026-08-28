@@ -66,6 +66,19 @@ class FakeTables {
         ],
       });
     }
+    if (input.tableId === "workspace_memberships") {
+      return Promise.resolve({
+        rows: [
+          {
+            $id: "membership-owner",
+            workspaceId: "workspace-admin",
+            userId: "owner-admin",
+            role: "workspace_owner",
+            status: "active",
+          },
+        ],
+      });
+    }
     return Promise.resolve({ rows: [] });
   }
 
@@ -75,7 +88,7 @@ class FakeTables {
 
   createRow(input: Readonly<Record<string, unknown>>) {
     this.rows.push(input);
-    return Promise.resolve({});
+    return Promise.resolve({ $id: input.rowId });
   }
 
   updateTransaction() {
@@ -164,5 +177,65 @@ describe("trusted Function composition root", () => {
     expect(persisted).not.toContain(proof);
     expect(persisted).not.toContain("Le solde est incorrect.");
     expect(persisted).toContain("v1.");
+  });
+
+  it("BDD-ADMIN-001 composes the trusted Owner route and atomic Appwrite store", async () => {
+    const tables = new FakeTables();
+    let sequence = 0;
+    const dependencies = createHttpApplication(config, {
+      tables: tables as unknown as import("node-appwrite").TablesDB,
+      storage: {} as import("node-appwrite").Storage,
+      createId: () => `generated-${String(++sequence)}`,
+      createReference: () => "unused",
+      createCorrelationId: () => "correlation-admin",
+      nowIso: () => "2026-08-28T10:00:00.000Z",
+      nowMs: () => 104,
+      startedAt: () => 100,
+      principalVerifier: {
+        verify: () =>
+          Promise.resolve({ status: "verified", principalId: "owner-admin" }),
+      },
+    });
+    const json = vi.fn();
+    const context: FunctionContext = {
+      req: {
+        method: "POST",
+        path: "/v1/workspaces/workspace-admin/projects",
+        headers: {
+          authorization: "Bearer aaa.bbb.ccc",
+          "content-type": "application/json",
+        },
+        bodyJson: {
+          kind: "create_project",
+          operationId: "operation-admin",
+          workspaceId: "workspace-admin",
+          projectId: "project-admin",
+          slug: "admin-project",
+          enabledTypes: ["bug"],
+          contextDeclarations: [],
+          reporterPurpose: { fr: "But français", en: "English purpose" },
+        },
+      },
+      res: { json },
+      log: vi.fn(),
+      error: vi.fn(),
+    };
+
+    await routeRequest(context, dependencies);
+
+    expect(json).toHaveBeenCalledWith(
+      {
+        status: "ok",
+        project: { projectId: "project-admin", slug: "admin-project" },
+      },
+      201,
+      expect.any(Object),
+    );
+    expect(tables.rows.slice(-4).map((row) => row.tableId)).toEqual([
+      "projects",
+      "project_slugs",
+      "administration_audit",
+      "administration_idempotency",
+    ]);
   });
 });

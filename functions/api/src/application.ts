@@ -9,9 +9,11 @@ import { createNodeAppwriteAttachmentAcceptanceStore } from "./appwrite-attachme
 import { createNodeAppwriteIntakeStore } from "./appwrite-intake-store.js";
 import { createNodeAppwritePrivateAttachmentStorage } from "./appwrite-private-attachment-storage.js";
 import { createNodeAppwritePrincipalVerifier } from "./appwrite-principal-verifier.js";
+import { createNodeAppwriteProjectAdministrationStore } from "./appwrite-project-administration-store.js";
 import { createNodeAppwritePublicProjectReader } from "./appwrite-public-project-reader.js";
 import { createNodeAppwriteWorkspaceAttachmentScopeResolver } from "./appwrite-workspace-attachment-scope.js";
 import { createNodeAppwriteWorkspaceCapabilityScopeResolver } from "./appwrite-workspace-capability-scope.js";
+import { createNodeAppwriteWorkspaceOwnerScopeResolver } from "./appwrite-workspace-owner-scope.js";
 import { createNodeAppwriteWorkspaceProjectOperationPorts } from "./appwrite-workspace-project-ports.js";
 import { createNodeAppwriteProviderGrantVault } from "./appwrite-provider-grant-vault.js";
 import { createNodeAppwriteSourceConnectionStore } from "./appwrite-source-connection-store.js";
@@ -28,11 +30,16 @@ import {
   matchesAccessProof,
 } from "./proof-crypto.js";
 import { createPublicApi } from "./public-api.js";
+import { createProjectAdministration } from "./project-administration.js";
+import { createProjectAdministrationHttp } from "./project-administration-http.js";
 import { createReporterAttachmentDownload } from "./reporter-attachment-download.js";
 import { createSensitiveDataProtector } from "./sensitive-data-protector.js";
 import { createSourceConnectionCoordinator } from "./source-connection-coordinator.js";
 import { createSourceConnectionHttp } from "./source-connection-http.js";
-import { createWorkspaceAttachmentDownload } from "./workspace-attachment-download.js";
+import {
+  createWorkspaceAttachmentDownload,
+  type AppwritePrincipalVerifier,
+} from "./workspace-attachment-download.js";
 import { createWorkspaceProjectOperations } from "./workspace-project-operations.js";
 
 export interface ApplicationRuntime {
@@ -51,6 +58,7 @@ export interface ApplicationRuntime {
     readonly stage: "token_exchange" | "installations" | "repositories";
     readonly status: number;
   }) => void;
+  readonly principalVerifier?: AppwritePrincipalVerifier;
 }
 
 export function createHttpApplication(
@@ -127,10 +135,12 @@ export function createHttpApplication(
     accountless,
     createAttachmentDownload(attachmentMetadata, attachmentStorage),
   );
-  const principalVerifier = createNodeAppwritePrincipalVerifier({
-    endpoint: config.appwriteEndpoint,
-    projectId: config.appwriteProjectId,
-  });
+  const principalVerifier =
+    runtime.principalVerifier ??
+    createNodeAppwritePrincipalVerifier({
+      endpoint: config.appwriteEndpoint,
+      projectId: config.appwriteProjectId,
+    });
   const workspaceScopeSchema = {
     databaseId: config.appwriteSchema.databaseId,
     projectsTableId: config.appwriteSchema.projectsTableId,
@@ -147,6 +157,29 @@ export function createHttpApplication(
   const workspaceScope = createNodeAppwriteWorkspaceCapabilityScopeResolver(
     runtime.tables,
     workspaceScopeSchema,
+  );
+  const projectAdministration = createProjectAdministrationHttp(
+    createProjectAdministration(
+      principalVerifier,
+      createNodeAppwriteWorkspaceOwnerScopeResolver(runtime.tables, {
+        databaseId: config.appwriteSchema.databaseId,
+        workspaceMembershipsTableId: config.appwriteSchema.workspaceMembershipsTableId,
+      }),
+      createNodeAppwriteProjectAdministrationStore(runtime.tables, {
+        databaseId: config.appwriteSchema.databaseId,
+        projectsTableId: config.appwriteSchema.projectsTableId,
+        projectSlugsTableId: config.appwriteSchema.projectSlugsTableId,
+        administrationAuditTableId: config.appwriteSchema.administrationAuditTableId,
+        administrationIdempotencyTableId:
+          config.appwriteSchema.administrationIdempotencyTableId,
+      }),
+      {
+        createAuditId: runtime.createId,
+        digest: (command) =>
+          createHash("sha256").update(JSON.stringify(command)).digest("base64url"),
+        now: runtime.nowIso,
+      },
+    ),
   );
   const workspaceOperations = createWorkspaceProjectOperations(
     principalVerifier,
@@ -216,6 +249,7 @@ export function createHttpApplication(
     createCorrelationId: runtime.createCorrelationId,
     environment: config.environment,
     now: runtime.nowMs,
+    projectAdministration,
     publicApi: createPublicApi(
       projects,
       intake,
