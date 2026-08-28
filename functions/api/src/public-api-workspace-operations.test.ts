@@ -25,6 +25,7 @@ function setup(outcome: "ok" | "denied" | "retryable" = "ok") {
     searchFeedback: method,
     aggregateFeedback: method,
     listNotifications: method,
+    markNotificationRead: method,
     authorizeRealtime: method,
   };
   const api = createPublicApi(
@@ -62,6 +63,7 @@ describe("trusted Workspace operation HTTP boundary", () => {
     ["feedback/search", { query: "feedback" }],
     ["feedback/aggregate", {}],
     ["notifications/list", {}],
+    ["notifications/read", { notificationId: "notification-a" }],
     ["realtime/authorize", {}],
   ])(
     "BDD-OWN-FUNCTION-001 dispatches %s with bearer and route scope",
@@ -127,6 +129,22 @@ describe("trusted Workspace operation HTTP boundary", () => {
         body: { error: "ERR-WORKSPACE-DENIED" },
       });
     }
+    expect(target.method).not.toHaveBeenCalled();
+  });
+
+  it("BDD-NOT-FEED-005 rejects a malformed notification read identifier", async () => {
+    const target = setup();
+    await expect(
+      target.api.handle({
+        method: "POST",
+        path: `${base}/notifications/read`,
+        headers,
+        body: { notificationId: "bad/id" },
+      }),
+    ).resolves.toEqual({
+      statusCode: 404,
+      body: { error: "ERR-WORKSPACE-DENIED" },
+    });
     expect(target.method).not.toHaveBeenCalled();
   });
 

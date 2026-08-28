@@ -1,4 +1,4 @@
-import type { ProjectCapability } from "@y7-feedback/domain";
+import type { ActorAccess, ProjectCapability } from "@y7-feedback/domain";
 
 import type { WorkspaceCapabilityScopeResolver } from "./appwrite-workspace-capability-scope.js";
 import type { AppwritePrincipalVerifier } from "./workspace-attachment-download.js";
@@ -32,7 +32,12 @@ export interface WorkspaceFeedbackPort {
 }
 
 export interface WorkspaceNotificationPort {
-  list(scope: ScopedProjectIdentity): Promise<unknown>;
+  list(scope: ScopedProjectIdentity, actor: ActorAccess): Promise<unknown>;
+  markRead(
+    scope: ScopedProjectIdentity,
+    actor: ActorAccess,
+    notificationId: string,
+  ): Promise<unknown>;
 }
 
 export interface WorkspaceRealtimePort {
@@ -76,12 +81,13 @@ export interface WorkspaceProjectOperations {
   listNotifications(
     request: WorkspaceProjectRequest,
   ): Promise<WorkspaceOperationOutcome>;
+  markNotificationRead(
+    request: WorkspaceProjectRequest & { readonly notificationId: string },
+  ): Promise<WorkspaceOperationOutcome>;
   authorizeRealtime(
     request: WorkspaceProjectRequest,
   ): Promise<WorkspaceOperationOutcome>;
 }
-
-type Execute = (scope: ScopedProjectIdentity) => Promise<unknown>;
 
 export class WorkspaceOperationDeniedError extends Error {
   constructor() {
@@ -98,7 +104,7 @@ export function createWorkspaceProjectOperations(
   async function execute(
     request: WorkspaceProjectRequest,
     capability: ProjectCapability,
-    operation: Execute,
+    operation: (scope: ScopedProjectIdentity, actor: ActorAccess) => Promise<unknown>,
   ): Promise<WorkspaceOperationOutcome> {
     const verification = await principal.verify(request.jwt);
     if (verification.status !== "verified") return verification;
@@ -110,11 +116,14 @@ export function createWorkspaceProjectOperations(
     });
     if (authorization.status !== "authorized") return authorization;
     try {
-      const data = await operation({
-        principalId: verification.principalId,
-        workspaceId: authorization.project.workspaceId,
-        projectId: authorization.project.id,
-      });
+      const data = await operation(
+        {
+          principalId: verification.principalId,
+          workspaceId: authorization.project.workspaceId,
+          projectId: authorization.project.id,
+        },
+        authorization.actor,
+      );
       return data === undefined ? { status: "ok" } : { status: "ok", data };
     } catch (error: unknown) {
       return error instanceof WorkspaceOperationDeniedError
@@ -149,7 +158,13 @@ export function createWorkspaceProjectOperations(
         ports.feedback.aggregate(scope),
       ),
     listNotifications: (request) =>
-      execute(request, "notification.read", (scope) => ports.notifications.list(scope)),
+      execute(request, "notification.read", (scope, actor) =>
+        ports.notifications.list(scope, actor),
+      ),
+    markNotificationRead: (request) =>
+      execute(request, "notification.read", (scope, actor) =>
+        ports.notifications.markRead(scope, actor, request.notificationId),
+      ),
     authorizeRealtime: (request) =>
       execute(request, "realtime.subscribe", (scope) =>
         ports.realtime.authorize(scope),

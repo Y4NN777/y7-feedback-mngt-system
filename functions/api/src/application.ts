@@ -17,6 +17,7 @@ import { createNodeAppwriteWorkspaceAttachmentScopeResolver } from "./appwrite-w
 import { createNodeAppwriteWorkspaceCapabilityScopeResolver } from "./appwrite-workspace-capability-scope.js";
 import { createNodeAppwriteWorkspaceOwnerScopeResolver } from "./appwrite-workspace-owner-scope.js";
 import { createNodeAppwriteWorkspaceProjectOperationPorts } from "./appwrite-workspace-project-ports.js";
+import { createNodeAppwriteNotificationFeedStore } from "./appwrite-notification-feed-store.js";
 import { createNodeAppwriteWorkbenchStore } from "./appwrite-workbench-store.js";
 import { createNodeAppwriteWorkbenchMutationStore } from "./appwrite-workbench-mutation-store.js";
 import { createNodeAppwriteProviderGrantVault } from "./appwrite-provider-grant-vault.js";
@@ -221,18 +222,44 @@ export function createHttpApplication(
       },
     ),
   );
+  const workspaceProjectPorts = createNodeAppwriteWorkspaceProjectOperationPorts(
+    runtime.tables,
+    {
+      databaseId: config.appwriteSchema.databaseId,
+      feedbackTableId: config.appwriteSchema.feedbackTableId,
+      notificationsTableId: config.appwriteSchema.notificationsTableId,
+    },
+    runtime.createId,
+  );
+  const notificationFeed = createNodeAppwriteNotificationFeedStore(runtime.tables, {
+    databaseId: config.appwriteSchema.databaseId,
+    feedbackTableId: config.appwriteSchema.feedbackTableId,
+    notificationsTableId: config.appwriteSchema.notificationsTableId,
+  });
   const workspaceOperations = createWorkspaceProjectOperations(
     principalVerifier,
     workspaceScope,
-    createNodeAppwriteWorkspaceProjectOperationPorts(
-      runtime.tables,
-      {
-        databaseId: config.appwriteSchema.databaseId,
-        feedbackTableId: config.appwriteSchema.feedbackTableId,
-        notificationsTableId: config.appwriteSchema.notificationsTableId,
+    {
+      ...workspaceProjectPorts,
+      notifications: {
+        /* v8 ignore next -- composition callback is exercised by deployed feed matrix */
+        list: (scope, actor) =>
+          notificationFeed.list({
+            actor,
+            workspaceId: scope.workspaceId,
+            projectId: scope.projectId,
+          }),
+        /* v8 ignore next -- composition callback is exercised by deployed read matrix */
+        markRead: (scope, actor, notificationId) =>
+          notificationFeed.markRead({
+            actor,
+            workspaceId: scope.workspaceId,
+            projectId: scope.projectId,
+            notificationId,
+            readAt: runtime.nowIso(),
+          }),
       },
-      runtime.createId,
-    ),
+    },
   );
   const conversationLifecycle = createConversationLifecycleHttp(
     createConversationLifecycleCoordinator(

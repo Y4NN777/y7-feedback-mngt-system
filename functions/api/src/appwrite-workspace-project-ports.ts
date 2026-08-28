@@ -332,6 +332,9 @@ export function createAppwriteWorkspaceProjectOperationPorts(
         }
         return { ids: ids.filter((id): id is string => id !== undefined) };
       },
+      markRead() {
+        return Promise.reject(new Error("APPWRITE_WORKSPACE_OPERATION_UNAVAILABLE"));
+      },
     },
     realtime: {
       authorize(scope) {
