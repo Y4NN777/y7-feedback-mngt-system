@@ -1,4 +1,8 @@
-import type { RepositoryIdentity, SourceProvider } from "@y7-feedback/domain";
+import type {
+  ProviderRepositoryMetadata,
+  RepositoryIdentity,
+  SourceProvider,
+} from "@y7-feedback/domain";
 
 export interface ProviderGrantMaterial {
   readonly accessToken: string;
@@ -28,5 +32,9 @@ export interface SourceProviderAdapter {
     readonly encryptedGrantRef: string;
     readonly authorizedRepositories: readonly RepositoryIdentity[];
   }>;
+  importRepository(input: {
+    readonly encryptedGrantRef: string;
+    readonly repositoryId: string;
+  }): Promise<ProviderRepositoryMetadata>;
   revokeGrant(encryptedGrantRef: string): Promise<void>;
 }

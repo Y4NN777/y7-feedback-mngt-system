@@ -1,4 +1,9 @@
-import type { RepositoryIdentity } from "@y7-feedback/domain";
+import type {
+  ProviderReleaseMetadata,
+  ProviderRepositoryMetadata,
+  RepositoryIdentity,
+  RepositoryVisibility,
+} from "@y7-feedback/domain";
 
 import type {
   ProviderGrantMaterial,
@@ -13,7 +18,8 @@ export interface GitHubProviderConfig {
 
 type Fetcher = (input: string, init: RequestInit) => Promise<Response>;
 export type GitHubProviderDiagnostic = (event: {
-  readonly stage: "token_exchange" | "installations" | "repositories";
+  readonly stage:
+    "token_exchange" | "installations" | "repositories" | "metadata" | "releases";
   readonly status: number;
 }) => void;
 
@@ -92,6 +98,58 @@ function positiveIds(value: unknown, field: string): readonly number[] {
     }
     return entry.id;
   });
+}
+
+function repositoryMetadata(
+  value: unknown,
+  expectedId: string,
+): ProviderRepositoryMetadata {
+  if (
+    !isObject(value) ||
+    String(value.id) !== expectedId ||
+    !isObject(value.owner) ||
+    typeof value.owner.login !== "string"
+  ) {
+    throw new Error("SOURCE_PROVIDER_RESPONSE_INVALID");
+  }
+  const visibility: RepositoryVisibility =
+    value.visibility === "internal"
+      ? "internal"
+      : value.private === true
+        ? "private"
+        : value.private === false
+          ? "public"
+          : unavailable();
+  return {
+    provider: "github",
+    id: expectedId,
+    name: required(value.name, 500),
+    owner: required(value.owner.login, 500),
+    visibility,
+    webUrl: required(value.html_url, 2_000),
+    defaultBranch: required(value.default_branch, 200),
+    releases: [],
+  };
+}
+
+function releaseMetadata(value: unknown): ProviderReleaseMetadata | undefined {
+  if (!isObject(value)) throw new Error("SOURCE_PROVIDER_RESPONSE_INVALID");
+  if (value.draft === true || value.published_at === null) return undefined;
+  if (
+    typeof value.id !== "number" ||
+    !Number.isSafeInteger(value.id) ||
+    value.id <= 0
+  ) {
+    throw new Error("SOURCE_PROVIDER_RESPONSE_INVALID");
+  }
+  const tag = required(value.tag_name, 200);
+  return {
+    id: String(value.id),
+    tag,
+    name: value.name === null ? tag : required(value.name, 500),
+    publishedAt: required(value.published_at, 40),
+    webUrl: required(value.html_url, 2_000),
+  };
 }
 
 function headers(token: string): Readonly<Record<string, string>> {
@@ -212,6 +270,60 @@ export function createGitHubSourceProvider(
           encryptedGrantRef: required(await vault.seal("github", material), 1_000),
           authorizedRepositories: [...repositories.values()],
         };
+      } catch {
+        return unavailable();
+      }
+    },
+    async importRepository(input) {
+      try {
+        const repositoryId = required(input.repositoryId, 36);
+        if (!/^[1-9][0-9]{0,35}$/u.test(repositoryId)) return unavailable();
+        const material = await vault.open(
+          "github",
+          required(input.encryptedGrantRef, 1_000),
+        );
+        const metadataResult = await fetcher(
+          new URL(`repositories/${repositoryId}`, apiOrigin).toString(),
+          {
+            method: "GET",
+            cache: "no-store",
+            credentials: "omit",
+            headers: headers(required(material.accessToken)),
+          },
+        );
+        diagnostic({ stage: "metadata", status: metadataResult.status });
+        if (metadataResult.status !== 200) return unavailable();
+        const metadata = repositoryMetadata(
+          (await metadataResult.json()) as unknown,
+          repositoryId,
+        );
+        const releases: ProviderReleaseMetadata[] = [];
+        for (let page = 1; page <= maximumPages; page += 1) {
+          const url = new URL(
+            `repos/${encodeURIComponent(metadata.owner)}/${encodeURIComponent(metadata.name)}/releases`,
+            apiOrigin,
+          );
+          url.search = new URLSearchParams({
+            per_page: "100",
+            page: String(page),
+          }).toString();
+          const result = await fetcher(url.toString(), {
+            method: "GET",
+            cache: "no-store",
+            credentials: "omit",
+            headers: headers(required(material.accessToken)),
+          });
+          diagnostic({ stage: "releases", status: result.status });
+          if (result.status !== 200) return unavailable();
+          const payload: unknown = await result.json();
+          if (!Array.isArray(payload)) return unavailable();
+          for (const value of payload) {
+            const release = releaseMetadata(value);
+            if (release) releases.push(release);
+          }
+          if (!hasNext(result)) return { ...metadata, releases };
+        }
+        return unavailable();
       } catch {
         return unavailable();
       }
