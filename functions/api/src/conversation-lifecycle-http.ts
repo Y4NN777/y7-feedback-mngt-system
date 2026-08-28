@@ -133,6 +133,7 @@ export function createConversationLifecycleHttp(
             projectId,
             feedbackId,
             command: request.body.command,
+            locale: request.body.locale,
           }),
         );
       }
@@ -170,6 +171,7 @@ export function createConversationLifecycleHttp(
               proof,
               feedbackId,
               command: request.body.command,
+              locale: request.body.locale,
             }),
           );
     },

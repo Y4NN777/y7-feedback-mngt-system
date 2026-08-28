@@ -15,6 +15,12 @@ const schema = {
   internalNotesTableId: "conversation_internal_notes",
   lifecycleTableId: "conversation_lifecycle",
   idempotencyTableId: "conversation_idempotency",
+  accessGrantsTableId: "access_grants",
+  reportersTableId: "reporters",
+  workspaceMembershipsTableId: "workspace_memberships",
+  projectAssignmentsTableId: "project_assignments",
+  notificationsTableId: "notifications",
+  outboxTableId: "notification_outbox",
 };
 const queries = {
   equal: (attribute: string, values: readonly string[]) =>
@@ -102,8 +108,20 @@ const persistence = {
   },
 };
 
-function store(tables: FakeTables) {
-  return createAppwriteConversationLifecycleStore(tables, schema, queries, persistence);
+function store(
+  tables: FakeTables,
+  append = vi.fn().mockResolvedValue({
+    notifications: 0,
+    emailAttempts: 0,
+  }),
+) {
+  return createAppwriteConversationLifecycleStore(
+    tables,
+    schema,
+    queries,
+    persistence,
+    { append },
+  );
 }
 
 const common = {
@@ -111,6 +129,7 @@ const common = {
   workspaceId: "workspace_1",
   projectId: "project_1",
   payloadDigest: "digest_1",
+  locale: "fr" as const,
 };
 
 const messageCommand = {
@@ -157,6 +176,115 @@ describe("Appwrite conversation and lifecycle transaction", () => {
       commit: true,
     });
   });
+
+  it.each([
+    {
+      state: "under_review" as const,
+      kind: "request_clarification" as const,
+      expectedKind: "clarification_requested",
+      audience: "both",
+      actorKind: "workspace" as const,
+    },
+    {
+      state: "awaiting_reporter" as const,
+      kind: "reporter_answer" as const,
+      expectedKind: "reporter_answered",
+      audience: "workspace",
+      actorKind: "reporter" as const,
+    },
+    {
+      state: "under_review" as const,
+      kind: "resolve" as const,
+      expectedKind: "feedback_resolved",
+      audience: "both",
+      actorKind: "workspace" as const,
+    },
+    {
+      state: "resolved" as const,
+      kind: "close" as const,
+      expectedKind: "feedback_closed",
+      audience: "both",
+      actorKind: "workspace" as const,
+    },
+    {
+      state: "closed" as const,
+      kind: "reopen" as const,
+      expectedKind: "feedback_reopened",
+      audience: "workspace",
+      actorKind: "reporter" as const,
+    },
+  ])(
+    "fans out $kind in the same transaction",
+    async ({ state, kind, expectedKind, audience, actorKind }) => {
+      const tables = new FakeTables();
+      tables.feedback = { ...project, state };
+      const append = vi.fn().mockResolvedValue({ notifications: 1, emailAttempts: 1 });
+      await store(tables, append).execute({
+        ...common,
+        locale: "en",
+        command: {
+          kind,
+          eventId: `event_${kind}`,
+          expectedVersion: 1,
+          actorId: actorKind === "reporter" ? "reporter_1" : "maintainer_1",
+          actorKind,
+          occurredAt: messageCommand.occurredAt,
+          reason: "Observable transition",
+        },
+      });
+      expect(append).toHaveBeenCalledWith(
+        expect.objectContaining({
+          transactionId: "transaction_1",
+          eventId: `event_${kind}`,
+          kind: expectedKind,
+          audience,
+          locale: "en",
+          actor: {
+            kind: actorKind,
+            id: actorKind === "reporter" ? "reporter_1" : "maintainer_1",
+          },
+        }),
+      );
+    },
+  );
+
+  it.each([
+    {
+      actorKind: "reporter" as const,
+      actorId: "reporter_1",
+      audience: "reporter" as const,
+      expectedKind: "reporter_answered",
+      expectedAudience: "workspace",
+    },
+    {
+      actorKind: "workspace" as const,
+      actorId: "maintainer_1",
+      audience: "workspace" as const,
+      expectedKind: "message_added",
+      expectedAudience: "workspace",
+    },
+  ])(
+    "maps $actorKind conversation messages to their notification audience",
+    async ({ actorKind, actorId, audience, expectedKind, expectedAudience }) => {
+      const tables = new FakeTables();
+      const append = vi.fn().mockResolvedValue({ notifications: 1, emailAttempts: 1 });
+      await store(tables, append).execute({
+        ...common,
+        command: {
+          kind: "append_message",
+          eventId: `message_${actorKind}`,
+          actorId,
+          actorKind,
+          audience,
+          occurredAt: messageCommand.occurredAt,
+          content: "Visible conversation content",
+        },
+      });
+      expect(append).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: expectedKind, audience: expectedAudience }),
+      );
+    },
+  );
 
   it("BDD-CONV-002 stores Internal Notes in a distinct encrypted table", async () => {
     const tables = new FakeTables();
@@ -338,6 +466,20 @@ describe("Appwrite conversation and lifecycle transaction", () => {
     });
   });
 
+  it("rolls back the source transaction when durable notification fanout cannot be staged", async () => {
+    const tables = new FakeTables();
+    const append = vi.fn().mockRejectedValue(new Error("forced fanout failure"));
+    await expect(
+      store(tables, append).execute({ ...common, command: messageCommand }),
+    ).rejects.toEqual(new AppwriteConversationLifecycleError("ERR-CONV-RETRYABLE"));
+    expect(tables.created).toHaveLength(1);
+    expect(tables.created[0]?.tableId).toBe("conversation_messages");
+    expect(tables.transactions.at(-1)).toEqual({
+      transactionId: "transaction_1",
+      rollback: true,
+    });
+  });
+
   it("rejects invalid schema and malformed transaction or duplicate idempotency state", async () => {
     expect(() =>
       createAppwriteConversationLifecycleStore(
@@ -345,6 +487,7 @@ describe("Appwrite conversation and lifecycle transaction", () => {
         { ...schema, messagesTableId: schema.feedbackTableId },
         queries,
         persistence,
+        { append: vi.fn() },
       ),
     ).toThrow("APPWRITE_CONVERSATION_SCHEMA_INVALID");
     expect(() =>
@@ -353,6 +496,7 @@ describe("Appwrite conversation and lifecycle transaction", () => {
         { ...schema, databaseId: "bad/id" },
         queries,
         persistence,
+        { append: vi.fn() },
       ),
     ).toThrow("APPWRITE_CONVERSATION_SCHEMA_INVALID");
 
@@ -582,6 +726,7 @@ describe("Appwrite conversation and lifecycle transaction", () => {
       tables as unknown as TablesDB,
       schema,
       persistence,
+      { append: vi.fn().mockResolvedValue({ notifications: 0, emailAttempts: 0 }) },
     );
     await expect(
       nodeStore.execute({ ...common, command: messageCommand }),

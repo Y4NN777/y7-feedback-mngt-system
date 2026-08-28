@@ -234,6 +234,37 @@ describe("trusted Conversation and lifecycle orchestration", () => {
     expect(committed?.command.actorId).toBe("maintainer_1");
     expect(committed?.command.actorKind).toBe("workspace");
     expect(committed?.command.occurredAt).toBe("2026-08-28T12:00:00.000Z");
+    expect(committed?.locale).toBe("fr");
+  });
+
+  it.each(["fr", "en"] as const)(
+    "propagates the explicit %s notification locale",
+    async (locale) => {
+      const target = setup();
+      await expect(
+        target.coordinator.executeWorkspace({
+          ...context,
+          jwt: "valid.jwt.token",
+          command: message,
+          locale,
+        }),
+      ).resolves.toMatchObject({ status: "ok" });
+      expect(target.execute).toHaveBeenCalledWith(expect.objectContaining({ locale }));
+    },
+  );
+
+  it("rejects an unsupported notification locale before authorization", async () => {
+    const target = setup();
+    await expect(
+      target.coordinator.executeWorkspace({
+        ...context,
+        jwt: "valid.jwt.token",
+        command: message,
+        locale: "es",
+      }),
+    ).resolves.toEqual({ status: "invalid" });
+    expect(target.verify).not.toHaveBeenCalled();
+    expect(target.execute).not.toHaveBeenCalled();
   });
 
   it("keeps the idempotency digest stable when a response-loss retry gets a new server time", async () => {

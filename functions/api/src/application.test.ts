@@ -4,6 +4,7 @@ import type { ServerConfig } from "@y7-feedback/config/server";
 
 import { createHttpApplication, deriveReporterActorId } from "./application";
 import { routeRequest, type FunctionContext } from "./http";
+import { createSensitiveDataProtector } from "./sensitive-data-protector";
 
 function isObject(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -112,7 +113,40 @@ class FakeTables {
         $id: input.rowId,
         workspaceId: "workspace-admin",
         projectId: "project-conversation",
+        reporterId: "reporter-conversation",
         state: "received",
+      });
+    }
+    if (input.tableId === "access_grants" && input.rowId === "feedback-conversation") {
+      return Promise.resolve({
+        $id: input.rowId,
+        feedbackId: input.rowId,
+        reference: "Y7-CONVERSATION-12345678",
+        status: "active",
+      });
+    }
+    if (input.tableId === "reporters" && input.rowId === "reporter-conversation") {
+      const protector = createSensitiveDataProtector("data_2026_08", [
+        {
+          id: "data_2026_08",
+          material: Buffer.from(
+            config.sensitiveDataEnvelopeKeys.data_2026_08 ?? "",
+            "base64url",
+          ),
+        },
+      ]);
+      return Promise.resolve({
+        $id: input.rowId,
+        workspaceId: "workspace-admin",
+        attributionJson: protector.seal(
+          {
+            environment: "preview",
+            tableId: "reporters",
+            rowId: input.rowId,
+            field: "attributionJson",
+          },
+          JSON.stringify({ kind: "unidentified" }),
+        ),
       });
     }
     return Promise.reject(new Error("not used"));
