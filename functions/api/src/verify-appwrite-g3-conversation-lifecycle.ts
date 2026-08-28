@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 
 import { Client, Query, TablesDB, Users } from "node-appwrite";
 
@@ -87,7 +87,7 @@ async function main(): Promise<void> {
     const response = await api.handle({ method, path, headers, body });
     if (response?.statusCode !== statusCode) {
       throw new Error(
-        `APPWRITE_G3_CONVERSATION_HTTP_${String(statusCode)}_${String(response?.statusCode)}`,
+        `APPWRITE_G3_CONVERSATION_HTTP_${String(statusCode)}_${String(response?.statusCode)}_${JSON.stringify(response?.body)}`,
       );
     }
     return response.body;
@@ -193,6 +193,27 @@ async function main(): Promise<void> {
     };
     await command("workspace", note);
     await command("workspace", question);
+    const idempotency = await tables.listRows({
+      databaseId: config.appwriteSchema.databaseId,
+      tableId: config.appwriteSchema.conversationIdempotencyTableId,
+      queries: [
+        Query.equal("feedbackId", [feedbackId]),
+        Query.equal("operationId", [question.eventId]),
+        Query.limit(2),
+      ],
+      total: false,
+    });
+    const expectedDigest = createHash("sha256")
+      .update(
+        JSON.stringify({ parsed: question, actorId: ownerId, actorKind: "workspace" }),
+      )
+      .digest("base64url");
+    if (
+      idempotency.rows.length !== 1 ||
+      idempotency.rows[0]?.payloadDigest !== expectedDigest
+    ) {
+      throw new Error("APPWRITE_G3_CONVERSATION_DEPLOYMENT_DIGEST_STALE");
+    }
     await command("workspace", question, 200);
     await command("workspace", { ...question, content: "conflicting payload" }, 409);
     await command("workspace", {
@@ -294,13 +315,21 @@ async function main(): Promise<void> {
       config.appwriteSchema.conversationIdempotencyTableId,
     ]) {
       try {
-        await direct.listRows({
+        const visible = await direct.listRows({
           databaseId: config.appwriteSchema.databaseId,
           tableId,
           total: false,
         });
-        throw new Error("APPWRITE_G3_CONVERSATION_DIRECT_ACCESS_ALLOWED");
+        if (visible.rows.length !== 0) {
+          throw new Error("APPWRITE_G3_CONVERSATION_DIRECT_ACCESS_ALLOWED");
+        }
       } catch (error: unknown) {
+        if (
+          error instanceof Error &&
+          error.message === "APPWRITE_G3_CONVERSATION_DIRECT_ACCESS_ALLOWED"
+        ) {
+          throw error;
+        }
         if (!denied(error)) throw error;
       }
     }
