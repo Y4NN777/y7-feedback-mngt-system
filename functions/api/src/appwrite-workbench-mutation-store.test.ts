@@ -7,12 +7,19 @@ import {
   type WorkbenchMutationTablesPort,
 } from "./appwrite-workbench-mutation-store";
 import { AppwriteWorkbenchError } from "./appwrite-workbench-store";
+import type { NotificationFanoutInput } from "./appwrite-notification-fanout";
 
 const schema = {
   databaseId: "feedback",
   feedbackTableId: "feedback_items",
   idempotencyTableId: "conversation_idempotency",
   projectAssignmentsTableId: "project_assignments",
+  accessGrantsTableId: "access_grants",
+  reportersTableId: "reporters",
+  workspaceMembershipsTableId: "workspace_memberships",
+  notificationsTableId: "notifications",
+  notificationSignalsTableId: "notification_signals",
+  outboxTableId: "notification_outbox",
 };
 const queries = {
   equal: (attribute: string, values: readonly string[]) =>
@@ -198,6 +205,55 @@ describe("Appwrite Workbench mutation store", () => {
         }),
       ),
     ).rejects.toEqual(new AppwriteWorkbenchError("ERR-WORK-DENIED"));
+  });
+
+  it("BDD-NOT-004 appends assignment notification facts in the source transaction", async () => {
+    const tables = new Tables();
+    tables.assignmentRows = [
+      {
+        userId: "maintainer_2",
+        workspaceId: "workspace_1",
+        projectId: "project_1",
+        status: "active",
+      },
+    ];
+    const append = vi.fn<(input: NotificationFanoutInput) => Promise<unknown>>(() =>
+      Promise.resolve({}),
+    );
+    const store = createAppwriteWorkbenchMutationStore(tables, schema, queries, {
+      append,
+    });
+    await store.execute(
+      input({
+        command: {
+          kind: "assign_feedback",
+          operationId: "operation_notify",
+          maintainerId: "maintainer_2",
+        },
+      }),
+    );
+    expect(append).toHaveBeenCalledOnce();
+    expect(append.mock.calls[0]?.[0]).toMatchObject({
+      transactionId: "transaction_1",
+      eventId: "operation_notify",
+      kind: "assignment_changed",
+      audience: "workspace",
+      actor: { kind: "workspace", id: "owner_1" },
+      feedback: { assignedMaintainerId: "maintainer_2" },
+    });
+
+    append.mockRejectedValueOnce(new Error("fanout unavailable"));
+    await expect(
+      store.execute(
+        input({
+          command: { kind: "unassign_feedback", operationId: "operation_fail" },
+        }),
+      ),
+    ).rejects.toEqual(new AppwriteWorkbenchError("ERR-WORK-RETRYABLE"));
+    expect(tables.transactions).toContainEqual({
+      transactionId: "transaction_1",
+      rollback: true,
+    });
   });
 
   it("fails closed for invalid schema, inputs, duplicates and malformed replay facts", async () => {

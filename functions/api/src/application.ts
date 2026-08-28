@@ -183,12 +183,23 @@ export function createHttpApplication(
         },
         sensitive,
       ),
-      createNodeAppwriteWorkbenchMutationStore(runtime.tables, {
-        databaseId: config.appwriteSchema.databaseId,
-        feedbackTableId: config.appwriteSchema.feedbackTableId,
-        idempotencyTableId: config.appwriteSchema.conversationIdempotencyTableId,
-        projectAssignmentsTableId: config.appwriteSchema.projectAssignmentsTableId,
-      }),
+      createNodeAppwriteWorkbenchMutationStore(
+        runtime.tables,
+        {
+          databaseId: config.appwriteSchema.databaseId,
+          feedbackTableId: config.appwriteSchema.feedbackTableId,
+          idempotencyTableId: config.appwriteSchema.conversationIdempotencyTableId,
+          projectAssignmentsTableId: config.appwriteSchema.projectAssignmentsTableId,
+          accessGrantsTableId: config.appwriteSchema.accessGrantsTableId,
+          reportersTableId: config.appwriteSchema.reportersTableId,
+          workspaceMembershipsTableId:
+            config.appwriteSchema.workspaceMembershipsTableId,
+          notificationsTableId: config.appwriteSchema.notificationsTableId,
+          notificationSignalsTableId: config.appwriteSchema.notificationSignalsTableId,
+          outboxTableId: config.appwriteSchema.outboxTableId,
+        },
+        sensitive,
+      ),
       {
         /* v8 ignore next -- composition callback is exercised by deployed mutations */
         digest: (command) =>

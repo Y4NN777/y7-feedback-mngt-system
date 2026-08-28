@@ -1,10 +1,15 @@
 import { createHash } from "node:crypto";
 
-import { Query, type TablesDB } from "node-appwrite";
+import { Permission, Query, Role, type TablesDB } from "node-appwrite";
 
 import { validateWorkspaceClassification, type ActorAccess } from "@y7-feedback/domain";
 
 import { AppwriteWorkbenchError } from "./appwrite-workbench-store.js";
+import {
+  appendAppwriteNotificationFanout,
+  type NotificationFanoutInput,
+} from "./appwrite-notification-fanout.js";
+import type { AppwriteSensitivePersistence } from "./sensitive-data-protector.js";
 
 export type WorkbenchCommand =
   | {
@@ -86,6 +91,16 @@ export interface WorkbenchMutationSchema {
   readonly feedbackTableId: string;
   readonly idempotencyTableId: string;
   readonly projectAssignmentsTableId: string;
+  readonly accessGrantsTableId: string;
+  readonly reportersTableId: string;
+  readonly workspaceMembershipsTableId: string;
+  readonly notificationsTableId: string;
+  readonly notificationSignalsTableId: string;
+  readonly outboxTableId: string;
+}
+
+export interface WorkbenchNotificationFanout {
+  append(input: NotificationFanoutInput): Promise<unknown>;
 }
 
 const appwriteId = /^[A-Za-z0-9][A-Za-z0-9._-]{0,35}$/u;
@@ -114,7 +129,7 @@ function stableId(feedbackId: string, operationId: string): string {
 function authorize(
   value: unknown,
   input: Parameters<WorkbenchMutationStore["execute"]>[0],
-): void {
+): asserts value is Readonly<Record<string, unknown>> {
   if (
     !object(value) ||
     value.$id !== input.feedbackId ||
@@ -166,6 +181,7 @@ export function createAppwriteWorkbenchMutationStore(
   tables: WorkbenchMutationTablesPort,
   schema: WorkbenchMutationSchema,
   queries: WorkbenchMutationQueryPort,
+  fanout?: WorkbenchNotificationFanout,
 ): WorkbenchMutationStore {
   if (
     [
@@ -173,12 +189,24 @@ export function createAppwriteWorkbenchMutationStore(
       schema.feedbackTableId,
       schema.idempotencyTableId,
       schema.projectAssignmentsTableId,
+      schema.accessGrantsTableId,
+      schema.reportersTableId,
+      schema.workspaceMembershipsTableId,
+      schema.notificationsTableId,
+      schema.notificationSignalsTableId,
+      schema.outboxTableId,
     ].some((id) => !appwriteId.test(id)) ||
     new Set([
       schema.feedbackTableId,
       schema.idempotencyTableId,
       schema.projectAssignmentsTableId,
-    ]).size !== 3
+      schema.accessGrantsTableId,
+      schema.reportersTableId,
+      schema.workspaceMembershipsTableId,
+      schema.notificationsTableId,
+      schema.notificationSignalsTableId,
+      schema.outboxTableId,
+    ]).size !== 9
   )
     throw new Error("APPWRITE_WORKBENCH_MUTATION_SCHEMA_INVALID");
   return {
@@ -223,15 +251,13 @@ export function createAppwriteWorkbenchMutationStore(
           closed = true;
           return prior;
         }
-        authorize(
-          await tables.getRow({
-            databaseId: schema.databaseId,
-            tableId: schema.feedbackTableId,
-            rowId: input.feedbackId,
-            transactionId,
-          }),
-          input,
-        );
+        const feedback = await tables.getRow({
+          databaseId: schema.databaseId,
+          tableId: schema.feedbackTableId,
+          rowId: input.feedbackId,
+          transactionId,
+        });
+        authorize(feedback, input);
         if (input.command.kind === "assign_feedback") {
           const assignments = await tables.listRows({
             databaseId: schema.databaseId,
@@ -279,6 +305,22 @@ export function createAppwriteWorkbenchMutationStore(
         });
         if (!object(updated) || updated.$id !== input.feedbackId)
           throw new AppwriteWorkbenchError("ERR-WORK-RETRYABLE");
+        if (
+          fanout !== undefined &&
+          (input.command.kind === "assign_feedback" ||
+            input.command.kind === "unassign_feedback")
+        ) {
+          await fanout.append({
+            transactionId,
+            feedback: { ...feedback, ...data },
+            eventId: input.command.operationId,
+            kind: "assignment_changed",
+            occurredAt: input.occurredAt,
+            locale: "fr",
+            audience: "workspace",
+            actor: { kind: "workspace", id: input.actor.principalId },
+          });
+        }
         const result = { feedbackId: input.feedbackId, action: input.command.kind };
         const rowId = stableId(input.feedbackId, input.command.operationId);
         const created = await tables.createRow({
@@ -320,21 +362,38 @@ export function createAppwriteWorkbenchMutationStore(
 export function createNodeAppwriteWorkbenchMutationStore(
   tables: TablesDB,
   schema: WorkbenchMutationSchema,
+  persistence: AppwriteSensitivePersistence,
+  fanoutOverride?: WorkbenchNotificationFanout,
 ): WorkbenchMutationStore {
+  const port: WorkbenchMutationTablesPort = {
+    createTransaction: (input) => tables.createTransaction(input),
+    getRow: (input) => tables.getRow(input),
+    listRows: async (input) => ({
+      rows: (await tables.listRows({ ...input, queries: [...input.queries] })).rows,
+    }),
+    updateRow: (input) => tables.updateRow(input),
+    createRow: (input) =>
+      tables.createRow({ ...input, permissions: [...input.permissions] }),
+    updateTransaction: (input) => tables.updateTransaction(input),
+  };
   return createAppwriteWorkbenchMutationStore(
-    {
-      createTransaction: (input) => tables.createTransaction(input),
-      getRow: (input) => tables.getRow(input),
-      listRows: async (input) => ({
-        rows: (await tables.listRows({ ...input, queries: [...input.queries] })).rows,
-      }),
-      updateRow: (input) => tables.updateRow(input),
-      createRow: (input) =>
-        tables.createRow({ ...input, permissions: [...input.permissions] }),
-      updateTransaction: (input) => tables.updateTransaction(input),
-    },
+    port,
     schema,
     defaultQueries,
+    fanoutOverride ?? {
+      append: (input) =>
+        appendAppwriteNotificationFanout(
+          port,
+          schema,
+          defaultQueries,
+          {
+            /* v8 ignore next -- official Node SDK permission serialization is deployed evidence */
+            readUser: (userId) => Permission.read(Role.user(userId)),
+          },
+          persistence,
+          input,
+        ),
+    },
   );
 }
 /* v8 ignore stop */
