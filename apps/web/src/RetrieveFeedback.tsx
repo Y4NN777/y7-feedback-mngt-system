@@ -4,6 +4,7 @@ import type { FeedbackSource, Locale, ReporterFeedbackView } from "@y7-feedback/
 
 import type { ConversationGateway } from "./ConversationGateway";
 import { accessMessages } from "./i18n/access";
+import type { PublicationConsentGateway } from "./PublicationConsentGateway";
 import { ReporterConversation } from "./ReporterConversation";
 
 export type AccountlessGatewayOutcome =
@@ -83,18 +84,28 @@ export function RetrieveFeedback({
   gateway,
   locale,
   onLocaleChange,
+  publicationConsentGateway,
 }: {
   readonly conversationGateway: ConversationGateway;
   readonly createOperationId: () => string;
   readonly gateway: AccountlessGateway;
   readonly locale: Locale;
   readonly onLocaleChange: (locale: Locale) => void;
+  readonly publicationConsentGateway: PublicationConsentGateway;
 }) {
   const copy = accessMessages[locale];
   const [reference, setReference] = useState("");
   const [proof, setProof] = useState("");
   const [outcome, setOutcome] = useState<"denied" | "retryable" | null>(null);
   const [view, setView] = useState<ReporterFeedbackView | null>(null);
+  const [consentAudience, setConsentAudience] = useState("");
+  const [consent, setConsent] = useState<{
+    status: "active" | "revoked";
+    version: number;
+  }>();
+  const [consentOutcome, setConsentOutcome] = useState<
+    "denied" | "conflict" | "retryable"
+  >();
 
   async function retrieve(event: SyntheticEvent<HTMLFormElement, SubmitEvent>) {
     event.preventDefault();
@@ -120,6 +131,31 @@ export function RetrieveFeedback({
     setProof("");
     setOutcome(null);
     setView(null);
+    setConsentAudience("");
+    setConsent(undefined);
+    setConsentOutcome(undefined);
+  }
+
+  async function updateConsent(action: "grant" | "revoke") {
+    const base = {
+      operationId: createOperationId(),
+      reference: reference.trim(),
+      proof,
+    };
+    const result =
+      action === "grant"
+        ? await publicationConsentGateway.grant({
+            ...base,
+            disclosureVersion: "reporter-content-v1",
+            audience: consentAudience.trim(),
+          })
+        : await publicationConsentGateway.revoke(base);
+    if (result.status === "ok") {
+      setConsent({ status: result.consent.state, version: result.consent.version });
+      setConsentOutcome(undefined);
+    } else {
+      setConsentOutcome(result.status);
+    }
   }
 
   return (
@@ -165,6 +201,60 @@ export function RetrieveFeedback({
             proof={proof}
             reference={reference}
           />
+          <section
+            className="retrieved-view"
+            aria-labelledby="publication-consent-title"
+          >
+            <h2 id="publication-consent-title">{copy.publicationConsent}</h2>
+            <p>{copy.publicationConsentHint}</p>
+            <label className="field">
+              <span>{copy.publicationAudience}</span>
+              <input
+                value={consentAudience}
+                placeholder="github:123"
+                onChange={(event) => {
+                  setConsentAudience(event.currentTarget.value);
+                  setConsentOutcome(undefined);
+                }}
+              />
+            </label>
+            <div className="form-actions">
+              <button
+                type="button"
+                disabled={consentAudience.trim() === ""}
+                onClick={() => {
+                  void updateConsent("grant");
+                }}
+              >
+                {copy.grantPublicationConsent}
+              </button>
+              <button
+                type="button"
+                disabled={consent?.status !== "active"}
+                onClick={() => {
+                  void updateConsent("revoke");
+                }}
+              >
+                {copy.revokePublicationConsent}
+              </button>
+            </div>
+            {consent && (
+              <p role="status">
+                {consent.status === "active"
+                  ? copy.consentActive.replace("{version}", String(consent.version))
+                  : copy.consentRevoked.replace("{version}", String(consent.version))}
+              </p>
+            )}
+            {consentOutcome && (
+              <p role="alert">
+                {consentOutcome === "denied"
+                  ? copy.denied
+                  : consentOutcome === "conflict"
+                    ? copy.consentConflict
+                    : copy.retryable}
+              </p>
+            )}
+          </section>
           <button
             className="primary-action retrieve-again"
             type="button"

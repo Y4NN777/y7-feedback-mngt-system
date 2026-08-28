@@ -9,9 +9,11 @@ import { createHttpAdministrationGateway } from "./AdministrationGateway";
 import { createAppwriteAdministrationSession } from "./AdministrationSession";
 import { App } from "./App";
 import { createHttpConversationGateway } from "./ConversationGateway";
+import { createHttpExternalIssueGateway } from "./ExternalIssueGateway";
 import { createHttpIntakeGateway } from "./IntakeGateway";
 import { createAppwriteNotificationInvalidation } from "./NotificationInvalidation";
 import { createHttpProjectGateway } from "./ProjectGateway";
+import { createHttpPublicationConsentGateway } from "./PublicationConsentGateway";
 import { createHttpWorkbenchGateway } from "./WorkbenchGateway";
 import { createHttpSourceManagementGateway } from "./SourceManagementGateway";
 import { OperationalTelemetry } from "./observability/OperationalTelemetry";
@@ -24,6 +26,9 @@ const intakeGateway = createHttpIntakeGateway(config.apiEndpoint);
 const accountlessGateway = createHttpAccountlessGateway(config.apiEndpoint);
 const conversationGateway = createHttpConversationGateway(config.apiEndpoint);
 const projectGateway = createHttpProjectGateway(config.apiEndpoint);
+const publicationConsentGateway = createHttpPublicationConsentGateway(
+  config.apiEndpoint,
+);
 const administrationSession = createAppwriteAdministrationSession(
   config.appwriteEndpoint,
   config.appwriteProjectId,
@@ -42,6 +47,9 @@ const sourceManagementGateway = createHttpSourceManagementGateway(
   config.apiEndpoint,
   () => administrationSession.createJwt(),
 );
+const externalIssueGateway = createHttpExternalIssueGateway(config.apiEndpoint, () =>
+  administrationSession.createJwt(),
+);
 
 if (!root) {
   throw new Error("Application root is missing");
@@ -55,9 +63,11 @@ createRoot(root).render(
         administrationGateway={administrationGateway}
         administrationSession={administrationSession}
         conversationGateway={conversationGateway}
+        externalIssueGateway={externalIssueGateway}
         intakeGateway={intakeGateway}
         notificationInvalidation={notificationInvalidation}
         projectGateway={projectGateway}
+        publicationConsentGateway={publicationConsentGateway}
         workbenchGateway={workbenchGateway}
         sourceManagementGateway={sourceManagementGateway}
       />

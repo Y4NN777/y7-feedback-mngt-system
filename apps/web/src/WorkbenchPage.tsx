@@ -10,6 +10,7 @@ import type {
 
 import type { AdministrationSession } from "./AdministrationSession";
 import type { NotificationInvalidation } from "./NotificationInvalidation";
+import type { ExternalIssueGateway } from "./ExternalIssueGateway";
 import type { WorkbenchGateway } from "./WorkbenchGateway";
 import { workbenchMessages, workbenchNotificationMessages } from "./i18n/workbench";
 
@@ -29,6 +30,7 @@ function sourceSummary(source: Readonly<Record<string, unknown>>): string {
 
 export function WorkbenchPage({
   gateway,
+  externalIssueGateway,
   createOperationId,
   locale,
   notificationInvalidation,
@@ -36,6 +38,7 @@ export function WorkbenchPage({
   session,
 }: {
   readonly gateway: WorkbenchGateway;
+  readonly externalIssueGateway: ExternalIssueGateway;
   readonly createOperationId: () => string;
   readonly locale: Locale;
   readonly notificationInvalidation: NotificationInvalidation;
@@ -57,6 +60,11 @@ export function WorkbenchPage({
   const [signInDenied, setSignInDenied] = useState(false);
   const [classification, setClassification] = useState("");
   const [maintainerId, setMaintainerId] = useState("");
+  const [repositoryKey, setRepositoryKey] = useState("");
+  const [consentVersion, setConsentVersion] = useState("");
+  const [issueStatus, setIssueStatus] = useState<
+    "accepted" | "replayed" | "denied" | "conflict" | "retryable"
+  >();
   const [mutationStatus, setMutationStatus] = useState<
     "ok" | "invalid" | "denied" | "conflict" | "retryable"
   >();
@@ -121,6 +129,22 @@ export function WorkbenchPage({
       if (unsubscribe !== undefined) void unsubscribe();
     };
   }, [authenticated, gateway, notificationInvalidation, queryClient, scope]);
+  const repositories = useQuery({
+    queryKey: ["external-issue-repositories", scope, selectedId],
+    queryFn: () =>
+      scope === undefined
+        ? Promise.resolve({ status: "denied" as const })
+        : externalIssueGateway.repositories(scope),
+    enabled: authenticated && scope !== undefined && selectedId !== undefined,
+    retry: false,
+  });
+  const selectedRepository =
+    repositories.data?.status === "ok"
+      ? repositories.data.result.find(
+          (candidate) =>
+            `${candidate.connectionId}:${candidate.repositoryId}` === repositoryKey,
+        )
+      : undefined;
 
   async function signIn(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -151,6 +175,26 @@ export function WorkbenchPage({
     });
     setMutationStatus(outcome.status);
     if (outcome.status === "ok") await notifications.refetch();
+  }
+
+  async function linkExternalIssue() {
+    if (scope === undefined || selectedId === undefined) return;
+    const repository = selectedRepository;
+    if (repository === undefined) {
+      setIssueStatus("denied");
+      return;
+    }
+    const outcome = await externalIssueGateway.link({
+      ...scope,
+      feedbackId: selectedId,
+      operationId: createOperationId(),
+      connectionId: repository.connectionId,
+      repositoryId: repository.repositoryId,
+      ...(repository.visibility === "public"
+        ? { consentVersion: Number(consentVersion) }
+        : {}),
+    });
+    setIssueStatus(outcome.status === "ok" ? outcome.result.status : outcome.status);
   }
 
   return (
@@ -421,9 +465,98 @@ export function WorkbenchPage({
                   {copy.delete}
                 </button>
               </fieldset>
+              <fieldset className="workbench-actions">
+                <legend>{copy.externalIssue}</legend>
+                {repositories.isPending ? (
+                  <p role="status">{copy.repositoriesLoading}</p>
+                ) : repositories.data?.status !== "ok" ? (
+                  <div role="alert">
+                    <p>
+                      {repositories.data?.status === "denied"
+                        ? copy.denied
+                        : copy.retryable}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void repositories.refetch();
+                      }}
+                    >
+                      {copy.retry}
+                    </button>
+                  </div>
+                ) : repositories.data.result.length === 0 ? (
+                  <p>{copy.noRepository}</p>
+                ) : (
+                  <>
+                    <label>
+                      {copy.repository}
+                      <select
+                        required
+                        value={repositoryKey}
+                        onChange={(event) => {
+                          setRepositoryKey(event.target.value);
+                          setConsentVersion("");
+                          setIssueStatus(undefined);
+                        }}
+                      >
+                        <option value="">{copy.chooseRepository}</option>
+                        {repositories.data.result.map((repository) => (
+                          <option
+                            key={`${repository.connectionId}:${repository.repositoryId}`}
+                            value={`${repository.connectionId}:${repository.repositoryId}`}
+                          >
+                            {repository.provider} · {repository.owner}/{repository.name}{" "}
+                            · {repository.visibility}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    {selectedRepository?.visibility === "public" && (
+                      <label>
+                        {copy.consentVersion}
+                        <input
+                          type="number"
+                          min="1"
+                          step="1"
+                          required
+                          value={consentVersion}
+                          onChange={(event) => {
+                            setConsentVersion(event.target.value);
+                            setIssueStatus(undefined);
+                          }}
+                        />
+                      </label>
+                    )}
+                    <button
+                      type="button"
+                      disabled={
+                        repositoryKey === "" ||
+                        (selectedRepository?.visibility === "public" &&
+                          (!Number.isSafeInteger(Number(consentVersion)) ||
+                            Number(consentVersion) < 1))
+                      }
+                      onClick={() => {
+                        void linkExternalIssue();
+                      }}
+                    >
+                      {copy.linkIssue}
+                    </button>
+                  </>
+                )}
+              </fieldset>
               {mutationStatus && (
                 <p role="status">
                   {mutationStatus === "ok" ? copy.mutationOk : copy[mutationStatus]}
+                </p>
+              )}
+              {issueStatus && (
+                <p role="status">
+                  {issueStatus === "accepted"
+                    ? copy.issueAccepted
+                    : issueStatus === "replayed"
+                      ? copy.issueReplayed
+                      : copy[issueStatus]}
                 </p>
               )}
             </article>

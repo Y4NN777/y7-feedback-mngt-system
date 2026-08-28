@@ -7,11 +7,13 @@ import { AdministrationPage } from "./AdministrationPage";
 import type { AdministrationGateway } from "./AdministrationGateway";
 import type { AdministrationSession } from "./AdministrationSession";
 import type { ConversationGateway } from "./ConversationGateway";
+import type { ExternalIssueGateway } from "./ExternalIssueGateway";
 import { FeedbackIntake } from "./FeedbackIntake";
 import { messages } from "./i18n/messages";
 import type { IntakeGateway } from "./IntakeGateway";
 import type { NotificationInvalidation } from "./NotificationInvalidation";
 import type { ProjectGateway } from "./ProjectGateway";
+import type { PublicationConsentGateway } from "./PublicationConsentGateway";
 import { RetrieveFeedback, type AccountlessGateway } from "./RetrieveFeedback";
 import type { WorkbenchGateway } from "./WorkbenchGateway";
 import { WorkbenchPage } from "./WorkbenchPage";
@@ -27,6 +29,10 @@ const unavailableIntakeGateway: IntakeGateway = {
 const unavailableProjectGateway: ProjectGateway = {
   resolve: () => Promise.resolve({ status: "unavailable" }),
 };
+const unavailablePublicationConsentGateway: PublicationConsentGateway = {
+  grant: () => Promise.resolve({ status: "retryable" }),
+  revoke: () => Promise.resolve({ status: "retryable" }),
+};
 const unavailableAdministrationGateway: AdministrationGateway = {
   execute: () => Promise.resolve({ status: "retryable" }),
 };
@@ -38,6 +44,10 @@ const unavailableAdministrationSession: AdministrationSession = {
 const unavailableConversationGateway: ConversationGateway = {
   retrieve: () => Promise.resolve({ status: "retryable" }),
   execute: () => Promise.resolve({ status: "retryable" }),
+};
+const unavailableExternalIssueGateway: ExternalIssueGateway = {
+  repositories: () => Promise.resolve({ status: "retryable" }),
+  link: () => Promise.resolve({ status: "retryable" }),
 };
 const unavailableWorkbenchGateway: WorkbenchGateway = {
   list: () => Promise.resolve({ status: "retryable" }),
@@ -145,9 +155,11 @@ export function App({
   administrationGateway = unavailableAdministrationGateway,
   administrationSession = unavailableAdministrationSession,
   conversationGateway = unavailableConversationGateway,
+  externalIssueGateway = unavailableExternalIssueGateway,
   createOperationId = () => crypto.randomUUID(),
   intakeGateway = unavailableIntakeGateway,
   projectGateway = unavailableProjectGateway,
+  publicationConsentGateway = unavailablePublicationConsentGateway,
   redirectProject = (canonicalSlug) => {
     window.location.replace(`/${canonicalSlug}`);
   },
@@ -159,9 +171,11 @@ export function App({
   readonly administrationGateway?: AdministrationGateway;
   readonly administrationSession?: AdministrationSession;
   readonly conversationGateway?: ConversationGateway;
+  readonly externalIssueGateway?: ExternalIssueGateway;
   readonly createOperationId?: () => string;
   readonly intakeGateway?: IntakeGateway;
   readonly projectGateway?: ProjectGateway;
+  readonly publicationConsentGateway?: PublicationConsentGateway;
   readonly redirectProject?: (canonicalSlug: string) => void;
   readonly workbenchGateway?: WorkbenchGateway;
   readonly notificationInvalidation?: NotificationInvalidation;
@@ -183,6 +197,7 @@ export function App({
         gateway={accountlessGateway}
         locale={locale}
         onLocaleChange={selectLocale}
+        publicationConsentGateway={publicationConsentGateway}
       />
     );
   }
@@ -200,6 +215,7 @@ export function App({
     return (
       <WorkbenchPage
         createOperationId={createOperationId}
+        externalIssueGateway={externalIssueGateway}
         gateway={workbenchGateway}
         locale={locale}
         notificationInvalidation={notificationInvalidation}
