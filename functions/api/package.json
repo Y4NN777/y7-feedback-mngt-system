@@ -16,6 +16,7 @@
     "verify:appwrite:g1": "node dist/verify-appwrite-g1.js --apply",
     "verify:appwrite:g2:attachments": "node dist/verify-appwrite-g2-attachment.js --apply",
     "verify:appwrite:g3:conversation-lifecycle": "node dist/verify-appwrite-g3-conversation-lifecycle.js --apply",
+    "verify:appwrite:g3:workbench": "node dist/verify-appwrite-g3-workbench.js --apply",
     "verify:appwrite:antivirus": "node dist/verify-appwrite-antivirus.js --apply",
     "verify:appwrite:direct-access": "node dist/verify-appwrite-direct-access.js --apply",
     "verify:appwrite:workspace-operations": "node dist/verify-appwrite-workspace-operations.js --apply",
