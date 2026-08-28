@@ -37,14 +37,16 @@ function setup() {
       slug: "wise-money",
     }),
   );
+  const mutate = vi.fn<AppwriteProjectAdministrationStore["mutate"]>();
   return {
     verify,
     resolve,
     create,
+    mutate,
     administration: createProjectAdministration(
       { verify },
       { resolve },
-      { create },
+      { create, mutate },
       {
         createAuditId: () => "audit_1",
         digest: () => "digest_1",
