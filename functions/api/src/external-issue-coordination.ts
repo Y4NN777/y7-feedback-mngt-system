@@ -19,6 +19,8 @@ export interface ExternalIssuePersistence {
     readonly reporterId: string;
     readonly workspaceId: string;
     readonly projectId: string;
+    readonly operationId: string;
+    readonly payloadDigest: string;
     readonly disclosureVersion: string;
     readonly audience: string;
     readonly occurredAt: string;
@@ -28,6 +30,8 @@ export interface ExternalIssuePersistence {
     readonly reporterId: string;
     readonly workspaceId: string;
     readonly projectId: string;
+    readonly operationId: string;
+    readonly payloadDigest: string;
     readonly occurredAt: string;
   }): Promise<{ readonly version: number; readonly state: "revoked" }>;
   requestLink(input: {
@@ -205,6 +209,7 @@ export function createExternalIssueCoordinator(
     },
 
     async grantConsent(input: {
+      readonly operationId: string;
       readonly reference: string;
       readonly proof: string;
       readonly disclosureVersion: string;
@@ -213,7 +218,8 @@ export function createExternalIssueCoordinator(
       try {
         if (
           !disclosure.test(input.disclosureVersion) ||
-          !audience.test(input.audience)
+          !audience.test(input.audience) ||
+          !identifier.test(input.operationId)
         ) {
           return { status: "denied" as const };
         }
@@ -224,6 +230,13 @@ export function createExternalIssueCoordinator(
           reporterId: verified.reporterId,
           workspaceId: verified.workspaceId,
           projectId: verified.projectId,
+          operationId: input.operationId,
+          payloadDigest: dependencies.digest({
+            kind: "grant_publication_consent",
+            feedbackId: verified.feedbackId,
+            disclosureVersion: input.disclosureVersion,
+            audience: input.audience,
+          }),
           disclosureVersion: input.disclosureVersion,
           audience: input.audience,
           occurredAt: dependencies.now(),
@@ -234,8 +247,15 @@ export function createExternalIssueCoordinator(
       }
     },
 
-    async revokeConsent(input: { readonly reference: string; readonly proof: string }) {
+    async revokeConsent(input: {
+      readonly operationId: string;
+      readonly reference: string;
+      readonly proof: string;
+    }) {
       try {
+        if (!identifier.test(input.operationId)) {
+          return { status: "denied" as const };
+        }
         const verified = await reporter(input);
         if (verified.status !== "verified") return { status: verified.status } as const;
         const consent = await dependencies.persistence.revokeConsent({
@@ -243,6 +263,11 @@ export function createExternalIssueCoordinator(
           reporterId: verified.reporterId,
           workspaceId: verified.workspaceId,
           projectId: verified.projectId,
+          operationId: input.operationId,
+          payloadDigest: dependencies.digest({
+            kind: "revoke_publication_consent",
+            feedbackId: verified.feedbackId,
+          }),
           occurredAt: dependencies.now(),
         });
         return { status: "ok" as const, consent };
