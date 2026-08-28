@@ -29,6 +29,9 @@ const manifest = createAppwriteInfrastructureManifest({
   conversationInternalNotesTableId: "conversation_internal_notes",
   conversationIdempotencyTableId: "conversation_idempotency",
   conversationLifecycleTableId: "conversation_lifecycle",
+  publicationConsentsTableId: "publication_consents",
+  externalIssueLinksTableId: "external_issue_links",
+  providerOutboxTableId: "provider_outbox",
 });
 
 function projectsTable() {

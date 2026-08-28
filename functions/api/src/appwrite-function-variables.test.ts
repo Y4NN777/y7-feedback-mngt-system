@@ -33,7 +33,7 @@ describe("Appwrite Function variable policy", () => {
   it("BDD-DEL-APPWRITE-008 creates deterministic secret variables without static Appwrite authority", () => {
     const actions = planAppwriteFunctionVariables(environment, []);
 
-    expect(actions).toHaveLength(32);
+    expect(actions).toHaveLength(appwriteFunctionVariableKeys.length);
     expect(actions.every((action) => action.kind === "create")).toBe(true);
     for (const action of actions) {
       expect(action).toHaveProperty("secret", true);
