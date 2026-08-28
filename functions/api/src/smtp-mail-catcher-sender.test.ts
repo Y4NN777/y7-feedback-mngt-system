@@ -51,6 +51,48 @@ describe("Preview SMTP mail catcher sender", () => {
     });
   });
 
+  it.each([
+    ["feedback_received", "fr", "Nouveau retour reçu"],
+    ["feedback_received", "en", "New feedback received"],
+    ["message_added", "fr", "Nouveau message"],
+    ["message_added", "en", "New message"],
+    ["feedback_under_review", "fr", "Retour en cours d’analyse"],
+    ["feedback_under_review", "en", "Feedback under review"],
+    ["clarification_requested", "fr", "Précision demandée"],
+    ["clarification_requested", "en", "Clarification requested"],
+    ["reporter_answered", "fr", "Nouvelle réponse"],
+    ["reporter_answered", "en", "New reply"],
+    ["feedback_resolved", "fr", "Retour résolu"],
+    ["feedback_resolved", "en", "Feedback resolved"],
+    ["feedback_closed", "fr", "Retour clôturé"],
+    ["feedback_closed", "en", "Feedback closed"],
+    ["feedback_reopened", "fr", "Retour rouvert"],
+    ["feedback_reopened", "en", "Feedback reopened"],
+    ["assignment_changed", "fr", "Attribution modifiée"],
+    ["assignment_changed", "en", "Assignment changed"],
+  ] as const)(
+    "sends the public %s template in %s",
+    async (kind, locale, expectedSubject) => {
+      const target = context();
+      await expect(
+        target.sender.deliver({
+          deliveryId: "notification_event",
+          channel: "email",
+          payload: {
+            kind,
+            locale,
+            reference: "Y7-REF-12345678",
+            recipient: { kind: "reporter", id: "reporter_1" },
+          },
+        }),
+      ).resolves.toBe("delivered");
+      expect(target.sendMail).toHaveBeenCalledWith(
+        expect.objectContaining({ subject: expectedSubject }),
+      );
+      expect(JSON.stringify(target.sendMail.mock.calls)).not.toContain("reporter_1");
+    },
+  );
+
   it("BDD-MAIL-002 completes in-product delivery without SMTP", async () => {
     const target = context();
 
@@ -120,6 +162,38 @@ describe("Preview SMTP mail catcher sender", () => {
     [{ kind: "feedback_accepted", locale: "es", reference: "Y7-REF-12345678" }],
     [{ kind: "feedback_accepted", locale: "fr", reference: 7 }],
     [{ kind: "feedback_accepted", locale: "fr", reference: "bad" }],
+    [
+      {
+        kind: "message_added",
+        locale: "fr",
+        reference: "Y7-REF-12345678",
+        recipient: null,
+      },
+    ],
+    [
+      {
+        kind: "message_added",
+        locale: "fr",
+        reference: "Y7-REF-12345678",
+        recipient: { kind: "reporter", id: "bad/id" },
+      },
+    ],
+    [
+      {
+        kind: "message_added",
+        locale: "fr",
+        reference: "Y7-REF-12345678",
+        recipient: { kind: "wrong", id: "reporter_1" },
+      },
+    ],
+    [
+      {
+        kind: "message_added",
+        locale: "fr",
+        reference: "Y7-REF-12345678",
+        recipient: { kind: "reporter", id: "reporter_1", extra: true },
+      },
+    ],
   ])("BDD-MAIL-005 rejects malformed payload %#", async (payload) => {
     const target = context();
     await expect(

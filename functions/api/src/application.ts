@@ -275,6 +275,13 @@ export function createHttpApplication(
           internalNotesTableId: config.appwriteSchema.conversationInternalNotesTableId,
           lifecycleTableId: config.appwriteSchema.conversationLifecycleTableId,
           idempotencyTableId: config.appwriteSchema.conversationIdempotencyTableId,
+          accessGrantsTableId: config.appwriteSchema.accessGrantsTableId,
+          reportersTableId: config.appwriteSchema.reportersTableId,
+          workspaceMembershipsTableId:
+            config.appwriteSchema.workspaceMembershipsTableId,
+          projectAssignmentsTableId: config.appwriteSchema.projectAssignmentsTableId,
+          notificationsTableId: config.appwriteSchema.notificationsTableId,
+          outboxTableId: config.appwriteSchema.outboxTableId,
         },
         sensitive,
       ),

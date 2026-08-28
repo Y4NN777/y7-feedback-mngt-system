@@ -10,6 +10,10 @@ import {
   type LifecycleTransitionCommand,
 } from "@y7-feedback/domain";
 
+import {
+  appendAppwriteNotificationFanout,
+  type NotificationFanoutInput,
+} from "./appwrite-notification-fanout.js";
 import type { AppwriteSensitivePersistence } from "./sensitive-data-protector.js";
 
 type Command = AppendConversationCommand | LifecycleTransitionCommand;
@@ -36,6 +40,12 @@ export interface AppwriteConversationLifecycleSchema {
   readonly internalNotesTableId: string;
   readonly lifecycleTableId: string;
   readonly idempotencyTableId: string;
+  readonly accessGrantsTableId: string;
+  readonly reportersTableId: string;
+  readonly workspaceMembershipsTableId: string;
+  readonly projectAssignmentsTableId: string;
+  readonly notificationsTableId: string;
+  readonly outboxTableId: string;
 }
 
 export interface AppwriteConversationLifecycleTablesPort {
@@ -87,7 +97,15 @@ export interface ConversationLifecycleStoreInput {
   readonly workspaceId?: string;
   readonly projectId?: string;
   readonly payloadDigest: string;
+  readonly locale: "fr" | "en";
   readonly command: Command;
+}
+
+export interface ConversationNotificationFanout {
+  append(input: NotificationFanoutInput): Promise<{
+    readonly notifications: number;
+    readonly emailAttempts: number;
+  }>;
 }
 
 export type ConversationLifecycleStoreResult = {
@@ -141,6 +159,12 @@ function validateSchema(schema: AppwriteConversationLifecycleSchema): void {
     schema.internalNotesTableId,
     schema.lifecycleTableId,
     schema.idempotencyTableId,
+    schema.accessGrantsTableId,
+    schema.reportersTableId,
+    schema.workspaceMembershipsTableId,
+    schema.projectAssignmentsTableId,
+    schema.notificationsTableId,
+    schema.outboxTableId,
   ];
   const tableIds = ids.slice(1);
   if (
@@ -190,11 +214,45 @@ function mapDomain(
   return new AppwriteConversationLifecycleError("ERR-CONV-INVALID");
 }
 
+function notificationEvent(
+  command: Command,
+): Pick<NotificationFanoutInput, "kind" | "audience" | "actor"> {
+  const actor = { kind: command.actorKind, id: command.actorId } as const;
+  switch (command.kind) {
+    case "append_internal_note":
+      return { kind: "internal_note", audience: "workspace", actor };
+    case "append_message":
+      return {
+        kind: command.actorKind === "reporter" ? "reporter_answered" : "message_added",
+        audience:
+          command.actorKind === "reporter"
+            ? "workspace"
+            : command.audience === "reporter"
+              ? "reporter"
+              : "workspace",
+        actor,
+      };
+    case "start_review":
+      return { kind: "feedback_under_review", audience: "reporter", actor };
+    case "request_clarification":
+      return { kind: "clarification_requested", audience: "both", actor };
+    case "reporter_answer":
+      return { kind: "reporter_answered", audience: "workspace", actor };
+    case "resolve":
+      return { kind: "feedback_resolved", audience: "both", actor };
+    case "close":
+      return { kind: "feedback_closed", audience: "both", actor };
+    case "reopen":
+      return { kind: "feedback_reopened", audience: "workspace", actor };
+  }
+}
+
 export function createAppwriteConversationLifecycleStore(
   tables: AppwriteConversationLifecycleTablesPort,
   schema: AppwriteConversationLifecycleSchema,
   queries: ConversationLifecycleQueryPort,
   persistence: AppwriteSensitivePersistence,
+  fanout: ConversationNotificationFanout,
 ): ConversationLifecycleStore {
   validateSchema(schema);
   return {
@@ -407,6 +465,15 @@ export function createAppwriteConversationLifecycleStore(
           };
         }
 
+        await fanout.append({
+          transactionId,
+          feedback,
+          eventId: input.command.eventId,
+          occurredAt: input.command.occurredAt,
+          locale: input.locale,
+          ...notificationEvent(input.command),
+        });
+
         const idempotencyRowId = stableId(
           "conv_",
           input.feedbackId,
@@ -453,22 +520,42 @@ export function createNodeAppwriteConversationLifecycleStore(
   tables: TablesDB,
   schema: AppwriteConversationLifecycleSchema,
   persistence: AppwriteSensitivePersistence,
+  fanoutOverride?: ConversationNotificationFanout,
 ): ConversationLifecycleStore {
-  return createAppwriteConversationLifecycleStore(
-    {
-      createTransaction: (input) => tables.createTransaction(input),
-      getRow: (input) => tables.getRow(input),
-      listRows: async (input) => {
-        const rows = await tables.listRows({ ...input, queries: [...input.queries] });
-        return { rows: rows.rows };
-      },
-      createRow: (input) =>
-        tables.createRow({ ...input, permissions: [...input.permissions] }),
-      updateRow: (input) => tables.updateRow(input),
-      updateTransaction: (input) => tables.updateTransaction(input),
+  const port: AppwriteConversationLifecycleTablesPort = {
+    createTransaction: (input) => tables.createTransaction(input),
+    getRow: (input) => tables.getRow(input),
+    listRows: async (input) => {
+      const rows = await tables.listRows({ ...input, queries: [...input.queries] });
+      return { rows: rows.rows };
     },
+    createRow: (input) =>
+      tables.createRow({ ...input, permissions: [...input.permissions] }),
+    updateRow: (input) => tables.updateRow(input),
+    updateTransaction: (input) => tables.updateTransaction(input),
+  };
+  return createAppwriteConversationLifecycleStore(
+    port,
     schema,
     defaultQueries,
     persistence,
+    fanoutOverride ?? {
+      append: (input) =>
+        appendAppwriteNotificationFanout(
+          port,
+          {
+            databaseId: schema.databaseId,
+            accessGrantsTableId: schema.accessGrantsTableId,
+            reportersTableId: schema.reportersTableId,
+            workspaceMembershipsTableId: schema.workspaceMembershipsTableId,
+            projectAssignmentsTableId: schema.projectAssignmentsTableId,
+            notificationsTableId: schema.notificationsTableId,
+            outboxTableId: schema.outboxTableId,
+          },
+          defaultQueries,
+          persistence,
+          input,
+        ),
+    },
   );
 }

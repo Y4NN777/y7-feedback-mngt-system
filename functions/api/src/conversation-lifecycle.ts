@@ -52,12 +52,14 @@ export interface ConversationLifecycleCoordinator {
     readonly projectId: string;
     readonly feedbackId: string;
     readonly command: unknown;
+    readonly locale?: unknown;
   }): Promise<ConversationLifecycleOutcome>;
   executeReporter(input: {
     readonly reference: string;
     readonly proof: string;
     readonly feedbackId: string;
     readonly command: unknown;
+    readonly locale?: unknown;
   }): Promise<ConversationLifecycleOutcome>;
 }
 
@@ -100,6 +102,14 @@ function text(value: unknown, maximum: number): string | undefined {
   return typeof value === "string" && value.trim().length > 0 && value.length <= maximum
     ? value.trim()
     : undefined;
+}
+
+function locale(value: unknown): "fr" | "en" | undefined {
+  return value === undefined
+    ? "fr"
+    : value === "fr" || value === "en"
+      ? value
+      : undefined;
 }
 
 function parse(value: unknown): ParsedCommand | undefined {
@@ -196,6 +206,7 @@ export function createConversationLifecycleCoordinator(
     parsed: ParsedCommand,
     actorId: string,
     actorKind: "workspace" | "reporter",
+    selectedLocale: "fr" | "en",
   ): Promise<ConversationLifecycleOutcome> {
     const command = trusted(parsed, actorId, actorKind, dependencies.now());
     if (command === undefined) return { status: "denied" };
@@ -203,7 +214,13 @@ export function createConversationLifecycleCoordinator(
       const result = await store.execute({
         ...input,
         command,
-        payloadDigest: dependencies.digest({ parsed, actorId, actorKind }),
+        locale: selectedLocale,
+        payloadDigest: dependencies.digest({
+          parsed,
+          actorId,
+          actorKind,
+          locale: selectedLocale,
+        }),
       });
       return { status: "ok", result };
     } catch (error: unknown) {
@@ -263,7 +280,9 @@ export function createConversationLifecycleCoordinator(
     },
     async executeWorkspace(input) {
       const parsed = parse(input.command);
-      if (parsed === undefined) return { status: "invalid" };
+      const selectedLocale = locale(input.locale);
+      if (parsed === undefined || selectedLocale === undefined)
+        return { status: "invalid" };
       const verification = await principal.verify(input.jwt);
       if (verification.status !== "verified") return verification;
       const authorization = await workspaceScope.resolve({
@@ -273,11 +292,19 @@ export function createConversationLifecycleCoordinator(
         capability: "feedback.write",
       });
       if (authorization.status !== "authorized") return authorization;
-      return commit(input, parsed, authorization.actor.principalId, "workspace");
+      return commit(
+        input,
+        parsed,
+        authorization.actor.principalId,
+        "workspace",
+        selectedLocale,
+      );
     },
     async executeReporter(input) {
       const parsed = parse(input.command);
-      if (parsed === undefined) return { status: "invalid" };
+      const selectedLocale = locale(input.locale);
+      if (parsed === undefined || selectedLocale === undefined)
+        return { status: "invalid" };
       const authorization = await accountless.authorize({
         reference: input.reference,
         proof: input.proof,
@@ -291,6 +318,7 @@ export function createConversationLifecycleCoordinator(
         parsed,
         dependencies.reporterActorId(input.reference),
         "reporter",
+        selectedLocale,
       );
     },
   };
