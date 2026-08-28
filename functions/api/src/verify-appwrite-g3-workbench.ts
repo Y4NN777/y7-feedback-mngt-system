@@ -5,6 +5,8 @@ import { Client, Query, TablesDB, Users } from "node-appwrite";
 import { parseServerConfig } from "@y7-feedback/config/server";
 
 import { createSensitiveDataProtector } from "./sensitive-data-protector.js";
+import { createNodeAppwriteWorkbenchStore } from "./appwrite-workbench-store.js";
+import { createNodeAppwriteWorkspaceCapabilityScopeResolver } from "./appwrite-workspace-capability-scope.js";
 
 function object(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -100,7 +102,7 @@ async function main(): Promise<void> {
     const payload: unknown = await response.json();
     if (response.status !== expected)
       throw new Error(
-        `APPWRITE_G3_WORKBENCH_HTTP_${String(expected)}_GOT_${String(response.status)}_${JSON.stringify(payload)}`,
+        `APPWRITE_G3_WORKBENCH_HTTP_${String(expected)}_GOT_${String(response.status)}_${path}_${JSON.stringify(payload)}`,
       );
     return payload;
   };
@@ -202,6 +204,75 @@ async function main(): Promise<void> {
       workspaceClassification: null,
       assignedMaintainerId: maintainerId,
     });
+
+    const scope = await createNodeAppwriteWorkspaceCapabilityScopeResolver(tables, {
+      databaseId: config.appwriteSchema.databaseId,
+      projectsTableId: config.appwriteSchema.projectsTableId,
+      workspaceMembershipsTableId: config.appwriteSchema.workspaceMembershipsTableId,
+      projectAssignmentsTableId: config.appwriteSchema.projectAssignmentsTableId,
+    }).resolve({
+      principalId: ownerId,
+      workspaceId,
+      projectId,
+      capability: "feedback.read",
+    });
+    if (scope.status !== "authorized") {
+      throw new Error(
+        `APPWRITE_G3_WORKBENCH_SCOPE_PREFLIGHT_${scope.status.toUpperCase()}`,
+      );
+    }
+    let rawInbox;
+    try {
+      rawInbox = await tables.listRows({
+        databaseId: config.appwriteSchema.databaseId,
+        tableId: config.appwriteSchema.feedbackTableId,
+        queries: [
+          Query.equal("workspaceId", [workspaceId]),
+          Query.equal("projectId", [projectId]),
+          Query.limit(100),
+        ],
+        total: false,
+      });
+    } catch (error: unknown) {
+      const code = object(error) ? String(error.code) : "UNKNOWN";
+      throw new Error(`APPWRITE_G3_WORKBENCH_QUERY_PREFLIGHT_${code}`);
+    }
+    const rawFeedback = rawInbox.rows[0];
+    if (!object(rawFeedback))
+      throw new Error("APPWRITE_G3_WORKBENCH_ROW_PREFLIGHT_MISSING");
+    const acceptedAt: unknown = rawFeedback["acceptedAt"] as unknown;
+    const acceptedMilliseconds =
+      typeof acceptedAt === "string" ? Date.parse(acceptedAt) : Number.NaN;
+    const rowShape = {
+      count: rawInbox.rows.length === 1,
+      id: rawFeedback.$id === feedbackId,
+      workspace: rawFeedback.workspaceId === workspaceId,
+      project: rawFeedback.projectId === projectId,
+      type: rawFeedback.type === "bug",
+      state: rawFeedback.state === "received",
+      accepted: typeof acceptedAt === "string" && Number.isFinite(acceptedMilliseconds),
+      assignment: rawFeedback.assignedMaintainerId === maintainerId,
+    };
+    if (Object.values(rowShape).some((valid) => !valid)) {
+      throw new Error(
+        `APPWRITE_G3_WORKBENCH_ROW_PREFLIGHT_${JSON.stringify(rowShape)}`,
+      );
+    }
+    const localInbox = await createNodeAppwriteWorkbenchStore(
+      tables,
+      {
+        databaseId: config.appwriteSchema.databaseId,
+        feedbackTableId: config.appwriteSchema.feedbackTableId,
+      },
+      { environment: config.environment, protector },
+    ).list({
+      actor: scope.actor,
+      workspaceId,
+      projectId,
+      filter: { types: ["bug"], states: ["received"], assignment: "all" },
+    });
+    if (localInbox.length !== 1)
+      throw new Error("APPWRITE_G3_WORKBENCH_STORE_PREFLIGHT_INVALID");
 
     const ownerInbox = await request(
       ownerJwt,

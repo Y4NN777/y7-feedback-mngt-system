@@ -196,6 +196,19 @@ describe("Appwrite Workbench store", () => {
     ).rejects.toEqual(new AppwriteWorkbenchError("ERR-WORK-RETRYABLE"));
   });
 
+  it("BDD-WORK-018 normalizes Appwrite UTC datetime representations", async () => {
+    const tables = new Tables();
+    tables.rows = [row("feedback_1", { acceptedAt: "2026-08-28T10:00:00+00:00" })];
+    await expect(
+      createAppwriteWorkbenchStore(tables, schema, queries, sensitive).list({
+        actor: owner,
+        workspaceId: "workspace_1",
+        projectId: "project_1",
+        filter: { types: [], states: [], assignment: "all" },
+      }),
+    ).resolves.toMatchObject([{ acceptedAt: "2026-08-28T10:00:00.000Z" }]);
+  });
+
   it("BDD-WORK-004 denies a forged actor scope before exposing detail", async () => {
     const tables = new Tables();
     tables.getValue = row("feedback_1");
