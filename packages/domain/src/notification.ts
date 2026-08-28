@@ -64,12 +64,13 @@ function validateInstant(value: string): string {
 
 function workspaceRecipients(
   participants: NotificationParticipants,
+  channels: readonly NotificationChannel[] = ["in_product", "email"],
 ): readonly NotificationRecipient[] {
   const recipients: NotificationRecipient[] = [
     {
       principalId: required(participants.ownerId),
       kind: "workspace_owner",
-      channels: ["in_product", "email"],
+      channels,
     },
   ];
   if (participants.assignedMaintainerId !== undefined) {
@@ -78,7 +79,7 @@ function workspaceRecipients(
       recipients.push({
         principalId,
         kind: "assigned_maintainer",
-        channels: ["in_product", "email"],
+        channels,
       });
     }
   }
@@ -110,7 +111,7 @@ export function planNotificationRecipients(
 
   const candidates =
     fact.visibility === "workspace"
-      ? workspaceRecipients(participants)
+      ? workspaceRecipients(participants, ["in_product"])
       : [
           {
             principalId: reporterId,

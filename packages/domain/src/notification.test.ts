@@ -65,7 +65,7 @@ describe("Day 3 notification recipient policy", () => {
       {
         principalId: "maintainer-one",
         kind: "assigned_maintainer",
-        channels: ["in_product", "email"],
+        channels: ["in_product"],
       },
     ]);
   });
