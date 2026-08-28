@@ -135,7 +135,7 @@ export function validateWorkspaceClassification(value: unknown): string {
   }
   const normalized = value.trim();
   const hasControlCharacter = Array.from(normalized).some((character) => {
-    const codePoint = character.codePointAt(0) ?? 0;
+    const codePoint = character.charCodeAt(0);
     return codePoint <= 31 || codePoint === 127;
   });
   if (

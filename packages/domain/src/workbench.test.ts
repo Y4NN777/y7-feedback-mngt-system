@@ -119,9 +119,36 @@ describe("Workbench inbox policy", () => {
 
   it("BDD-WORK-004 rejects ambiguous filters and invalid classification", () => {
     for (const candidate of [
+      null,
+      [],
+      { types: "bug", states: [], assignment: "all" },
+      { types: ["bug", "bug"], states: [], assignment: "all" },
+      { types: ["bug", "suggestion", "review", "bug"], states: [], assignment: "all" },
       { types: ["unknown"], states: [], assignment: "all" },
+      { types: [], states: "received", assignment: "all" },
+      { types: [], states: ["received", "received"], assignment: "all" },
+      {
+        types: [],
+        states: [
+          "received",
+          "under_review",
+          "awaiting_reporter",
+          "resolved",
+          "closed",
+          "received",
+        ],
+        assignment: "all",
+      },
       { types: [], states: ["unknown"], assignment: "all" },
       { types: [], states: [], assignment: "mine" },
+      { types: [], states: [], assignment: "all", acceptedFrom: 1 },
+      { types: [], states: [], assignment: "all", acceptedFrom: "not-a-date" },
+      {
+        types: [],
+        states: [],
+        assignment: "all",
+        acceptedFrom: "2026-08-28T10:00:00Z",
+      },
       {
         types: [],
         states: [],
@@ -140,5 +167,35 @@ describe("Workbench inbox policy", () => {
     expect(() => validateWorkspaceClassification("<script>alert(1)</script>")).toThrow(
       new WorkbenchPolicyError("ERR-WORK-CLASSIFICATION-INVALID"),
     );
+    for (const value of [
+      undefined,
+      "",
+      "x".repeat(121),
+      "eval(value)",
+      "bad\u0000value",
+    ]) {
+      expect(() => validateWorkspaceClassification(value)).toThrow(
+        new WorkbenchPolicyError("ERR-WORK-CLASSIFICATION-INVALID"),
+      );
+    }
+  });
+
+  it("covers assignment and time-window exclusion branches", () => {
+    expect(
+      filterWorkbenchInbox(items, owner, "workspace_1", "project_1", {
+        types: [],
+        states: [],
+        assignment: "assigned_to_me",
+        acceptedFrom: "2026-08-28T10:30:00.000Z",
+      }),
+    ).toEqual([]);
+    expect(
+      filterWorkbenchInbox(items, owner, "workspace_1", "project_1", {
+        types: [],
+        states: [],
+        assignment: "all",
+        acceptedTo: "2026-08-28T09:00:00.000Z",
+      }),
+    ).toEqual([]);
   });
 });
