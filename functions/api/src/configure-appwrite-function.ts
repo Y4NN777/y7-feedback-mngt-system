@@ -1,4 +1,4 @@
-import { Client, Functions } from "node-appwrite";
+import { Client, Functions, Query } from "node-appwrite";
 
 import {
   planAppwriteFunctionVariables,
@@ -22,6 +22,7 @@ const functions = new Functions(
 );
 const current = await functions.listVariables({
   functionId: target.id,
+  queries: [Query.limit(100)],
   total: false,
 });
 const actions = planAppwriteFunctionVariables(
