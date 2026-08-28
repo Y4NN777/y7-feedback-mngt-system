@@ -51,6 +51,13 @@
   overflow-wrap: anywhere;
 }
 
+.workbench-actions {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  padding: 1rem;
+}
+
 @media (max-width: 640px) {
   .workbench-filters,
   .workbench-list button {

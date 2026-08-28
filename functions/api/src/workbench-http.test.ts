@@ -7,7 +7,7 @@ const path = "/v1/workspaces/workspace_1/projects/project_1/workbench";
 describe("Workbench HTTP", () => {
   it("BDD-WORK-009 parses bounded inbox filters", async () => {
     const list = vi.fn().mockResolvedValue({ status: "ok", result: [] });
-    const http = createWorkbenchHttp({ list, read: vi.fn() });
+    const http = createWorkbenchHttp({ list, read: vi.fn(), execute: vi.fn() });
 
     await expect(
       http.handle({
@@ -36,6 +36,7 @@ describe("Workbench HTTP", () => {
     const http = createWorkbenchHttp({
       list: vi.fn().mockResolvedValue({ status: "ok", result: [] }),
       read: vi.fn(),
+      execute: vi.fn(),
     });
     await expect(
       http.handle({
@@ -56,5 +57,19 @@ describe("Workbench HTTP", () => {
       statusCode: 400,
       body: { error: "ERR-WORK-FILTER-INVALID" },
     });
+  });
+
+  it("BDD-WORK-015 maps mutation conflicts without disclosing state", async () => {
+    const execute = vi.fn().mockResolvedValue({ status: "conflict" });
+    const http = createWorkbenchHttp({ list: vi.fn(), read: vi.fn(), execute });
+    await expect(
+      http.handle({
+        method: "POST",
+        path: `${path}/feedback_1`,
+        headers: { authorization: "Bearer jwt_1" },
+        query: {},
+        body: { kind: "delete_feedback", operationId: "operation_1" },
+      }),
+    ).resolves.toEqual({ statusCode: 409, body: { error: "ERR-WORK-CONFLICT" } });
   });
 });
