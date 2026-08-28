@@ -47,6 +47,29 @@
   text-align: left;
 }
 
+.notification-feed {
+  border: 1px solid var(--ink, #1c1c1c);
+  padding: 1rem;
+}
+
+.notification-feed ol {
+  display: grid;
+  gap: 0;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.notification-feed li {
+  display: grid;
+  grid-template-columns: minmax(10rem, 1.5fr) minmax(10rem, 1fr) auto auto;
+  gap: 0.75rem;
+  align-items: center;
+  border-top: 1px solid var(--ink, #1c1c1c);
+  padding: 0.75rem 0;
+  overflow-wrap: anywhere;
+}
+
 .workbench-detail article {
   overflow-wrap: anywhere;
 }
@@ -60,7 +83,8 @@
 
 @media (max-width: 640px) {
   .workbench-filters,
-  .workbench-list button {
+  .workbench-list button,
+  .notification-feed li {
     grid-template-columns: minmax(0, 1fr);
   }
 }

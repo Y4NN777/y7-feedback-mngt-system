@@ -3,6 +3,16 @@ import { describe, expect, it, vi } from "vitest";
 import { createHttpWorkbenchGateway } from "./WorkbenchGateway";
 
 describe("HTTP Workbench gateway", () => {
+  const notification = {
+    id: "notification_1",
+    eventId: "event_1",
+    feedbackId: "feedback_1",
+    kind: "feedback_resolved",
+    reference: "Y7-NOTIFY-12345678",
+    locale: "fr",
+    createdAt: "2026-08-28T10:00:00.000Z",
+    readAt: null,
+  };
   it("BDD-WORK-WEB-001 sends scoped filters with a temporary JWT", async () => {
     const fetcher = vi.fn().mockResolvedValue(
       new Response(
@@ -52,6 +62,159 @@ describe("HTTP Workbench gateway", () => {
         workspaceId: "workspace_1",
         projectId: "project_1",
         filter: { types: [], states: [], assignment: "all" },
+      }),
+    ).resolves.toEqual({ status: "retryable" });
+  });
+
+  it("BDD-NOT-WEB-002 reads the scoped feed and marks a notification read", async () => {
+    const responses = [
+      new Response(
+        JSON.stringify({
+          status: "ok",
+          data: { items: [notification], unreadCount: 1 },
+        }),
+        { status: 200 },
+      ),
+      new Response(JSON.stringify({ status: "ok", data: { status: "read" } }), {
+        status: 200,
+      }),
+      new Response(
+        JSON.stringify({
+          status: "ok",
+          data: { databaseId: "feedback", tableId: "notification_signals" },
+        }),
+        { status: 200 },
+      ),
+    ];
+    const fetcher = vi.fn(() => Promise.resolve(responses.shift() ?? new Response()));
+    const gateway = createHttpWorkbenchGateway(
+      "https://api.example.test",
+      () => Promise.resolve("jwt_1"),
+      fetcher,
+    );
+    const scope = { workspaceId: "workspace_1", projectId: "project_1" };
+    await expect(gateway.notifications(scope)).resolves.toEqual({
+      status: "ok",
+      result: { items: [notification], unreadCount: 1 },
+    });
+    await expect(
+      gateway.markNotificationRead({ ...scope, notificationId: "notification_1" }),
+    ).resolves.toEqual({ status: "ok", result: { status: "read" } });
+    await expect(gateway.authorizeNotificationRealtime(scope)).resolves.toEqual({
+      status: "ok",
+      result: { databaseId: "feedback", tableId: "notification_signals" },
+    });
+    expect(fetcher).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining("operations/notifications/read"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ notificationId: "notification_1" }),
+      }),
+    );
+  });
+
+  it("accepts every notification event and an idempotent read outcome", async () => {
+    const kinds = [
+      "feedback_received",
+      "message_added",
+      "feedback_under_review",
+      "clarification_requested",
+      "reporter_answered",
+      "feedback_resolved",
+      "feedback_closed",
+      "feedback_reopened",
+      "assignment_changed",
+    ] as const;
+    const items = kinds.map((kind, index) => ({
+      ...notification,
+      id: `notification_${String(index)}`,
+      eventId: `event_${String(index)}`,
+      kind,
+      locale: index % 2 === 0 ? ("fr" as const) : ("en" as const),
+      readAt: "2026-08-28T10:01:00.000Z",
+    }));
+    const responses = [
+      new Response(JSON.stringify({ status: "ok", data: { items, unreadCount: 0 } })),
+      new Response(JSON.stringify({ status: "ok", data: { status: "already_read" } })),
+    ];
+    const gateway = createHttpWorkbenchGateway(
+      "https://api.example.test",
+      () => Promise.resolve("jwt_1"),
+      () => Promise.resolve(responses.shift() ?? new Response()),
+    );
+    const scope = { workspaceId: "workspace_1", projectId: "project_1" };
+    await expect(gateway.notifications(scope)).resolves.toMatchObject({ status: "ok" });
+    await expect(
+      gateway.markNotificationRead({ ...scope, notificationId: "notification_1" }),
+    ).resolves.toEqual({
+      status: "ok",
+      result: { status: "already_read" },
+    });
+  });
+
+  it.each([
+    null,
+    { items: null, unreadCount: 0 },
+    { items: [], unreadCount: "0" },
+    { items: [], unreadCount: -1 },
+    { items: [], unreadCount: 0.5 },
+    { items: [notification], unreadCount: 2 },
+    { items: [notification], unreadCount: 0 },
+    { items: [null], unreadCount: 1 },
+    { items: [{ ...notification, id: 1 }], unreadCount: 1 },
+    { items: [{ ...notification, eventId: 1 }], unreadCount: 1 },
+    { items: [{ ...notification, feedbackId: 1 }], unreadCount: 1 },
+    { items: [{ ...notification, kind: "private_note" }], unreadCount: 1 },
+    { items: [{ ...notification, reference: 1 }], unreadCount: 1 },
+    { items: [{ ...notification, locale: "es" }], unreadCount: 1 },
+    { items: [{ ...notification, createdAt: 1 }], unreadCount: 1 },
+    { items: [{ ...notification, createdAt: "bad" }], unreadCount: 1 },
+    { items: [{ ...notification, readAt: 1 }], unreadCount: 0 },
+    { items: [{ ...notification, readAt: "bad" }], unreadCount: 0 },
+  ])("fails closed for malformed notification feed %#", async (data) => {
+    const gateway = createHttpWorkbenchGateway(
+      "https://api.example.test",
+      () => Promise.resolve("jwt_1"),
+      () => Promise.resolve(new Response(JSON.stringify({ status: "ok", data }))),
+    );
+    await expect(
+      gateway.notifications({ workspaceId: "workspace_1", projectId: "project_1" }),
+    ).resolves.toEqual({ status: "retryable" });
+  });
+
+  it("fails closed for a malformed notification read response", async () => {
+    const gateway = createHttpWorkbenchGateway(
+      "https://api.example.test",
+      () => Promise.resolve("jwt_1"),
+      () =>
+        Promise.resolve(
+          new Response(JSON.stringify({ status: "ok", data: { status: "wrong" } })),
+        ),
+    );
+    await expect(
+      gateway.markNotificationRead({
+        workspaceId: "workspace_1",
+        projectId: "project_1",
+        notificationId: "notification_1",
+      }),
+    ).resolves.toEqual({ status: "retryable" });
+  });
+
+  it.each([
+    null,
+    { databaseId: 1, tableId: "notification_signals" },
+    { databaseId: "feedback", tableId: 1 },
+  ])("fails closed for malformed realtime authorization %#", async (data) => {
+    const gateway = createHttpWorkbenchGateway(
+      "https://api.example.test",
+      () => Promise.resolve("jwt_1"),
+      () => Promise.resolve(new Response(JSON.stringify({ status: "ok", data }))),
+    );
+    await expect(
+      gateway.authorizeNotificationRealtime({
+        workspaceId: "workspace_1",
+        projectId: "project_1",
       }),
     ).resolves.toEqual({ status: "retryable" });
   });

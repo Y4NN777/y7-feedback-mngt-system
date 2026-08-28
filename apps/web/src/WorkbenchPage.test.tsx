@@ -7,10 +7,15 @@ import { describe, expect, it, vi } from "vitest";
 import type { Locale } from "@y7-feedback/domain";
 
 import type { AdministrationSession } from "./AdministrationSession";
+import type { NotificationInvalidation } from "./NotificationInvalidation";
 import type { WorkbenchGateway } from "./WorkbenchGateway";
 import { WorkbenchPage } from "./WorkbenchPage";
 
-function setup(list?: WorkbenchGateway["list"]) {
+function setup(
+  list?: WorkbenchGateway["list"],
+  notifications?: WorkbenchGateway["notifications"],
+  authorizeRealtime?: WorkbenchGateway["authorizeNotificationRealtime"],
+) {
   const listMock = vi.fn<WorkbenchGateway["list"]>(
     list ??
       (() =>
@@ -29,6 +34,37 @@ function setup(list?: WorkbenchGateway["list"]) {
   );
   const executeMock = vi.fn<WorkbenchGateway["execute"]>(() =>
     Promise.resolve({ status: "ok" as const, result: { status: "applied" } }),
+  );
+  const notificationsMock = vi.fn<WorkbenchGateway["notifications"]>(
+    notifications ??
+      (() =>
+        Promise.resolve({
+          status: "ok" as const,
+          result: {
+            unreadCount: 1,
+            items: [
+              {
+                id: "notification_1",
+                eventId: "event_1",
+                feedbackId: "feedback_1",
+                kind: "feedback_resolved" as const,
+                reference: "Y7-NOTIFY-12345678",
+                locale: "fr" as const,
+                createdAt: "2026-08-28T10:04:00.000Z",
+                readAt: null,
+              },
+            ],
+          },
+        })),
+  );
+  const markNotificationReadMock = vi.fn<WorkbenchGateway["markNotificationRead"]>(() =>
+    Promise.resolve({
+      status: "ok" as const,
+      result: { status: "read" as const },
+    }),
+  );
+  const subscribeMock = vi.fn<NotificationInvalidation["subscribe"]>(() =>
+    Promise.resolve(() => Promise.resolve()),
   );
   const gateway: WorkbenchGateway = {
     list: listMock,
@@ -88,6 +124,19 @@ function setup(list?: WorkbenchGateway["list"]) {
         },
       }),
     ),
+    notifications: notificationsMock,
+    markNotificationRead: markNotificationReadMock,
+    authorizeNotificationRealtime: vi.fn(
+      authorizeRealtime ??
+        (() =>
+          Promise.resolve({
+            status: "ok" as const,
+            result: {
+              databaseId: "feedback",
+              tableId: "notification_signals",
+            },
+          })),
+    ),
   };
   const signOutMock = vi.fn(() => Promise.resolve());
   const session: AdministrationSession = {
@@ -103,14 +152,25 @@ function setup(list?: WorkbenchGateway["list"]) {
           createOperationId={() => "operation_1"}
           gateway={gateway}
           locale={locale}
+          notificationInvalidation={{ subscribe: subscribeMock }}
           onLocaleChange={setLocale}
           session={session}
         />
       </QueryClientProvider>
     );
   }
-  render(<Harness />);
-  return { gateway, executeMock, listMock, session, signOutMock };
+  const view = render(<Harness />);
+  return {
+    gateway,
+    executeMock,
+    listMock,
+    markNotificationReadMock,
+    notificationsMock,
+    session,
+    signOutMock,
+    subscribeMock,
+    unmount: view.unmount,
+  };
 }
 
 async function open(user: ReturnType<typeof userEvent.setup>) {
@@ -154,8 +214,62 @@ describe("Workbench experience", () => {
     const user = userEvent.setup();
     setup(() => Promise.resolve({ status: "retryable" }));
     await open(user);
-    expect(await screen.findByRole("alert")).toHaveTextContent("indisponible");
-    expect(screen.getByRole("button", { name: "Réessayer" })).toBeVisible();
+    const alerts = await screen.findAllByRole("alert");
+    expect(alerts.some((alert) => alert.textContent.includes("indisponible"))).toBe(
+      true,
+    );
+    expect(screen.getAllByRole("button", { name: "Réessayer" })).not.toHaveLength(0);
+  });
+
+  it("BDD-NOT-WEB-001 shows unread notifications and marks one read authoritatively", async () => {
+    const user = userEvent.setup();
+    const target = setup();
+    await open(user);
+    expect(await screen.findByText("Retour résolu")).toBeVisible();
+    expect(screen.getByText("non lues").parentElement).toHaveTextContent("1 non lues");
+    await user.click(screen.getByRole("button", { name: "Marquer comme lue" }));
+    expect(target.markNotificationReadMock).toHaveBeenCalledWith({
+      workspaceId: "workspace_1",
+      projectId: "project_1",
+      notificationId: "notification_1",
+    });
+    expect(target.notificationsMock).toHaveBeenCalledTimes(2);
+    expect(target.subscribeMock).toHaveBeenCalledWith(
+      { databaseId: "feedback", tableId: "notification_signals" },
+      expect.any(Function),
+    );
+    target.subscribeMock.mock.calls[0]?.[1]();
+    expect(target.notificationsMock).toHaveBeenCalledTimes(3);
+    target.unmount();
+  });
+
+  it("shows notification retry and empty states without hiding the inbox", async () => {
+    const user = userEvent.setup();
+    const target = setup(undefined, () => Promise.resolve({ status: "retryable" }));
+    await open(user);
+    expect(
+      await screen.findByText("Le service est indisponible. Réessayez."),
+    ).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Réessayer" }));
+    expect(target.notificationsMock).toHaveBeenCalledTimes(2);
+
+    target.notificationsMock.mockResolvedValue({
+      status: "ok",
+      result: { items: [], unreadCount: 0 },
+    });
+    await user.click(screen.getByRole("button", { name: "Réessayer" }));
+    expect(await screen.findByText("Aucune notification.")).toBeVisible();
+    expect(screen.getByText("feedback_1")).toBeVisible();
+  });
+
+  it("keeps polling when Realtime authorization is temporarily unavailable", async () => {
+    const user = userEvent.setup();
+    const target = setup(undefined, undefined, () =>
+      Promise.resolve({ status: "retryable" }),
+    );
+    await open(user);
+    expect(await screen.findByText("Retour résolu")).toBeVisible();
+    expect(target.subscribeMock).not.toHaveBeenCalled();
   });
 
   it("BDD-WORK-WEB-006 executes classification only through the trusted gateway", async () => {

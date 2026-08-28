@@ -20,6 +20,7 @@ const schema = {
   workspaceMembershipsTableId: "workspace_memberships",
   projectAssignmentsTableId: "project_assignments",
   notificationsTableId: "notifications",
+  notificationSignalsTableId: "notification_signals",
   outboxTableId: "notification_outbox",
 };
 const queries = {

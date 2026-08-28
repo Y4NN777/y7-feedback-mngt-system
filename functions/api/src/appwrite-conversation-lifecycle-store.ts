@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { Query, type TablesDB } from "node-appwrite";
+import { Permission, Query, Role, type TablesDB } from "node-appwrite";
 
 import {
   ConversationLifecycleError,
@@ -45,6 +45,7 @@ export interface AppwriteConversationLifecycleSchema {
   readonly workspaceMembershipsTableId: string;
   readonly projectAssignmentsTableId: string;
   readonly notificationsTableId: string;
+  readonly notificationSignalsTableId: string;
   readonly outboxTableId: string;
 }
 
@@ -69,7 +70,7 @@ export interface AppwriteConversationLifecycleTablesPort {
     readonly tableId: string;
     readonly rowId: string;
     readonly data: Readonly<Record<string, unknown>>;
-    readonly permissions: readonly [];
+    readonly permissions: readonly string[];
     readonly transactionId: string;
   }): Promise<unknown>;
   updateRow(input: {
@@ -164,6 +165,7 @@ function validateSchema(schema: AppwriteConversationLifecycleSchema): void {
     schema.workspaceMembershipsTableId,
     schema.projectAssignmentsTableId,
     schema.notificationsTableId,
+    schema.notificationSignalsTableId,
     schema.outboxTableId,
   ];
   const tableIds = ids.slice(1);
@@ -550,9 +552,14 @@ export function createNodeAppwriteConversationLifecycleStore(
             workspaceMembershipsTableId: schema.workspaceMembershipsTableId,
             projectAssignmentsTableId: schema.projectAssignmentsTableId,
             notificationsTableId: schema.notificationsTableId,
+            notificationSignalsTableId: schema.notificationSignalsTableId,
             outboxTableId: schema.outboxTableId,
           },
           defaultQueries,
+          {
+            /* v8 ignore next -- official Node SDK permission serialization is deployed evidence */
+            readUser: (userId) => Permission.read(Role.user(userId)),
+          },
           persistence,
           input,
         ),

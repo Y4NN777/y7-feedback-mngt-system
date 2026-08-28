@@ -28,6 +28,7 @@ const config: ServerConfig = {
     lifecycleTableId: "feedback_lifecycle",
     accessGrantsTableId: "access_grants",
     notificationsTableId: "notifications",
+    notificationSignalsTableId: "notification_signals",
     outboxTableId: "notification_outbox",
     idempotencyTableId: "intake_idempotency",
     attachmentBucketId: "private_attachments",

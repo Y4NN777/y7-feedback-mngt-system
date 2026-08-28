@@ -10,6 +10,7 @@ import type { ConversationGateway } from "./ConversationGateway";
 import { FeedbackIntake } from "./FeedbackIntake";
 import { messages } from "./i18n/messages";
 import type { IntakeGateway } from "./IntakeGateway";
+import type { NotificationInvalidation } from "./NotificationInvalidation";
 import type { ProjectGateway } from "./ProjectGateway";
 import { RetrieveFeedback, type AccountlessGateway } from "./RetrieveFeedback";
 import type { WorkbenchGateway } from "./WorkbenchGateway";
@@ -41,6 +42,12 @@ const unavailableWorkbenchGateway: WorkbenchGateway = {
   read: () => Promise.resolve({ status: "retryable" }),
   execute: () => Promise.resolve({ status: "retryable" }),
   conversation: () => Promise.resolve({ status: "retryable" }),
+  notifications: () => Promise.resolve({ status: "retryable" }),
+  markNotificationRead: () => Promise.resolve({ status: "retryable" }),
+  authorizeNotificationRealtime: () => Promise.resolve({ status: "retryable" }),
+};
+const unavailableNotificationInvalidation: NotificationInvalidation = {
+  subscribe: () => Promise.resolve(() => Promise.resolve()),
 };
 const projectSlugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 
@@ -136,6 +143,7 @@ export function App({
     window.location.replace(`/${canonicalSlug}`);
   },
   workbenchGateway = unavailableWorkbenchGateway,
+  notificationInvalidation = unavailableNotificationInvalidation,
 }: {
   readonly accountlessGateway?: AccountlessGateway;
   readonly administrationGateway?: AdministrationGateway;
@@ -146,6 +154,7 @@ export function App({
   readonly projectGateway?: ProjectGateway;
   readonly redirectProject?: (canonicalSlug: string) => void;
   readonly workbenchGateway?: WorkbenchGateway;
+  readonly notificationInvalidation?: NotificationInvalidation;
 }) {
   const [locale, setLocale] = useState<Locale>("fr");
   const copy = messages[locale];
@@ -182,6 +191,7 @@ export function App({
         createOperationId={createOperationId}
         gateway={workbenchGateway}
         locale={locale}
+        notificationInvalidation={notificationInvalidation}
         onLocaleChange={selectLocale}
         session={administrationSession}
       />

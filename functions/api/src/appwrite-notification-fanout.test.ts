@@ -13,8 +13,10 @@ const schema = {
   workspaceMembershipsTableId: "workspace_memberships",
   projectAssignmentsTableId: "project_assignments",
   notificationsTableId: "notifications",
+  notificationSignalsTableId: "notification_signals",
   outboxTableId: "notification_outbox",
 };
+const permissions = { readUser: (userId: string) => `read("user:${userId}")` };
 const protector = createSensitiveDataProtector("active", [
   {
     id: "active",
@@ -108,6 +110,7 @@ function execute(
     target,
     schemaOverride,
     queries,
+    permissions,
     persistence,
     {
       transactionId: "transaction_1",
@@ -151,6 +154,7 @@ describe("Appwrite notification fanout", () => {
         equal: (attribute, values) => `${attribute}=${values.join(",")}`,
         limit: (value) => `limit=${String(value)}`,
       },
+      permissions,
       persistence,
       {
         transactionId: "transaction_1",
@@ -175,6 +179,21 @@ describe("Appwrite notification fanout", () => {
     expect(notifications.every((row) => row.transactionId === "transaction_1")).toBe(
       true,
     );
+    const signals = target.createRow.mock.calls
+      .map(([input]) => input)
+      .filter((input) => input.tableId === "notification_signals");
+    expect(signals).toEqual([
+      expect.objectContaining({
+        data: {
+          recipientId: "owner_1",
+          createdAt: "2026-08-28T20:00:00.000Z",
+        },
+        permissions: ['read("user:owner_1")'],
+        transactionId: "transaction_1",
+      }),
+    ]);
+    expect(JSON.stringify(signals)).not.toContain("workspace_1");
+    expect(JSON.stringify(signals)).not.toContain("feedback_1");
     const outboxes = target.createRow.mock.calls
       .map(([input]) => input)
       .filter((input) => input.tableId === "notification_outbox");
@@ -203,6 +222,7 @@ describe("Appwrite notification fanout", () => {
         equal: (attribute, values) => `${attribute}=${values.join(",")}`,
         limit: (value) => `limit=${String(value)}`,
       },
+      permissions,
       persistence,
       {
         transactionId: "transaction_1",
@@ -217,7 +237,9 @@ describe("Appwrite notification fanout", () => {
     );
     expect(
       target.createRow.mock.calls
-        .map(([input]) => input.data.recipientId)
+        .map(([input]) => input)
+        .filter((input) => input.tableId === "notifications")
+        .map((input) => input.data.recipientId)
         .filter(Boolean),
     ).toEqual(["owner_1"]);
   });
@@ -232,6 +254,7 @@ describe("Appwrite notification fanout", () => {
           equal: (attribute, values) => `${attribute}=${values.join(",")}`,
           limit: (value) => `limit=${String(value)}`,
         },
+        permissions,
         persistence,
         {
           transactionId: "transaction_1",
@@ -259,6 +282,7 @@ describe("Appwrite notification fanout", () => {
           equal: (attribute, values) => `${attribute}=${values.join(",")}`,
           limit: (value) => `limit=${String(value)}`,
         },
+        permissions,
         persistence,
         {
           transactionId: "transaction_1",
@@ -595,6 +619,20 @@ describe("Appwrite notification fanout", () => {
       .mockResolvedValueOnce({ $id: "wrong" });
     await expect(
       execute(target, { audience: "reporter", eventId: "event_outbox" }),
+    ).rejects.toThrow("APPWRITE_NOTIFICATION_FANOUT_UNAVAILABLE");
+  });
+
+  it("fails when a workspace invalidation signal is not persisted", async () => {
+    const target = setup();
+    target.createRow
+      .mockImplementationOnce((input) => Promise.resolve({ $id: input.rowId }))
+      .mockResolvedValueOnce({ $id: "wrong" });
+    await expect(
+      execute(target, {
+        audience: "workspace",
+        actor: { kind: "workspace", id: "owner_1" },
+        eventId: "event_signal",
+      }),
     ).rejects.toThrow("APPWRITE_NOTIFICATION_FANOUT_UNAVAILABLE");
   });
 });

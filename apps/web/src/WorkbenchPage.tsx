@@ -1,5 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
-import { useState, type SyntheticEvent } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState, type SyntheticEvent } from "react";
 
 import type {
   FeedbackLifecycleState,
@@ -9,8 +9,9 @@ import type {
 } from "@y7-feedback/domain";
 
 import type { AdministrationSession } from "./AdministrationSession";
+import type { NotificationInvalidation } from "./NotificationInvalidation";
 import type { WorkbenchGateway } from "./WorkbenchGateway";
-import { workbenchMessages } from "./i18n/workbench";
+import { workbenchMessages, workbenchNotificationMessages } from "./i18n/workbench";
 
 const states: readonly FeedbackLifecycleState[] = [
   "received",
@@ -30,16 +31,19 @@ export function WorkbenchPage({
   gateway,
   createOperationId,
   locale,
+  notificationInvalidation,
   onLocaleChange,
   session,
 }: {
   readonly gateway: WorkbenchGateway;
   readonly createOperationId: () => string;
   readonly locale: Locale;
+  readonly notificationInvalidation: NotificationInvalidation;
   readonly onLocaleChange: (locale: Locale) => void;
   readonly session: AdministrationSession;
 }) {
   const copy = workbenchMessages[locale];
+  const queryClient = useQueryClient();
   const [authenticated, setAuthenticated] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -88,6 +92,35 @@ export function WorkbenchPage({
     enabled: authenticated && scope !== undefined && selectedId !== undefined,
     retry: false,
   });
+  const notifications = useQuery({
+    queryKey: ["workbench-notifications", scope],
+    queryFn: () =>
+      scope === undefined
+        ? Promise.resolve({ status: "denied" as const })
+        : gateway.notifications(scope),
+    enabled: authenticated && scope !== undefined,
+    retry: false,
+    refetchInterval: 5_000,
+  });
+  useEffect(() => {
+    if (!authenticated || scope === undefined) return;
+    let cancelled = false;
+    let unsubscribe: (() => Promise<void>) | undefined;
+    void gateway.authorizeNotificationRealtime(scope).then(async (outcome) => {
+      if (outcome.status !== "ok") return;
+      const close = await notificationInvalidation.subscribe(outcome.result, () => {
+        void queryClient.invalidateQueries({
+          queryKey: ["workbench-notifications", scope],
+        });
+      });
+      if (cancelled) await close();
+      else unsubscribe = close;
+    });
+    return () => {
+      cancelled = true;
+      if (unsubscribe !== undefined) void unsubscribe();
+    };
+  }, [authenticated, gateway, notificationInvalidation, queryClient, scope]);
 
   async function signIn(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -108,6 +141,16 @@ export function WorkbenchPage({
     if (outcome.status === "ok") {
       await detail.refetch();
     }
+  }
+
+  async function markNotificationRead(notificationId: string) {
+    if (scope === undefined) return;
+    const outcome = await gateway.markNotificationRead({
+      ...scope,
+      notificationId,
+    });
+    setMutationStatus(outcome.status);
+    if (outcome.status === "ok") await notifications.refetch();
   }
 
   return (
@@ -404,6 +447,67 @@ export function WorkbenchPage({
               {copy.signOut}
             </button>
           </div>
+          <section className="notification-feed" aria-labelledby="notification-title">
+            <h2 id="notification-title">{copy.notifications}</h2>
+            {notifications.isPending ? (
+              <p role="status">{copy.loading}</p>
+            ) : notifications.data?.status !== "ok" ? (
+              <div role="alert">
+                <p>
+                  {notifications.data?.status === "denied"
+                    ? copy.denied
+                    : copy.retryable}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void notifications.refetch();
+                  }}
+                >
+                  {copy.retry}
+                </button>
+              </div>
+            ) : (
+              <>
+                <p aria-live="polite">
+                  <strong>{notifications.data.result.unreadCount}</strong>{" "}
+                  {copy.unreadNotifications}
+                </p>
+                {notifications.data.result.items.length === 0 ? (
+                  <p>{copy.noNotifications}</p>
+                ) : (
+                  <ol>
+                    {notifications.data.result.items.map((notification) => (
+                      <li key={notification.id}>
+                        <strong>
+                          {workbenchNotificationMessages[locale][notification.kind]}
+                        </strong>
+                        <span>{notification.reference}</span>
+                        <time dateTime={notification.createdAt}>
+                          {new Intl.DateTimeFormat(locale, {
+                            dateStyle: "short",
+                            timeStyle: "short",
+                          }).format(new Date(notification.createdAt))}
+                        </time>
+                        {notification.readAt === null ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              void markNotificationRead(notification.id);
+                            }}
+                          >
+                            {copy.markRead}
+                          </button>
+                        ) : (
+                          <span>{copy.notificationRead}</span>
+                        )}
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </>
+            )}
+          </section>
           <fieldset className="workbench-filters">
             <legend>{copy.filters}</legend>
             <label>

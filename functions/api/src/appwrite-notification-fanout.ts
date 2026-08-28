@@ -15,6 +15,7 @@ export interface AppwriteNotificationFanoutSchema {
   readonly workspaceMembershipsTableId: string;
   readonly projectAssignmentsTableId: string;
   readonly notificationsTableId: string;
+  readonly notificationSignalsTableId: string;
   readonly outboxTableId: string;
 }
 
@@ -38,7 +39,7 @@ export interface AppwriteNotificationFanoutTablesPort {
     readonly tableId: string;
     readonly rowId: string;
     readonly data: Readonly<Record<string, unknown>>;
-    readonly permissions: readonly [];
+    readonly permissions: readonly string[];
     readonly transactionId: string;
   }): Promise<unknown>;
 }
@@ -46,6 +47,10 @@ export interface AppwriteNotificationFanoutTablesPort {
 export interface AppwriteNotificationFanoutQueryPort {
   equal(attribute: string, values: readonly string[]): string;
   limit(value: number): string;
+}
+
+export interface AppwriteNotificationFanoutPermissionPort {
+  readUser(userId: string): string;
 }
 
 export type NotificationFanoutInput = {
@@ -65,7 +70,7 @@ function object(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function stableId(prefix: "not_" | "nout_", value: string): string {
+function stableId(prefix: "not_" | "nout_" | "nsig_", value: string): string {
   return `${prefix}${createHash("sha256").update(value).digest("hex").slice(0, 31)}`;
 }
 
@@ -87,6 +92,7 @@ function validateSchema(schema: AppwriteNotificationFanoutSchema): void {
     schema.workspaceMembershipsTableId,
     schema.projectAssignmentsTableId,
     schema.notificationsTableId,
+    schema.notificationSignalsTableId,
     schema.outboxTableId,
   ];
   if (
@@ -232,6 +238,7 @@ export async function appendAppwriteNotificationFanout(
   tables: AppwriteNotificationFanoutTablesPort,
   schema: AppwriteNotificationFanoutSchema,
   queries: AppwriteNotificationFanoutQueryPort,
+  permissions: AppwriteNotificationFanoutPermissionPort,
   persistence: AppwriteSensitivePersistence,
   input: NotificationFanoutInput,
 ): Promise<{ readonly notifications: number; readonly emailAttempts: number }> {
@@ -356,6 +363,23 @@ export async function appendAppwriteNotificationFanout(
     });
     if (!validCreated(notification, notificationId)) {
       throw new Error("APPWRITE_NOTIFICATION_FANOUT_UNAVAILABLE");
+    }
+    if (item.recipient.kind === "workspace") {
+      const signalId = stableId("nsig_", item.notificationKey);
+      const signal = await tables.createRow({
+        databaseId: schema.databaseId,
+        tableId: schema.notificationSignalsTableId,
+        rowId: signalId,
+        data: {
+          recipientId: item.recipient.id,
+          createdAt: item.fact.occurredAt,
+        },
+        permissions: [permissions.readUser(item.recipient.id)],
+        transactionId: input.transactionId,
+      });
+      if (!validCreated(signal, signalId)) {
+        throw new Error("APPWRITE_NOTIFICATION_FANOUT_UNAVAILABLE");
+      }
     }
     if (item.channels.includes("email")) {
       const outboxId = stableId("nout_", `${item.notificationKey}:email`);

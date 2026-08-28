@@ -10,6 +10,7 @@ import { createAppwriteAdministrationSession } from "./AdministrationSession";
 import { App } from "./App";
 import { createHttpConversationGateway } from "./ConversationGateway";
 import { createHttpIntakeGateway } from "./IntakeGateway";
+import { createAppwriteNotificationInvalidation } from "./NotificationInvalidation";
 import { createHttpProjectGateway } from "./ProjectGateway";
 import { createHttpWorkbenchGateway } from "./WorkbenchGateway";
 import { OperationalTelemetry } from "./observability/OperationalTelemetry";
@@ -32,6 +33,10 @@ const administrationGateway = createHttpAdministrationGateway(config.apiEndpoint
 const workbenchGateway = createHttpWorkbenchGateway(config.apiEndpoint, () =>
   administrationSession.createJwt(),
 );
+const notificationInvalidation = createAppwriteNotificationInvalidation(
+  config.appwriteEndpoint,
+  config.appwriteProjectId,
+);
 
 if (!root) {
   throw new Error("Application root is missing");
@@ -46,6 +51,7 @@ createRoot(root).render(
         administrationSession={administrationSession}
         conversationGateway={conversationGateway}
         intakeGateway={intakeGateway}
+        notificationInvalidation={notificationInvalidation}
         projectGateway={projectGateway}
         workbenchGateway={workbenchGateway}
       />
