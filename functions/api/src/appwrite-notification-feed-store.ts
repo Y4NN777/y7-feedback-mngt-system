@@ -91,6 +91,8 @@ const eventKinds = new Set<NotificationEventKind>([
   "feedback_received",
   "clarification_requested",
   "reporter_answered",
+  "message_added",
+  "feedback_under_review",
   "feedback_resolved",
   "feedback_closed",
   "feedback_reopened",
