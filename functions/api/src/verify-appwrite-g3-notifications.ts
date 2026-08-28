@@ -314,7 +314,7 @@ async function main(): Promise<void> {
         },
       },
       workerId: "g3_notification_worker",
-      createLeaseToken: () => randomBytes(16).toString("base64url"),
+      createLeaseToken: () => `lease_${randomBytes(16).toString("base64url")}`,
       now: () => {
         logicalClock += 2_000;
         return new Date(logicalClock);
