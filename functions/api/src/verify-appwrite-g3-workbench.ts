@@ -322,9 +322,7 @@ async function main(): Promise<void> {
       `/v1/workspaces/${siblingWorkspaceId}/projects/${projectId}/workbench/${feedbackId}`,
       404,
     );
-    await request(ownerJwt, "GET", `${path}/${feedbackId}`, 404, undefined, {
-      "x-appwrite-user-id": ownerId,
-    });
+    await request("forged.jwt.value", "GET", `${path}/${feedbackId}`, 404);
     isolationPassed = true;
 
     await request(ownerJwt, "POST", `${path}/${feedbackId}`, 200, {
