@@ -511,6 +511,22 @@ describe("Appwrite Workspace Project operation ports", () => {
         },
       ],
     });
+    const unreadNotification = setup();
+    unreadNotification.listRows.mockResolvedValueOnce({
+      rows: [{ ...validNotification, readAt: null }],
+      total: 1,
+    });
+    await expect(unreadNotification.ports.notifications.list(scope)).resolves.toEqual({
+      notifications: [
+        {
+          id: "notification-a",
+          feedbackId: "feedback-a",
+          kind: "conversation_message",
+          createdAt: "2026-08-28T12:00:00.000Z",
+          readAt: null,
+        },
+      ],
+    });
     for (const notification of [
       null,
       {},

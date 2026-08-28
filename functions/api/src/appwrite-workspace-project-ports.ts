@@ -317,7 +317,7 @@ export function createAppwriteWorkspaceProjectOperationPorts(
             row.projectId === scope.projectId &&
             typeof row.kind === "string" &&
             typeof row.createdAt === "string" &&
-            (readAt === undefined || typeof readAt === "string")
+            (readAt === undefined || readAt === null || typeof readAt === "string")
             ? {
                 id,
                 feedbackId: row.feedbackId,
