@@ -19,6 +19,25 @@ function table(id: string): AppwriteTableDefinition {
 }
 
 describe("additive Appwrite table migration", () => {
+  it("BDD-CONV-MIG-001 plans separate Message, Internal Note and idempotency tables", () => {
+    const feedback = table("feedback_items");
+    const messages = table("conversation_messages");
+    const notes = table("conversation_internal_notes");
+    const idempotency = table("conversation_idempotency");
+    expect(
+      planAdditiveTableMigration({
+        version: "day3-conversation-v1",
+        currentTables: [feedback],
+        targetTables: [feedback, messages, notes, idempotency],
+        additiveTableIds: [messages.id, notes.id, idempotency.id],
+      }),
+    ).toEqual({
+      version: "day3-conversation-v1",
+      createTables: [messages, notes, idempotency],
+      rollbackTableIds: [idempotency.id, notes.id, messages.id],
+    });
+  });
+
   it("BDD-ADMIN-MIG-001 plans only absent Day 3 tables and a reverse rollback", () => {
     const projects = table("projects");
     const audit = table("administration_audit");

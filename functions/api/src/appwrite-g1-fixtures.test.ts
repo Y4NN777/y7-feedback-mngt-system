@@ -30,6 +30,9 @@ const schema: ServerConfig["appwriteSchema"] = {
   sourceConnectionsTableId: "source_connections",
   administrationAuditTableId: "administration_audit",
   administrationIdempotencyTableId: "administration_idempotency",
+  conversationMessagesTableId: "conversation_messages",
+  conversationInternalNotesTableId: "conversation_internal_notes",
+  conversationIdempotencyTableId: "conversation_idempotency",
 };
 
 class MemoryFixtureStore implements G1FixtureStore {
