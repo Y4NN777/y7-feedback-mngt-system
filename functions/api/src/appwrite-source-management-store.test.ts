@@ -292,6 +292,36 @@ describe("Appwrite source management store", () => {
     ]);
   });
 
+  it("BDD-SRC-210 projects provider-cleared disconnected health", async () => {
+    const target = setup();
+    target.listRows.mockResolvedValueOnce({
+      rows: [
+        {
+          ...selected,
+          status: "disconnected",
+          encryptedGrantRef: "revoked",
+          selectedRepositoriesJson: JSON.stringify({
+            kind: "selected",
+            repositories: [],
+          }),
+        },
+      ],
+    });
+    await expect(
+      target.store.list({
+        ownerUserId: "owner_1",
+        workspaceId: "workspace_1",
+        projectId: "project_1",
+      }),
+    ).resolves.toMatchObject([
+      {
+        state: "disconnected",
+        selectedRepositories: [],
+        importedRepositories: [],
+      },
+    ]);
+  });
+
   it("rejects every malformed persisted source connection shape", async () => {
     const validState = JSON.parse(selected.selectedRepositoriesJson) as Record<
       string,
