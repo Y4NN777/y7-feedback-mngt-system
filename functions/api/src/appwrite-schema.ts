@@ -564,6 +564,7 @@ export function createAppwriteInfrastructureManifest(
           datetime("updatedAt"),
           datetime("nextAttemptAt", { required: false }),
           varchar("lastErrorCode", 64, { required: false }),
+          varchar("claimedBy", 64, { required: false }),
         ],
         [
           index("operation_unique", ["operationId"], "unique"),

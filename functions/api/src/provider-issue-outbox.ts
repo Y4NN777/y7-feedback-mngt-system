@@ -35,6 +35,7 @@ export interface ProviderIssueOutboxStore {
     readonly outboxId: string;
     readonly linkId: string;
     readonly attempt: number;
+    readonly failedAt: string;
     readonly nextAttemptAt: string;
     readonly errorCode: "provider_retryable";
   }): Promise<void>;
@@ -149,6 +150,7 @@ export function createProviderIssueOutboxWorker(
           outboxId: claim.outboxId,
           linkId: claim.linkId,
           attempt: claim.attempt,
+          failedAt,
           nextAttemptAt,
           errorCode: "provider_retryable",
         });
