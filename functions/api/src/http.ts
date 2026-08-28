@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { serializeOperationalEvent } from "./observability.js";
 import type { ConversationLifecycleHttp } from "./conversation-lifecycle-http.js";
+import type { ExternalIssueHttp } from "./external-issue-http.js";
 import type { PublicApi } from "./public-api.js";
 import type { ProjectAdministrationHttp } from "./project-administration-http.js";
 import type { SourceConnectionHttp } from "./source-connection-http.js";
@@ -42,6 +43,7 @@ export interface HttpDependencies {
   readonly now: () => number;
   readonly publicApi?: PublicApi;
   readonly conversationLifecycle?: ConversationLifecycleHttp;
+  readonly externalIssue?: ExternalIssueHttp;
   readonly projectAdministration?: ProjectAdministrationHttp;
   readonly sourceConnections?: SourceConnectionHttp;
   readonly workbench?: WorkbenchHttp;
@@ -174,13 +176,31 @@ export async function routeRequest(
               ? req.bodyJson
               : undefined,
         });
+  const externalIssueResponse =
+    isHealth ||
+    isIngressProbe ||
+    sourceResponse ||
+    administrationResponse ||
+    conversationResponse ||
+    workbenchResponse
+      ? null
+      : await dependencies.externalIssue?.handle({
+          method,
+          path: req.path,
+          headers: requestHeaders,
+          body:
+            method === "POST" && !contentType.startsWith("multipart/form-data")
+              ? req.bodyJson
+              : undefined,
+        });
   const publicResponse =
     isHealth || isIngressProbe
       ? null
       : sourceResponse ||
           administrationResponse ||
           conversationResponse ||
-          workbenchResponse
+          workbenchResponse ||
+          externalIssueResponse
         ? null
         : await dependencies.publicApi?.handle({
             method,
@@ -198,6 +218,7 @@ export async function routeRequest(
       administrationResponse?.statusCode ??
       conversationResponse?.statusCode ??
       workbenchResponse?.statusCode ??
+      externalIssueResponse?.statusCode ??
       publicResponse?.statusCode ??
       404);
   const operation = isHealth
@@ -212,9 +233,11 @@ export async function routeRequest(
             ? "conversation_lifecycle"
             : workbenchResponse
               ? "workbench"
-              : publicResponse
-                ? "public_api"
-                : "unknown";
+              : externalIssueResponse
+                ? "external_issue"
+                : publicResponse
+                  ? "public_api"
+                  : "unknown";
   const outcome = isHealth
     ? "success"
     : (probeResponse ??
@@ -222,6 +245,7 @@ export async function routeRequest(
         administrationResponse ??
         conversationResponse ??
         workbenchResponse ??
+        externalIssueResponse ??
         publicResponse)
       ? statusCode < 400
         ? "success"
@@ -270,6 +294,14 @@ export async function routeRequest(
 
   if (workbenchResponse) {
     return res.json(workbenchResponse.body, workbenchResponse.statusCode, headers);
+  }
+
+  if (externalIssueResponse) {
+    return res.json(
+      externalIssueResponse.body,
+      externalIssueResponse.statusCode,
+      headers,
+    );
   }
 
   if (publicResponse) {

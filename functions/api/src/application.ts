@@ -23,6 +23,8 @@ import {
 } from "./appwrite-notification-feed-store.js";
 import { createNodeAppwriteWorkbenchStore } from "./appwrite-workbench-store.js";
 import { createNodeAppwriteWorkbenchMutationStore } from "./appwrite-workbench-mutation-store.js";
+import { createNodeAppwriteExternalIssueStore } from "./appwrite-external-issue-store.js";
+import { createNodeAppwriteReporterConsentVerifier } from "./appwrite-reporter-consent-verifier.js";
 import { createNodeAppwriteProviderGrantVault } from "./appwrite-provider-grant-vault.js";
 import { createNodeAppwriteSourceConnectionStore } from "./appwrite-source-connection-store.js";
 import {
@@ -61,6 +63,24 @@ import {
 } from "./workspace-project-operations.js";
 import { createWorkbenchCoordinator } from "./workbench.js";
 import { createWorkbenchHttp } from "./workbench-http.js";
+import { createExternalIssueCoordinator } from "./external-issue-coordination.js";
+import { createExternalIssueHttp } from "./external-issue-http.js";
+
+export function digestExternalIssueCommand(value: unknown): string {
+  return createHash("sha256").update(JSON.stringify(value)).digest("base64url");
+}
+
+export function createProtectedFeedbackUrl(
+  webOrigin: string,
+  input: {
+    readonly workspaceId: string;
+    readonly projectId: string;
+    readonly feedbackId: string;
+  },
+): string {
+  const query = new URLSearchParams(input);
+  return `${webOrigin}/workbench?${query.toString()}`;
+}
 
 export interface ApplicationRuntime {
   readonly tables: TablesDB;
@@ -349,6 +369,36 @@ export function createHttpApplication(
       },
     ),
   );
+  const externalIssue = createExternalIssueHttp(
+    createExternalIssueCoordinator({
+      principalVerifier,
+      scopeResolver: workspaceScope,
+      reporterProofVerifier: createNodeAppwriteReporterConsentVerifier(
+        accountless,
+        runtime.tables,
+        {
+          databaseId: config.appwriteSchema.databaseId,
+          feedbackTableId: config.appwriteSchema.feedbackTableId,
+        },
+      ),
+      persistence: createNodeAppwriteExternalIssueStore(
+        runtime.tables,
+        {
+          databaseId: config.appwriteSchema.databaseId,
+          feedbackTableId: config.appwriteSchema.feedbackTableId,
+          accessGrantsTableId: config.appwriteSchema.accessGrantsTableId,
+          sourceConnectionsTableId: config.appwriteSchema.sourceConnectionsTableId,
+          publicationConsentsTableId: config.appwriteSchema.publicationConsentsTableId,
+          externalIssueLinksTableId: config.appwriteSchema.externalIssueLinksTableId,
+          providerOutboxTableId: config.appwriteSchema.providerOutboxTableId,
+        },
+        sensitive,
+      ),
+      digest: digestExternalIssueCommand,
+      feedbackUrl: createProtectedFeedbackUrl.bind(null, config.webOrigin),
+      now: runtime.nowIso,
+    }),
+  );
   /* v8 ignore start -- provider composition is exercised by real Preview OAuth */
   const sourceConnections = config.providers
     ? (() => {
@@ -421,6 +471,7 @@ export function createHttpApplication(
     createCorrelationId: runtime.createCorrelationId,
     environment: config.environment,
     conversationLifecycle,
+    externalIssue,
     now: runtime.nowMs,
     projectAdministration,
     publicApi: createPublicApi(

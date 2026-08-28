@@ -23,6 +23,7 @@ export function resolveAppwriteFunctionTarget(
 export const appwriteFunctionVariableKeys = [
   "Y7_ENVIRONMENT",
   "APPWRITE_ENVIRONMENT",
+  "Y7_WEB_ORIGIN",
   "APPWRITE_DATABASE_ID",
   "APPWRITE_WORKSPACES_TABLE_ID",
   "APPWRITE_WORKSPACE_MEMBERSHIPS_TABLE_ID",
