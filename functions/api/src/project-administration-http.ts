@@ -34,24 +34,31 @@ export function createProjectAdministrationHttp(
 ): ProjectAdministrationHttp {
   return {
     async handle(request) {
-      const match = /^\/v1\/workspaces\/([^/]+)\/projects$/u.exec(request.path);
+      const createMatch = /^\/v1\/workspaces\/([^/]+)\/projects$/u.exec(request.path);
+      const commandMatch =
+        /^\/v1\/workspaces\/([^/]+)\/projects\/([^/]+)\/commands$/u.exec(request.path);
+      const match = createMatch ?? commandMatch;
       if (request.method !== "POST" || match === null) return undefined;
       const workspaceId = match[1];
+      const projectId = commandMatch?.[2];
       const jwt = bearer(request.headers);
       if (
         workspaceId === undefined ||
         jwt === null ||
         !object(request.body) ||
-        request.body.workspaceId !== workspaceId
+        request.body.workspaceId !== workspaceId ||
+        (projectId !== undefined && request.body.projectId !== projectId) ||
+        (projectId === undefined && request.body.kind !== "create_project") ||
+        (projectId !== undefined && request.body.kind === "create_project")
       ) {
         return { statusCode: 403, body: { error: "ERR-ADMIN-DENIED" } };
       }
 
-      const outcome = await administration.create({ jwt, command: request.body });
+      const outcome = await administration.execute({ jwt, command: request.body });
       switch (outcome.status) {
         case "ok":
           return {
-            statusCode: 201,
+            statusCode: createMatch === null ? 200 : 201,
             body: { status: "ok", project: outcome.result },
           };
         case "invalid":
