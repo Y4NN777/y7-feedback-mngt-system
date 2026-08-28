@@ -73,7 +73,6 @@ function input() {
     operationId: "operation_1",
     connectionId: "connection_1",
     repositoryId: "repository_1",
-    reference: "Y7-ABC123",
     protectedWorkspaceUrl:
       "https://y7.example.test/w/workspace_1/p/project_1/f/Y7-ABC123",
     consentVersion: undefined,
@@ -103,7 +102,7 @@ function setup(
     readonly consents?: readonly unknown[];
     readonly feedback?: unknown;
     readonly source?: unknown;
-    readonly grants?: readonly unknown[];
+    readonly grant?: unknown;
     readonly replayLink?: unknown;
     readonly transactionId?: string;
     readonly failOutboxCreate?: boolean;
@@ -130,6 +129,10 @@ function setup(
         return options.feedback === undefined ? baseFeedback : options.feedback;
       if (tableId === schema.sourceConnectionsTableId && rowId === "connection_1")
         return options.source === undefined ? baseSource : options.source;
+      if (tableId === schema.accessGrantsTableId && rowId === "feedback_1")
+        return options.grant === undefined
+          ? { feedbackId: "feedback_1", reference: "Y7-ABC123" }
+          : options.grant;
       if (tableId === schema.externalIssueLinksTableId && rowId === "link_existing")
         return Object.hasOwn(options, "replayLink")
           ? options.replayLink
@@ -148,12 +151,6 @@ function setup(
         return { rows: options.outbox ?? [] };
       if (tableId === schema.externalIssueLinksTableId)
         return { rows: options.activeLinks ?? [] };
-      if (tableId === schema.accessGrantsTableId)
-        return {
-          rows: options.grants ?? [
-            { feedbackId: "feedback_1", reference: "Y7-ABC123" },
-          ],
-        };
       if (tableId === schema.publicationConsentsTableId)
         return { rows: options.consents ?? [] };
       throw new Error(`UNEXPECTED_LIST:${tableId}`);
@@ -417,7 +414,6 @@ describe("Appwrite external issue store", () => {
     { operationId: "bad id" },
     { connectionId: "bad id" },
     { repositoryId: "bad id" },
-    { reference: "bad ref!" },
     { payloadDigest: "short" },
     { occurredAt: "invalid" },
   ])("BDD-ISSUE-STORE-012 denies malformed link request %#", async (override) => {
@@ -592,15 +588,14 @@ describe("Appwrite external issue store", () => {
     }
   });
 
-  it("BDD-ISSUE-STORE-020 rejects missing or mismatched access references", async () => {
-    for (const grants of [
-      [],
-      [{}, {}],
-      [null],
-      [{ feedbackId: "other", reference: "Y7-ABC123" }],
-      [{ feedbackId: "feedback_1", reference: "Y7-OTHER" }],
+  it("BDD-ISSUE-STORE-020 rejects missing or corrupt authoritative access grants", async () => {
+    for (const grant of [
+      null,
+      {},
+      { feedbackId: "other", reference: "Y7-ABC123" },
+      { feedbackId: "feedback_1", reference: "bad ref!" },
     ]) {
-      await expect(setup({ grants }).store.requestLink(input())).rejects.toEqual(
+      await expect(setup({ grant }).store.requestLink(input())).rejects.toEqual(
         new AppwriteExternalIssueError("ERR-ISSUE-DENIED"),
       );
     }

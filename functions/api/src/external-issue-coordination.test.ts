@@ -47,8 +47,8 @@ function setup() {
     },
     persistence,
     digest: (value) => `digest:${JSON.stringify(value)}`,
-    feedbackUrl: ({ workspaceId, projectId, reference }) =>
-      `https://y7.example.test/w/${workspaceId}/p/${projectId}/f/${reference}`,
+    feedbackUrl: ({ workspaceId, projectId, feedbackId }) =>
+      `https://y7.example.test/w/${workspaceId}/p/${projectId}/f/${feedbackId}`,
     now: () => "2026-08-28T13:00:00.000Z",
   };
   return { coordinator: createExternalIssueCoordinator(dependencies), dependencies };
@@ -68,7 +68,6 @@ describe("External issue coordinator", () => {
           operationId: "operation_1",
           connectionId: "connection_1",
           repositoryId: "repository_1",
-          reference: "Y7-ABC123",
           consentVersion: 1,
         },
       }),
@@ -84,7 +83,7 @@ describe("External issue coordinator", () => {
       expect.objectContaining({
         actor,
         protectedWorkspaceUrl:
-          "https://y7.example.test/w/workspace_1/p/project_1/f/Y7-ABC123",
+          "https://y7.example.test/w/workspace_1/p/project_1/f/feedback_1",
         occurredAt: "2026-08-28T13:00:00.000Z",
       }),
     );
@@ -106,7 +105,6 @@ describe("External issue coordinator", () => {
             operationId: "operation_1",
             connectionId: "connection_1",
             repositoryId: "repository_1",
-            reference: "Y7-ABC123",
           },
         }),
       ).resolves.toEqual({ status });
@@ -131,7 +129,6 @@ describe("External issue coordinator", () => {
           operationId: "operation_1",
           connectionId: "connection_1",
           repositoryId: "repository_1",
-          reference: "Y7-ABC123",
         },
       }),
     ).resolves.toEqual({ status: "denied" });
@@ -191,7 +188,6 @@ describe("External issue coordinator", () => {
           operationId: "bad id",
           connectionId: "connection_1",
           repositoryId: "repository_1",
-          reference: "Y7-ABC123",
         },
       }),
     ).resolves.toEqual({ status: "denied" });
@@ -208,7 +204,6 @@ describe("External issue coordinator", () => {
         operationId: "operation_1",
         connectionId: "connection_1",
         repositoryId: "repository_1",
-        reference: "Y7-ABC123",
       },
     } as const;
     const invalid = [
@@ -220,7 +215,6 @@ describe("External issue coordinator", () => {
       { ...valid, command: { ...valid.command, operationId: "bad id" } },
       { ...valid, command: { ...valid.command, connectionId: "bad id" } },
       { ...valid, command: { ...valid.command, repositoryId: "bad id" } },
-      { ...valid, command: { ...valid.command, reference: "bad ref!" } },
       { ...valid, command: { ...valid.command, consentVersion: 0 } },
       { ...valid, command: { ...valid.command, consentVersion: 1.5 } },
     ];
@@ -291,7 +285,6 @@ describe("External issue coordinator", () => {
         operationId: "operation_1",
         connectionId: "connection_1",
         repositoryId: "repository_1",
-        reference: "Y7-ABC123",
       },
     } as const;
 
@@ -363,7 +356,6 @@ describe("External issue coordinator", () => {
           operationId: "operation_1",
           connectionId: "connection_1",
           repositoryId: "repository_1",
-          reference: "Y7-ABC123",
         },
       }),
     ).resolves.toEqual({ status: "retryable" });
@@ -385,7 +377,6 @@ describe("External issue coordinator", () => {
             operationId: "operation_1",
             connectionId: "connection_1",
             repositoryId: "repository_1",
-            reference: "Y7-ABC123",
           },
         }),
       ).resolves.toEqual({ status });

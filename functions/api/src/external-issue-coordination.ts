@@ -42,7 +42,6 @@ export interface ExternalIssuePersistence {
     readonly operationId: string;
     readonly connectionId: string;
     readonly repositoryId: string;
-    readonly reference: string;
     readonly protectedWorkspaceUrl: string;
     readonly consentVersion: number | undefined;
     readonly payloadDigest: string;
@@ -94,7 +93,6 @@ export interface ExternalIssueCoordinatorDependencies {
     readonly workspaceId: string;
     readonly projectId: string;
     readonly feedbackId: string;
-    readonly reference: string;
   }) => string;
   readonly now: () => string;
 }
@@ -139,7 +137,6 @@ export function createExternalIssueCoordinator(
         readonly operationId: string;
         readonly connectionId: string;
         readonly repositoryId: string;
-        readonly reference: string;
         readonly consentVersion?: number;
       };
     }): Promise<ExternalIssueOutcome> {
@@ -153,7 +150,6 @@ export function createExternalIssueCoordinator(
           !identifier.test(input.command.operationId) ||
           !identifier.test(input.command.connectionId) ||
           !identifier.test(input.command.repositoryId) ||
-          !reference.test(input.command.reference) ||
           (input.command.consentVersion !== undefined &&
             (!Number.isSafeInteger(input.command.consentVersion) ||
               input.command.consentVersion < 1))
@@ -180,7 +176,6 @@ export function createExternalIssueCoordinator(
           workspaceId: input.workspaceId,
           projectId: input.projectId,
           feedbackId: input.feedbackId,
-          reference: input.command.reference,
         });
         const occurredAt = dependencies.now();
         const payloadDigest = dependencies.digest({
@@ -198,7 +193,6 @@ export function createExternalIssueCoordinator(
           operationId: input.command.operationId,
           connectionId: input.command.connectionId,
           repositoryId: input.command.repositoryId,
-          reference: input.command.reference,
           protectedWorkspaceUrl,
           consentVersion: input.command.consentVersion,
           payloadDigest,
