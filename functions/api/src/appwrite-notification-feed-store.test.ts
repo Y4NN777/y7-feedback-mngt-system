@@ -182,6 +182,18 @@ describe("Appwrite notification feed store", () => {
     ]);
   });
 
+  it("normalizes Appwrite UTC offsets at the feed boundary", async () => {
+    const target = setup();
+    target.listRows
+      .mockResolvedValueOnce({
+        rows: [notification({ createdAt: "2026-08-28T20:00:00.000+00:00" })],
+      })
+      .mockResolvedValueOnce({ rows: [feedback()] });
+
+    const result = await target.store.list({ actor: owner, ...scope });
+    expect(result.items[0]?.createdAt).toBe("2026-08-28T20:00:00.000Z");
+  });
+
   it("BDD-NOT-FEED-002 revokes a Maintainer feed immediately after assignment removal", async () => {
     const target = setup();
     target.listRows
