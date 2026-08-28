@@ -9,5 +9,6 @@ export * from "./project-routing.js";
 export * from "./project-administration.js";
 export * from "./project-administration-state.js";
 export * from "./reporter.js";
+export * from "./notification.js";
 export * from "./source-connection.js";
 export * from "./workbench.js";
