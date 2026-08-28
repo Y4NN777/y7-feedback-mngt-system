@@ -382,6 +382,12 @@ export function createAppwriteInfrastructureManifest(
         [
           index("project_provider_unique", ["projectId", "provider"], "unique"),
           index("workspace_status", ["workspaceId", "status"]),
+          index("owner_workspace_project_status", [
+            "ownerUserId",
+            "workspaceId",
+            "projectId",
+            "status",
+          ]),
         ],
       ),
       table(
