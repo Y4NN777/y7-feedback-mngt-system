@@ -59,7 +59,6 @@ export interface AppwriteWorkbenchTablesPort {
 export interface AppwriteWorkbenchQueryPort {
   equal(attribute: string, values: readonly string[]): string;
   limit(value: number): string;
-  orderDesc(attribute: string): string;
 }
 
 export interface WorkbenchStore {
@@ -97,7 +96,6 @@ const executableContext = /<\s*script|javascript\s*:|\b(?:function|eval)\s*\(/iu
 const defaultQueries: AppwriteWorkbenchQueryPort = {
   equal: (attribute, values) => Query.equal(attribute, [...values]),
   limit: (value) => Query.limit(value),
-  orderDesc: (attribute) => Query.orderDesc(attribute),
 };
 
 function object(value: unknown): value is Readonly<Record<string, unknown>> {
@@ -295,7 +293,6 @@ export function createAppwriteWorkbenchStore(
           queries: [
             queries.equal("workspaceId", [input.workspaceId]),
             queries.equal("projectId", [input.projectId]),
-            queries.orderDesc("acceptedAt"),
             queries.limit(100),
           ],
           total: false,

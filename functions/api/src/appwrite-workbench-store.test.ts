@@ -20,7 +20,6 @@ const queries = {
   equal: (attribute: string, values: readonly string[]) =>
     `equal:${attribute}:${values.join(",")}`,
   limit: (value: number) => `limit:${String(value)}`,
-  orderDesc: (attribute: string) => `orderDesc:${attribute}`,
 };
 const owner: ActorAccess = {
   principalId: "owner_1",
@@ -110,7 +109,6 @@ describe("Appwrite Workbench store", () => {
     expect(tables.queries).toEqual([
       "equal:workspaceId:workspace_1",
       "equal:projectId:project_1",
-      "orderDesc:acceptedAt",
       "limit:100",
     ]);
   });
