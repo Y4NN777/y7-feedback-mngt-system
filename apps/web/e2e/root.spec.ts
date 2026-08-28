@@ -411,3 +411,96 @@ test("BDD-ADMIN-001 administration sign-in preserves input and is accessible at 
     ),
   ).toBe(false);
 });
+
+test("BDD-WORK-001 Workbench detail is keyboard-complete and accessible at 320 px", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await page.route("http://127.0.0.1/v1/account/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    await route.fulfill({
+      status: 201,
+      contentType: "application/json",
+      body: JSON.stringify(path.endsWith("/jwts") ? { jwt: "jwt_1" } : {}),
+    });
+  });
+  await page.route("http://127.0.0.1:8787/v1/workspaces/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    const conversation = path.endsWith("/conversation");
+    const detail = path.endsWith("/workbench/feedback_1");
+    const result = detail
+      ? {
+          feedbackId: "feedback_1",
+          type: "bug",
+          state: "under_review",
+          acceptedAt: "2026-08-28T10:00:00.000Z",
+          assignedPrincipalIds: ["maintainer_1"],
+          source: { type: "bug", problem: "Upload fails" },
+          context: [],
+          attachmentNames: [],
+          classification: "Performance",
+          assignedMaintainerId: "maintainer_1",
+        }
+      : [
+          {
+            feedbackId: "feedback_1",
+            type: "bug",
+            state: "under_review",
+            acceptedAt: "2026-08-28T10:00:00.000Z",
+            assignedPrincipalIds: ["maintainer_1"],
+          },
+        ];
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(
+        conversation
+          ? {
+              status: "ok",
+              conversation: {
+                feedbackId: "feedback_1",
+                state: "under_review",
+                messages: [],
+                internalNotes: [
+                  {
+                    id: "note_1",
+                    actorKind: "workspace",
+                    audience: "workspace",
+                    occurredAt: "2026-08-28T10:01:00.000Z",
+                    content: "Internal evidence",
+                  },
+                ],
+                lifecycle: [],
+              },
+            }
+          : { status: "ok", result },
+      ),
+    });
+  });
+  await page.goto("/workbench");
+  await page.getByLabel("Adresse e-mail").fill("owner@example.test");
+  await page.getByLabel("Mot de passe").fill("password");
+  await page.getByRole("button", { name: "Se connecter" }).click();
+  await page.getByLabel("Identifiant du Workspace").fill("workspace_1");
+  await page.getByLabel("Identifiant du projet").fill("project_1");
+  await page.getByRole("button", { name: "Ouvrir la boîte" }).click();
+  const feedback = page.getByRole("button", { name: /feedback_1/u });
+  await expect(feedback).toBeVisible();
+  await feedback.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("heading", { name: "Upload fails" })).toBeVisible();
+  await expect(page.getByText("Internal evidence")).toBeVisible();
+  const accessibility = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa"])
+    .analyze();
+  expect(
+    accessibility.violations.filter(
+      (violation) => violation.impact === "serious" || violation.impact === "critical",
+    ),
+  ).toEqual([]);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+    ),
+  ).toBe(false);
+});
