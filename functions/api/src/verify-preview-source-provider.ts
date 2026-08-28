@@ -216,13 +216,19 @@ async function finalize(path: string, callbackPath: string): Promise<void> {
   const users = new Users(admin);
   const tables = new TablesDB(admin);
   try {
+    const session = await users.createSession({ userId: state.userId });
+    const freshToken = await users.createJWT({
+      userId: state.userId,
+      sessionId: session.$id,
+      duration: 900,
+    });
     const base = `/v1/workspaces/${state.workspaceId}/projects/${state.projectId}/source-connections/${connectionId}`;
     const request = async (path: string, body: unknown, expected: number) => {
       const response = await fetch(new URL(path, functionUrl), {
         method: "POST",
         cache: "no-store",
         headers: {
-          authorization: `Bearer ${state.jwt}`,
+          authorization: `Bearer ${freshToken.jwt}`,
           "content-type": "application/json",
         },
         body: JSON.stringify(body),

@@ -86,8 +86,13 @@ function parseJson(value: unknown): Readonly<Record<string, unknown>> | undefine
 function repositories(
   value: unknown,
   expectedProvider: SourceProvider,
+  allowEmpty = false,
 ): readonly RepositoryIdentity[] | undefined {
-  if (!Array.isArray(value) || value.length === 0 || value.length > 100) {
+  if (
+    !Array.isArray(value) ||
+    (!allowEmpty && value.length === 0) ||
+    value.length > 100
+  ) {
     return undefined;
   }
   const seen = new Set<string>();
@@ -197,7 +202,11 @@ function connection(
   ) {
     return undefined;
   }
-  const selected = repositories(selectedState.repositories, sourceProvider);
+  const selected = repositories(
+    selectedState.repositories,
+    sourceProvider,
+    state === "disconnected",
+  );
   const imported = selected
     ? imports(selectedState.imports, id, sourceProvider, selected)
     : undefined;
