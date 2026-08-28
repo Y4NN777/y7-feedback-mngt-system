@@ -83,13 +83,12 @@ export function createExternalIssueHttp(
           header(request.headers, "x-appwrite-user-id") !== undefined ||
           !exactKeys(
             request.body,
-            ["operationId", "connectionId", "repositoryId", "reference"],
+            ["operationId", "connectionId", "repositoryId"],
             ["consentVersion"],
           ) ||
           typeof request.body.operationId !== "string" ||
           typeof request.body.connectionId !== "string" ||
           typeof request.body.repositoryId !== "string" ||
-          typeof request.body.reference !== "string" ||
           (request.body.consentVersion !== undefined &&
             typeof request.body.consentVersion !== "number")
         ) {
@@ -104,7 +103,6 @@ export function createExternalIssueHttp(
             operationId: request.body.operationId,
             connectionId: request.body.connectionId,
             repositoryId: request.body.repositoryId,
-            reference: request.body.reference,
             ...(request.body.consentVersion === undefined
               ? {}
               : { consentVersion: request.body.consentVersion }),

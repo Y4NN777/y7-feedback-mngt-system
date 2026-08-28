@@ -39,7 +39,6 @@ describe("External issue HTTP", () => {
           operationId: "operation_1",
           connectionId: "connection_1",
           repositoryId: "repository_1",
-          reference: "Y7-ABC123",
           consentVersion: 1,
         },
       }),
@@ -112,7 +111,6 @@ describe("External issue HTTP", () => {
           operationId: "operation_1",
           connectionId: "connection_1",
           repositoryId: "repository_1",
-          reference: "Y7-ABC123",
         },
       }),
     ).resolves.toEqual({ statusCode, body: { error } });
@@ -139,7 +137,6 @@ describe("External issue HTTP", () => {
           operationId: "operation_1",
           connectionId: "connection_1",
           repositoryId: "repository_1",
-          reference: "Y7-ABC123",
         },
       }),
     ).resolves.toMatchObject({ statusCode: 200 });

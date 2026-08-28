@@ -462,7 +462,6 @@ export function createAppwriteExternalIssueStore(
           !identifier.test(input.operationId) ||
           !identifier.test(input.connectionId) ||
           !identifier.test(input.repositoryId) ||
-          !reference.test(input.reference) ||
           input.payloadDigest.length < 16 ||
           !timestamp(input.occurredAt)
         ) {
@@ -527,15 +526,17 @@ export function createAppwriteExternalIssueStore(
           }),
           input,
         );
-        const grants = await list(schema.accessGrantsTableId, transactionId, [
-          queries.equal("reference", [input.reference]),
-          queries.limit(2),
-        ]);
+        const grant = await tables.getRow({
+          databaseId: schema.databaseId,
+          tableId: schema.accessGrantsTableId,
+          rowId: input.feedbackId,
+          transactionId,
+        });
         if (
-          grants.rows.length !== 1 ||
-          !object(grants.rows[0]) ||
-          grants.rows[0].feedbackId !== input.feedbackId ||
-          grants.rows[0].reference !== input.reference
+          !object(grant) ||
+          grant.feedbackId !== input.feedbackId ||
+          typeof grant.reference !== "string" ||
+          !reference.test(grant.reference)
         ) {
           throw new AppwriteExternalIssueError("ERR-ISSUE-DENIED");
         }
@@ -567,7 +568,7 @@ export function createAppwriteExternalIssueStore(
             connectionState: "active",
             selected: true,
           },
-          reference: input.reference,
+          reference: grant.reference,
           protectedWorkspaceUrl: input.protectedWorkspaceUrl,
           feedbackType: source.type,
           reporterContent: JSON.stringify(source),
