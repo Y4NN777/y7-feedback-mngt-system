@@ -13,6 +13,7 @@ export interface ServerConfig {
   readonly appwriteEndpoint: string;
   readonly appwriteProjectId: string;
   readonly appwriteApiKey: string;
+  readonly webOrigin: string;
   readonly appwriteSchema: {
     readonly databaseId: string;
     readonly workspacesTableId: string;
@@ -140,6 +141,24 @@ function parseProofKey(value: string | undefined): string {
   const key = requireValue(value);
   if (!proofKey.test(key)) throw new ConfigError("PROOF_KEY_INVALID");
   return key;
+}
+
+function parseWebOrigin(
+  value: string | undefined,
+  environment: ApplicationEnvironment,
+): string {
+  const endpoint = parseEndpoint(value, environment);
+  const url = new URL(endpoint);
+  if (
+    url.pathname !== "/" ||
+    url.search !== "" ||
+    url.hash !== "" ||
+    url.username !== "" ||
+    url.password !== ""
+  ) {
+    throw new ConfigError("WEB_ORIGIN_INVALID");
+  }
+  return url.origin;
 }
 
 function parseProviderGrantKey(
@@ -292,6 +311,7 @@ export function parseServerConfig(
     appwriteEndpoint: parseEndpoint(input.APPWRITE_ENDPOINT, environment),
     appwriteProjectId: requireValue(input.APPWRITE_PROJECT_ID),
     appwriteApiKey: requireValue(input.APPWRITE_API_KEY),
+    webOrigin: parseWebOrigin(input.Y7_WEB_ORIGIN, environment),
     appwriteSchema: parseAppwriteSchema(input),
     accessProofEnvelopeKey,
     providerGrantEnvelopeKey,

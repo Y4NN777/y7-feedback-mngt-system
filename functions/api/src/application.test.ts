@@ -2,7 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { ServerConfig } from "@y7-feedback/config/server";
 
-import { createHttpApplication, deriveReporterActorId } from "./application";
+import {
+  createHttpApplication,
+  createProtectedFeedbackUrl,
+  deriveReporterActorId,
+  digestExternalIssueCommand,
+} from "./application";
 import { routeRequest, type FunctionContext } from "./http";
 import { createSensitiveDataProtector } from "./sensitive-data-protector";
 
@@ -16,6 +21,7 @@ const config: ServerConfig = {
   appwriteEndpoint: "https://preview.appwrite.example/v1",
   appwriteProjectId: "feedback-preview",
   appwriteApiKey: "server-only-key",
+  webOrigin: "https://y7-feedback.vercel.app",
   appwriteSchema: {
     databaseId: "feedback",
     workspacesTableId: "workspaces",
@@ -167,6 +173,21 @@ describe("trusted Function composition root", () => {
     expect(actorId).toMatch(/^reporter_[a-f0-9]{27}$/u);
     expect(actorId).not.toContain("SECRET");
     expect(deriveReporterActorId("Y7-2026-SECRET-REFERENCE")).toBe(actorId);
+  });
+
+  it("builds deterministic issue digests and protected Workbench URLs", () => {
+    expect(digestExternalIssueCommand({ reference: "Y7-ABC123" })).toMatch(
+      /^[A-Za-z0-9_-]{43}$/u,
+    );
+    expect(
+      createProtectedFeedbackUrl("https://feedback.example", {
+        workspaceId: "workspace_1",
+        projectId: "project_1",
+        feedbackId: "feedback_1",
+      }),
+    ).toBe(
+      "https://feedback.example/workbench?workspaceId=workspace_1&projectId=project_1&feedbackId=feedback_1",
+    );
   });
 
   it("BDD-INTAKE-COMPOSE-001 accepts through HTTP and a private Appwrite transaction", async () => {

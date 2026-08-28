@@ -93,6 +93,7 @@ export interface ExternalIssueCoordinatorDependencies {
   readonly feedbackUrl: (input: {
     readonly workspaceId: string;
     readonly projectId: string;
+    readonly feedbackId: string;
     readonly reference: string;
   }) => string;
   readonly now: () => string;
@@ -178,6 +179,7 @@ export function createExternalIssueCoordinator(
         const protectedWorkspaceUrl = dependencies.feedbackUrl({
           workspaceId: input.workspaceId,
           projectId: input.projectId,
+          feedbackId: input.feedbackId,
           reference: input.command.reference,
         });
         const occurredAt = dependencies.now();
@@ -277,3 +279,7 @@ export function createExternalIssueCoordinator(
     },
   };
 }
+
+export type ExternalIssueCoordinator = ReturnType<
+  typeof createExternalIssueCoordinator
+>;

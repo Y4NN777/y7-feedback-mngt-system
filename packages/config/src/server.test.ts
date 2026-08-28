@@ -9,6 +9,7 @@ const validServer = {
   APPWRITE_ENDPOINT: "https://preview.appwrite.example/v1",
   APPWRITE_PROJECT_ID: "feedback-preview",
   APPWRITE_API_KEY: "server-only-key",
+  Y7_WEB_ORIGIN: "https://y7-feedback.vercel.app",
   APPWRITE_DATABASE_ID: "feedback",
   APPWRITE_WORKSPACES_TABLE_ID: "workspaces",
   APPWRITE_WORKSPACE_MEMBERSHIPS_TABLE_ID: "workspace_memberships",
@@ -53,6 +54,7 @@ describe("trusted environment contract", () => {
       appwriteEndpoint: "https://preview.appwrite.example/v1",
       appwriteProjectId: "feedback-preview",
       appwriteApiKey: "server-only-key",
+      webOrigin: "https://y7-feedback.vercel.app",
       appwriteSchema: {
         databaseId: "feedback",
         workspacesTableId: "workspaces",
@@ -160,6 +162,26 @@ describe("trusted environment contract", () => {
       expect(() => parseServerConfig({ ...validServer, ...override })).toThrow(
         new ConfigError("SENSITIVE_DATA_KEYS_INVALID"),
       );
+    }
+  });
+
+  it("BDD-ISSUE-CONFIG-001 requires a canonical secure Web origin", () => {
+    expect(
+      parseServerConfig({
+        ...validServer,
+        Y7_WEB_ORIGIN: "https://y7-feedback.vercel.app/",
+      }).webOrigin,
+    ).toBe("https://y7-feedback.vercel.app");
+    for (const value of [
+      "https://user@example.test",
+      "https://example.test/path",
+      "https://example.test/?query=1",
+      "https://example.test/#fragment",
+      "http://example.test",
+    ]) {
+      expect(() =>
+        parseServerConfig({ ...validServer, Y7_WEB_ORIGIN: value }),
+      ).toThrow();
     }
   });
 

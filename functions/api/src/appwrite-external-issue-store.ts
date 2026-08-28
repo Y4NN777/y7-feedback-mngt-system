@@ -255,9 +255,10 @@ function rebuildConsent(
 
 function validateSchema(schema: AppwriteExternalIssueSchema): void {
   const values = Object.values(schema) as readonly string[];
+  const tableIds = values.slice(1);
   if (
     values.some((value) => !identifier.test(value)) ||
-    new Set(values).size !== values.length
+    new Set(tableIds).size !== tableIds.length
   ) {
     throw new Error("APPWRITE_EXTERNAL_ISSUE_SCHEMA_INVALID");
   }

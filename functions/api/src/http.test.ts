@@ -503,4 +503,50 @@ describe("trusted API entrypoint", () => {
       expect.objectContaining({ method: "POST", body: undefined }),
     );
   });
+
+  it("routes external issue responses before the public API", async () => {
+    const externalIssue = {
+      handle: vi.fn().mockResolvedValue({
+        statusCode: 201,
+        body: { status: "accepted", result: { linkId: "link_1" } },
+      }),
+    };
+    const publicHandle = vi.fn();
+    const { context, json } = createContext(
+      "POST",
+      "/v1/workspaces/workspace_1/projects/project_1/feedback/feedback_1/external-issue-link",
+      {
+        headers: { "content-type": "application/json" },
+        bodyJson: { operationId: "operation_1" },
+      },
+    );
+
+    await routeRequest(context, {
+      ...dependencies,
+      externalIssue,
+      publicApi: { handle: publicHandle },
+    });
+
+    expect(externalIssue.handle).toHaveBeenCalledWith(
+      expect.objectContaining({ body: { operationId: "operation_1" } }),
+    );
+    expect(publicHandle).not.toHaveBeenCalled();
+    expect(json).toHaveBeenCalledWith(
+      { status: "accepted", result: { linkId: "link_1" } },
+      201,
+      expect.objectContaining({ "cache-control": "no-store" }),
+    );
+    expect(context.log).toHaveBeenCalledWith(
+      expect.stringContaining('"operation":"external_issue"'),
+    );
+
+    const multipart = createContext("POST", context.req.path, {
+      headers: { "content-type": "multipart/form-data; boundary=test" },
+      bodyJson: { ignored: true },
+    });
+    await routeRequest(multipart.context, { ...dependencies, externalIssue });
+    expect(externalIssue.handle).toHaveBeenLastCalledWith(
+      expect.objectContaining({ body: undefined }),
+    );
+  });
 });
