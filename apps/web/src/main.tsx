@@ -8,6 +8,7 @@ import { createHttpAccountlessGateway } from "./AccountlessHttpGateway";
 import { createHttpAdministrationGateway } from "./AdministrationGateway";
 import { createAppwriteAdministrationSession } from "./AdministrationSession";
 import { App } from "./App";
+import { createHttpConversationGateway } from "./ConversationGateway";
 import { createHttpIntakeGateway } from "./IntakeGateway";
 import { createHttpProjectGateway } from "./ProjectGateway";
 import { OperationalTelemetry } from "./observability/OperationalTelemetry";
@@ -18,6 +19,7 @@ const queryClient = new QueryClient();
 const config = parsePublicConfig(import.meta.env);
 const intakeGateway = createHttpIntakeGateway(config.apiEndpoint);
 const accountlessGateway = createHttpAccountlessGateway(config.apiEndpoint);
+const conversationGateway = createHttpConversationGateway(config.apiEndpoint);
 const projectGateway = createHttpProjectGateway(config.apiEndpoint);
 const administrationSession = createAppwriteAdministrationSession(
   config.appwriteEndpoint,
@@ -38,6 +40,7 @@ createRoot(root).render(
         accountlessGateway={accountlessGateway}
         administrationGateway={administrationGateway}
         administrationSession={administrationSession}
+        conversationGateway={conversationGateway}
         intakeGateway={intakeGateway}
         projectGateway={projectGateway}
       />

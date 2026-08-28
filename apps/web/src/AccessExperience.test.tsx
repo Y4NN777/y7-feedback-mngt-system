@@ -1,5 +1,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ReporterFeedbackView } from "@y7-feedback/domain";
@@ -9,6 +11,13 @@ import { App } from "./App";
 import type { AccountlessGateway } from "./RetrieveFeedback";
 
 const proof = "proof_A_abcdefghijklmnopqrstuvwxyz_0123456789ABCDEFG";
+
+function renderApp(app: ReactElement) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return render(<QueryClientProvider client={client}>{app}</QueryClientProvider>);
+}
 
 afterEach(() => {
   cleanup();
@@ -41,7 +50,7 @@ describe("accountless access experience", () => {
     const retrieve = vi.fn<AccountlessGateway["retrieve"]>(() =>
       Promise.resolve({ status: "denied" }),
     );
-    render(<App accountlessGateway={{ retrieve }} />);
+    renderApp(<App accountlessGateway={{ retrieve }} />);
 
     expect(screen.getByRole("main")).toHaveAttribute("data-visual-anchor", "swiss");
     expect(screen.getByRole("region", { name: "Retrouver un retour" })).toHaveAttribute(
@@ -125,7 +134,7 @@ describe("accountless access experience", () => {
         },
       })
       .mockResolvedValueOnce({ status: "retryable" });
-    render(<App accountlessGateway={{ retrieve }} />);
+    renderApp(<App accountlessGateway={{ retrieve }} />);
 
     await user.type(screen.getByRole("textbox", { name: "Référence" }), view.reference);
     await user.type(screen.getByLabelText("Preuve d’accès"), proof);
@@ -162,7 +171,7 @@ describe("accountless access experience", () => {
   it("fails closed for missing input, default unavailability, and gateway errors", async () => {
     window.history.replaceState({}, "", "/retrieve");
     const user = userEvent.setup();
-    render(<App />);
+    renderApp(<App />);
 
     await user.click(screen.getByRole("button", { name: "Retrouver le retour" }));
     expect(screen.getByRole("alert")).toHaveTextContent(

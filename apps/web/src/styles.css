@@ -677,6 +677,66 @@ h1 {
   overflow-wrap: anywhere;
 }
 
+.conversation-panel {
+  margin-top: 2rem;
+  border: 1px solid #111111;
+  background: #ffffff;
+  padding: clamp(1rem, 3vw, 2rem);
+}
+
+.conversation-list,
+.lifecycle-list {
+  margin: 1rem 0 2rem;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid #111111;
+}
+
+.conversation-list li,
+.lifecycle-list li {
+  display: grid;
+  grid-template-columns: minmax(8rem, 0.8fr) minmax(0, 2fr) minmax(10rem, 1fr);
+  gap: 1rem;
+  border-bottom: 1px solid #111111;
+  padding: 1rem 0;
+  overflow-wrap: anywhere;
+}
+
+.conversation-list p {
+  margin: 0;
+}
+
+.conversation-list time,
+.lifecycle-list time {
+  color: #4b4b4b;
+  font-size: 0.8rem;
+}
+
+.conversation-form {
+  display: grid;
+  gap: 0.75rem;
+  max-width: 52rem;
+}
+
+.conversation-form label,
+.conversation-form label span {
+  display: grid;
+  gap: 0.5rem;
+  font-weight: 700;
+}
+
+.conversation-form textarea {
+  min-height: 8rem;
+  resize: vertical;
+  font: inherit;
+  padding: 0.75rem;
+}
+
+.conversation-form button {
+  justify-self: start;
+  min-height: 3rem;
+}
+
 @media (max-width: 46rem) {
   body {
     background: #f7f7f8;
@@ -793,6 +853,11 @@ h1 {
   .retrieve-form .primary-action {
     justify-self: stretch;
     width: calc(100% - 2.5rem);
+  }
+  .conversation-list li,
+  .lifecycle-list li {
+    grid-template-columns: 1fr;
+    gap: 0.4rem;
   }
 }
 
