@@ -39,6 +39,7 @@ const unavailableConversationGateway: ConversationGateway = {
 const unavailableWorkbenchGateway: WorkbenchGateway = {
   list: () => Promise.resolve({ status: "retryable" }),
   read: () => Promise.resolve({ status: "retryable" }),
+  execute: () => Promise.resolve({ status: "retryable" }),
 };
 const projectSlugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 
@@ -177,6 +178,7 @@ export function App({
   if (window.location.pathname === "/workbench") {
     return (
       <WorkbenchPage
+        createOperationId={createOperationId}
         gateway={workbenchGateway}
         locale={locale}
         onLocaleChange={selectLocale}

@@ -25,7 +25,7 @@ export interface WorkbenchDetail extends WorkbenchItem {
 
 export type WorkbenchGatewayOutcome<T> =
   | { readonly status: "ok"; readonly result: T }
-  | { readonly status: "denied" | "retryable" };
+  | { readonly status: "invalid" | "denied" | "conflict" | "retryable" };
 
 export interface WorkbenchGateway {
   list(input: {
@@ -38,6 +38,12 @@ export interface WorkbenchGateway {
     readonly projectId: string;
     readonly feedbackId: string;
   }): Promise<WorkbenchGatewayOutcome<WorkbenchDetail>>;
+  execute(input: {
+    readonly workspaceId: string;
+    readonly projectId: string;
+    readonly feedbackId: string;
+    readonly command: Readonly<Record<string, unknown>>;
+  }): Promise<WorkbenchGatewayOutcome<Readonly<Record<string, unknown>>>>;
 }
 
 type Fetcher = (input: string, init: RequestInit) => Promise<Response>;
@@ -145,7 +151,11 @@ export function createHttpWorkbenchGateway(
 ): WorkbenchGateway {
   const base = endpoint.endsWith("/") ? endpoint.slice(0, -1) : endpoint;
 
-  async function request<T>(path: string, parse: (value: unknown) => T | undefined) {
+  async function request<T>(
+    path: string,
+    parse: (value: unknown) => T | undefined,
+    init: Omit<RequestInit, "headers"> = { method: "GET" },
+  ) {
     let jwt: string;
     try {
       jwt = await getJwt();
@@ -154,11 +164,16 @@ export function createHttpWorkbenchGateway(
     }
     try {
       const response = await fetcher(`${base}${path}`, {
-        method: "GET",
-        headers: { authorization: `Bearer ${jwt}` },
+        ...init,
+        headers: {
+          authorization: `Bearer ${jwt}`,
+          ...(init.body === undefined ? {} : { "content-type": "application/json" }),
+        },
       });
       const body: unknown = await response.json();
       if (response.status === 404) return { status: "denied" } as const;
+      if (response.status === 400) return { status: "invalid" } as const;
+      if (response.status === 409) return { status: "conflict" } as const;
       if (response.ok && object(body)) {
         const result = parse(body.result);
         if (result !== undefined) return { status: "ok", result } as const;
@@ -192,6 +207,13 @@ export function createHttpWorkbenchGateway(
     read(input) {
       const path = `/v1/workspaces/${encodeURIComponent(input.workspaceId)}/projects/${encodeURIComponent(input.projectId)}/workbench/${encodeURIComponent(input.feedbackId)}`;
       return request(path, detail);
+    },
+    execute(input) {
+      const path = `/v1/workspaces/${encodeURIComponent(input.workspaceId)}/projects/${encodeURIComponent(input.projectId)}/workbench/${encodeURIComponent(input.feedbackId)}`;
+      return request(path, (value) => (object(value) ? value : undefined), {
+        method: "POST",
+        body: JSON.stringify(input.command),
+      });
     },
   };
 }

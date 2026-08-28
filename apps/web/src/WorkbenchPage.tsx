@@ -28,11 +28,13 @@ function sourceSummary(source: Readonly<Record<string, unknown>>): string {
 
 export function WorkbenchPage({
   gateway,
+  createOperationId,
   locale,
   onLocaleChange,
   session,
 }: {
   readonly gateway: WorkbenchGateway;
+  readonly createOperationId: () => string;
   readonly locale: Locale;
   readonly onLocaleChange: (locale: Locale) => void;
   readonly session: AdministrationSession;
@@ -49,6 +51,11 @@ export function WorkbenchPage({
   const [assignment, setAssignment] = useState<WorkbenchFilter["assignment"]>("all");
   const [selectedId, setSelectedId] = useState<string>();
   const [signInDenied, setSignInDenied] = useState(false);
+  const [classification, setClassification] = useState("");
+  const [maintainerId, setMaintainerId] = useState("");
+  const [mutationStatus, setMutationStatus] = useState<
+    "ok" | "invalid" | "denied" | "conflict" | "retryable"
+  >();
   const filter: WorkbenchFilter = {
     types: type === "all" ? [] : [type],
     states: state === "all" ? [] : [state],
@@ -79,6 +86,19 @@ export function WorkbenchPage({
     setAuthenticated(outcome === "authenticated");
     setSignInDenied(outcome !== "authenticated");
     setPassword("");
+  }
+
+  async function mutate(command: Readonly<Record<string, unknown>>) {
+    if (scope === undefined || selectedId === undefined) return;
+    const outcome = await gateway.execute({
+      ...scope,
+      feedbackId: selectedId,
+      command: { ...command, operationId: createOperationId() },
+    });
+    setMutationStatus(outcome.status);
+    if (outcome.status === "ok") {
+      await detail.refetch();
+    }
   }
 
   return (
@@ -242,6 +262,64 @@ export function WorkbenchPage({
                     <li key={name}>{name}</li>
                   ))}
                 </ul>
+              )}
+              <fieldset className="workbench-actions">
+                <legend>{copy.actions}</legend>
+                <label>
+                  {copy.classificationInput}
+                  <input
+                    value={classification}
+                    onChange={(event) => {
+                      setClassification(event.target.value);
+                    }}
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void mutate({ kind: "classify_feedback", classification });
+                  }}
+                >
+                  {copy.classify}
+                </button>
+                <label>
+                  {copy.maintainerInput}
+                  <input
+                    value={maintainerId}
+                    onChange={(event) => {
+                      setMaintainerId(event.target.value);
+                    }}
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void mutate({ kind: "assign_feedback", maintainerId });
+                  }}
+                >
+                  {copy.assign}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void mutate({ kind: "unassign_feedback" });
+                  }}
+                >
+                  {copy.unassign}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void mutate({ kind: "delete_feedback" });
+                  }}
+                >
+                  {copy.delete}
+                </button>
+              </fieldset>
+              {mutationStatus && (
+                <p role="status">
+                  {mutationStatus === "ok" ? copy.mutationOk : copy[mutationStatus]}
+                </p>
               )}
             </article>
           )}

@@ -18,6 +18,7 @@ import { createNodeAppwriteWorkspaceCapabilityScopeResolver } from "./appwrite-w
 import { createNodeAppwriteWorkspaceOwnerScopeResolver } from "./appwrite-workspace-owner-scope.js";
 import { createNodeAppwriteWorkspaceProjectOperationPorts } from "./appwrite-workspace-project-ports.js";
 import { createNodeAppwriteWorkbenchStore } from "./appwrite-workbench-store.js";
+import { createNodeAppwriteWorkbenchMutationStore } from "./appwrite-workbench-mutation-store.js";
 import { createNodeAppwriteProviderGrantVault } from "./appwrite-provider-grant-vault.js";
 import { createNodeAppwriteSourceConnectionStore } from "./appwrite-source-connection-store.js";
 import type { HttpDependencies } from "./http.js";
@@ -181,6 +182,17 @@ export function createHttpApplication(
         },
         sensitive,
       ),
+      createNodeAppwriteWorkbenchMutationStore(runtime.tables, {
+        databaseId: config.appwriteSchema.databaseId,
+        feedbackTableId: config.appwriteSchema.feedbackTableId,
+        idempotencyTableId: config.appwriteSchema.conversationIdempotencyTableId,
+        projectAssignmentsTableId: config.appwriteSchema.projectAssignmentsTableId,
+      }),
+      {
+        digest: (command) =>
+          createHash("sha256").update(JSON.stringify(command)).digest("base64url"),
+        now: runtime.nowIso,
+      },
     ),
   );
   const projectAdministration = createProjectAdministrationHttp(

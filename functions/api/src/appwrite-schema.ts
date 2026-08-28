@@ -78,10 +78,13 @@ const text = (
   required: options.required ?? true,
 });
 
-const datetime = (key: string): AppwriteColumn => ({
+const datetime = (
+  key: string,
+  options: { readonly required?: boolean } = {},
+): AppwriteColumn => ({
   key,
   type: "datetime",
-  required: true,
+  required: options.required ?? true,
 });
 
 const integer = (key: string): AppwriteColumn => ({
@@ -219,6 +222,7 @@ export function createAppwriteInfrastructureManifest(
           text("internalNotesJson"),
           text("workspaceClassification", { required: false }),
           varchar("assignedMaintainerId", 36, { required: false }),
+          datetime("deletedAt", { required: false }),
         ],
         [
           index("project", ["projectId"]),

@@ -39,13 +39,16 @@ function response(outcome: WorkbenchOutcome): WorkbenchHttpResponse {
   }
   return outcome.status === "denied"
     ? { statusCode: 404, body: { error: "ERR-WORK-DENIED" } }
-    : { statusCode: 503, body: { error: "ERR-WORK-RETRYABLE" } };
+    : outcome.status === "invalid"
+      ? { statusCode: 400, body: { error: "ERR-WORK-COMMAND-INVALID" } }
+      : outcome.status === "conflict"
+        ? { statusCode: 409, body: { error: "ERR-WORK-CONFLICT" } }
+        : { statusCode: 503, body: { error: "ERR-WORK-RETRYABLE" } };
 }
 
 export function createWorkbenchHttp(coordinator: WorkbenchCoordinator): WorkbenchHttp {
   return {
     async handle(request) {
-      if (request.method !== "GET") return undefined;
       const detail = detailPath.exec(request.path);
       const inbox = inboxPath.exec(request.path);
       const match = detail ?? inbox;
@@ -62,6 +65,18 @@ export function createWorkbenchHttp(coordinator: WorkbenchCoordinator): Workbenc
       ) {
         return { statusCode: 404, body: { error: "ERR-WORK-DENIED" } };
       }
+      if (request.method === "POST" && feedbackId !== undefined) {
+        return response(
+          await coordinator.execute({
+            jwt,
+            workspaceId,
+            projectId,
+            feedbackId,
+            command: request.body,
+          }),
+        );
+      }
+      if (request.method !== "GET") return undefined;
       if (feedbackId !== undefined) {
         return response(
           await coordinator.read({ jwt, workspaceId, projectId, feedbackId }),

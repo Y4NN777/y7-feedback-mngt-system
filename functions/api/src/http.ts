@@ -169,6 +169,10 @@ export async function routeRequest(
           path: req.path,
           headers: requestHeaders,
           query: req.query ?? {},
+          body:
+            method === "POST" && !contentType.startsWith("multipart/form-data")
+              ? req.bodyJson
+              : undefined,
         });
   const publicResponse =
     isHealth || isIngressProbe

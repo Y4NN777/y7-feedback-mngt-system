@@ -27,7 +27,7 @@ export interface WorkbenchDetail {
 }
 
 export class AppwriteWorkbenchError extends Error {
-  readonly code: "ERR-WORK-DENIED" | "ERR-WORK-RETRYABLE";
+  readonly code: "ERR-WORK-DENIED" | "ERR-WORK-CONFLICT" | "ERR-WORK-RETRYABLE";
 
   constructor(code: AppwriteWorkbenchError["code"]) {
     super(code);
@@ -178,7 +178,7 @@ function inboxItem(value: unknown): WorkbenchInboxItem {
     state: value.state as FeedbackLifecycleState,
     acceptedAt: value.acceptedAt,
     assignedPrincipalIds: assigned(value.assignedMaintainerId),
-    deleted: false,
+    deleted: value.deletedAt !== undefined && value.deletedAt !== null,
   };
 }
 
@@ -225,6 +225,7 @@ function detail(
     item.feedbackId !== input.feedbackId ||
     item.workspaceId !== input.workspaceId ||
     item.projectId !== input.projectId ||
+    item.deleted ||
     !input.actor.workspaceIds.includes(input.workspaceId) ||
     (input.actor.responsibility === "project_maintainer" &&
       !input.actor.projectIds.includes(input.projectId)) ||

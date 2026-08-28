@@ -27,6 +27,9 @@ function setup(list?: WorkbenchGateway["list"]) {
           ],
         })),
   );
+  const executeMock = vi.fn<WorkbenchGateway["execute"]>(() =>
+    Promise.resolve({ status: "ok" as const, result: { status: "applied" } }),
+  );
   const gateway: WorkbenchGateway = {
     list: listMock,
     read: vi.fn(() =>
@@ -46,6 +49,7 @@ function setup(list?: WorkbenchGateway["list"]) {
         },
       }),
     ),
+    execute: executeMock,
   };
   const session: AdministrationSession = {
     createJwt: () => Promise.resolve("jwt_1"),
@@ -57,6 +61,7 @@ function setup(list?: WorkbenchGateway["list"]) {
     return (
       <QueryClientProvider client={new QueryClient()}>
         <WorkbenchPage
+          createOperationId={() => "operation_1"}
           gateway={gateway}
           locale={locale}
           onLocaleChange={setLocale}
@@ -66,7 +71,7 @@ function setup(list?: WorkbenchGateway["list"]) {
     );
   }
   render(<Harness />);
-  return { gateway, listMock, session };
+  return { gateway, executeMock, listMock, session };
 }
 
 async function open(user: ReturnType<typeof userEvent.setup>) {
@@ -109,5 +114,26 @@ describe("Workbench experience", () => {
     await open(user);
     expect(await screen.findByRole("alert")).toHaveTextContent("indisponible");
     expect(screen.getByRole("button", { name: "Réessayer" })).toBeVisible();
+  });
+
+  it("BDD-WORK-WEB-006 executes classification only through the trusted gateway", async () => {
+    const user = userEvent.setup();
+    const target = setup();
+    await open(user);
+    await user.click(await screen.findByRole("button", { name: /feedback_1/u }));
+    await screen.findByRole("heading", { name: "Upload fails" });
+    await user.type(screen.getByLabelText("Nouvelle classification"), "Performance");
+    await user.click(screen.getByRole("button", { name: "Classer" }));
+    expect(target.executeMock).toHaveBeenCalledWith({
+      workspaceId: "workspace_1",
+      projectId: "project_1",
+      feedbackId: "feedback_1",
+      command: {
+        kind: "classify_feedback",
+        classification: "Performance",
+        operationId: "operation_1",
+      },
+    });
+    expect(await screen.findByText("Action appliquée.")).toBeVisible();
   });
 });
