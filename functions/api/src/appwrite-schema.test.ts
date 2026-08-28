@@ -30,6 +30,9 @@ const schema: ServerConfig["appwriteSchema"] = {
   conversationInternalNotesTableId: "conversation_internal_notes",
   conversationIdempotencyTableId: "conversation_idempotency",
   conversationLifecycleTableId: "conversation_lifecycle",
+  publicationConsentsTableId: "publication_consents",
+  externalIssueLinksTableId: "external_issue_links",
+  providerOutboxTableId: "provider_outbox",
 };
 
 function table(id: string) {
@@ -99,6 +102,10 @@ describe("Appwrite infrastructure manifest", () => {
       [schema.conversationInternalNotesTableId, ["feedbackId", "occurredAt"]],
       [schema.conversationIdempotencyTableId, ["feedbackId", "operationId"]],
       [schema.conversationLifecycleTableId, ["feedbackId", "sequence"]],
+      [schema.publicationConsentsTableId, ["feedbackId", "version"]],
+      [schema.externalIssueLinksTableId, ["feedbackId", "state"]],
+      [schema.providerOutboxTableId, ["operationId"]],
+      [schema.providerOutboxTableId, ["status", "nextAttemptAt"]],
     ] as const;
 
     for (const [tableId, queriedColumns] of requirements) {

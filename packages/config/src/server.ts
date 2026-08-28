@@ -39,6 +39,9 @@ export interface ServerConfig {
     readonly conversationInternalNotesTableId: string;
     readonly conversationIdempotencyTableId: string;
     readonly conversationLifecycleTableId: string;
+    readonly publicationConsentsTableId: string;
+    readonly externalIssueLinksTableId: string;
+    readonly providerOutboxTableId: string;
   };
   readonly accessProofEnvelopeKey: string;
   readonly providerGrantEnvelopeKey: string;
@@ -119,6 +122,13 @@ function parseAppwriteSchema(input: Readonly<Record<string, string | undefined>>
     conversationLifecycleTableId: requireAppwriteId(
       input.APPWRITE_CONVERSATION_LIFECYCLE_TABLE_ID,
     ),
+    publicationConsentsTableId: requireAppwriteId(
+      input.APPWRITE_PUBLICATION_CONSENTS_TABLE_ID,
+    ),
+    externalIssueLinksTableId: requireAppwriteId(
+      input.APPWRITE_EXTERNAL_ISSUE_LINKS_TABLE_ID,
+    ),
+    providerOutboxTableId: requireAppwriteId(input.APPWRITE_PROVIDER_OUTBOX_TABLE_ID),
   };
   if (new Set(Object.values(tableIds)).size !== Object.values(tableIds).length) {
     throw new ConfigError("APPWRITE_SCHEMA_INVALID");
