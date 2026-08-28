@@ -103,6 +103,7 @@ describe("Appwrite infrastructure manifest", () => {
       [schema.conversationIdempotencyTableId, ["feedbackId", "operationId"]],
       [schema.conversationLifecycleTableId, ["feedbackId", "sequence"]],
       [schema.publicationConsentsTableId, ["feedbackId", "version"]],
+      [schema.publicationConsentsTableId, ["feedbackId", "operationId"]],
       [schema.externalIssueLinksTableId, ["feedbackId", "state"]],
       [schema.providerOutboxTableId, ["operationId"]],
       [schema.providerOutboxTableId, ["status", "nextAttemptAt"]],

@@ -142,6 +142,7 @@ describe("External issue coordinator", () => {
 
     await expect(
       coordinator.grantConsent({
+        operationId: "consent_grant_1",
         reference: "Y7-ABC123",
         proof: "proof",
         disclosureVersion: "public-issue-v1",
@@ -149,10 +150,15 @@ describe("External issue coordinator", () => {
       }),
     ).resolves.toEqual({ status: "ok", consent: { version: 1, state: "active" } });
     await expect(
-      coordinator.revokeConsent({ reference: "Y7-ABC123", proof: "proof" }),
+      coordinator.revokeConsent({
+        operationId: "consent_revoke_1",
+        reference: "Y7-ABC123",
+        proof: "proof",
+      }),
     ).resolves.toEqual({ status: "ok", consent: { version: 2, state: "revoked" } });
     expect(dependencies.persistence.grantConsent).toHaveBeenCalledWith(
       expect.objectContaining({
+        operationId: "consent_grant_1",
         feedbackId: "feedback_1",
         reporterId: "reporter_1",
         audience: "github:repository_1",
@@ -168,6 +174,7 @@ describe("External issue coordinator", () => {
 
     await expect(
       coordinator.grantConsent({
+        operationId: "consent_grant_1",
         reference: "Y7-ABC123",
         proof: "bad",
         disclosureVersion: "public-issue-v1",
@@ -229,30 +236,35 @@ describe("External issue coordinator", () => {
     const { coordinator } = setup();
     for (const candidate of [
       {
+        operationId: "consent_grant_1",
         reference: "Y7-ABC123",
         proof: "proof",
         disclosureVersion: "bad disclosure!",
         audience: "github:repository_1",
       },
       {
+        operationId: "consent_grant_1",
         reference: "Y7-ABC123",
         proof: "proof",
         disclosureVersion: "public-issue-v1",
         audience: "bitbucket:repository_1",
       },
       {
+        operationId: "consent_grant_1",
         reference: "bad reference!",
         proof: "proof",
         disclosureVersion: "public-issue-v1",
         audience: "github:repository_1",
       },
       {
+        operationId: "consent_grant_1",
         reference: "Y7-ABC123",
         proof: "",
         disclosureVersion: "public-issue-v1",
         audience: "github:repository_1",
       },
       {
+        operationId: "consent_grant_1",
         reference: "Y7-ABC123",
         proof: "x".repeat(513),
         disclosureVersion: "public-issue-v1",
@@ -302,6 +314,7 @@ describe("External issue coordinator", () => {
 
     await expect(
       coordinator.grantConsent({
+        operationId: "consent_grant_1",
         reference: "Y7-ABC123",
         proof: "proof",
         disclosureVersion: "public-issue-v1",
@@ -309,7 +322,11 @@ describe("External issue coordinator", () => {
       }),
     ).resolves.toEqual({ status: "denied" });
     await expect(
-      coordinator.revokeConsent({ reference: "Y7-ABC123", proof: "proof" }),
+      coordinator.revokeConsent({
+        operationId: "consent_revoke_1",
+        reference: "Y7-ABC123",
+        proof: "proof",
+      }),
     ).resolves.toEqual({ status: "retryable" });
   });
 
@@ -319,8 +336,19 @@ describe("External issue coordinator", () => {
       status: "retryable",
     });
     await expect(
-      coordinator.revokeConsent({ reference: "Y7-ABC123", proof: "proof" }),
+      coordinator.revokeConsent({
+        operationId: "consent_revoke_1",
+        reference: "Y7-ABC123",
+        proof: "proof",
+      }),
     ).resolves.toEqual({ status: "retryable" });
+    await expect(
+      coordinator.revokeConsent({
+        operationId: "bad id",
+        reference: "Y7-ABC123",
+        proof: "proof",
+      }),
+    ).resolves.toEqual({ status: "denied" });
 
     vi.mocked(dependencies.persistence.requestLink).mockRejectedValueOnce(
       "non-error failure",

@@ -499,6 +499,8 @@ export function createAppwriteInfrastructureManifest(
           varchar("workspaceId", 36),
           varchar("projectId", 36),
           varchar("reporterId", 36),
+          varchar("operationId", 36),
+          varchar("payloadDigest", 128),
           integer("version"),
           varchar("state", 16),
           varchar("disclosureVersion", 64),
@@ -507,6 +509,7 @@ export function createAppwriteInfrastructureManifest(
         ],
         [
           index("feedback_version_unique", ["feedbackId", "version"], "unique"),
+          index("feedback_operation_unique", ["feedbackId", "operationId"], "unique"),
           index("feedback_state", ["feedbackId", "state"]),
           index("workspace_project", ["workspaceId", "projectId"]),
         ],
