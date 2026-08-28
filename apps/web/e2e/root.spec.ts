@@ -262,6 +262,127 @@ test("BDD-ACC-UX-001 retrieval is accessible without overflow at 320 px", async 
   expect(hasHorizontalOverflow).toBe(false);
 });
 
+test("BDD-CONV-001 Reporter answers without Internal Notes in FR/EN at 320 px", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  const commands: unknown[] = [];
+  await page.route("http://127.0.0.1:8787/v1/feedback/**", async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (path === "/v1/feedback/retrieve") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          status: "ok",
+          feedback: {
+            feedbackId: "feedback_1",
+            reference: "Y7-2026-000001",
+            originalSource: {
+              type: "bug",
+              problem: "Le solde est incorrect",
+            },
+            currentSource: { type: "bug", problem: "Le solde est incorrect" },
+            currentState: "awaiting_reporter",
+            history: [],
+            messages: [],
+            attachments: [],
+            sourceRevisions: [],
+            deletionRequests: [],
+          },
+        }),
+      });
+      return;
+    }
+    if (path.endsWith("/conversation/retrieve")) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          status: "ok",
+          conversation: {
+            feedbackId: "feedback_1",
+            state: commands.length >= 2 ? "under_review" : "awaiting_reporter",
+            messages:
+              commands.length >= 1
+                ? [
+                    {
+                      id: "message_answer",
+                      actorKind: "reporter",
+                      audience: "reporter",
+                      occurredAt: "2026-08-28T12:02:00.000Z",
+                      content: "Version 2.1",
+                    },
+                  ]
+                : [
+                    {
+                      id: "message_question",
+                      actorKind: "workspace",
+                      audience: "reporter",
+                      occurredAt: "2026-08-28T12:00:00.000Z",
+                      content: "Quelle version est concernée ?",
+                    },
+                  ],
+            lifecycle: [
+              {
+                id: "event_question",
+                priorState: "under_review",
+                state: "awaiting_reporter",
+                actorKind: "workspace",
+                occurredAt: "2026-08-28T12:01:00.000Z",
+                reason: "Version requise",
+                sequence: 3,
+              },
+            ],
+          },
+        }),
+      });
+      return;
+    }
+    if (path.endsWith("/conversation/commands")) {
+      commands.push(request.postDataJSON());
+      await route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: JSON.stringify({ status: "applied" }),
+      });
+      return;
+    }
+    await route.abort();
+  });
+
+  await page.goto("/retrieve");
+  await page.getByRole("textbox", { name: "Référence" }).fill("Y7-2026-000001");
+  await page.getByLabel("Preuve d’accès").fill("private-proof");
+  await page.getByRole("button", { name: "Retrouver le retour" }).click();
+  await expect(page.getByText("Quelle version est concernée ?")).toBeVisible();
+  await expect(page.getByText(/note interne/u)).toHaveCount(0);
+  await page.getByRole("textbox", { name: "Votre réponse" }).fill("Version 2.1");
+  await page.getByRole("button", { name: "English" }).click();
+  await expect(page.getByRole("textbox", { name: "Your answer" })).toHaveValue(
+    "Version 2.1",
+  );
+  await page.getByRole("button", { name: "Send answer" }).click();
+  await expect(page.getByRole("status")).toContainText("Answer recorded");
+  expect(commands).toHaveLength(2);
+  await expect(page).not.toHaveURL(/private-proof/u);
+
+  const accessibility = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa"])
+    .analyze();
+  expect(
+    accessibility.violations.filter(
+      (violation) => violation.impact === "serious" || violation.impact === "critical",
+    ),
+  ).toEqual([]);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+    ),
+  ).toBe(false);
+});
+
 test("BDD-ADMIN-001 administration sign-in preserves input and is accessible at 320 px", async ({
   page,
 }) => {

@@ -6,6 +6,7 @@ import type { Locale } from "@y7-feedback/domain";
 import { AdministrationPage } from "./AdministrationPage";
 import type { AdministrationGateway } from "./AdministrationGateway";
 import type { AdministrationSession } from "./AdministrationSession";
+import type { ConversationGateway } from "./ConversationGateway";
 import { FeedbackIntake } from "./FeedbackIntake";
 import { messages } from "./i18n/messages";
 import type { IntakeGateway } from "./IntakeGateway";
@@ -28,6 +29,10 @@ const unavailableAdministrationSession: AdministrationSession = {
   createJwt: () => Promise.reject(new Error("SESSION_UNAVAILABLE")),
   signIn: () => Promise.resolve("denied"),
   signOut: () => Promise.resolve(),
+};
+const unavailableConversationGateway: ConversationGateway = {
+  retrieve: () => Promise.resolve({ status: "retryable" }),
+  execute: () => Promise.resolve({ status: "retryable" }),
 };
 const projectSlugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 
@@ -115,6 +120,7 @@ export function App({
   accountlessGateway = unavailableGateway,
   administrationGateway = unavailableAdministrationGateway,
   administrationSession = unavailableAdministrationSession,
+  conversationGateway = unavailableConversationGateway,
   createOperationId = () => crypto.randomUUID(),
   intakeGateway = unavailableIntakeGateway,
   projectGateway = unavailableProjectGateway,
@@ -125,6 +131,7 @@ export function App({
   readonly accountlessGateway?: AccountlessGateway;
   readonly administrationGateway?: AdministrationGateway;
   readonly administrationSession?: AdministrationSession;
+  readonly conversationGateway?: ConversationGateway;
   readonly createOperationId?: () => string;
   readonly intakeGateway?: IntakeGateway;
   readonly projectGateway?: ProjectGateway;
@@ -141,6 +148,8 @@ export function App({
   if (window.location.pathname === "/retrieve") {
     return (
       <RetrieveFeedback
+        conversationGateway={conversationGateway}
+        createOperationId={createOperationId}
         gateway={accountlessGateway}
         locale={locale}
         onLocaleChange={selectLocale}

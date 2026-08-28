@@ -2,7 +2,9 @@ import { useState, type SyntheticEvent } from "react";
 
 import type { FeedbackSource, Locale, ReporterFeedbackView } from "@y7-feedback/domain";
 
+import type { ConversationGateway } from "./ConversationGateway";
 import { accessMessages } from "./i18n/access";
+import { ReporterConversation } from "./ReporterConversation";
 
 export type AccountlessGatewayOutcome =
   | { readonly status: "ok"; readonly view: ReporterFeedbackView }
@@ -76,10 +78,14 @@ function ReporterView({
 }
 
 export function RetrieveFeedback({
+  conversationGateway,
+  createOperationId,
   gateway,
   locale,
   onLocaleChange,
 }: {
+  readonly conversationGateway: ConversationGateway;
+  readonly createOperationId: () => string;
   readonly gateway: AccountlessGateway;
   readonly locale: Locale;
   readonly onLocaleChange: (locale: Locale) => void;
@@ -151,6 +157,14 @@ export function RetrieveFeedback({
       {view ? (
         <>
           <ReporterView locale={locale} view={view} />
+          <ReporterConversation
+            createOperationId={createOperationId}
+            feedbackId={view.feedbackId}
+            gateway={conversationGateway}
+            locale={locale}
+            proof={proof}
+            reference={reference}
+          />
           <button
             className="primary-action retrieve-again"
             type="button"
