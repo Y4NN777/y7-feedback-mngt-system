@@ -203,7 +203,7 @@ export function createConversationLifecycleCoordinator(
       const result = await store.execute({
         ...input,
         command,
-        payloadDigest: dependencies.digest(command),
+        payloadDigest: dependencies.digest({ parsed, actorId, actorKind }),
       });
       return { status: "ok", result };
     } catch (error: unknown) {
