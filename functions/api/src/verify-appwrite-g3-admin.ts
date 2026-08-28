@@ -98,7 +98,10 @@ async function main(): Promise<void> {
       body: command,
     });
     if (response?.statusCode !== expected) {
-      throw new Error(`APPWRITE_G3_ADMIN_HTTP_${String(expected)}`);
+      const outcome = object(response?.body) ? response.body.error : undefined;
+      throw new Error(
+        `APPWRITE_G3_ADMIN_HTTP_${String(expected)}_GOT_${String(response?.statusCode)}_${typeof outcome === "string" ? outcome : "UNKNOWN"}`,
+      );
     }
     return response.body;
   };
@@ -233,13 +236,21 @@ async function main(): Promise<void> {
       config.appwriteSchema.administrationIdempotencyTableId,
     ]) {
       try {
-        await clientTables.listRows({
+        const visible = await clientTables.listRows({
           databaseId: config.appwriteSchema.databaseId,
           tableId,
           total: false,
         });
-        throw new Error("APPWRITE_G3_ADMIN_DIRECT_ACCESS_ALLOWED");
+        if (visible.rows.length !== 0) {
+          throw new Error("APPWRITE_G3_ADMIN_DIRECT_ACCESS_ALLOWED");
+        }
       } catch (error: unknown) {
+        if (
+          error instanceof Error &&
+          error.message === "APPWRITE_G3_ADMIN_DIRECT_ACCESS_ALLOWED"
+        ) {
+          throw error;
+        }
         if (!denied(error)) throw error;
       }
     }

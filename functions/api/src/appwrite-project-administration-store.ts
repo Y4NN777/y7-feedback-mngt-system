@@ -85,7 +85,7 @@ export interface AppwriteProjectAdministrationTablesPort {
 }
 
 export interface AppwriteProjectAdministrationQueryPort {
-  equal(attribute: string, values: readonly string[]): string;
+  equal(attribute: string, values: readonly (string | boolean)[]): string;
   limit(limit: number): string;
 }
 
@@ -143,7 +143,7 @@ function stableRowId(prefix: string, ...parts: readonly string[]): string {
   const digest = createHash("sha256")
     .update(parts.join("\0"))
     .digest("hex")
-    .slice(0, 31);
+    .slice(0, 36 - prefix.length);
   return `${prefix}${digest}`;
 }
 
@@ -533,7 +533,6 @@ export function createAppwriteProjectAdministrationStore(
             databaseId: schema.databaseId,
             tableId: schema.projectAssignmentsTableId,
             queries: [
-              queries.equal("workspaceId", [input.command.workspaceId]),
               queries.equal("projectId", [input.command.projectId]),
               queries.equal("userId", [input.command.maintainerId]),
               queries.limit(2),
@@ -642,7 +641,7 @@ export function createAppwriteProjectAdministrationStore(
               tableId: schema.projectSlugsTableId,
               queries: [
                 queries.equal("projectId", [input.command.projectId]),
-                queries.equal("current", ["true"]),
+                queries.equal("current", [true]),
                 queries.limit(2),
               ],
               total: false,
