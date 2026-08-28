@@ -39,6 +39,7 @@ const config: ServerConfig = {
     conversationMessagesTableId: "conversation_messages",
     conversationInternalNotesTableId: "conversation_internal_notes",
     conversationIdempotencyTableId: "conversation_idempotency",
+    conversationLifecycleTableId: "conversation_lifecycle",
   },
   accessProofEnvelopeKey: "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc",
   providerGrantEnvelopeKey: "CAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg",

@@ -439,6 +439,26 @@ export function createAppwriteInfrastructureManifest(
         ],
         [index("feedback_operation_unique", ["feedbackId", "operationId"], "unique")],
       ),
+      table(
+        schema.conversationLifecycleTableId,
+        "Conversation lifecycle facts",
+        [
+          varchar("feedbackId", 36),
+          varchar("workspaceId", 36),
+          varchar("projectId", 36),
+          varchar("priorState", 32),
+          varchar("state", 32),
+          varchar("actorId", 36),
+          varchar("actorKind", 16),
+          text("reasonEnvelope"),
+          datetime("occurredAt"),
+          integer("sequence"),
+        ],
+        [
+          index("feedback_sequence_unique", ["feedbackId", "sequence"], "unique"),
+          index("workspace_project_time", ["workspaceId", "projectId", "occurredAt"]),
+        ],
+      ),
     ],
     attachmentBucket: {
       id: schema.attachmentBucketId,
