@@ -29,6 +29,39 @@ interface TablesAdminClient {
     readonly columns: object[];
     readonly indexes: object[];
   }): Promise<unknown>;
+  createBooleanColumn(input: {
+    readonly databaseId: string;
+    readonly tableId: string;
+    readonly key: string;
+    readonly required: boolean;
+  }): Promise<unknown>;
+  createDatetimeColumn(input: {
+    readonly databaseId: string;
+    readonly tableId: string;
+    readonly key: string;
+    readonly required: boolean;
+  }): Promise<unknown>;
+  createIntegerColumn(input: {
+    readonly databaseId: string;
+    readonly tableId: string;
+    readonly key: string;
+    readonly required: boolean;
+  }): Promise<unknown>;
+  createTextColumn(input: {
+    readonly databaseId: string;
+    readonly tableId: string;
+    readonly key: string;
+    readonly required: boolean;
+    readonly encrypt?: boolean;
+  }): Promise<unknown>;
+  createVarcharColumn(input: {
+    readonly databaseId: string;
+    readonly tableId: string;
+    readonly key: string;
+    readonly size: number;
+    readonly required: boolean;
+    readonly encrypt?: boolean;
+  }): Promise<unknown>;
 }
 
 interface StorageAdminClient {
@@ -200,6 +233,42 @@ export function createNodeAppwriteProvisioningPort(
           attributes: [...item.columns],
         })),
       });
+    },
+    async createColumn(databaseId, tableId, definition) {
+      const common = {
+        databaseId,
+        tableId,
+        key: definition.key,
+        required: definition.required,
+      };
+      switch (definition.type) {
+        case "boolean":
+          await tables.createBooleanColumn(common);
+          return;
+        case "datetime":
+          await tables.createDatetimeColumn(common);
+          return;
+        case "integer":
+          await tables.createIntegerColumn(common);
+          return;
+        case "text":
+          await tables.createTextColumn({
+            ...common,
+            ...(definition.encrypt === undefined
+              ? {}
+              : { encrypt: definition.encrypt }),
+          });
+          return;
+        case "varchar":
+          await tables.createVarcharColumn({
+            ...common,
+            size: definition.size,
+            ...(definition.encrypt === undefined
+              ? {}
+              : { encrypt: definition.encrypt }),
+          });
+          return;
+      }
     },
     getBucket: (bucketId) => optional(storage.getBucket({ bucketId }), bucket),
     async createBucket(definition) {

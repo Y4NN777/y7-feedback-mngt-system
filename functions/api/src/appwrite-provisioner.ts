@@ -39,6 +39,11 @@ export interface AppwriteProvisioningPort {
   createDatabase(definition: ExistingAppwriteDatabase): Promise<void>;
   getTable(databaseId: string, tableId: string): Promise<ExistingAppwriteTable | null>;
   createTable(databaseId: string, definition: ExistingAppwriteTable): Promise<void>;
+  createColumn(
+    databaseId: string,
+    tableId: string,
+    definition: AppwriteColumn,
+  ): Promise<void>;
   getBucket(bucketId: string): Promise<ExistingAppwriteBucket | null>;
   createBucket(definition: ExistingAppwriteBucket): Promise<void>;
 }
@@ -79,6 +84,29 @@ function assertConforming(
   }
 }
 
+function additiveColumns(
+  actual: ExistingAppwriteTable,
+  expected: ExistingAppwriteTable,
+): readonly AppwriteColumn[] {
+  const actualBase = { ...actual, columns: expected.columns };
+  if (canonical(actualBase) !== canonical(expected)) {
+    throw new Error(`APPWRITE_INFRASTRUCTURE_DRIFT:table:${expected.id}`);
+  }
+  const target = new Map(expected.columns.map((column) => [column.key, column]));
+  for (const column of actual.columns) {
+    const definition = target.get(column.key);
+    if (definition === undefined || canonical(column) !== canonical(definition)) {
+      throw new Error(`APPWRITE_INFRASTRUCTURE_DRIFT:table:${expected.id}`);
+    }
+  }
+  const present = new Set(actual.columns.map((column) => column.key));
+  const missing = expected.columns.filter((column) => !present.has(column.key));
+  if (missing.some((column) => column.required)) {
+    throw new Error(`APPWRITE_INFRASTRUCTURE_DRIFT:table:${expected.id}`);
+  }
+  return missing;
+}
+
 export async function provisionAppwriteInfrastructure(
   port: AppwriteProvisioningPort,
   manifest: AppwriteInfrastructureManifest,
@@ -90,6 +118,7 @@ export async function provisionAppwriteInfrastructure(
       existing: await port.getTable(manifest.database.id, definition.id),
     })),
   );
+  const pendingColumns = new Map<string, readonly AppwriteColumn[]>();
   const bucket = await port.getBucket(manifest.attachmentBucket.id);
 
   if (database) {
@@ -97,11 +126,9 @@ export async function provisionAppwriteInfrastructure(
   }
   for (const candidate of tables) {
     if (candidate.existing) {
-      assertConforming(
-        "table",
+      pendingColumns.set(
         candidate.definition.id,
-        candidate.existing,
-        candidate.definition,
+        additiveColumns(candidate.existing, candidate.definition),
       );
     }
   }
@@ -125,10 +152,24 @@ export async function provisionAppwriteInfrastructure(
       created += 1;
     }
   }
+  for (const [tableId, columns] of pendingColumns) {
+    for (const column of columns) {
+      await port.createColumn(manifest.database.id, tableId, column);
+      created += 1;
+    }
+  }
   if (!bucket) {
     await port.createBucket(manifest.attachmentBucket);
     created += 1;
   }
 
-  return { created, verified: manifest.tables.length + 2 - created };
+  return {
+    created,
+    verified:
+      manifest.tables.length +
+      2 -
+      tables.filter(({ existing }) => !existing).length -
+      (database ? 0 : 1) -
+      (bucket ? 0 : 1),
+  };
 }

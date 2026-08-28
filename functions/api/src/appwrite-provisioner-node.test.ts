@@ -43,6 +43,11 @@ function clients() {
       create: vi.fn(),
       getTable: vi.fn(),
       createTable: vi.fn(),
+      createBooleanColumn: vi.fn(),
+      createDatetimeColumn: vi.fn(),
+      createIntegerColumn: vi.fn(),
+      createTextColumn: vi.fn(),
+      createVarcharColumn: vi.fn(),
     },
     storage: {
       getBucket: vi.fn(),
@@ -110,6 +115,35 @@ describe("Node Appwrite provisioning adapter", () => {
         type,
         attributes: columns,
       })),
+    });
+  });
+
+  it("BDD-INFRA-014 translates additive optional columns without defaults", async () => {
+    const sdk = clients();
+    const port = createNodeAppwriteProvisioningPort(sdk.tables, sdk.storage);
+    await port.createColumn("feedback", "feedback_items", {
+      key: "assignedMaintainerId",
+      type: "varchar",
+      size: 36,
+      required: false,
+    });
+    await port.createColumn("feedback", "feedback_items", {
+      key: "deletedAt",
+      type: "datetime",
+      required: false,
+    });
+    expect(sdk.tables.createVarcharColumn).toHaveBeenCalledWith({
+      databaseId: "feedback",
+      tableId: "feedback_items",
+      key: "assignedMaintainerId",
+      size: 36,
+      required: false,
+    });
+    expect(sdk.tables.createDatetimeColumn).toHaveBeenCalledWith({
+      databaseId: "feedback",
+      tableId: "feedback_items",
+      key: "deletedAt",
+      required: false,
     });
   });
 
