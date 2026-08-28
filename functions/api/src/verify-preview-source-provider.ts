@@ -16,6 +16,7 @@ interface StateFile {
   readonly membershipId: string;
   readonly workspaceId: string;
   readonly projectId: string;
+  readonly originalProjectSlug: string;
 }
 
 function isObject(value: unknown): value is Readonly<Record<string, unknown>> {
@@ -60,8 +61,9 @@ async function prepare(path: string, sourceProvider: Provider): Promise<void> {
   const suffix = randomBytes(7).toString("hex");
   const userId = `src_owner_${suffix}`;
   const membershipId = `src_member_${suffix}`;
-  const workspaceId = "workspace_alpha";
-  const projectId = "project_alpha";
+  const workspaceId = `src_workspace_${suffix}`;
+  const projectId = `src_project_${suffix}`;
+  const originalProjectSlug = `src-${suffix}`;
   const admin = new Client()
     .setEndpoint(config.appwriteEndpoint)
     .setProject(config.appwriteProjectId)
@@ -70,6 +72,7 @@ async function prepare(path: string, sourceProvider: Provider): Promise<void> {
   const tables = new TablesDB(admin);
   let userCreated = false;
   let membershipCreated = false;
+  let projectCreated = false;
   try {
     await users.create({ userId, name: "Source provider Preview verifier" });
     userCreated = true;
@@ -80,6 +83,22 @@ async function prepare(path: string, sourceProvider: Provider): Promise<void> {
       duration: 900,
     });
     const now = new Date().toISOString();
+    await tables.createRow({
+      databaseId: config.appwriteSchema.databaseId,
+      tableId: config.appwriteSchema.projectsTableId,
+      rowId: projectId,
+      data: {
+        workspaceId,
+        slug: originalProjectSlug,
+        active: true,
+        enabledTypesJson: '["bug","suggestion","review"]',
+        contextDeclarationsJson: "[]",
+        reporterPurposeFr: "Vérification Sources G3",
+        reporterPurposeEn: "G3 Sources verification",
+      },
+      permissions: [],
+    });
+    projectCreated = true;
     await tables.createRow({
       databaseId: config.appwriteSchema.databaseId,
       tableId: config.appwriteSchema.workspaceMembershipsTableId,
@@ -134,6 +153,7 @@ async function prepare(path: string, sourceProvider: Provider): Promise<void> {
       membershipId,
       workspaceId,
       projectId,
+      originalProjectSlug,
     };
     await writeFile(path, JSON.stringify(state), { encoding: "utf8", mode: 0o600 });
     await chmod(path, 0o600);
@@ -147,6 +167,15 @@ async function prepare(path: string, sourceProvider: Provider): Promise<void> {
           databaseId: config.appwriteSchema.databaseId,
           tableId: config.appwriteSchema.workspaceMembershipsTableId,
           rowId: membershipId,
+        })
+        .catch(() => undefined);
+    }
+    if (projectCreated) {
+      await tables
+        .deleteRow({
+          databaseId: config.appwriteSchema.databaseId,
+          tableId: config.appwriteSchema.projectsTableId,
+          rowId: projectId,
         })
         .catch(() => undefined);
     }
@@ -188,38 +217,119 @@ async function finalize(path: string, callbackPath: string): Promise<void> {
   const tables = new TablesDB(admin);
   try {
     const base = `/v1/workspaces/${state.workspaceId}/projects/${state.projectId}/source-connections/${connectionId}`;
-    const select = await fetch(new URL(`${base}/select`, functionUrl), {
-      method: "POST",
-      cache: "no-store",
-      headers: {
-        authorization: `Bearer ${state.jwt}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({ repositoryIds: [authorized[0].id] }),
-    });
-    const selected = await jsonResponse(select);
-    if (select.status !== 200 || selected.status !== "active") {
+    const request = async (path: string, body: unknown, expected: number) => {
+      const response = await fetch(new URL(path, functionUrl), {
+        method: "POST",
+        cache: "no-store",
+        headers: {
+          authorization: `Bearer ${state.jwt}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(30_000),
+      });
+      const payload = await jsonResponse(response);
+      if (response.status !== expected) {
+        throw new Error(
+          `SOURCE_VERIFY_HTTP_${String(expected)}_GOT_${String(response.status)}`,
+        );
+      }
+      return payload;
+    };
+    await request(
+      `${base}/select`,
+      { repositoryIds: [authorized[0].id, "unselected_repository"] },
+      404,
+    );
+    const selected = await request(
+      `${base}/select`,
+      { repositoryIds: [authorized[0].id] },
+      200,
+    );
+    if (selected.status !== "active") {
       throw new Error("SOURCE_VERIFY_SELECTION_FAILED");
     }
-    const disconnect = await fetch(new URL(`${base}/disconnect`, functionUrl), {
-      method: "POST",
-      cache: "no-store",
-      headers: {
-        authorization: `Bearer ${state.jwt}`,
-        "content-type": "application/json",
-      },
-      body: "{}",
+    const managePath = `/v1/workspaces/${state.workspaceId}/projects/${state.projectId}/source-connections/manage/list`;
+    const initial = await request(managePath, {}, 200);
+    if (
+      initial.status !== "ok" ||
+      initial.projectSlug !== state.originalProjectSlug ||
+      !Array.isArray(initial.connections) ||
+      initial.connections.length !== 1 ||
+      !isObject(initial.connections[0]) ||
+      !Array.isArray(initial.connections[0].selectedRepositories) ||
+      initial.connections[0].selectedRepositories.length !== 1 ||
+      !isObject(initial.connections[0].selectedRepositories[0]) ||
+      initial.connections[0].selectedRepositories[0].id !== authorized[0].id ||
+      !Array.isArray(initial.connections[0].importedRepositories) ||
+      initial.connections[0].importedRepositories.length !== 0
+    ) {
+      throw new Error("SOURCE_VERIFY_INITIAL_MANAGEMENT_INVALID");
+    }
+    await request(
+      `/v1/workspaces/wrong_${state.workspaceId}/projects/${state.projectId}/source-connections/manage/list`,
+      {},
+      404,
+    );
+    await request(`${base}/refresh`, { repositoryId: authorized[0].id }, 200);
+    await request(`${base}/refresh`, { repositoryId: authorized[0].id }, 200);
+    const refreshed = await request(managePath, {}, 200);
+    const refreshedConnections = refreshed.connections;
+    const refreshedConnection =
+      Array.isArray(refreshedConnections) && isObject(refreshedConnections[0])
+        ? refreshedConnections[0]
+        : undefined;
+    const imports = refreshedConnection?.importedRepositories;
+    if (
+      !Array.isArray(imports) ||
+      imports.length !== 1 ||
+      !isObject(imports[0]) ||
+      imports[0].provider !== state.provider ||
+      imports[0].repositoryId !== authorized[0].id ||
+      typeof imports[0].owner !== "string" ||
+      typeof imports[0].name !== "string" ||
+      !Array.isArray(imports[0].releases) ||
+      JSON.stringify(refreshed).includes("unselected_repository")
+    ) {
+      throw new Error("SOURCE_VERIFY_IMPORT_INVALID");
+    }
+    const renamedSlug = `src-renamed-${state.userId.slice(-14)}`;
+    await tables.updateRow({
+      databaseId: config.appwriteSchema.databaseId,
+      tableId: config.appwriteSchema.projectsTableId,
+      rowId: state.projectId,
+      data: { slug: renamedSlug },
     });
-    const disconnected = await jsonResponse(disconnect);
-    if (disconnect.status !== 200 || disconnected.status !== "disconnected") {
+    const renamed = await request(managePath, {}, 200);
+    if (renamed.projectSlug !== renamedSlug) {
+      throw new Error("SOURCE_VERIFY_SLUG_REFRESH_INVALID");
+    }
+    const disconnected = await request(`${base}/disconnect`, {}, 200);
+    if (disconnected.status !== "disconnected") {
       throw new Error("SOURCE_VERIFY_REVOCATION_FAILED");
+    }
+    await request(`${base}/refresh`, { repositoryId: authorized[0].id }, 404);
+    const afterDisconnect = await request(managePath, {}, 200);
+    if (
+      !Array.isArray(afterDisconnect.connections) ||
+      !isObject(afterDisconnect.connections[0]) ||
+      afterDisconnect.connections[0].state !== "disconnected"
+    ) {
+      throw new Error("SOURCE_VERIFY_DISCONNECTED_HEALTH_INVALID");
     }
     process.stdout.write(
       `${JSON.stringify({
+        result: "PROVIDER_G3_SOURCES_PASSED",
         provider: state.provider,
         callback: true,
         authorizedRepositoryCount: authorized.length,
         selected: true,
+        unselectedAbsent: true,
+        importedMetadata: true,
+        importedReleaseCount: imports[0].releases.length,
+        refreshIdempotent: true,
+        scopeIsolation: true,
+        currentSlug: true,
         revoked: true,
         cleanup: true,
       })}\n`,
@@ -230,6 +340,13 @@ async function finalize(path: string, callbackPath: string): Promise<void> {
         databaseId: config.appwriteSchema.databaseId,
         tableId: config.appwriteSchema.sourceConnectionsTableId,
         rowId: connectionId,
+      })
+      .catch(() => undefined);
+    await tables
+      .deleteRow({
+        databaseId: config.appwriteSchema.databaseId,
+        tableId: config.appwriteSchema.projectsTableId,
+        rowId: state.projectId,
       })
       .catch(() => undefined);
     await tables
@@ -256,9 +373,9 @@ async function cleanup(path: string): Promise<void> {
   const opaqueState = new URL(state.authorizationUrl).searchParams.get("state");
   const connectionId = opaqueState?.split(".", 1)[0];
   if (
-    state.provider !== "github" ||
-    state.workspaceId !== "workspace_alpha" ||
-    state.projectId !== "project_alpha" ||
+    !/^src_workspace_[a-f0-9]{14}$/.test(state.workspaceId) ||
+    !/^src_project_[a-f0-9]{14}$/.test(state.projectId) ||
+    !/^src-[a-f0-9]{14}$/.test(state.originalProjectSlug) ||
     !/^src_owner_[a-f0-9]{14}$/.test(state.userId) ||
     !/^src_member_[a-f0-9]{14}$/.test(state.membershipId) ||
     !connectionId ||
@@ -272,7 +389,7 @@ async function cleanup(path: string): Promise<void> {
     .setKey(config.appwriteApiKey);
   const users = new Users(admin);
   const tables = new TablesDB(admin);
-  const [sourceConnection, membership, user] = await Promise.all([
+  const [sourceConnection, membership, project, user] = await Promise.all([
     tables.getRow({
       databaseId: config.appwriteSchema.databaseId,
       tableId: config.appwriteSchema.sourceConnectionsTableId,
@@ -283,6 +400,11 @@ async function cleanup(path: string): Promise<void> {
       tableId: config.appwriteSchema.workspaceMembershipsTableId,
       rowId: state.membershipId,
     }),
+    tables.getRow({
+      databaseId: config.appwriteSchema.databaseId,
+      tableId: config.appwriteSchema.projectsTableId,
+      rowId: state.projectId,
+    }),
     users.get({ userId: state.userId }),
   ]);
   if (
@@ -292,6 +414,7 @@ async function cleanup(path: string): Promise<void> {
     !["pending", "claiming"].includes(String(sourceConnection.status)) ||
     membership.workspaceId !== state.workspaceId ||
     membership.userId !== state.userId ||
+    project.workspaceId !== state.workspaceId ||
     user.$id !== state.userId
   ) {
     throw new Error("SOURCE_VERIFY_CLEANUP_SCOPE_INVALID");
@@ -312,6 +435,14 @@ async function cleanup(path: string): Promise<void> {
     })
     .then(() => true)
     .catch(() => false);
+  const projectDeleted = await tables
+    .deleteRow({
+      databaseId: config.appwriteSchema.databaseId,
+      tableId: config.appwriteSchema.projectsTableId,
+      rowId: state.projectId,
+    })
+    .then(() => true)
+    .catch(() => false);
   const userDeleted = await users
     .delete({ userId: state.userId })
     .then(() => true)
@@ -322,6 +453,7 @@ async function cleanup(path: string): Promise<void> {
       provider: state.provider,
       sourceConnectionDeleted,
       membershipDeleted,
+      projectDeleted,
       userDeleted,
       stateFileDeleted: true,
     })}\n`,
