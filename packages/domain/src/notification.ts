@@ -2,6 +2,8 @@ export type NotificationEventKind =
   | "feedback_received"
   | "clarification_requested"
   | "reporter_answered"
+  | "message_added"
+  | "feedback_under_review"
   | "feedback_resolved"
   | "feedback_closed"
   | "feedback_reopened"
@@ -57,6 +59,8 @@ const kinds = new Set<NotificationEventKind>([
   "feedback_received",
   "clarification_requested",
   "reporter_answered",
+  "message_added",
+  "feedback_under_review",
   "feedback_resolved",
   "feedback_closed",
   "feedback_reopened",
