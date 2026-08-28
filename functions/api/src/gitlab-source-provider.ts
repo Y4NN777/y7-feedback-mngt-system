@@ -1,4 +1,9 @@
-import type { RepositoryIdentity } from "@y7-feedback/domain";
+import type {
+  ProviderReleaseMetadata,
+  ProviderRepositoryMetadata,
+  RepositoryIdentity,
+  RepositoryVisibility,
+} from "@y7-feedback/domain";
 
 import type {
   ProviderGrantMaterial,
@@ -102,6 +107,54 @@ function repositories(value: unknown): readonly RepositoryIdentity[] {
   });
 }
 
+function repositoryMetadata(
+  value: unknown,
+  expectedId: string,
+): ProviderRepositoryMetadata {
+  if (
+    !isObject(value) ||
+    typeof value.id !== "number" ||
+    !Number.isSafeInteger(value.id) ||
+    String(value.id) !== expectedId ||
+    !isObject(value.namespace)
+  ) {
+    throw new Error("SOURCE_PROVIDER_RESPONSE_INVALID");
+  }
+  const visibility = value.visibility;
+  if (
+    visibility !== "public" &&
+    visibility !== "private" &&
+    visibility !== "internal"
+  ) {
+    throw new Error("SOURCE_PROVIDER_RESPONSE_INVALID");
+  }
+  return {
+    provider: "gitlab",
+    id: expectedId,
+    name: required(value.path, 500),
+    owner: required(value.namespace.full_path, 500),
+    visibility: visibility as RepositoryVisibility,
+    webUrl: required(value.web_url, 2_000),
+    defaultBranch: required(value.default_branch, 200),
+    releases: [],
+  };
+}
+
+function releaseMetadata(
+  value: unknown,
+  repositoryWebUrl: string,
+): ProviderReleaseMetadata {
+  if (!isObject(value)) throw new Error("SOURCE_PROVIDER_RESPONSE_INVALID");
+  const tag = required(value.tag_name, 200);
+  return {
+    id: tag,
+    tag,
+    name: required(value.name, 500),
+    publishedAt: required(value.released_at, 40),
+    webUrl: `${repositoryWebUrl}/-/releases/${encodeURIComponent(tag)}`,
+  };
+}
+
 function unavailable(): never {
   throw new Error("SOURCE_PROVIDER_UNAVAILABLE");
 }
@@ -185,6 +238,63 @@ export function createGitLabSourceProvider(
           encryptedGrantRef: required(await vault.seal("gitlab", grant), 1_000),
           authorizedRepositories: [...authorized.values()],
         };
+      } catch {
+        return unavailable();
+      }
+    },
+    async importRepository(input) {
+      try {
+        const repositoryId = required(input.repositoryId, 36);
+        if (!/^[1-9][0-9]{0,35}$/u.test(repositoryId)) return unavailable();
+        const grant = await vault.open(
+          "gitlab",
+          required(input.encryptedGrantRef, 1_000),
+        );
+        const requestHeaders = {
+          authorization: `Bearer ${required(grant.accessToken)}`,
+        };
+        const metadataResult = await fetcher(
+          new URL(`api/v4/projects/${repositoryId}`, origin).toString(),
+          {
+            method: "GET",
+            cache: "no-store",
+            credentials: "omit",
+            headers: requestHeaders,
+          },
+        );
+        if (metadataResult.status !== 200) return unavailable();
+        const metadata = repositoryMetadata(
+          (await metadataResult.json()) as unknown,
+          repositoryId,
+        );
+        const releases: ProviderReleaseMetadata[] = [];
+        let page = 1;
+        for (;;) {
+          const url = new URL(`api/v4/projects/${repositoryId}/releases`, origin);
+          url.search = new URLSearchParams({
+            per_page: "100",
+            page: String(page),
+          }).toString();
+          const result = await fetcher(url.toString(), {
+            method: "GET",
+            cache: "no-store",
+            credentials: "omit",
+            headers: requestHeaders,
+          });
+          if (result.status !== 200) return unavailable();
+          const payload: unknown = await result.json();
+          if (!Array.isArray(payload)) return unavailable();
+          releases.push(
+            ...payload.map((value) => releaseMetadata(value, metadata.webUrl)),
+          );
+          const next = result.headers.get("x-next-page");
+          if (!next) return { ...metadata, releases };
+          const nextPage = Number(next);
+          if (!Number.isSafeInteger(nextPage) || nextPage <= page || nextPage > 100) {
+            return unavailable();
+          }
+          page = nextPage;
+        }
       } catch {
         return unavailable();
       }

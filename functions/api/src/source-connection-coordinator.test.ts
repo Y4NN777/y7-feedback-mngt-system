@@ -93,6 +93,7 @@ function fixtures() {
         authorizedRepositories: [{ provider: "github" as const, id: "repository_1" }],
       }),
     ),
+    importRepository: vi.fn(() => Promise.reject(new Error("unused"))),
     revokeGrant: githubRevokeGrant,
   };
   const gitlab: SourceProviderAdapter = {

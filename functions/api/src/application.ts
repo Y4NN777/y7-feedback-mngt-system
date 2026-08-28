@@ -70,7 +70,8 @@ export interface ApplicationRuntime {
   readonly digestProviderNonce?: (nonce: string) => string;
   readonly providerDiagnostic?: (event: {
     readonly provider: "github";
-    readonly stage: "token_exchange" | "installations" | "repositories";
+    readonly stage:
+      "token_exchange" | "installations" | "repositories" | "metadata" | "releases";
     readonly status: number;
   }) => void;
   readonly principalVerifier?: AppwritePrincipalVerifier;

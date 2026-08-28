@@ -138,6 +138,124 @@ describe("GitLab OAuth source provider adapter", () => {
     expect(remove).toHaveBeenCalledWith("gitlab", "vault:gitlab:grant-1");
   });
 
+  it("BDD-SRC-GITLAB-004 imports selected project metadata and paginated releases", async () => {
+    const { provider, fetcher, open } = setup([
+      json(200, {
+        id: 83836910,
+        path: "feedback",
+        namespace: { full_path: "Y4NN777" },
+        visibility: "private",
+        web_url: "https://gitlab.com/Y4NN777/feedback",
+        default_branch: "main",
+      }),
+      json(
+        200,
+        [
+          {
+            tag_name: "v1.0.0",
+            name: "First release",
+            released_at: "2026-08-27T12:00:00.000Z",
+          },
+        ],
+        { "x-next-page": "2" },
+      ),
+      json(200, []),
+    ]);
+
+    await expect(
+      provider.importRepository({
+        encryptedGrantRef: "vault:gitlab:grant-1",
+        repositoryId: "83836910",
+      }),
+    ).resolves.toEqual({
+      provider: "gitlab",
+      id: "83836910",
+      name: "feedback",
+      owner: "Y4NN777",
+      visibility: "private",
+      webUrl: "https://gitlab.com/Y4NN777/feedback",
+      defaultBranch: "main",
+      releases: [
+        {
+          id: "v1.0.0",
+          tag: "v1.0.0",
+          name: "First release",
+          publishedAt: "2026-08-27T12:00:00.000Z",
+          webUrl: "https://gitlab.com/Y4NN777/feedback/-/releases/v1.0.0",
+        },
+      ],
+    });
+    expect(open).toHaveBeenCalledWith("gitlab", "vault:gitlab:grant-1");
+    expect(fetcher).toHaveBeenNthCalledWith(
+      1,
+      "https://gitlab.com/api/v4/projects/83836910",
+      expect.objectContaining({ method: "GET" }),
+    );
+    expect(fetcher).toHaveBeenNthCalledWith(
+      2,
+      "https://gitlab.com/api/v4/projects/83836910/releases?per_page=100&page=1",
+      expect.objectContaining({ method: "GET" }),
+    );
+  });
+
+  it("fails closed when GitLab project metadata, releases or pagination are invalid", async () => {
+    const validProject = {
+      id: 83836910,
+      path: "feedback",
+      namespace: { full_path: "Y4NN777" },
+      visibility: "public",
+      web_url: "https://gitlab.com/Y4NN777/feedback",
+      default_branch: "main",
+    };
+    const validRelease = {
+      tag_name: "v1",
+      name: "One",
+      released_at: "2026-08-27T12:00:00.000Z",
+    };
+    const cases: readonly (readonly Response[])[] = [
+      [json(404, {})],
+      [json(200, null)],
+      [json(200, { ...validProject, id: "83836910" })],
+      [json(200, { ...validProject, id: 1.5 })],
+      [json(200, { ...validProject, id: 7 })],
+      [json(200, { ...validProject, namespace: null })],
+      [json(200, { ...validProject, visibility: "unknown" })],
+      [json(200, validProject), json(500, {})],
+      [json(200, validProject), json(200, {})],
+      [json(200, validProject), json(200, [null])],
+      [json(200, validProject), json(200, [{ ...validRelease, name: null }])],
+      [json(200, { ...validProject, path: null }), json(200, [])],
+      [json(200, validProject), json(200, [], { "x-next-page": "bad" })],
+      [json(200, validProject), json(200, [], { "x-next-page": "1" })],
+      [json(200, validProject), json(200, [], { "x-next-page": "101" })],
+    ];
+    for (const responses of cases) {
+      await expect(
+        setup(responses).provider.importRepository({
+          encryptedGrantRef: "vault:gitlab:grant-1",
+          repositoryId: "83836910",
+        }),
+      ).rejects.toThrow("SOURCE_PROVIDER_UNAVAILABLE");
+    }
+    await expect(
+      setup([]).provider.importRepository({
+        encryptedGrantRef: "vault:gitlab:grant-1",
+        repositoryId: "invalid",
+      }),
+    ).rejects.toThrow("SOURCE_PROVIDER_UNAVAILABLE");
+
+    const internal = setup([
+      json(200, { ...validProject, visibility: "internal" }),
+      json(200, []),
+    ]);
+    await expect(
+      internal.provider.importRepository({
+        encryptedGrantRef: "vault:gitlab:grant-1",
+        repositoryId: "83836910",
+      }),
+    ).resolves.toMatchObject({ visibility: "internal" });
+  });
+
   it("fails closed without sealing or deleting on malformed provider responses", async () => {
     const exchangeFailure = setup([json(401, { error: "invalid_grant" })]);
     await expect(

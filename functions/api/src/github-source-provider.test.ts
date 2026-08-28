@@ -150,6 +150,175 @@ describe("GitHub App user authorization source adapter", () => {
     expect(remove).toHaveBeenCalledWith("github", "vault:github:grant-1");
   });
 
+  it("BDD-SRC-GITHUB-004 imports selected repository metadata and published releases only", async () => {
+    const { provider, fetcher, open } = setup([
+      json(200, {
+        id: 1329343404,
+        name: "y7-feedback-mngt-system",
+        owner: { login: "Y4NN777" },
+        private: true,
+        visibility: "private",
+        html_url: "https://github.com/Y4NN777/y7-feedback-mngt-system",
+        default_branch: "main",
+      }),
+      json(200, [
+        {
+          id: 91,
+          tag_name: "v1.0.0",
+          name: null,
+          draft: false,
+          published_at: "2026-08-27T12:00:00.000Z",
+          html_url:
+            "https://github.com/Y4NN777/y7-feedback-mngt-system/releases/tag/v1.0.0",
+        },
+        {
+          id: 92,
+          tag_name: "draft",
+          name: "Draft",
+          draft: true,
+          published_at: null,
+          html_url:
+            "https://github.com/Y4NN777/y7-feedback-mngt-system/releases/tag/draft",
+        },
+        {
+          id: 93,
+          tag_name: "v2.0.0",
+          name: "Second release",
+          draft: false,
+          published_at: "2026-08-28T12:00:00.000Z",
+          html_url:
+            "https://github.com/Y4NN777/y7-feedback-mngt-system/releases/tag/v2.0.0",
+        },
+      ]),
+    ]);
+
+    await expect(
+      provider.importRepository({
+        encryptedGrantRef: "vault:github:grant-1",
+        repositoryId: "1329343404",
+      }),
+    ).resolves.toEqual({
+      provider: "github",
+      id: "1329343404",
+      name: "y7-feedback-mngt-system",
+      owner: "Y4NN777",
+      visibility: "private",
+      webUrl: "https://github.com/Y4NN777/y7-feedback-mngt-system",
+      defaultBranch: "main",
+      releases: [
+        {
+          id: "91",
+          tag: "v1.0.0",
+          name: "v1.0.0",
+          publishedAt: "2026-08-27T12:00:00.000Z",
+          webUrl:
+            "https://github.com/Y4NN777/y7-feedback-mngt-system/releases/tag/v1.0.0",
+        },
+        {
+          id: "93",
+          tag: "v2.0.0",
+          name: "Second release",
+          publishedAt: "2026-08-28T12:00:00.000Z",
+          webUrl:
+            "https://github.com/Y4NN777/y7-feedback-mngt-system/releases/tag/v2.0.0",
+        },
+      ],
+    });
+    expect(open).toHaveBeenCalledWith("github", "vault:github:grant-1");
+    expect(fetcher).toHaveBeenNthCalledWith(
+      1,
+      "https://api.github.com/repositories/1329343404",
+      expect.objectContaining({ method: "GET" }),
+    );
+    expect(fetcher).toHaveBeenNthCalledWith(
+      2,
+      "https://api.github.com/repos/Y4NN777/y7-feedback-mngt-system/releases?per_page=100&page=1",
+      expect.objectContaining({ method: "GET" }),
+    );
+  });
+
+  it("fails closed when GitHub repository metadata or release pagination is invalid", async () => {
+    const validRepository = {
+      id: 1329343404,
+      name: "feedback",
+      owner: { login: "Y4NN777" },
+      private: false,
+      visibility: "public",
+      html_url: "https://github.com/Y4NN777/feedback",
+      default_branch: "main",
+    };
+    const validRelease = {
+      id: 91,
+      tag_name: "v1",
+      name: "One",
+      draft: false,
+      published_at: "2026-08-27T12:00:00.000Z",
+      html_url: "https://github.com/Y4NN777/feedback/releases/tag/v1",
+    };
+    const cases: readonly (readonly Response[])[] = [
+      [json(404, {})],
+      [json(200, null)],
+      [json(200, { ...validRepository, id: 7 })],
+      [json(200, { ...validRepository, owner: null })],
+      [json(200, { ...validRepository, owner: { login: 7 } })],
+      [json(200, { ...validRepository, private: null, visibility: "unknown" })],
+      [json(200, validRepository), json(500, {})],
+      [json(200, validRepository), json(200, {})],
+      [json(200, validRepository), json(200, [null])],
+      [json(200, validRepository), json(200, [{ ...validRelease, id: "91" }])],
+      [json(200, validRepository), json(200, [{ ...validRelease, id: 1.5 }])],
+      [json(200, validRepository), json(200, [{ ...validRelease, id: 0 }])],
+      [json(200, { ...validRepository, name: null }), json(200, [])],
+    ];
+    for (const responses of cases) {
+      await expect(
+        setup(responses).provider.importRepository({
+          encryptedGrantRef: "vault:github:grant-1",
+          repositoryId: "1329343404",
+        }),
+      ).rejects.toThrow("SOURCE_PROVIDER_UNAVAILABLE");
+    }
+    await expect(
+      setup([]).provider.importRepository({
+        encryptedGrantRef: "vault:github:grant-1",
+        repositoryId: "invalid",
+      }),
+    ).rejects.toThrow("SOURCE_PROVIDER_UNAVAILABLE");
+
+    const internal = setup([
+      json(200, {
+        ...validRepository,
+        private: true,
+        visibility: "internal",
+      }),
+      json(200, []),
+    ]);
+    await expect(
+      internal.provider.importRepository({
+        encryptedGrantRef: "vault:github:grant-1",
+        repositoryId: "1329343404",
+      }),
+    ).resolves.toMatchObject({ visibility: "internal" });
+
+    const boundedQueue = [
+      json(200, validRepository),
+      json(200, [], { link: '<next>; rel="next"' }),
+    ];
+    const bounded = createGitHubSourceProvider(
+      { clientId: "client", clientSecret: "secret" },
+      setup([]),
+      () => Promise.resolve(boundedQueue.shift() ?? json(500, {})),
+      Date.now,
+      1,
+    );
+    await expect(
+      bounded.importRepository({
+        encryptedGrantRef: "vault:github:grant-1",
+        repositoryId: "1329343404",
+      }),
+    ).rejects.toThrow("SOURCE_PROVIDER_UNAVAILABLE");
+  });
+
   it("fails closed without persisting or removing after provider failure", async () => {
     const exchangeFailure = setup([json(401, { error: "bad_verification_code" })]);
     await expect(
