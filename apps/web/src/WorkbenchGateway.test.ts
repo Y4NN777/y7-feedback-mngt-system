@@ -55,4 +55,44 @@ describe("HTTP Workbench gateway", () => {
       }),
     ).resolves.toEqual({ status: "retryable" });
   });
+
+  it("BDD-WORK-WEB-007 parses the workspace-only conversation projection", async () => {
+    const gateway = createHttpWorkbenchGateway(
+      "https://api.example.test",
+      () => Promise.resolve("jwt_1"),
+      () =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              status: "ok",
+              conversation: {
+                feedbackId: "feedback_1",
+                state: "received",
+                messages: [],
+                internalNotes: [
+                  {
+                    id: "note_1",
+                    actorKind: "workspace",
+                    audience: "workspace",
+                    occurredAt: "2026-08-28T10:00:00.000Z",
+                    content: "Internal evidence",
+                  },
+                ],
+                lifecycle: [],
+              },
+            }),
+          ),
+        ),
+    );
+    await expect(
+      gateway.conversation({
+        workspaceId: "workspace_1",
+        projectId: "project_1",
+        feedbackId: "feedback_1",
+      }),
+    ).resolves.toMatchObject({
+      status: "ok",
+      result: { internalNotes: [{ content: "Internal evidence" }] },
+    });
+  });
 });

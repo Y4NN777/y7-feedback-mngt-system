@@ -79,6 +79,15 @@ export function WorkbenchPage({
     enabled: authenticated && scope !== undefined && selectedId !== undefined,
     retry: false,
   });
+  const conversation = useQuery({
+    queryKey: ["workbench-conversation", scope, selectedId],
+    queryFn: () =>
+      scope === undefined || selectedId === undefined
+        ? Promise.resolve({ status: "denied" as const })
+        : gateway.conversation({ ...scope, feedbackId: selectedId }),
+    enabled: authenticated && scope !== undefined && selectedId !== undefined,
+    retry: false,
+  });
 
   async function signIn(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -262,6 +271,59 @@ export function WorkbenchPage({
                     <li key={name}>{name}</li>
                   ))}
                 </ul>
+              )}
+              {conversation.isPending ? (
+                <p role="status">{copy.loading}</p>
+              ) : conversation.data?.status !== "ok" ? (
+                <p role="alert">
+                  {conversation.data?.status === "denied"
+                    ? copy.denied
+                    : copy.retryable}
+                </p>
+              ) : (
+                <section className="workbench-conversation">
+                  <h3>{copy.messages}</h3>
+                  {conversation.data.result.messages.length === 0 ? (
+                    <p>{copy.conversationEmpty}</p>
+                  ) : (
+                    <ol>
+                      {conversation.data.result.messages.map((entry) => (
+                        <li key={entry.id}>
+                          <strong>{entry.actorKind}</strong>
+                          <p>{entry.content}</p>
+                          <time dateTime={entry.occurredAt}>{entry.occurredAt}</time>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                  <h3>{copy.internalNotes}</h3>
+                  {conversation.data.result.internalNotes.length === 0 ? (
+                    <p>{copy.conversationEmpty}</p>
+                  ) : (
+                    <ol>
+                      {conversation.data.result.internalNotes.map((entry) => (
+                        <li key={entry.id}>
+                          <p>{entry.content}</p>
+                          <time dateTime={entry.occurredAt}>{entry.occurredAt}</time>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                  <h3>{copy.lifecycle}</h3>
+                  {conversation.data.result.lifecycle.length === 0 ? (
+                    <p>{copy.conversationEmpty}</p>
+                  ) : (
+                    <ol>
+                      {conversation.data.result.lifecycle.map((fact) => (
+                        <li key={fact.id}>
+                          <strong>{fact.state.replaceAll("_", " ")}</strong>
+                          <p>{fact.reason}</p>
+                          <time dateTime={fact.occurredAt}>{fact.occurredAt}</time>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </section>
               )}
               <fieldset className="workbench-actions">
                 <legend>{copy.actions}</legend>

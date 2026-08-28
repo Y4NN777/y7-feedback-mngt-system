@@ -23,6 +23,32 @@ export interface WorkbenchDetail extends WorkbenchItem {
   readonly assignedMaintainerId: string | null;
 }
 
+export interface WorkbenchConversationEntry {
+  readonly id: string;
+  readonly actorKind: "workspace" | "reporter";
+  readonly audience: "workspace" | "reporter";
+  readonly occurredAt: string;
+  readonly content: string;
+}
+
+export interface WorkbenchLifecycleFact {
+  readonly id: string;
+  readonly priorState: FeedbackLifecycleState;
+  readonly state: FeedbackLifecycleState;
+  readonly actorKind: "workspace" | "reporter";
+  readonly occurredAt: string;
+  readonly reason: string;
+  readonly sequence: number;
+}
+
+export interface WorkbenchConversation {
+  readonly feedbackId: string;
+  readonly state: FeedbackLifecycleState;
+  readonly messages: readonly WorkbenchConversationEntry[];
+  readonly internalNotes: readonly WorkbenchConversationEntry[];
+  readonly lifecycle: readonly WorkbenchLifecycleFact[];
+}
+
 export type WorkbenchGatewayOutcome<T> =
   | { readonly status: "ok"; readonly result: T }
   | { readonly status: "invalid" | "denied" | "conflict" | "retryable" };
@@ -44,6 +70,11 @@ export interface WorkbenchGateway {
     readonly feedbackId: string;
     readonly command: Readonly<Record<string, unknown>>;
   }): Promise<WorkbenchGatewayOutcome<Readonly<Record<string, unknown>>>>;
+  conversation(input: {
+    readonly workspaceId: string;
+    readonly projectId: string;
+    readonly feedbackId: string;
+  }): Promise<WorkbenchGatewayOutcome<WorkbenchConversation>>;
 }
 
 type Fetcher = (input: string, init: RequestInit) => Promise<Response>;
@@ -144,6 +175,88 @@ function detail(value: unknown): WorkbenchDetail | undefined {
   };
 }
 
+function state(value: unknown): FeedbackLifecycleState | undefined {
+  return value === "received" ||
+    value === "under_review" ||
+    value === "awaiting_reporter" ||
+    value === "resolved" ||
+    value === "closed"
+    ? value
+    : undefined;
+}
+
+function conversationEntry(value: unknown): WorkbenchConversationEntry | undefined {
+  if (
+    !object(value) ||
+    typeof value.id !== "string" ||
+    (value.actorKind !== "workspace" && value.actorKind !== "reporter") ||
+    (value.audience !== "workspace" && value.audience !== "reporter") ||
+    typeof value.occurredAt !== "string" ||
+    typeof value.content !== "string"
+  )
+    return undefined;
+  return {
+    id: value.id,
+    actorKind: value.actorKind,
+    audience: value.audience,
+    occurredAt: value.occurredAt,
+    content: value.content,
+  };
+}
+
+function conversation(value: unknown): WorkbenchConversation | undefined {
+  if (
+    !object(value) ||
+    typeof value.feedbackId !== "string" ||
+    !Array.isArray(value.messages) ||
+    !Array.isArray(value.internalNotes) ||
+    !Array.isArray(value.lifecycle)
+  )
+    return undefined;
+  const currentState = state(value.state);
+  const messages = value.messages.map(conversationEntry);
+  const internalNotes = value.internalNotes.map(conversationEntry);
+  const lifecycle = value.lifecycle.map((fact): WorkbenchLifecycleFact | undefined => {
+    if (
+      !object(fact) ||
+      typeof fact.id !== "string" ||
+      (fact.actorKind !== "workspace" && fact.actorKind !== "reporter") ||
+      typeof fact.occurredAt !== "string" ||
+      typeof fact.reason !== "string" ||
+      typeof fact.sequence !== "number" ||
+      !Number.isSafeInteger(fact.sequence)
+    )
+      return undefined;
+    const priorState = state(fact.priorState);
+    const nextState = state(fact.state);
+    return priorState === undefined || nextState === undefined
+      ? undefined
+      : {
+          id: fact.id,
+          priorState,
+          state: nextState,
+          actorKind: fact.actorKind,
+          occurredAt: fact.occurredAt,
+          reason: fact.reason,
+          sequence: fact.sequence,
+        };
+  });
+  if (
+    currentState === undefined ||
+    messages.some((entry) => entry === undefined) ||
+    internalNotes.some((entry) => entry === undefined) ||
+    lifecycle.some((entry) => entry === undefined)
+  )
+    return undefined;
+  return {
+    feedbackId: value.feedbackId,
+    state: currentState,
+    messages: messages as readonly WorkbenchConversationEntry[],
+    internalNotes: internalNotes as readonly WorkbenchConversationEntry[],
+    lifecycle: lifecycle as readonly WorkbenchLifecycleFact[],
+  };
+}
+
 export function createHttpWorkbenchGateway(
   endpoint: string,
   getJwt: () => Promise<string>,
@@ -155,6 +268,8 @@ export function createHttpWorkbenchGateway(
     path: string,
     parse: (value: unknown) => T | undefined,
     init: Omit<RequestInit, "headers"> = { method: "GET" },
+    select: (body: Readonly<Record<string, unknown>>) => unknown = (body) =>
+      body.result,
   ) {
     let jwt: string;
     try {
@@ -175,7 +290,7 @@ export function createHttpWorkbenchGateway(
       if (response.status === 400) return { status: "invalid" } as const;
       if (response.status === 409) return { status: "conflict" } as const;
       if (response.ok && object(body)) {
-        const result = parse(body.result);
+        const result = parse(select(body));
         if (result !== undefined) return { status: "ok", result } as const;
       }
     } catch {
@@ -214,6 +329,15 @@ export function createHttpWorkbenchGateway(
         method: "POST",
         body: JSON.stringify(input.command),
       });
+    },
+    conversation(input) {
+      const path = `/v1/workspaces/${encodeURIComponent(input.workspaceId)}/projects/${encodeURIComponent(input.projectId)}/feedback/${encodeURIComponent(input.feedbackId)}/conversation`;
+      return request(
+        path,
+        conversation,
+        { method: "GET" },
+        (body) => body.conversation,
+      );
     },
   };
 }
