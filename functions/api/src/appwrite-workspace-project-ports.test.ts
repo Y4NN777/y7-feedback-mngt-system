@@ -222,7 +222,7 @@ describe("Appwrite Workspace Project operation ports", () => {
       ],
     });
     await expect(target.ports.realtime.authorize(scope)).resolves.toEqual({
-      channel: "workspace.workspace-a.project.project-a",
+      channel: "databases.feedback.tables.notifications.rows",
     });
   });
 

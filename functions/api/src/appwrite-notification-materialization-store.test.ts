@@ -78,6 +78,7 @@ describe("Appwrite notification materialization", () => {
     await target.store.commit(commit);
     expect(target.writes).toHaveLength(2);
     expect(target.writes[0]?.tableId).toBe("notifications");
+    expect(target.writes[0]?.permissions).toEqual(['read("user:owner_1")']);
     expect(target.writes[1]?.tableId).toBe("notification_outbox");
     const data = target.writes[1]?.data;
     expect(data?.payloadJson).not.toContain("in_product_invalidation");

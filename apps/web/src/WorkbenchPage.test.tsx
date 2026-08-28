@@ -11,6 +11,7 @@ import type { WorkbenchGateway } from "./WorkbenchGateway";
 import { WorkbenchPage } from "./WorkbenchPage";
 
 function setup(list?: WorkbenchGateway["list"]) {
+  let invalidateNotifications: (() => void) | undefined;
   const listMock = vi.fn<WorkbenchGateway["list"]>(
     list ??
       (() =>
@@ -111,6 +112,12 @@ function setup(list?: WorkbenchGateway["list"]) {
     ),
     notifications: notificationsMock,
     markNotificationRead: markNotificationReadMock,
+    subscribeNotifications: vi.fn<WorkbenchGateway["subscribeNotifications"]>(
+      (_input, invalidate) => {
+        invalidateNotifications = invalidate;
+        return Promise.resolve(() => undefined);
+      },
+    ),
   };
   const signOutMock = vi.fn(() => Promise.resolve());
   const session: AdministrationSession = {
@@ -139,6 +146,9 @@ function setup(list?: WorkbenchGateway["list"]) {
     listMock,
     markNotificationReadMock,
     notificationsMock,
+    get invalidateNotifications() {
+      return invalidateNotifications;
+    },
     session,
     signOutMock,
   };
@@ -196,7 +206,7 @@ describe("Workbench experience", () => {
     expect(await screen.findByText("lifecycle changed")).toBeVisible();
     expect(screen.getByText(/Non lue/u)).toBeVisible();
     const callsBeforeInvalidation = target.notificationsMock.mock.calls.length;
-    window.dispatchEvent(new Event("y7:notifications-invalidated"));
+    target.invalidateNotifications?.();
     await vi.waitFor(() => {
       expect(target.notificationsMock.mock.calls.length).toBeGreaterThan(
         callsBeforeInvalidation,

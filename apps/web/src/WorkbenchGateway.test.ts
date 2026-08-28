@@ -64,6 +64,38 @@ describe("HTTP Workbench gateway", () => {
     );
   });
 
+  it("BDD-NOT-WEB-003 subscribes only after trusted Realtime authorization", async () => {
+    const fetcher = vi.fn(() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            status: "ok",
+            data: { channel: "databases.feedback.tables.notifications.rows" },
+          }),
+        ),
+      ),
+    );
+    const stop = vi.fn();
+    const invalidate = vi.fn();
+    const subscribe = vi.fn(() => stop);
+    const gateway = createHttpWorkbenchGateway(
+      "https://api.example.test",
+      () => Promise.resolve("jwt_1"),
+      fetcher,
+      subscribe,
+    );
+    await expect(
+      gateway.subscribeNotifications(
+        { workspaceId: "workspace_1", projectId: "project_1" },
+        invalidate,
+      ),
+    ).resolves.toBe(stop);
+    expect(subscribe).toHaveBeenCalledWith(
+      "databases.feedback.tables.notifications.rows",
+      invalidate,
+    );
+  });
+
   it("BDD-WORK-WEB-001 sends scoped filters with a temporary JWT", async () => {
     const fetcher = vi.fn().mockResolvedValue(
       new Response(

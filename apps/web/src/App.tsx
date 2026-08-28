@@ -43,6 +43,7 @@ const unavailableWorkbenchGateway: WorkbenchGateway = {
   conversation: () => Promise.resolve({ status: "retryable" }),
   notifications: () => Promise.resolve({ status: "retryable" }),
   markNotificationRead: () => Promise.resolve({ status: "retryable" }),
+  subscribeNotifications: () => Promise.resolve(() => undefined),
 };
 const projectSlugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 

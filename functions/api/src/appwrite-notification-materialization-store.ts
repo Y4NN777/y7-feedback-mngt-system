@@ -1,4 +1,4 @@
-import { Query, type TablesDB } from "node-appwrite";
+import { Permission, Query, Role, type TablesDB } from "node-appwrite";
 
 import type {
   NotificationMaterializationCommit,
@@ -26,7 +26,7 @@ export interface AppwriteNotificationMaterializationTables {
     readonly tableId: string;
     readonly rowId: string;
     readonly data: Readonly<Record<string, unknown>>;
-    readonly permissions: readonly [];
+    readonly permissions: readonly string[];
     readonly transactionId: string;
   }): Promise<unknown>;
   updateTransaction(input: {
@@ -108,7 +108,7 @@ export function createAppwriteNotificationMaterializationStore(
             reference: notification.reference,
             createdAt: notification.createdAt,
           },
-          permissions: [],
+          permissions: [Permission.read(Role.user(notification.recipientId))],
           transactionId: transaction.$id,
         });
         if (!acknowledged(created, notification.id)) {
@@ -178,7 +178,8 @@ export function createNodeAppwriteNotificationMaterializationStore(
         return { rows: result.rows };
       },
       createTransaction: (input) => tables.createTransaction(input),
-      createRow: (input) => tables.createRow({ ...input, permissions: [] }),
+      createRow: (input) =>
+        tables.createRow({ ...input, permissions: [...input.permissions] }),
       updateTransaction: (input) => tables.updateTransaction(input),
     },
     schema,

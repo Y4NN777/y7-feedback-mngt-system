@@ -95,9 +95,17 @@ export interface WorkbenchGateway {
   }): Promise<
     WorkbenchGatewayOutcome<{ readonly id: string; readonly readAt: string }>
   >;
+  subscribeNotifications(
+    input: { readonly workspaceId: string; readonly projectId: string },
+    invalidate: () => void,
+  ): Promise<() => void>;
 }
 
 type Fetcher = (input: string, init: RequestInit) => Promise<Response>;
+type RealtimeSubscriber = (
+  channel: string,
+  invalidate: () => void,
+) => Promise<() => void> | (() => void);
 
 function object(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -303,6 +311,7 @@ export function createHttpWorkbenchGateway(
   endpoint: string,
   getJwt: () => Promise<string>,
   fetcher: Fetcher = fetch,
+  subscribe: RealtimeSubscriber = () => () => undefined,
 ): WorkbenchGateway {
   const base = endpoint.endsWith("/") ? endpoint.slice(0, -1) : endpoint;
 
@@ -415,6 +424,21 @@ export function createHttpWorkbenchGateway(
         },
         (body) => body.data,
       );
+    },
+    async subscribeNotifications(input, invalidate) {
+      const path = `/v1/workspaces/${encodeURIComponent(input.workspaceId)}/projects/${encodeURIComponent(input.projectId)}/operations/realtime/authorize`;
+      const outcome = await request(
+        path,
+        (value) =>
+          object(value) && typeof value.channel === "string"
+            ? value.channel
+            : undefined,
+        { method: "POST", body: "{}" },
+        (body) => body.data,
+      );
+      return outcome.status === "ok"
+        ? await subscribe(outcome.result, invalidate)
+        : () => undefined;
     },
   };
 }

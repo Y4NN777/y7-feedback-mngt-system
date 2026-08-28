@@ -387,7 +387,7 @@ export function createAppwriteWorkspaceProjectOperationPorts(
       authorize(scope) {
         validateScope(scope);
         return Promise.resolve({
-          channel: `workspace.${scope.workspaceId}.project.${scope.projectId}`,
+          channel: `databases.${schema.databaseId}.tables.${schema.notificationsTableId}.rows`,
         });
       },
     },

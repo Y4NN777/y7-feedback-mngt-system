@@ -101,14 +101,22 @@ export function WorkbenchPage({
   const refetchNotifications = notifications.refetch;
 
   useEffect(() => {
-    function invalidate() {
-      if (authenticated && scope !== undefined) void refetchNotifications();
-    }
-    window.addEventListener("y7:notifications-invalidated", invalidate);
+    if (!authenticated || scope === undefined) return undefined;
+    let unsubscribe: (() => void) | undefined;
+    let cancelled = false;
+    void gateway
+      .subscribeNotifications(scope, () => {
+        void refetchNotifications();
+      })
+      .then((stop) => {
+        if (cancelled) stop();
+        else unsubscribe = stop;
+      });
     return () => {
-      window.removeEventListener("y7:notifications-invalidated", invalidate);
+      cancelled = true;
+      unsubscribe?.();
     };
-  }, [authenticated, refetchNotifications, scope]);
+  }, [authenticated, gateway, refetchNotifications, scope]);
 
   async function signIn(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
