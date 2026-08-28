@@ -118,6 +118,10 @@ async function main(): Promise<void> {
   let deletionPassed = false;
   let sessionRevocationPassed = false;
   let directAccessDenied = false;
+  let notificationFeedPassed = false;
+  let notificationReadPassed = false;
+  let realtimeSignalPassed = false;
+  let notificationVisibleP95Ms = 0;
 
   try {
     const now = new Date().toISOString();
@@ -169,6 +173,33 @@ async function main(): Promise<void> {
       status: "active",
       createdAt: now,
       updatedAt: now,
+    });
+    await createRow(config.appwriteSchema.reportersTableId, reporterId, {
+      workspaceId,
+      attributionJson: protector.seal(
+        {
+          environment: config.environment,
+          tableId: config.appwriteSchema.reportersTableId,
+          rowId: reporterId,
+          field: "attributionJson",
+        },
+        JSON.stringify({ kind: "anonymous" }),
+      ),
+    });
+    await createRow(config.appwriteSchema.accessGrantsTableId, feedbackId, {
+      feedbackId,
+      reference: `Y7-G3-WORK-${suffix.toUpperCase()}`,
+      verifier: protector.seal(
+        {
+          environment: config.environment,
+          tableId: config.appwriteSchema.accessGrantsTableId,
+          rowId: feedbackId,
+          field: "verifier",
+        },
+        "g3-workbench-verifier",
+      ),
+      generation: 1,
+      status: "active",
     });
     await createRow(config.appwriteSchema.feedbackTableId, feedbackId, {
       projectId,
@@ -344,6 +375,122 @@ async function main(): Promise<void> {
       throw new Error("APPWRITE_G3_WORKBENCH_UNASSIGNED_INVALID");
     removalPassed = true;
 
+    const operationsPath = `/v1/workspaces/${workspaceId}/projects/${projectId}/operations`;
+    const visibleDurations: number[] = [];
+    let notificationIds: string[] = [];
+    for (let index = 0; index < 5; index += 1) {
+      const startedAt = Date.now();
+      await request(ownerJwt, "POST", `${path}/${feedbackId}`, 200, {
+        kind: "assign_feedback",
+        operationId: `g3n${String(index)}_${suffix}`,
+        maintainerId,
+      });
+      const deadline = Date.now() + 5_000;
+      let waiting = true;
+      while (waiting) {
+        const feed = await request(
+          maintainerJwt,
+          "POST",
+          `${operationsPath}/notifications/list`,
+          200,
+          {},
+        );
+        const data = object(feed) && object(feed.data) ? feed.data : undefined;
+        if (data && Array.isArray(data.items) && data.items.length >= index + 1) {
+          notificationIds = data.items.map((item) => {
+            if (
+              !object(item) ||
+              typeof item.id !== "string" ||
+              item.kind !== "assignment_changed" ||
+              item.feedbackId !== feedbackId
+            )
+              throw new Error("APPWRITE_G3_NOTIFICATION_FEED_INVALID");
+            return item.id;
+          });
+          visibleDurations.push(Date.now() - startedAt);
+          waiting = false;
+          continue;
+        }
+        if (Date.now() >= deadline)
+          throw new Error("APPWRITE_G3_NOTIFICATION_VISIBLE_TIMEOUT");
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+    }
+    const sortedDurations = [...visibleDurations].sort((left, right) => left - right);
+    notificationVisibleP95Ms =
+      sortedDurations[Math.ceil(sortedDurations.length * 0.95) - 1] ?? 5_001;
+    if (notificationVisibleP95Ms > 5_000 || notificationIds.length !== 5)
+      throw new Error("APPWRITE_G3_NOTIFICATION_VISIBLE_SLO");
+    notificationFeedPassed = true;
+
+    const read = await request(
+      maintainerJwt,
+      "POST",
+      `${operationsPath}/notifications/read`,
+      200,
+      { notificationId: notificationIds[0] },
+    );
+    if (!object(read) || !object(read.data) || read.data.status !== "read")
+      throw new Error("APPWRITE_G3_NOTIFICATION_READ_INVALID");
+    const readFeed = await request(
+      maintainerJwt,
+      "POST",
+      `${operationsPath}/notifications/list`,
+      200,
+      {},
+    );
+    if (!object(readFeed) || !object(readFeed.data) || readFeed.data.unreadCount !== 4)
+      throw new Error("APPWRITE_G3_NOTIFICATION_UNREAD_INVALID");
+    notificationReadPassed = true;
+
+    const realtime = await request(
+      maintainerJwt,
+      "POST",
+      `${operationsPath}/realtime/authorize`,
+      200,
+      {},
+    );
+    if (
+      !object(realtime) ||
+      !object(realtime.data) ||
+      realtime.data.databaseId !== config.appwriteSchema.databaseId ||
+      realtime.data.tableId !== config.appwriteSchema.notificationSignalsTableId
+    )
+      throw new Error("APPWRITE_G3_NOTIFICATION_REALTIME_INVALID");
+    const signals = await tables.listRows({
+      databaseId: config.appwriteSchema.databaseId,
+      tableId: config.appwriteSchema.notificationSignalsTableId,
+      queries: [Query.equal("recipientId", [maintainerId]), Query.limit(100)],
+      total: false,
+    });
+    if (
+      signals.rows.length !== 5 ||
+      signals.rows.some(
+        (row) =>
+          row.recipientId !== maintainerId ||
+          typeof row.createdAt !== "string" ||
+          Object.keys(row).some((key) =>
+            ["workspaceId", "projectId", "feedbackId", "reference", "content"].includes(
+              key,
+            ),
+          ),
+      )
+    )
+      throw new Error("APPWRITE_G3_NOTIFICATION_SIGNAL_INVALID");
+    realtimeSignalPassed = true;
+
+    await request(ownerJwt, "POST", `${path}/${feedbackId}`, 200, {
+      kind: "unassign_feedback",
+      operationId: `g3z_${suffix}`,
+    });
+    await request(
+      maintainerJwt,
+      "POST",
+      `${operationsPath}/notifications/list`,
+      404,
+      {},
+    );
+
     await request(ownerJwt, "POST", `${path}/${feedbackId}`, 200, {
       kind: "delete_feedback",
       operationId: `g3d_${suffix}`,
@@ -400,6 +547,35 @@ async function main(): Promise<void> {
     } catch (error: unknown) {
       cleanupFailure ??= error;
     }
+    try {
+      const notifications = await tables.listRows({
+        databaseId: config.appwriteSchema.databaseId,
+        tableId: config.appwriteSchema.notificationsTableId,
+        queries: [Query.equal("feedbackId", [feedbackId]), Query.limit(100)],
+        total: false,
+      });
+      for (const row of notifications.rows) {
+        createdRows.push([config.appwriteSchema.notificationsTableId, row.$id]);
+        const attempts = await tables.listRows({
+          databaseId: config.appwriteSchema.databaseId,
+          tableId: config.appwriteSchema.outboxTableId,
+          queries: [Query.equal("notificationId", [row.$id]), Query.limit(100)],
+          total: false,
+        });
+        for (const attempt of attempts.rows)
+          createdRows.push([config.appwriteSchema.outboxTableId, attempt.$id]);
+      }
+      const signals = await tables.listRows({
+        databaseId: config.appwriteSchema.databaseId,
+        tableId: config.appwriteSchema.notificationSignalsTableId,
+        queries: [Query.equal("recipientId", [maintainerId]), Query.limit(100)],
+        total: false,
+      });
+      for (const row of signals.rows)
+        createdRows.push([config.appwriteSchema.notificationSignalsTableId, row.$id]);
+    } catch (error: unknown) {
+      cleanupFailure ??= error;
+    }
     for (const [tableId, rowId] of [
       ...new Map(createdRows.map((row) => [row.join("\0"), row])).values(),
     ].reverse()) {
@@ -437,6 +613,10 @@ async function main(): Promise<void> {
       deletionPassed,
       sessionRevocationPassed,
       directAccessDenied,
+      notificationFeedPassed,
+      notificationReadPassed,
+      realtimeSignalPassed,
+      notificationVisibleP95Ms,
       cleanupPassed: true,
     }),
   );
