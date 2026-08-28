@@ -79,6 +79,7 @@ describe("Appwrite infrastructure manifest", () => {
       [schema.projectSlugsTableId, ["projectId", "current"]],
       [schema.projectsTableId, ["slug"]],
       [schema.accessGrantsTableId, ["reference"]],
+      [schema.accessGrantsTableId, ["feedbackId"]],
       [schema.notificationSignalsTableId, ["recipientId", "createdAt"]],
       [schema.idempotencyTableId, ["scopeKey", "clientOperationId"]],
       [schema.attachmentStagingTableId, ["objectId"]],

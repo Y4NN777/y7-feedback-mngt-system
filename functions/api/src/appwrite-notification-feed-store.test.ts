@@ -74,7 +74,6 @@ function setup() {
     {
       equal: (attribute, values) => `${attribute}=${values.join(",")}`,
       limit: (value) => `limit=${String(value)}`,
-      orderDesc: (attribute) => `desc=${attribute}`,
     },
   );
   return {
@@ -154,13 +153,33 @@ describe("Appwrite notification feed store", () => {
         queries: [
           "workspaceId=workspace_1",
           "projectId=project_1",
-          "recipientKind=workspace",
           "recipientId=owner_1",
-          "desc=createdAt",
           "limit=100",
         ],
       }),
     );
+  });
+
+  it("orders the authoritative feed newest first without a new Preview index", async () => {
+    const target = setup();
+    target.listRows
+      .mockResolvedValueOnce({
+        rows: [
+          notification({
+            $id: "notification_old",
+            eventId: "event_old",
+            createdAt: "2026-08-28T19:00:00.000Z",
+          }),
+          notification({ $id: "notification_new", eventId: "event_new" }),
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [feedback()] });
+
+    const result = await target.store.list({ actor: owner, ...scope });
+    expect(result.items.map((item) => item.id)).toEqual([
+      "notification_new",
+      "notification_old",
+    ]);
   });
 
   it("BDD-NOT-FEED-002 revokes a Maintainer feed immediately after assignment removal", async () => {

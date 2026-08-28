@@ -66,7 +66,6 @@ export interface AppwriteNotificationFeedTablesPort {
 export interface AppwriteNotificationFeedQueryPort {
   equal(attribute: string, values: readonly string[]): string;
   limit(value: number): string;
-  orderDesc(attribute: string): string;
 }
 
 export interface NotificationFeedStore {
@@ -102,7 +101,6 @@ const eventKinds = new Set<NotificationEventKind>([
 const defaultQueries: AppwriteNotificationFeedQueryPort = {
   equal: (attribute, values) => Query.equal(attribute, [...values]),
   limit: (value) => Query.limit(value),
-  orderDesc: (attribute) => Query.orderDesc(attribute),
 };
 /* v8 ignore stop */
 
@@ -252,17 +250,15 @@ export function createAppwriteNotificationFeedStore(
           queries: [
             queries.equal("workspaceId", [input.workspaceId]),
             queries.equal("projectId", [input.projectId]),
-            queries.equal("recipientKind", ["workspace"]),
             queries.equal("recipientId", [input.actor.principalId]),
-            queries.orderDesc("createdAt"),
             queries.limit(100),
           ],
           total: false,
           ttl: 0,
         });
-        const items = result.rows.map((row) =>
-          parseNotification(row, input, "ERR-NOT-RETRYABLE"),
-        );
+        const items = result.rows
+          .map((row) => parseNotification(row, input, "ERR-NOT-RETRYABLE"))
+          .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
         if (items.length === 0) return { items: [], unreadCount: 0 };
         const feedback = await tables.listRows({
           databaseId: schema.databaseId,
