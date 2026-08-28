@@ -262,6 +262,22 @@ describe("trusted API entrypoint", () => {
     expect(context.log).toHaveBeenCalledWith(expect.not.stringContaining("/unknown"));
   });
 
+  it("does not parse a body for a non-POST conversation probe", async () => {
+    const { context, json } = createContext("GET", "/unknown");
+    const handle = vi.fn(() => Promise.resolve(undefined));
+    await routeRequest(context, {
+      ...dependencies,
+      conversationLifecycle: { handle },
+    });
+    expect(handle).toHaveBeenCalledWith({
+      method: "GET",
+      path: "/unknown",
+      headers: {},
+      body: undefined,
+    });
+    expect(json).toHaveBeenCalledWith({ error: "not_found" }, 404, expect.any(Object));
+  });
+
   it("BDD-API-003 delegates safe request fields to the public capability", async () => {
     const body = { clientOperationId: "operation" };
     const handle = vi.fn(() =>

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { serializeOperationalEvent } from "./observability.js";
+import type { ConversationLifecycleHttp } from "./conversation-lifecycle-http.js";
 import type { PublicApi } from "./public-api.js";
 import type { ProjectAdministrationHttp } from "./project-administration-http.js";
 import type { SourceConnectionHttp } from "./source-connection-http.js";
@@ -39,6 +40,7 @@ export interface HttpDependencies {
   readonly environment: "development" | "preview" | "production";
   readonly now: () => number;
   readonly publicApi?: PublicApi;
+  readonly conversationLifecycle?: ConversationLifecycleHttp;
   readonly projectAdministration?: ProjectAdministrationHttp;
   readonly sourceConnections?: SourceConnectionHttp;
   readonly release: string;
@@ -141,10 +143,22 @@ export async function routeRequest(
               ? req.bodyJson
               : undefined,
         });
+  const conversationResponse =
+    isHealth || isIngressProbe || sourceResponse || administrationResponse
+      ? null
+      : await dependencies.conversationLifecycle?.handle({
+          method,
+          path: req.path,
+          headers: requestHeaders,
+          body:
+            method === "POST" && !contentType.startsWith("multipart/form-data")
+              ? req.bodyJson
+              : undefined,
+        });
   const publicResponse =
     isHealth || isIngressProbe
       ? null
-      : sourceResponse || administrationResponse
+      : sourceResponse || administrationResponse || conversationResponse
         ? null
         : await dependencies.publicApi?.handle({
             method,
@@ -160,6 +174,7 @@ export async function routeRequest(
     : (probeResponse?.statusCode ??
       sourceResponse?.statusCode ??
       administrationResponse?.statusCode ??
+      conversationResponse?.statusCode ??
       publicResponse?.statusCode ??
       404);
   const operation = isHealth
@@ -170,12 +185,18 @@ export async function routeRequest(
         ? "source_connection"
         : administrationResponse
           ? "project_administration"
-          : publicResponse
-            ? "public_api"
-            : "unknown";
+          : conversationResponse
+            ? "conversation_lifecycle"
+            : publicResponse
+              ? "public_api"
+              : "unknown";
   const outcome = isHealth
     ? "success"
-    : (probeResponse ?? sourceResponse ?? administrationResponse ?? publicResponse)
+    : (probeResponse ??
+        sourceResponse ??
+        administrationResponse ??
+        conversationResponse ??
+        publicResponse)
       ? statusCode < 400
         ? "success"
         : "rejected"
@@ -209,6 +230,14 @@ export async function routeRequest(
     return res.json(
       administrationResponse.body,
       administrationResponse.statusCode,
+      headers,
+    );
+  }
+
+  if (conversationResponse) {
+    return res.json(
+      conversationResponse.body,
+      conversationResponse.statusCode,
       headers,
     );
   }
