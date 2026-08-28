@@ -32,21 +32,89 @@ function isObject(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function message(
-  value: unknown,
-): { readonly locale: "fr" | "en"; readonly reference: string } | undefined {
+type SafeMailMessage =
+  | {
+      readonly kind: "feedback_accepted";
+      readonly locale: "fr" | "en";
+      readonly reference: string;
+    }
+  | {
+      readonly kind: "notification_event";
+      readonly event:
+        "conversation_message" | "lifecycle_changed" | "assignment_changed";
+      readonly locale: "fr" | "en";
+      readonly reference: string;
+    };
+
+function message(value: unknown): SafeMailMessage | undefined {
   if (!isObject(value)) return undefined;
   const keys = Object.keys(value).sort();
-  if (keys.join(",") !== "kind,locale,reference") return undefined;
-  if (
-    value.kind !== "feedback_accepted" ||
-    (value.locale !== "fr" && value.locale !== "en") ||
-    typeof value.reference !== "string" ||
-    !reference.test(value.reference)
-  ) {
+  if (value.locale !== "fr" && value.locale !== "en") return undefined;
+  if (typeof value.reference !== "string" || !reference.test(value.reference)) {
     return undefined;
   }
-  return { locale: value.locale, reference: value.reference };
+  if (
+    value.kind === "feedback_accepted" &&
+    keys.join(",") === "kind,locale,reference"
+  ) {
+    return {
+      kind: "feedback_accepted",
+      locale: value.locale,
+      reference: value.reference,
+    };
+  }
+  if (
+    value.kind === "notification_event" &&
+    keys.join(",") === "event,kind,locale,reference" &&
+    (value.event === "conversation_message" ||
+      value.event === "lifecycle_changed" ||
+      value.event === "assignment_changed")
+  ) {
+    return {
+      kind: "notification_event",
+      event: value.event,
+      locale: value.locale,
+      reference: value.reference,
+    };
+  }
+  return undefined;
+}
+
+const eventCopy = {
+  conversation_message: {
+    fr: ["Nouveau message sur votre retour", "Un nouveau message est disponible."],
+    en: ["New message on your feedback", "A new message is available."],
+  },
+  lifecycle_changed: {
+    fr: ["Mise à jour de votre retour", "Le statut de votre retour a changé."],
+    en: ["Your feedback was updated", "The status of your feedback changed."],
+  },
+  assignment_changed: {
+    fr: ["Attribution mise à jour", "L’attribution de ce retour a changé."],
+    en: ["Assignment updated", "This feedback assignment changed."],
+  },
+} as const;
+
+function render(parsed: SafeMailMessage): {
+  readonly subject: string;
+  readonly text: string;
+} {
+  const french = parsed.locale === "fr";
+  if (parsed.kind === "feedback_accepted") {
+    return {
+      subject: french ? "Votre retour a été reçu" : "Your feedback was received",
+      text: french
+        ? `Votre retour a été reçu. Référence : ${parsed.reference}`
+        : `Your feedback was received. Reference: ${parsed.reference}`,
+    };
+  }
+  const [subject, sentence] = eventCopy[parsed.event][parsed.locale];
+  return {
+    subject,
+    text: french
+      ? `${sentence} Référence : ${parsed.reference}`
+      : `${sentence} Reference: ${parsed.reference}`,
+  };
 }
 
 function responseCode(error: unknown): number | undefined {
@@ -76,16 +144,14 @@ export function createSmtpMailCatcherSender(
       const parsed = message(input.payload);
       if (!deliveryId.test(input.deliveryId) || !parsed) return "permanent";
 
-      const french = parsed.locale === "fr";
+      const rendered = render(parsed);
       try {
         await transport.sendMail({
           envelope: { from: envelopeFrom, to: envelopeTo },
           from: config.from,
           headers: { "X-Y7-Delivery-ID": input.deliveryId },
-          subject: french ? "Votre retour a été reçu" : "Your feedback was received",
-          text: french
-            ? `Votre retour a été reçu. Référence : ${parsed.reference}`
-            : `Your feedback was received. Reference: ${parsed.reference}`,
+          subject: rendered.subject,
+          text: rendered.text,
           to: config.to,
         });
         return "delivered";

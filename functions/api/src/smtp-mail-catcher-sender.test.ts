@@ -69,6 +69,75 @@ describe("Preview SMTP mail catcher sender", () => {
   });
 
   it.each([
+    [
+      "fr",
+      "conversation_message",
+      "Nouveau message sur votre retour",
+      "Un nouveau message est disponible. Référence : Y7-REF-12345678",
+    ],
+    [
+      "en",
+      "lifecycle_changed",
+      "Your feedback was updated",
+      "The status of your feedback changed. Reference: Y7-REF-12345678",
+    ],
+    [
+      "fr",
+      "assignment_changed",
+      "Attribution mise à jour",
+      "L’attribution de ce retour a changé. Référence : Y7-REF-12345678",
+    ],
+  ] as const)(
+    "BDD-MAIL-G3-001 renders the allow-listed %s %s template",
+    async (locale, event, subject, text) => {
+      const target = context();
+      await expect(
+        target.sender.deliver({
+          deliveryId: "notification_g3_1",
+          channel: "email",
+          payload: {
+            kind: "notification_event",
+            event,
+            locale,
+            reference: "Y7-REF-12345678",
+          },
+        }),
+      ).resolves.toBe("delivered");
+      expect(target.sendMail).toHaveBeenCalledWith(
+        expect.objectContaining({ subject, text }),
+      );
+    },
+  );
+
+  it.each([
+    ["internal_note", "private note"],
+    ["accessProof", "proof-secret"],
+    ["contact", "person@example.test"],
+    ["attachment", "private-file.pdf"],
+    ["providerToken", "provider-secret"],
+    ["workspaceId", "workspace-other"],
+  ])(
+    "BDD-MAIL-G3-002 rejects the forbidden %s field before SMTP",
+    async (field, value) => {
+      const target = context();
+      await expect(
+        target.sender.deliver({
+          deliveryId: "notification_g3_2",
+          channel: "email",
+          payload: {
+            kind: "notification_event",
+            event: "lifecycle_changed",
+            locale: "en",
+            reference: "Y7-REF-12345678",
+            [field]: value,
+          },
+        }),
+      ).resolves.toBe("permanent");
+      expect(target.sendMail).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
     [{ responseCode: 421 }, "retryable"],
     [{ responseCode: 550 }, "permanent"],
     [new Error("unavailable"), "retryable"],
