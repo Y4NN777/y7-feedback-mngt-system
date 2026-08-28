@@ -6,5 +6,6 @@ export * from "./feedback.js";
 export * from "./policy.js";
 export * from "./project-routing.js";
 export * from "./project-administration.js";
+export * from "./project-administration-state.js";
 export * from "./reporter.js";
 export * from "./source-connection.js";
