@@ -23,6 +23,8 @@ const schema: ServerConfig["appwriteSchema"] = {
   attachmentsTableId: "attachments",
   providerGrantsTableId: "provider_grants",
   sourceConnectionsTableId: "source_connections",
+  administrationAuditTableId: "administration_audit",
+  administrationIdempotencyTableId: "administration_idempotency",
 };
 
 function table(id: string) {
@@ -79,6 +81,9 @@ describe("Appwrite infrastructure manifest", () => {
       [schema.attachmentsTableId, ["objectId"]],
       [schema.sourceConnectionsTableId, ["projectId", "provider"]],
       [schema.sourceConnectionsTableId, ["workspaceId", "status"]],
+      [schema.administrationAuditTableId, ["workspaceId", "projectId", "occurredAt"]],
+      [schema.administrationAuditTableId, ["operationId"]],
+      [schema.administrationIdempotencyTableId, ["workspaceId", "operationId"]],
     ] as const;
 
     for (const [tableId, queriedColumns] of requirements) {
@@ -114,6 +119,7 @@ describe("Appwrite infrastructure manifest", () => {
       "attachments.displayName",
       "provider_grants.envelope",
       "source_connections.selectedRepositoriesJson",
+      "administration_idempotency.resultJson",
     ]);
     for (const definition of manifest.tables) {
       const indexed = new Set(definition.indexes.flatMap(({ columns }) => columns));

@@ -358,6 +358,38 @@ export function createAppwriteInfrastructureManifest(
           index("workspace_status", ["workspaceId", "status"]),
         ],
       ),
+      table(
+        schema.administrationAuditTableId,
+        "Administration audit",
+        [
+          varchar("workspaceId", 36),
+          varchar("projectId", 36),
+          varchar("actorId", 36),
+          varchar("action", 64),
+          varchar("operationId", 36),
+          varchar("payloadDigest", 128),
+          datetime("occurredAt"),
+        ],
+        [
+          index("operation_unique", ["operationId"], "unique"),
+          index("workspace_project_time", ["workspaceId", "projectId", "occurredAt"]),
+        ],
+      ),
+      table(
+        schema.administrationIdempotencyTableId,
+        "Administration idempotency",
+        [
+          varchar("workspaceId", 36),
+          varchar("operationId", 36),
+          varchar("payloadDigest", 128),
+          varchar("action", 64),
+          varchar("projectId", 36),
+          varchar("auditId", 36),
+          text("resultJson"),
+          datetime("createdAt"),
+        ],
+        [index("workspace_operation_unique", ["workspaceId", "operationId"], "unique")],
+      ),
     ],
     attachmentBucket: {
       id: schema.attachmentBucketId,
