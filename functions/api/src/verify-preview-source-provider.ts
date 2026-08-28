@@ -17,6 +17,8 @@ interface StateFile {
   readonly workspaceId: string;
   readonly projectId: string;
   readonly originalProjectSlug: string;
+  readonly connectionId?: string;
+  readonly repositoryId?: string;
 }
 
 function isObject(value: unknown): value is Readonly<Record<string, unknown>> {
@@ -215,6 +217,7 @@ async function finalize(path: string, callbackPath: string): Promise<void> {
     .setKey(config.appwriteApiKey);
   const users = new Users(admin);
   const tables = new TablesDB(admin);
+  const retain = process.argv.includes("--retain");
   try {
     const session = await users.createSession({ userId: state.userId });
     const freshToken = await users.createJWT({
@@ -310,18 +313,31 @@ async function finalize(path: string, callbackPath: string): Promise<void> {
     if (renamed.projectSlug !== renamedSlug) {
       throw new Error("SOURCE_VERIFY_SLUG_REFRESH_INVALID");
     }
-    const disconnected = await request(`${base}/disconnect`, {}, 200);
-    if (disconnected.status !== "disconnected") {
-      throw new Error("SOURCE_VERIFY_REVOCATION_FAILED");
-    }
-    await request(`${base}/refresh`, { repositoryId: authorized[0].id }, 404);
-    const afterDisconnect = await request(managePath, {}, 200);
-    if (
-      !Array.isArray(afterDisconnect.connections) ||
-      !isObject(afterDisconnect.connections[0]) ||
-      afterDisconnect.connections[0].state !== "disconnected"
-    ) {
-      throw new Error("SOURCE_VERIFY_DISCONNECTED_HEALTH_INVALID");
+    if (retain) {
+      await writeFile(
+        path,
+        JSON.stringify({
+          ...state,
+          connectionId,
+          repositoryId: authorized[0].id,
+        } satisfies StateFile),
+        { encoding: "utf8", mode: 0o600 },
+      );
+      await chmod(path, 0o600);
+    } else {
+      const disconnected = await request(`${base}/disconnect`, {}, 200);
+      if (disconnected.status !== "disconnected") {
+        throw new Error("SOURCE_VERIFY_REVOCATION_FAILED");
+      }
+      await request(`${base}/refresh`, { repositoryId: authorized[0].id }, 404);
+      const afterDisconnect = await request(managePath, {}, 200);
+      if (
+        !Array.isArray(afterDisconnect.connections) ||
+        !isObject(afterDisconnect.connections[0]) ||
+        afterDisconnect.connections[0].state !== "disconnected"
+      ) {
+        throw new Error("SOURCE_VERIFY_DISCONNECTED_HEALTH_INVALID");
+      }
     }
     process.stdout.write(
       `${JSON.stringify({
@@ -336,35 +352,40 @@ async function finalize(path: string, callbackPath: string): Promise<void> {
         refreshIdempotent: true,
         scopeIsolation: true,
         currentSlug: true,
-        revoked: true,
-        cleanup: true,
+        revoked: !retain,
+        retainedForIssueVerification: retain,
+        cleanup: !retain,
       })}\n`,
     );
   } finally {
-    await tables
-      .deleteRow({
-        databaseId: config.appwriteSchema.databaseId,
-        tableId: config.appwriteSchema.sourceConnectionsTableId,
-        rowId: connectionId,
-      })
-      .catch(() => undefined);
-    await tables
-      .deleteRow({
-        databaseId: config.appwriteSchema.databaseId,
-        tableId: config.appwriteSchema.projectsTableId,
-        rowId: state.projectId,
-      })
-      .catch(() => undefined);
-    await tables
-      .deleteRow({
-        databaseId: config.appwriteSchema.databaseId,
-        tableId: config.appwriteSchema.workspaceMembershipsTableId,
-        rowId: state.membershipId,
-      })
-      .catch(() => undefined);
-    await users.delete({ userId: state.userId }).catch(() => undefined);
-    await unlink(path).catch(() => undefined);
-    await unlink(callbackPath).catch(() => undefined);
+    if (retain) {
+      await unlink(callbackPath).catch(() => undefined);
+    } else {
+      await tables
+        .deleteRow({
+          databaseId: config.appwriteSchema.databaseId,
+          tableId: config.appwriteSchema.sourceConnectionsTableId,
+          rowId: connectionId,
+        })
+        .catch(() => undefined);
+      await tables
+        .deleteRow({
+          databaseId: config.appwriteSchema.databaseId,
+          tableId: config.appwriteSchema.projectsTableId,
+          rowId: state.projectId,
+        })
+        .catch(() => undefined);
+      await tables
+        .deleteRow({
+          databaseId: config.appwriteSchema.databaseId,
+          tableId: config.appwriteSchema.workspaceMembershipsTableId,
+          rowId: state.membershipId,
+        })
+        .catch(() => undefined);
+      await users.delete({ userId: state.userId }).catch(() => undefined);
+      await unlink(path).catch(() => undefined);
+      await unlink(callbackPath).catch(() => undefined);
+    }
   }
 }
 
@@ -384,8 +405,8 @@ async function cleanup(path: string): Promise<void> {
     !/^src-[a-f0-9]{14}$/.test(state.originalProjectSlug) ||
     !/^src_owner_[a-f0-9]{14}$/.test(state.userId) ||
     !/^src_member_[a-f0-9]{14}$/.test(state.membershipId) ||
-    !connectionId ||
-    !/^[a-f0-9]{20}$/.test(connectionId)
+    !(state.connectionId ?? connectionId) ||
+    !/^[a-f0-9]{20}$/.test(state.connectionId ?? connectionId ?? "")
   ) {
     throw new Error("SOURCE_VERIFY_STATE_INVALID");
   }
@@ -399,7 +420,7 @@ async function cleanup(path: string): Promise<void> {
     tables.getRow({
       databaseId: config.appwriteSchema.databaseId,
       tableId: config.appwriteSchema.sourceConnectionsTableId,
-      rowId: connectionId,
+      rowId: state.connectionId ?? (connectionId as string),
     }),
     tables.getRow({
       databaseId: config.appwriteSchema.databaseId,
@@ -417,7 +438,9 @@ async function cleanup(path: string): Promise<void> {
     sourceConnection.workspaceId !== state.workspaceId ||
     sourceConnection.projectId !== state.projectId ||
     sourceConnection.provider !== state.provider ||
-    !["pending", "claiming"].includes(String(sourceConnection.status)) ||
+    !["pending", "claiming", "active", "disconnected"].includes(
+      String(sourceConnection.status),
+    ) ||
     membership.workspaceId !== state.workspaceId ||
     membership.userId !== state.userId ||
     project.workspaceId !== state.workspaceId ||
@@ -429,7 +452,7 @@ async function cleanup(path: string): Promise<void> {
     .deleteRow({
       databaseId: config.appwriteSchema.databaseId,
       tableId: config.appwriteSchema.sourceConnectionsTableId,
-      rowId: connectionId,
+      rowId: state.connectionId ?? (connectionId as string),
     })
     .then(() => true)
     .catch(() => false);
