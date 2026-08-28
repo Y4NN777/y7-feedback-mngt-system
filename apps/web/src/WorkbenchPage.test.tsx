@@ -50,6 +50,44 @@ function setup(list?: WorkbenchGateway["list"]) {
       }),
     ),
     execute: executeMock,
+    conversation: vi.fn(() =>
+      Promise.resolve({
+        status: "ok" as const,
+        result: {
+          feedbackId: "feedback_1",
+          state: "received" as const,
+          messages: [
+            {
+              id: "message_1",
+              actorKind: "workspace" as const,
+              audience: "reporter" as const,
+              occurredAt: "2026-08-28T10:01:00.000Z",
+              content: "Need details",
+            },
+          ],
+          internalNotes: [
+            {
+              id: "note_1",
+              actorKind: "workspace" as const,
+              audience: "workspace" as const,
+              occurredAt: "2026-08-28T10:02:00.000Z",
+              content: "Internal evidence",
+            },
+          ],
+          lifecycle: [
+            {
+              id: "fact_1",
+              priorState: "received" as const,
+              state: "under_review" as const,
+              actorKind: "workspace" as const,
+              occurredAt: "2026-08-28T10:03:00.000Z",
+              reason: "Started",
+              sequence: 2,
+            },
+          ],
+        },
+      }),
+    ),
   };
   const session: AdministrationSession = {
     createJwt: () => Promise.resolve("jwt_1"),
@@ -106,6 +144,9 @@ describe("Workbench experience", () => {
     await user.click(screen.getByRole("button", { name: /feedback_1/u }));
     expect(await screen.findByRole("heading", { name: "Upload fails" })).toBeVisible();
     expect(screen.getByText("Aucune pièce jointe")).toBeVisible();
+    expect(await screen.findByText("Internal evidence")).toBeVisible();
+    expect(screen.getByText("Need details")).toBeVisible();
+    expect(screen.getByText("Started")).toBeVisible();
   });
 
   it("BDD-WORK-WEB-005 exposes an actionable retry state", async () => {
