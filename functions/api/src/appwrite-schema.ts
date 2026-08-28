@@ -218,6 +218,7 @@ export function createAppwriteInfrastructureManifest(
           text("deletionRequestsJson"),
           text("internalNotesJson"),
           text("workspaceClassification", { required: false }),
+          varchar("assignedMaintainerId", 36, { required: false }),
         ],
         [
           index("project", ["projectId"]),
