@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState, type SyntheticEvent } from "react";
+import { useEffect, useState, type SyntheticEvent } from "react";
 
 import type {
   FeedbackLifecycleState,
@@ -88,6 +88,27 @@ export function WorkbenchPage({
     enabled: authenticated && scope !== undefined && selectedId !== undefined,
     retry: false,
   });
+  const notifications = useQuery({
+    queryKey: ["workbench-notifications", scope],
+    queryFn: () =>
+      scope === undefined
+        ? Promise.resolve({ status: "denied" as const })
+        : gateway.notifications(scope),
+    enabled: authenticated && scope !== undefined,
+    retry: false,
+    refetchInterval: 5_000,
+  });
+  const refetchNotifications = notifications.refetch;
+
+  useEffect(() => {
+    function invalidate() {
+      if (authenticated && scope !== undefined) void refetchNotifications();
+    }
+    window.addEventListener("y7:notifications-invalidated", invalidate);
+    return () => {
+      window.removeEventListener("y7:notifications-invalidated", invalidate);
+    };
+  }, [authenticated, refetchNotifications, scope]);
 
   async function signIn(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -108,6 +129,16 @@ export function WorkbenchPage({
     if (outcome.status === "ok") {
       await detail.refetch();
     }
+  }
+
+  async function markNotificationRead(notificationId: string) {
+    if (scope === undefined) return;
+    const outcome = await gateway.markNotificationRead({
+      ...scope,
+      notificationId,
+      readAt: new Date().toISOString(),
+    });
+    if (outcome.status === "ok") await notifications.refetch();
   }
 
   return (
@@ -404,6 +435,54 @@ export function WorkbenchPage({
               {copy.signOut}
             </button>
           </div>
+          <section className="notification-feed" aria-labelledby="notifications-title">
+            <h2 id="notifications-title">{copy.notifications}</h2>
+            {notifications.isPending ? (
+              <p role="status">{copy.loading}</p>
+            ) : notifications.data?.status !== "ok" ? (
+              <div role="alert">
+                <p>{copy.notificationRetry}</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void notifications.refetch();
+                  }}
+                >
+                  {copy.retry}
+                </button>
+              </div>
+            ) : notifications.data.result.length === 0 ? (
+              <p>{copy.notificationsEmpty}</p>
+            ) : (
+              <ol>
+                {notifications.data.result.map((notification) => (
+                  <li key={notification.id}>
+                    <p>
+                      <strong>{notification.kind.replaceAll("_", " ")}</strong>
+                      {" — "}
+                      {notification.readAt === null ? copy.unread : copy.read}
+                    </p>
+                    <time dateTime={notification.createdAt}>
+                      {new Intl.DateTimeFormat(locale, {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      }).format(new Date(notification.createdAt))}
+                    </time>
+                    {notification.readAt === null && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void markNotificationRead(notification.id);
+                        }}
+                      >
+                        {copy.markRead}
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
           <fieldset className="workbench-filters">
             <legend>{copy.filters}</legend>
             <label>

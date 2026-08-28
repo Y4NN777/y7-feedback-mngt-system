@@ -49,6 +49,14 @@ export interface WorkbenchConversation {
   readonly lifecycle: readonly WorkbenchLifecycleFact[];
 }
 
+export interface WorkbenchNotification {
+  readonly id: string;
+  readonly feedbackId: string;
+  readonly kind: string;
+  readonly createdAt: string;
+  readonly readAt: string | null;
+}
+
 export type WorkbenchGatewayOutcome<T> =
   | { readonly status: "ok"; readonly result: T }
   | { readonly status: "invalid" | "denied" | "conflict" | "retryable" };
@@ -75,6 +83,18 @@ export interface WorkbenchGateway {
     readonly projectId: string;
     readonly feedbackId: string;
   }): Promise<WorkbenchGatewayOutcome<WorkbenchConversation>>;
+  notifications(input: {
+    readonly workspaceId: string;
+    readonly projectId: string;
+  }): Promise<WorkbenchGatewayOutcome<readonly WorkbenchNotification[]>>;
+  markNotificationRead(input: {
+    readonly workspaceId: string;
+    readonly projectId: string;
+    readonly notificationId: string;
+    readonly readAt: string;
+  }): Promise<
+    WorkbenchGatewayOutcome<{ readonly id: string; readonly readAt: string }>
+  >;
 }
 
 type Fetcher = (input: string, init: RequestInit) => Promise<Response>;
@@ -257,6 +277,28 @@ function conversation(value: unknown): WorkbenchConversation | undefined {
   };
 }
 
+function notification(value: unknown): WorkbenchNotification | undefined {
+  if (
+    !object(value) ||
+    typeof value.id !== "string" ||
+    typeof value.feedbackId !== "string" ||
+    typeof value.kind !== "string" ||
+    typeof value.createdAt !== "string" ||
+    !Number.isFinite(Date.parse(value.createdAt)) ||
+    new Date(Date.parse(value.createdAt)).toISOString() !== value.createdAt ||
+    (value.readAt !== null && typeof value.readAt !== "string")
+  ) {
+    return undefined;
+  }
+  return {
+    id: value.id,
+    feedbackId: value.feedbackId,
+    kind: value.kind,
+    createdAt: value.createdAt,
+    readAt: value.readAt,
+  };
+}
+
 export function createHttpWorkbenchGateway(
   endpoint: string,
   getJwt: () => Promise<string>,
@@ -337,6 +379,41 @@ export function createHttpWorkbenchGateway(
         conversation,
         { method: "GET" },
         (body) => body.conversation,
+      );
+    },
+    notifications(input) {
+      const path = `/v1/workspaces/${encodeURIComponent(input.workspaceId)}/projects/${encodeURIComponent(input.projectId)}/operations/notifications/list`;
+      return request(
+        path,
+        (value) => {
+          if (!Array.isArray(value)) return undefined;
+          const parsed = value.map(notification);
+          return parsed.some((entry) => entry === undefined)
+            ? undefined
+            : (parsed as readonly WorkbenchNotification[]);
+        },
+        { method: "POST", body: "{}" },
+        (body) => (object(body.data) ? body.data.notifications : undefined),
+      );
+    },
+    markNotificationRead(input) {
+      const path = `/v1/workspaces/${encodeURIComponent(input.workspaceId)}/projects/${encodeURIComponent(input.projectId)}/operations/notifications/read`;
+      return request(
+        path,
+        (value) =>
+          object(value) &&
+          typeof value.id === "string" &&
+          typeof value.readAt === "string"
+            ? { id: value.id, readAt: value.readAt }
+            : undefined,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            notificationId: input.notificationId,
+            readAt: input.readAt,
+          }),
+        },
+        (body) => body.data,
       );
     },
   };

@@ -30,6 +30,27 @@ function setup(list?: WorkbenchGateway["list"]) {
   const executeMock = vi.fn<WorkbenchGateway["execute"]>(() =>
     Promise.resolve({ status: "ok" as const, result: { status: "applied" } }),
   );
+  const notificationsMock = vi.fn<WorkbenchGateway["notifications"]>(() =>
+    Promise.resolve({
+      status: "ok" as const,
+      result: [
+        {
+          id: "notification_1",
+          feedbackId: "feedback_1",
+          kind: "lifecycle_changed",
+          createdAt: "2026-08-28T10:05:00.000Z",
+          readAt: null,
+        },
+      ],
+    }),
+  );
+  const markNotificationReadMock = vi.fn<WorkbenchGateway["markNotificationRead"]>(
+    (input) =>
+      Promise.resolve({
+        status: "ok" as const,
+        result: { id: input.notificationId, readAt: input.readAt },
+      }),
+  );
   const gateway: WorkbenchGateway = {
     list: listMock,
     read: vi.fn(() =>
@@ -88,6 +109,8 @@ function setup(list?: WorkbenchGateway["list"]) {
         },
       }),
     ),
+    notifications: notificationsMock,
+    markNotificationRead: markNotificationReadMock,
   };
   const signOutMock = vi.fn(() => Promise.resolve());
   const session: AdministrationSession = {
@@ -110,7 +133,15 @@ function setup(list?: WorkbenchGateway["list"]) {
     );
   }
   render(<Harness />);
-  return { gateway, executeMock, listMock, session, signOutMock };
+  return {
+    gateway,
+    executeMock,
+    listMock,
+    markNotificationReadMock,
+    notificationsMock,
+    session,
+    signOutMock,
+  };
 }
 
 async function open(user: ReturnType<typeof userEvent.setup>) {
@@ -156,6 +187,29 @@ describe("Workbench experience", () => {
     await open(user);
     expect(await screen.findByRole("alert")).toHaveTextContent("indisponible");
     expect(screen.getByRole("button", { name: "Réessayer" })).toBeVisible();
+  });
+
+  it("BDD-NOT-WEB-001 renders unread state, marks read, and refetches on invalidation", async () => {
+    const user = userEvent.setup();
+    const target = setup();
+    await open(user);
+    expect(await screen.findByText("lifecycle changed")).toBeVisible();
+    expect(screen.getByText(/Non lue/u)).toBeVisible();
+    const callsBeforeInvalidation = target.notificationsMock.mock.calls.length;
+    window.dispatchEvent(new Event("y7:notifications-invalidated"));
+    await vi.waitFor(() => {
+      expect(target.notificationsMock.mock.calls.length).toBeGreaterThan(
+        callsBeforeInvalidation,
+      );
+    });
+    await user.click(screen.getByRole("button", { name: "Marquer comme lue" }));
+    expect(target.markNotificationReadMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaceId: "workspace_1",
+        projectId: "project_1",
+        notificationId: "notification_1",
+      }),
+    );
   });
 
   it("BDD-WORK-WEB-006 executes classification only through the trusted gateway", async () => {

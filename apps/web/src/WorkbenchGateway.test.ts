@@ -3,6 +3,67 @@ import { describe, expect, it, vi } from "vitest";
 import { createHttpWorkbenchGateway } from "./WorkbenchGateway";
 
 describe("HTTP Workbench gateway", () => {
+  it("BDD-NOT-WEB-002 parses the scoped feed and marks one notification read", async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            status: "ok",
+            data: {
+              notifications: [
+                {
+                  id: "notification_1",
+                  feedbackId: "feedback_1",
+                  kind: "lifecycle_changed",
+                  createdAt: "2026-08-28T10:05:00.000Z",
+                  readAt: null,
+                },
+              ],
+            },
+          }),
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            status: "ok",
+            data: {
+              id: "notification_1",
+              readAt: "2026-08-28T10:06:00.000Z",
+            },
+          }),
+        ),
+      );
+    const gateway = createHttpWorkbenchGateway(
+      "https://api.example.test/",
+      () => Promise.resolve("jwt_1"),
+      fetcher,
+    );
+    await expect(
+      gateway.notifications({ workspaceId: "workspace_1", projectId: "project_1" }),
+    ).resolves.toMatchObject({ status: "ok" });
+    await expect(
+      gateway.markNotificationRead({
+        workspaceId: "workspace_1",
+        projectId: "project_1",
+        notificationId: "notification_1",
+        readAt: "2026-08-28T10:06:00.000Z",
+      }),
+    ).resolves.toEqual({
+      status: "ok",
+      result: {
+        id: "notification_1",
+        readAt: "2026-08-28T10:06:00.000Z",
+      },
+    });
+    expect(fetcher).toHaveBeenNthCalledWith(
+      2,
+      "https://api.example.test/v1/workspaces/workspace_1/projects/project_1/operations/notifications/read",
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
   it("BDD-WORK-WEB-001 sends scoped filters with a temporary JWT", async () => {
     const fetcher = vi.fn().mockResolvedValue(
       new Response(
