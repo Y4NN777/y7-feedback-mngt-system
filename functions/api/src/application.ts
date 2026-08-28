@@ -24,6 +24,7 @@ import {
 import { createNodeAppwriteWorkbenchStore } from "./appwrite-workbench-store.js";
 import { createNodeAppwriteWorkbenchMutationStore } from "./appwrite-workbench-mutation-store.js";
 import { createNodeAppwriteExternalIssueStore } from "./appwrite-external-issue-store.js";
+import { createNodeAppwriteProviderIssueOutboxStore } from "./appwrite-provider-issue-outbox-store.js";
 import { createNodeAppwriteReporterConsentVerifier } from "./appwrite-reporter-consent-verifier.js";
 import { createNodeAppwriteProviderGrantVault } from "./appwrite-provider-grant-vault.js";
 import { createNodeAppwriteSourceConnectionStore } from "./appwrite-source-connection-store.js";
@@ -37,6 +38,8 @@ import { createConversationLifecycleCoordinator } from "./conversation-lifecycle
 import { createConversationLifecycleHttp } from "./conversation-lifecycle-http.js";
 import { createGitHubSourceProvider } from "./github-source-provider.js";
 import { createGitLabSourceProvider } from "./gitlab-source-provider.js";
+import { createGitHubIssueProvider } from "./github-issue-provider.js";
+import { createGitLabIssueProvider } from "./gitlab-issue-provider.js";
 import { createAttachmentDownload } from "./attachment-download.js";
 import {
   createAccessProof,
@@ -65,6 +68,8 @@ import { createWorkbenchCoordinator } from "./workbench.js";
 import { createWorkbenchHttp } from "./workbench-http.js";
 import { createExternalIssueCoordinator } from "./external-issue-coordination.js";
 import { createExternalIssueHttp } from "./external-issue-http.js";
+import { createProviderIssueOutboxWorker } from "./provider-issue-outbox.js";
+import { createProviderIssueOutboxHttp } from "./provider-issue-outbox-http.js";
 
 export function digestExternalIssueCommand(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(value)).digest("base64url");
@@ -465,6 +470,41 @@ export function createHttpApplication(
         );
       })()
     : undefined;
+  const providerIssueOutbox =
+    config.providers && config.providerOutboxTriggerSecret
+      ? (() => {
+          const vault = createNodeAppwriteProviderGrantVault(
+            runtime.tables,
+            {
+              databaseId: config.appwriteSchema.databaseId,
+              providerGrantsTableId: config.appwriteSchema.providerGrantsTableId,
+            },
+            Buffer.from(config.providerGrantEnvelopeKey, "base64url"),
+          );
+          return createProviderIssueOutboxHttp(
+            createProviderIssueOutboxWorker({
+              workerId: `${config.environment}-provider-worker`,
+              store: createNodeAppwriteProviderIssueOutboxStore(runtime.tables, {
+                databaseId: config.appwriteSchema.databaseId,
+                providerOutboxTableId: config.appwriteSchema.providerOutboxTableId,
+                externalIssueLinksTableId:
+                  config.appwriteSchema.externalIssueLinksTableId,
+                sourceConnectionsTableId:
+                  config.appwriteSchema.sourceConnectionsTableId,
+              }),
+              providers: [
+                createGitHubIssueProvider(vault),
+                createGitLabIssueProvider(config.providers.gitlab.origin, vault),
+              ],
+              now: () => new Date(runtime.nowIso()),
+              staleAfterMs: 5 * 60 * 1_000,
+              maximumAttempts: 5,
+              retryDelayMs: (attempt) => 2 ** attempt * 1_000,
+            }),
+            config.providerOutboxTriggerSecret,
+          );
+        })()
+      : undefined;
   /* v8 ignore stop */
 
   return {
@@ -484,6 +524,8 @@ export function createHttpApplication(
     ),
     /* v8 ignore next -- both compositions are exercised by deployed environments */
     ...(sourceConnections === undefined ? {} : { sourceConnections }),
+    /* v8 ignore next -- provider worker composition requires deployed provider authority */
+    ...(providerIssueOutbox === undefined ? {} : { providerIssueOutbox }),
     release: config.release,
     startedAt: runtime.startedAt,
     workbench,
