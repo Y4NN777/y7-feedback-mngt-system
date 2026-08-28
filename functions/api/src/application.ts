@@ -195,6 +195,20 @@ export function createHttpApplication(
         digest: (command) =>
           createHash("sha256").update(JSON.stringify(command)).digest("base64url"),
         now: runtime.nowIso,
+        notifyAssignmentCommitted: async (input) => {
+          await conversationNotifications.reconcile({
+            feedbackId: input.feedbackId,
+            actorId: input.actorId,
+            actorKind: "workspace",
+            command: {
+              kind: "assignment_changed",
+              eventId: input.eventId,
+              actorId: input.actorId,
+              actorKind: "workspace",
+              occurredAt: input.occurredAt,
+            },
+          });
+        },
       },
     ),
   );

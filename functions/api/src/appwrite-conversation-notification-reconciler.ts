@@ -13,7 +13,16 @@ import type {
 } from "./notification-materializer.js";
 import { createNotificationMaterializer } from "./notification-materializer.js";
 
-type ConversationCommand = AppendConversationCommand | LifecycleTransitionCommand;
+type ConversationCommand =
+  | AppendConversationCommand
+  | LifecycleTransitionCommand
+  | {
+      readonly kind: "assignment_changed";
+      readonly eventId: string;
+      readonly actorId: string;
+      readonly actorKind: "workspace";
+      readonly occurredAt: string;
+    };
 
 export interface ConversationNotificationInput {
   readonly feedbackId: string;
@@ -149,11 +158,13 @@ export function createAppwriteConversationNotificationReconciler(
       }
       const command = input.command;
       const kind: NotificationSourceFact["kind"] =
-        command.kind === "append_internal_note"
-          ? "internal_note"
-          : command.kind === "append_message"
-            ? "conversation_message"
-            : "lifecycle_changed";
+        command.kind === "assignment_changed"
+          ? "assignment_changed"
+          : command.kind === "append_internal_note"
+            ? "internal_note"
+            : command.kind === "append_message"
+              ? "conversation_message"
+              : "lifecycle_changed";
       const visibility =
         command.kind === "append_internal_note" ||
         (command.kind === "append_message" && command.audience === "workspace")

@@ -75,6 +75,12 @@ export function createWorkbenchCoordinator(
   dependencies: {
     readonly digest: (value: unknown) => string;
     readonly now: () => string;
+    readonly notifyAssignmentCommitted?: (input: {
+      readonly feedbackId: string;
+      readonly actorId: string;
+      readonly eventId: string;
+      readonly occurredAt: string;
+    }) => Promise<void>;
   },
 ): WorkbenchCoordinator {
   async function authorize(input: {
@@ -141,17 +147,34 @@ export function createWorkbenchCoordinator(
       const authorization = await authorize(input);
       if (authorization.status !== "authorized") return authorization;
       try {
+        const occurredAt = dependencies.now();
+        const result = await mutations.execute({
+          actor: authorization.actor,
+          workspaceId: input.workspaceId,
+          projectId: input.projectId,
+          feedbackId: input.feedbackId,
+          command,
+          payloadDigest: dependencies.digest(command),
+          occurredAt,
+        });
+        if (
+          command.kind === "assign_feedback" ||
+          command.kind === "unassign_feedback"
+        ) {
+          try {
+            await dependencies.notifyAssignmentCommitted?.({
+              feedbackId: input.feedbackId,
+              actorId: authorization.actor.principalId,
+              eventId: command.operationId,
+              occurredAt,
+            });
+          } catch {
+            // The assignment fact committed; reconciliation retries independently.
+          }
+        }
         return {
           status: "ok",
-          result: await mutations.execute({
-            actor: authorization.actor,
-            workspaceId: input.workspaceId,
-            projectId: input.projectId,
-            feedbackId: input.feedbackId,
-            command,
-            payloadDigest: dependencies.digest(command),
-            occurredAt: dependencies.now(),
-          }),
+          result,
         };
       } catch (error: unknown) {
         return failure(error);

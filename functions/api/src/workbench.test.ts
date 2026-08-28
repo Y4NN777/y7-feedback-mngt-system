@@ -107,6 +107,57 @@ describe("Workbench coordinator", () => {
     );
   });
 
+  it("BDD-NOT-RECON-005 reconciles assignment after commit and tolerates delivery failure", async () => {
+    const execute = vi.fn().mockResolvedValue({
+      status: "applied",
+      feedbackId: "feedback_1",
+      action: "assign_feedback",
+    });
+    const notifyAssignmentCommitted = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("notification unavailable"));
+    const coordinator = createWorkbenchCoordinator(
+      {
+        verify: vi
+          .fn()
+          .mockResolvedValue({ status: "verified", principalId: "owner_1" }),
+      },
+      {
+        resolve: vi.fn().mockResolvedValue({
+          status: "authorized",
+          actor,
+          project: { id: "project_1", workspaceId: "workspace_1", active: true },
+        }),
+      },
+      { list: vi.fn(), read: vi.fn() },
+      { execute },
+      {
+        digest: () => "digest_1234567890",
+        now: () => "2026-08-28T10:00:00.000Z",
+        notifyAssignmentCommitted,
+      },
+    );
+    await expect(
+      coordinator.execute({
+        jwt: "jwt_1",
+        workspaceId: "workspace_1",
+        projectId: "project_1",
+        feedbackId: "feedback_1",
+        command: {
+          kind: "assign_feedback",
+          operationId: "operation_1",
+          maintainerId: "maintainer_1",
+        },
+      }),
+    ).resolves.toMatchObject({ status: "ok" });
+    expect(notifyAssignmentCommitted).toHaveBeenCalledWith({
+      feedbackId: "feedback_1",
+      actorId: "owner_1",
+      eventId: "operation_1",
+      occurredAt: "2026-08-28T10:00:00.000Z",
+    });
+  });
+
   it("covers reads, parser variants, scope denial and stable failures", async () => {
     const store: WorkbenchStore = {
       list: vi.fn().mockRejectedValue(new Error("transport")),

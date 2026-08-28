@@ -123,6 +123,27 @@ describe("Appwrite conversation notification reconciliation", () => {
     ]);
   });
 
+  it("BDD-NOT-RECON-005 derives the new assignment and excludes its actor", async () => {
+    const target = setup();
+    await expect(
+      target.reconciler.reconcile({
+        feedbackId: "feedback_1",
+        actorId: "owner_1",
+        actorKind: "workspace",
+        command: {
+          kind: "assignment_changed",
+          eventId: "assignment_1",
+          actorId: "owner_1",
+          actorKind: "workspace",
+          occurredAt: "2026-08-28T12:01:30.000Z",
+        },
+      }),
+    ).resolves.toEqual({ status: "materialized", count: 2 });
+    expect(
+      target.commit.mock.calls.map(([value]) => value.notification.recipientId),
+    ).toEqual(["reporter_1", "maintainer_1"]);
+  });
+
   it("BDD-NOT-RECON-003 fails closed for missing owner or ambiguous grant", async () => {
     const target = setup();
     target.listRows.mockReset();
