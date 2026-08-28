@@ -88,6 +88,10 @@ describe("Appwrite infrastructure manifest", () => {
       [schema.attachmentsTableId, ["objectId"]],
       [schema.sourceConnectionsTableId, ["projectId", "provider"]],
       [schema.sourceConnectionsTableId, ["workspaceId", "status"]],
+      [
+        schema.sourceConnectionsTableId,
+        ["ownerUserId", "workspaceId", "projectId", "status"],
+      ],
       [schema.administrationAuditTableId, ["workspaceId", "projectId", "occurredAt"]],
       [schema.administrationAuditTableId, ["operationId"]],
       [schema.administrationIdempotencyTableId, ["workspaceId", "operationId"]],
