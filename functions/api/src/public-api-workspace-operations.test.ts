@@ -25,6 +25,7 @@ function setup(outcome: "ok" | "denied" | "retryable" = "ok") {
     searchFeedback: method,
     aggregateFeedback: method,
     listNotifications: method,
+    markNotificationRead: method,
     authorizeRealtime: method,
   };
   const api = createPublicApi(
@@ -62,6 +63,13 @@ describe("trusted Workspace operation HTTP boundary", () => {
     ["feedback/search", { query: "feedback" }],
     ["feedback/aggregate", {}],
     ["notifications/list", {}],
+    [
+      "notifications/read",
+      {
+        notificationId: "notification-a",
+        readAt: "2026-08-28T12:00:00.000Z",
+      },
+    ],
     ["realtime/authorize", {}],
   ])(
     "BDD-OWN-FUNCTION-001 dispatches %s with bearer and route scope",

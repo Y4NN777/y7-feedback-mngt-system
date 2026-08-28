@@ -192,15 +192,15 @@ describe("Appwrite Workspace Project operation ports", () => {
       .mockResolvedValueOnce({
         rows: [
           {
-            $id: "feedback-alpha",
+            $id: "notification-a",
+            feedbackId: "feedback-alpha",
+            recipientId: "user-a",
             workspaceId: "workspace-a",
             projectId: "project-a",
+            kind: "lifecycle_changed",
+            createdAt: "2026-08-28T12:00:00.000Z",
           },
         ],
-        total: 1,
-      })
-      .mockResolvedValueOnce({
-        rows: [{ $id: "notification-a", feedbackId: "feedback-alpha" }],
         total: 1,
       });
 
@@ -211,7 +211,15 @@ describe("Appwrite Workspace Project operation ports", () => {
       count: 7,
     });
     await expect(target.ports.notifications.list(scope)).resolves.toEqual({
-      ids: ["notification-a"],
+      notifications: [
+        {
+          id: "notification-a",
+          feedbackId: "feedback-alpha",
+          kind: "lifecycle_changed",
+          createdAt: "2026-08-28T12:00:00.000Z",
+          readAt: null,
+        },
+      ],
     });
     await expect(target.ports.realtime.authorize(scope)).resolves.toEqual({
       channel: "workspace.workspace-a.project.project-a",
@@ -243,6 +251,60 @@ describe("Appwrite Workspace Project operation ports", () => {
       transactionId: "transaction-a",
       rollback: true,
     });
+  });
+
+  it("BDD-NOT-FEED-001 marks only the current principal scoped notification read", async () => {
+    const target = setup();
+    target.listRows
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            $id: "notification-a",
+            feedbackId: "feedback-a",
+            recipientId: scope.principalId,
+            workspaceId: scope.workspaceId,
+            projectId: scope.projectId,
+          },
+        ],
+        total: 1,
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            $id: "feedback-a",
+            workspaceId: scope.workspaceId,
+            projectId: scope.projectId,
+          },
+        ],
+        total: 1,
+      });
+    await expect(
+      target.ports.notifications.markRead(
+        scope,
+        "notification-a",
+        "2026-08-28T12:30:00.000Z",
+      ),
+    ).resolves.toEqual({
+      id: "notification-a",
+      readAt: "2026-08-28T12:30:00.000Z",
+    });
+    expect(target.updateRow).toHaveBeenCalledWith({
+      databaseId: "feedback",
+      tableId: "notifications",
+      rowId: "notification-a",
+      data: { readAt: "2026-08-28T12:30:00.000Z" },
+      transactionId: "transaction-a",
+    });
+
+    const denied = setup();
+    denied.listRows.mockResolvedValueOnce({ rows: [], total: 0 });
+    await expect(
+      denied.ports.notifications.markRead(
+        scope,
+        "notification-a",
+        "2026-08-28T12:30:00.000Z",
+      ),
+    ).rejects.toThrow(new WorkspaceOperationDeniedError());
   });
 
   it("BDD-OWN-FUNCTION-002 fails closed if a scoped query returns a foreign row", async () => {
@@ -384,7 +446,9 @@ describe("Appwrite Workspace Project operation ports", () => {
     }
 
     const empty = setup();
-    await expect(empty.ports.notifications.list(scope)).resolves.toEqual({ ids: [] });
+    await expect(empty.ports.notifications.list(scope)).resolves.toEqual({
+      notifications: [],
+    });
 
     const badFeedback = setup();
     badFeedback.listRows.mockResolvedValueOnce({ rows: [{}], total: 1 });
@@ -392,25 +456,23 @@ describe("Appwrite Workspace Project operation ports", () => {
       "APPWRITE_WORKSPACE_OPERATION_UNAVAILABLE",
     );
 
+    const validNotification = {
+      $id: "notification-a",
+      feedbackId: "feedback-a",
+      recipientId: scope.principalId,
+      workspaceId: scope.workspaceId,
+      projectId: scope.projectId,
+      kind: "conversation_message",
+      createdAt: "2026-08-28T12:00:00.000Z",
+    };
     for (const notification of [
       {},
-      { $id: "bad id", feedbackId: "feedback-a" },
-      { $id: "notification-a", feedbackId: 7 },
-      { $id: "notification-a", feedbackId: "feedback-b" },
+      { ...validNotification, $id: "bad id" },
+      { ...validNotification, feedbackId: 7 },
+      { ...validNotification, feedbackId: "feedback-b", recipientId: "user-b" },
     ]) {
       const target = setup();
-      target.listRows
-        .mockResolvedValueOnce({
-          rows: [
-            {
-              $id: "feedback-a",
-              workspaceId: scope.workspaceId,
-              projectId: scope.projectId,
-            },
-          ],
-          total: 1,
-        })
-        .mockResolvedValueOnce({ rows: [notification], total: 1 });
+      target.listRows.mockResolvedValueOnce({ rows: [notification], total: 1 });
       await expect(target.ports.notifications.list(scope)).rejects.toThrow(
         "APPWRITE_WORKSPACE_OPERATION_UNAVAILABLE",
       );

@@ -33,6 +33,11 @@ export interface WorkspaceFeedbackPort {
 
 export interface WorkspaceNotificationPort {
   list(scope: ScopedProjectIdentity): Promise<unknown>;
+  markRead(
+    scope: ScopedProjectIdentity,
+    notificationId: string,
+    readAt: string,
+  ): Promise<unknown>;
 }
 
 export interface WorkspaceRealtimePort {
@@ -75,6 +80,12 @@ export interface WorkspaceProjectOperations {
   ): Promise<WorkspaceOperationOutcome>;
   listNotifications(
     request: WorkspaceProjectRequest,
+  ): Promise<WorkspaceOperationOutcome>;
+  markNotificationRead(
+    request: WorkspaceProjectRequest & {
+      readonly notificationId: string;
+      readonly readAt: string;
+    },
   ): Promise<WorkspaceOperationOutcome>;
   authorizeRealtime(
     request: WorkspaceProjectRequest,
@@ -150,6 +161,10 @@ export function createWorkspaceProjectOperations(
       ),
     listNotifications: (request) =>
       execute(request, "notification.read", (scope) => ports.notifications.list(scope)),
+    markNotificationRead: (request) =>
+      execute(request, "notification.read", (scope) =>
+        ports.notifications.markRead(scope, request.notificationId, request.readAt),
+      ),
     authorizeRealtime: (request) =>
       execute(request, "realtime.subscribe", (scope) =>
         ports.realtime.authorize(scope),

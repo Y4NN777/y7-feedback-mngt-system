@@ -294,43 +294,93 @@ export function createAppwriteWorkspaceProjectOperationPorts(
     notifications: {
       async list(scope) {
         validateScope(scope);
-        const feedback = await tables.listRows({
-          databaseId: schema.databaseId,
-          tableId: schema.feedbackTableId,
-          queries: [...scopeQueries(scope, queries), queries.limit(100)],
-          total: false,
-          ttl: 0,
-        });
-        const feedbackIds = feedback.rows.map((row) =>
-          exactScopedFeedbackId(row, scope),
-        );
-        if (feedbackIds.some((id) => id === undefined)) {
-          throw new Error("APPWRITE_WORKSPACE_OPERATION_UNAVAILABLE");
-        }
-        const safeFeedbackIds = feedbackIds.filter(
-          (id): id is string => id !== undefined,
-        );
-        if (safeFeedbackIds.length === 0) return { ids: [] };
         const result = await tables.listRows({
           databaseId: schema.databaseId,
           tableId: schema.notificationsTableId,
-          queries: [queries.equal("feedbackId", safeFeedbackIds), queries.limit(100)],
+          queries: [
+            queries.equal("recipientId", [scope.principalId]),
+            ...scopeQueries(scope, queries),
+            queries.limit(100),
+          ],
           total: false,
           ttl: 0,
         });
-        const ids = result.rows.map((row) => {
+        const notifications = result.rows.map((row) => {
           const id = exactId(row);
+          const readAt = isObject(row) ? row.readAt : undefined;
           return isObject(row) &&
             id !== undefined &&
             typeof row.feedbackId === "string" &&
-            safeFeedbackIds.includes(row.feedbackId)
-            ? id
+            appwriteId.test(row.feedbackId) &&
+            row.recipientId === scope.principalId &&
+            row.workspaceId === scope.workspaceId &&
+            row.projectId === scope.projectId &&
+            typeof row.kind === "string" &&
+            typeof row.createdAt === "string" &&
+            (readAt === undefined || typeof readAt === "string")
+            ? {
+                id,
+                feedbackId: row.feedbackId,
+                kind: row.kind,
+                createdAt: row.createdAt,
+                readAt: typeof readAt === "string" ? readAt : null,
+              }
             : undefined;
         });
-        if (ids.some((id) => id === undefined)) {
+        if (notifications.some((notification) => notification === undefined)) {
           throw new Error("APPWRITE_WORKSPACE_OPERATION_UNAVAILABLE");
         }
-        return { ids: ids.filter((id): id is string => id !== undefined) };
+        return {
+          notifications: notifications.filter(
+            (notification): notification is NonNullable<typeof notification> =>
+              notification !== undefined,
+          ),
+        };
+      },
+      async markRead(scope, notificationId, readAt) {
+        validateScope(scope);
+        if (
+          !appwriteId.test(notificationId) ||
+          !Number.isFinite(Date.parse(readAt)) ||
+          new Date(Date.parse(readAt)).toISOString() !== readAt
+        ) {
+          throw new Error("APPWRITE_WORKSPACE_OPERATION_INPUT_INVALID");
+        }
+        const matches = await tables.listRows({
+          databaseId: schema.databaseId,
+          tableId: schema.notificationsTableId,
+          queries: [
+            queries.equal("$id", [notificationId]),
+            queries.equal("recipientId", [scope.principalId]),
+            ...scopeQueries(scope, queries),
+            queries.limit(2),
+          ],
+          total: false,
+          ttl: 0,
+        });
+        if (matches.rows.length !== 1) throw new WorkspaceOperationDeniedError();
+        const row = matches.rows[0];
+        if (
+          !isObject(row) ||
+          exactId(row) !== notificationId ||
+          row.recipientId !== scope.principalId ||
+          row.workspaceId !== scope.workspaceId ||
+          row.projectId !== scope.projectId ||
+          typeof row.feedbackId !== "string" ||
+          !appwriteId.test(row.feedbackId)
+        ) {
+          throw new WorkspaceOperationDeniedError();
+        }
+        await mutate(scope, row.feedbackId, (transactionId) =>
+          tables.updateRow({
+            databaseId: schema.databaseId,
+            tableId: schema.notificationsTableId,
+            rowId: notificationId,
+            data: { readAt },
+            transactionId,
+          }),
+        );
+        return { id: notificationId, readAt };
       },
     },
     realtime: {

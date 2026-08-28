@@ -74,12 +74,13 @@ const projectPath = /^\/v1\/projects\/([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)$/u;
 const workspaceAttachmentPath =
   /^\/v1\/workspaces\/([A-Za-z0-9][A-Za-z0-9._-]{0,35})\/projects\/([A-Za-z0-9][A-Za-z0-9._-]{0,35})\/attachments\/download$/u;
 const workspaceOperationPath =
-  /^\/v1\/workspaces\/([A-Za-z0-9][A-Za-z0-9._-]{0,35})\/projects\/([A-Za-z0-9][A-Za-z0-9._-]{0,35})\/operations\/(feedback\/(?:read|search|aggregate)|notifications\/list|realtime\/authorize)$/u;
+  /^\/v1\/workspaces\/([A-Za-z0-9][A-Za-z0-9._-]{0,35})\/projects\/([A-Za-z0-9][A-Za-z0-9._-]{0,35})\/operations\/(feedback\/(?:read|search|aggregate)|notifications\/(?:list|read)|realtime\/authorize)$/u;
 type WorkspaceOperationAction =
   | "feedback/read"
   | "feedback/search"
   | "feedback/aggregate"
   | "notifications/list"
+  | "notifications/read"
   | "realtime/authorize";
 const appwriteId = /^[A-Za-z0-9][A-Za-z0-9._-]{0,35}$/u;
 
@@ -320,6 +321,20 @@ export function createPublicApi(
             }
             case "notifications/list": {
               outcome = await workspaceOperations.listNotifications(scoped);
+              break;
+            }
+            case "notifications/read": {
+              const notificationId = requiredString(
+                body.notificationId,
+                36,
+                "WORKSPACE_OPERATION_INVALID",
+              );
+              if (!appwriteId.test(notificationId)) throw new Error("INVALID");
+              outcome = await workspaceOperations.markNotificationRead({
+                ...scoped,
+                notificationId,
+                readAt: requiredString(body.readAt, 40, "WORKSPACE_OPERATION_INVALID"),
+              });
               break;
             }
             case "realtime/authorize": {
