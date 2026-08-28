@@ -48,6 +48,7 @@ function clients() {
       createIntegerColumn: vi.fn(),
       createTextColumn: vi.fn(),
       createVarcharColumn: vi.fn(),
+      createIndex: vi.fn(),
     },
     storage: {
       getBucket: vi.fn(),
@@ -505,6 +506,38 @@ describe("Node Appwrite provisioning adapter", () => {
       encryption: true,
       antivirus: true,
       transformations: false,
+    });
+  });
+
+  it("BDD-INFRA-014 creates key and unique indexes with their exact columns", async () => {
+    const sdk = clients();
+    const port = createNodeAppwriteProvisioningPort(sdk.tables, sdk.storage);
+    sdk.tables.createIndex.mockResolvedValue({});
+
+    await port.createIndex("feedback", "access_grants", {
+      key: "feedback",
+      type: "key",
+      columns: ["feedbackId"],
+    });
+    await port.createIndex("feedback", "notifications", {
+      key: "event_recipient",
+      type: "unique",
+      columns: ["eventId", "recipientId"],
+    });
+
+    expect(sdk.tables.createIndex).toHaveBeenNthCalledWith(1, {
+      databaseId: "feedback",
+      tableId: "access_grants",
+      key: "feedback",
+      type: "key",
+      columns: ["feedbackId"],
+    });
+    expect(sdk.tables.createIndex).toHaveBeenNthCalledWith(2, {
+      databaseId: "feedback",
+      tableId: "notifications",
+      key: "event_recipient",
+      type: "unique",
+      columns: ["eventId", "recipientId"],
     });
   });
 

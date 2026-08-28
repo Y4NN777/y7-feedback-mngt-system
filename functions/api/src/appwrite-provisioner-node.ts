@@ -1,4 +1,4 @@
-import { Compression } from "node-appwrite";
+import { Compression, TablesDBIndexType } from "node-appwrite";
 
 import type {
   AppwriteProvisioningPort,
@@ -61,6 +61,13 @@ interface TablesAdminClient {
     readonly size: number;
     readonly required: boolean;
     readonly encrypt?: boolean;
+  }): Promise<unknown>;
+  createIndex(input: {
+    readonly databaseId: string;
+    readonly tableId: string;
+    readonly key: string;
+    readonly type: TablesDBIndexType;
+    readonly columns: string[];
   }): Promise<unknown>;
 }
 
@@ -269,6 +276,18 @@ export function createNodeAppwriteProvisioningPort(
           });
           return;
       }
+    },
+    async createIndex(databaseId, tableId, definition) {
+      await tables.createIndex({
+        databaseId,
+        tableId,
+        key: definition.key,
+        type:
+          definition.type === "unique"
+            ? TablesDBIndexType.Unique
+            : TablesDBIndexType.Key,
+        columns: [...definition.columns],
+      });
     },
     getBucket: (bucketId) => optional(storage.getBucket({ bucketId }), bucket),
     async createBucket(definition) {

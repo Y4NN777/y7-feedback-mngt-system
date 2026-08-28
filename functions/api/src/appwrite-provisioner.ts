@@ -44,6 +44,11 @@ export interface AppwriteProvisioningPort {
     tableId: string,
     definition: AppwriteColumn,
   ): Promise<void>;
+  createIndex(
+    databaseId: string,
+    tableId: string,
+    definition: AppwriteIndex,
+  ): Promise<void>;
   getBucket(bucketId: string): Promise<ExistingAppwriteBucket | null>;
   createBucket(definition: ExistingAppwriteBucket): Promise<void>;
 }
@@ -84,11 +89,18 @@ function assertConforming(
   }
 }
 
-function additiveColumns(
+function additiveTableChanges(
   actual: ExistingAppwriteTable,
   expected: ExistingAppwriteTable,
-): readonly AppwriteColumn[] {
-  const actualBase = { ...actual, columns: expected.columns };
+): {
+  readonly columns: readonly AppwriteColumn[];
+  readonly indexes: readonly AppwriteIndex[];
+} {
+  const actualBase = {
+    ...actual,
+    columns: expected.columns,
+    indexes: expected.indexes,
+  };
   if (canonical(actualBase) !== canonical(expected)) {
     throw new Error(`APPWRITE_INFRASTRUCTURE_DRIFT:table:${expected.id}`);
   }
@@ -99,12 +111,25 @@ function additiveColumns(
       throw new Error(`APPWRITE_INFRASTRUCTURE_DRIFT:table:${expected.id}`);
     }
   }
-  const present = new Set(actual.columns.map((column) => column.key));
-  const missing = expected.columns.filter((column) => !present.has(column.key));
-  if (missing.some((column) => column.required)) {
+  const presentColumns = new Set(actual.columns.map((column) => column.key));
+  const missingColumns = expected.columns.filter(
+    (column) => !presentColumns.has(column.key),
+  );
+  if (missingColumns.some((column) => column.required)) {
     throw new Error(`APPWRITE_INFRASTRUCTURE_DRIFT:table:${expected.id}`);
   }
-  return missing;
+  const targetIndexes = new Map(expected.indexes.map((index) => [index.key, index]));
+  for (const index of actual.indexes) {
+    const definition = targetIndexes.get(index.key);
+    if (definition === undefined || canonical(index) !== canonical(definition)) {
+      throw new Error(`APPWRITE_INFRASTRUCTURE_DRIFT:table:${expected.id}`);
+    }
+  }
+  const presentIndexes = new Set(actual.indexes.map((index) => index.key));
+  return {
+    columns: missingColumns,
+    indexes: expected.indexes.filter((index) => !presentIndexes.has(index.key)),
+  };
 }
 
 export async function provisionAppwriteInfrastructure(
@@ -119,6 +144,7 @@ export async function provisionAppwriteInfrastructure(
     })),
   );
   const pendingColumns = new Map<string, readonly AppwriteColumn[]>();
+  const pendingIndexes = new Map<string, readonly AppwriteIndex[]>();
   const bucket = await port.getBucket(manifest.attachmentBucket.id);
 
   if (database) {
@@ -126,10 +152,9 @@ export async function provisionAppwriteInfrastructure(
   }
   for (const candidate of tables) {
     if (candidate.existing) {
-      pendingColumns.set(
-        candidate.definition.id,
-        additiveColumns(candidate.existing, candidate.definition),
-      );
+      const changes = additiveTableChanges(candidate.existing, candidate.definition);
+      pendingColumns.set(candidate.definition.id, changes.columns);
+      pendingIndexes.set(candidate.definition.id, changes.indexes);
     }
   }
   if (bucket) {
@@ -155,6 +180,12 @@ export async function provisionAppwriteInfrastructure(
   for (const [tableId, columns] of pendingColumns) {
     for (const column of columns) {
       await port.createColumn(manifest.database.id, tableId, column);
+      created += 1;
+    }
+  }
+  for (const [tableId, indexes] of pendingIndexes) {
+    for (const index of indexes) {
+      await port.createIndex(manifest.database.id, tableId, index);
       created += 1;
     }
   }

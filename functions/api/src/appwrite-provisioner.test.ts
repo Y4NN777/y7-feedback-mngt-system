@@ -77,6 +77,18 @@ class MemoryProvisioningPort implements AppwriteProvisioningPort {
     return Promise.resolve();
   }
 
+  createIndex(
+    _databaseId: string,
+    tableId: string,
+    definition: ExistingAppwriteTable["indexes"][number],
+  ) {
+    this.mutations.push(`index:${tableId}:${definition.key}`);
+    const table = this.tables.get(tableId);
+    if (!table) throw new Error("missing table");
+    this.tables.set(tableId, { ...table, indexes: [...table.indexes, definition] });
+    return Promise.resolve();
+  }
+
   async getBucket() {
     return Promise.resolve(this.bucket);
   }
@@ -159,6 +171,24 @@ describe("Appwrite infrastructure provisioner", () => {
     ]);
   });
 
+  it("BDD-INFRA-014 applies only missing indexes to an existing table", async () => {
+    const port = new MemoryProvisioningPort();
+    const manifest = createAppwriteInfrastructureManifest(schema);
+    await provisionAppwriteInfrastructure(port, manifest);
+    const grants = port.tables.get("access_grants");
+    if (!grants) throw new Error("test manifest lacks access grants");
+    port.tables.set("access_grants", {
+      ...grants,
+      indexes: grants.indexes.filter(({ key }) => key !== "feedback"),
+    });
+    port.mutations.length = 0;
+
+    await expect(
+      provisionAppwriteInfrastructure(port, manifest),
+    ).resolves.toMatchObject({ created: 1 });
+    expect(port.mutations).toEqual(["index:access_grants:feedback"]);
+  });
+
   it("rejects database, unknown-column and missing required-column drift", async () => {
     const manifest = createAppwriteInfrastructureManifest(schema);
     const databaseDrift = new MemoryProvisioningPort();
@@ -178,6 +208,22 @@ describe("Appwrite infrastructure provisioner", () => {
     await expect(
       provisionAppwriteInfrastructure(unknownColumn, manifest),
     ).rejects.toThrow("APPWRITE_INFRASTRUCTURE_DRIFT:table:feedback_items");
+
+    const changedIndex = new MemoryProvisioningPort();
+    await provisionAppwriteInfrastructure(changedIndex, manifest);
+    const grants = changedIndex.tables.get("access_grants");
+    if (!grants) throw new Error("test manifest lacks access grants");
+    changedIndex.tables.set("access_grants", {
+      ...grants,
+      indexes: grants.indexes.map((definition) =>
+        definition.key === "feedback"
+          ? { ...definition, type: "unique" as const }
+          : definition,
+      ),
+    });
+    await expect(
+      provisionAppwriteInfrastructure(changedIndex, manifest),
+    ).rejects.toThrow("APPWRITE_INFRASTRUCTURE_DRIFT:table:access_grants");
 
     const requiredColumn = new MemoryProvisioningPort();
     await provisionAppwriteInfrastructure(requiredColumn, manifest);
