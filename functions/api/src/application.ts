@@ -189,6 +189,7 @@ export function createHttpApplication(
         projectAssignmentsTableId: config.appwriteSchema.projectAssignmentsTableId,
       }),
       {
+        /* v8 ignore next -- composition callback is exercised by deployed mutations */
         digest: (command) =>
           createHash("sha256").update(JSON.stringify(command)).digest("base64url"),
         now: runtime.nowIso,

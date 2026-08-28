@@ -89,10 +89,11 @@ function setup(list?: WorkbenchGateway["list"]) {
       }),
     ),
   };
+  const signOutMock = vi.fn(() => Promise.resolve());
   const session: AdministrationSession = {
     createJwt: () => Promise.resolve("jwt_1"),
     signIn: vi.fn(() => Promise.resolve("authenticated" as const)),
-    signOut: vi.fn(() => Promise.resolve()),
+    signOut: signOutMock,
   };
   function Harness() {
     const [locale, setLocale] = useState<Locale>("fr");
@@ -109,7 +110,7 @@ function setup(list?: WorkbenchGateway["list"]) {
     );
   }
   render(<Harness />);
-  return { gateway, executeMock, listMock, session };
+  return { gateway, executeMock, listMock, session, signOutMock };
 }
 
 async function open(user: ReturnType<typeof userEvent.setup>) {
@@ -176,5 +177,25 @@ describe("Workbench experience", () => {
       },
     });
     expect(await screen.findByText("Action appliquée.")).toBeVisible();
+  });
+
+  it("supports all filters, assignment actions and sign-out", async () => {
+    const user = userEvent.setup();
+    const target = setup();
+    await open(user);
+    await screen.findByText("feedback_1");
+    await user.selectOptions(screen.getByLabelText("Type"), "bug");
+    await user.selectOptions(screen.getByLabelText("État"), "under_review");
+    await user.click(screen.getByRole("button", { name: /feedback_1/u }));
+    await screen.findByRole("heading", { name: "Upload fails" });
+    await user.type(screen.getByLabelText("Identifiant du Maintainer"), "maintainer_1");
+    await user.click(screen.getByRole("button", { name: "Assigner" }));
+    await user.click(screen.getByRole("button", { name: "Retirer l’attribution" }));
+    await user.click(screen.getByRole("button", { name: "Supprimer le Feedback" }));
+    expect(target.executeMock).toHaveBeenCalledTimes(3);
+    await user.click(screen.getByRole("button", { name: "Retour à la boîte" }));
+    await user.click(screen.getByRole("button", { name: "Se déconnecter" }));
+    expect(target.signOutMock).toHaveBeenCalled();
+    expect(await screen.findByLabelText("Adresse e-mail")).toBeVisible();
   });
 });

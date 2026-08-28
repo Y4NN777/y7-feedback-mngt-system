@@ -132,6 +132,34 @@ describe("Node Appwrite provisioning adapter", () => {
       type: "datetime",
       required: false,
     });
+    await port.createColumn("feedback", "feedback_items", {
+      key: "active",
+      type: "boolean",
+      required: false,
+    });
+    await port.createColumn("feedback", "feedback_items", {
+      key: "count",
+      type: "integer",
+      required: false,
+    });
+    await port.createColumn("feedback", "feedback_items", {
+      key: "secret",
+      type: "text",
+      required: false,
+      encrypt: true,
+    });
+    await port.createColumn("feedback", "feedback_items", {
+      key: "description",
+      type: "text",
+      required: false,
+    });
+    await port.createColumn("feedback", "feedback_items", {
+      key: "proof",
+      type: "varchar",
+      size: 128,
+      required: false,
+      encrypt: true,
+    });
     expect(sdk.tables.createVarcharColumn).toHaveBeenCalledWith({
       databaseId: "feedback",
       tableId: "feedback_items",
@@ -145,6 +173,18 @@ describe("Node Appwrite provisioning adapter", () => {
       key: "deletedAt",
       required: false,
     });
+    expect(sdk.tables.createBooleanColumn).toHaveBeenCalledWith(
+      expect.objectContaining({ key: "active" }),
+    );
+    expect(sdk.tables.createIntegerColumn).toHaveBeenCalledWith(
+      expect.objectContaining({ key: "count" }),
+    );
+    expect(sdk.tables.createTextColumn).toHaveBeenCalledWith(
+      expect.objectContaining({ key: "secret", encrypt: true }),
+    );
+    expect(sdk.tables.createVarcharColumn).toHaveBeenCalledWith(
+      expect.objectContaining({ key: "proof", encrypt: true }),
+    );
   });
 
   it("BDD-INFRA-010 normalizes SDK metadata before drift comparison", async () => {

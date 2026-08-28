@@ -159,6 +159,36 @@ describe("Appwrite infrastructure provisioner", () => {
     ]);
   });
 
+  it("rejects database, unknown-column and missing required-column drift", async () => {
+    const manifest = createAppwriteInfrastructureManifest(schema);
+    const databaseDrift = new MemoryProvisioningPort();
+    databaseDrift.database = { ...manifest.database, name: "Wrong" };
+    await expect(
+      provisionAppwriteInfrastructure(databaseDrift, manifest),
+    ).rejects.toThrow("APPWRITE_INFRASTRUCTURE_DRIFT:database:feedback");
+
+    const unknownColumn = new MemoryProvisioningPort();
+    await provisionAppwriteInfrastructure(unknownColumn, manifest);
+    const feedback = unknownColumn.tables.get("feedback_items");
+    if (!feedback) throw new Error("test manifest lacks feedback");
+    unknownColumn.tables.set("feedback_items", {
+      ...feedback,
+      columns: [...feedback.columns, { key: "unknown", type: "text", required: false }],
+    });
+    await expect(
+      provisionAppwriteInfrastructure(unknownColumn, manifest),
+    ).rejects.toThrow("APPWRITE_INFRASTRUCTURE_DRIFT:table:feedback_items");
+
+    const requiredColumn = new MemoryProvisioningPort();
+    await provisionAppwriteInfrastructure(requiredColumn, manifest);
+    const projects = requiredColumn.tables.get("projects");
+    if (!projects) throw new Error("test manifest lacks projects");
+    requiredColumn.tables.set("projects", { ...projects, columns: [] });
+    await expect(
+      provisionAppwriteInfrastructure(requiredColumn, manifest),
+    ).rejects.toThrow("APPWRITE_INFRASTRUCTURE_DRIFT:table:projects");
+  });
+
   it("BDD-INFRA-012 redacts unexpected SDK errors", () => {
     expect(
       safeAppwriteProvisioningErrorCode(
