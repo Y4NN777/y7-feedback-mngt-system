@@ -65,6 +65,18 @@ class MemoryProvisioningPort implements AppwriteProvisioningPort {
     return Promise.resolve();
   }
 
+  createColumn(
+    _databaseId: string,
+    tableId: string,
+    definition: ExistingAppwriteTable["columns"][number],
+  ) {
+    this.mutations.push(`column:${tableId}:${definition.key}`);
+    const table = this.tables.get(tableId);
+    if (!table) throw new Error("missing table");
+    this.tables.set(tableId, { ...table, columns: [...table.columns, definition] });
+    return Promise.resolve();
+  }
+
   async getBucket() {
     return Promise.resolve(this.bucket);
   }
@@ -122,6 +134,29 @@ describe("Appwrite infrastructure provisioner", () => {
       "APPWRITE_INFRASTRUCTURE_DRIFT:table:projects",
     );
     expect(port.mutations).toEqual([]);
+  });
+
+  it("BDD-INFRA-013 applies only missing optional columns to an existing table", async () => {
+    const port = new MemoryProvisioningPort();
+    const manifest = createAppwriteInfrastructureManifest(schema);
+    await provisionAppwriteInfrastructure(port, manifest);
+    const feedback = port.tables.get("feedback_items");
+    if (!feedback) throw new Error("test manifest lacks feedback");
+    port.tables.set("feedback_items", {
+      ...feedback,
+      columns: feedback.columns.filter(
+        ({ key }) => key !== "assignedMaintainerId" && key !== "deletedAt",
+      ),
+    });
+    port.mutations.length = 0;
+
+    await expect(
+      provisionAppwriteInfrastructure(port, manifest),
+    ).resolves.toMatchObject({ created: 2 });
+    expect(port.mutations).toEqual([
+      "column:feedback_items:assignedMaintainerId",
+      "column:feedback_items:deletedAt",
+    ]);
   });
 
   it("BDD-INFRA-012 redacts unexpected SDK errors", () => {
