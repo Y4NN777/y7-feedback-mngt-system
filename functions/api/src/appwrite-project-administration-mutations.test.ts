@@ -20,8 +20,12 @@ const schema = {
   administrationIdempotencyTableId: "administration_idempotency",
 };
 const queries = {
-  equal: (attribute: string, values: readonly string[]) =>
-    `equal:${attribute}:${values.join(",")}`,
+  equal: (attribute: string, values: readonly (string | boolean)[]) => {
+    if (attribute === "current" && values[0] !== true) {
+      throw new Error("current query must preserve its boolean type");
+    }
+    return `equal:${attribute}:${values.map(String).join(",")}`;
+  },
   limit: (limit: number) => `limit:${String(limit)}`,
 };
 const identity = {
@@ -66,6 +70,7 @@ class FakeMutationTables implements AppwriteProjectAdministrationTablesPort {
     },
   ];
   assignmentRows: readonly unknown[] = [];
+  assignmentQueries: readonly string[] = [];
   failUpdateAt: number | undefined;
   transactionId = "transaction_2";
   invalidCreatedRowAt: number | undefined;
@@ -90,6 +95,7 @@ class FakeMutationTables implements AppwriteProjectAdministrationTablesPort {
       return Promise.resolve({ rows: this.membershipRows });
     }
     if (input.tableId === "project_assignments") {
+      this.assignmentQueries = input.queries;
       return Promise.resolve({ rows: this.assignmentRows });
     }
     const current = input.queries.some((query) => query === "equal:current:true");
@@ -246,9 +252,15 @@ describe("Appwrite Project administration mutations", () => {
       maintainerId: "maintainer_1",
     });
     expect(assigned.created[0]?.tableId).toBe("project_assignments");
+    expect(String(assigned.created[0]?.rowId)).toHaveLength(36);
     expect((assigned.created[0]?.data as Record<string, unknown>).status).toBe(
       "active",
     );
+    expect(assigned.assignmentQueries).toEqual([
+      "equal:projectId:project_1",
+      "equal:userId:maintainer_1",
+      "limit:2",
+    ]);
 
     const removed = new FakeMutationTables();
     removed.assignmentRows = [
