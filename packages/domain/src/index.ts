@@ -1,6 +1,7 @@
 export { isLocale, supportedLocales, type Locale } from "./locale.js";
 export * from "./access.js";
 export * from "./attachment.js";
+export * from "./conversation-lifecycle.js";
 export * from "./authorization.js";
 export * from "./feedback.js";
 export * from "./policy.js";
