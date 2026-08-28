@@ -17,6 +17,7 @@ import { createNodeAppwriteWorkspaceAttachmentScopeResolver } from "./appwrite-w
 import { createNodeAppwriteWorkspaceCapabilityScopeResolver } from "./appwrite-workspace-capability-scope.js";
 import { createNodeAppwriteWorkspaceOwnerScopeResolver } from "./appwrite-workspace-owner-scope.js";
 import { createNodeAppwriteWorkspaceProjectOperationPorts } from "./appwrite-workspace-project-ports.js";
+import { createNodeAppwriteWorkbenchStore } from "./appwrite-workbench-store.js";
 import { createNodeAppwriteProviderGrantVault } from "./appwrite-provider-grant-vault.js";
 import { createNodeAppwriteSourceConnectionStore } from "./appwrite-source-connection-store.js";
 import type { HttpDependencies } from "./http.js";
@@ -45,6 +46,8 @@ import {
   type AppwritePrincipalVerifier,
 } from "./workspace-attachment-download.js";
 import { createWorkspaceProjectOperations } from "./workspace-project-operations.js";
+import { createWorkbenchCoordinator } from "./workbench.js";
+import { createWorkbenchHttp } from "./workbench-http.js";
 
 export interface ApplicationRuntime {
   readonly tables: TablesDB;
@@ -165,6 +168,20 @@ export function createHttpApplication(
   const workspaceScope = createNodeAppwriteWorkspaceCapabilityScopeResolver(
     runtime.tables,
     workspaceScopeSchema,
+  );
+  const workbench = createWorkbenchHttp(
+    createWorkbenchCoordinator(
+      principalVerifier,
+      workspaceScope,
+      createNodeAppwriteWorkbenchStore(
+        runtime.tables,
+        {
+          databaseId: config.appwriteSchema.databaseId,
+          feedbackTableId: config.appwriteSchema.feedbackTableId,
+        },
+        sensitive,
+      ),
+    ),
   );
   const projectAdministration = createProjectAdministrationHttp(
     createProjectAdministration(
@@ -309,5 +326,6 @@ export function createHttpApplication(
     ...(sourceConnections === undefined ? {} : { sourceConnections }),
     release: config.release,
     startedAt: runtime.startedAt,
+    workbench,
   };
 }

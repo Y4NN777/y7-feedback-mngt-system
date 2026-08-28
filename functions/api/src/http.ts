@@ -5,6 +5,7 @@ import type { ConversationLifecycleHttp } from "./conversation-lifecycle-http.js
 import type { PublicApi } from "./public-api.js";
 import type { ProjectAdministrationHttp } from "./project-administration-http.js";
 import type { SourceConnectionHttp } from "./source-connection-http.js";
+import type { WorkbenchHttp } from "./workbench-http.js";
 
 export interface FunctionRequest {
   readonly method: string;
@@ -43,6 +44,7 @@ export interface HttpDependencies {
   readonly conversationLifecycle?: ConversationLifecycleHttp;
   readonly projectAdministration?: ProjectAdministrationHttp;
   readonly sourceConnections?: SourceConnectionHttp;
+  readonly workbench?: WorkbenchHttp;
   readonly release: string;
   readonly startedAt: () => number;
 }
@@ -155,10 +157,26 @@ export async function routeRequest(
               ? req.bodyJson
               : undefined,
         });
+  const workbenchResponse =
+    isHealth ||
+    isIngressProbe ||
+    sourceResponse ||
+    administrationResponse ||
+    conversationResponse
+      ? null
+      : await dependencies.workbench?.handle({
+          method,
+          path: req.path,
+          headers: requestHeaders,
+          query: req.query ?? {},
+        });
   const publicResponse =
     isHealth || isIngressProbe
       ? null
-      : sourceResponse || administrationResponse || conversationResponse
+      : sourceResponse ||
+          administrationResponse ||
+          conversationResponse ||
+          workbenchResponse
         ? null
         : await dependencies.publicApi?.handle({
             method,
@@ -175,6 +193,7 @@ export async function routeRequest(
       sourceResponse?.statusCode ??
       administrationResponse?.statusCode ??
       conversationResponse?.statusCode ??
+      workbenchResponse?.statusCode ??
       publicResponse?.statusCode ??
       404);
   const operation = isHealth
@@ -187,15 +206,18 @@ export async function routeRequest(
           ? "project_administration"
           : conversationResponse
             ? "conversation_lifecycle"
-            : publicResponse
-              ? "public_api"
-              : "unknown";
+            : workbenchResponse
+              ? "workbench"
+              : publicResponse
+                ? "public_api"
+                : "unknown";
   const outcome = isHealth
     ? "success"
     : (probeResponse ??
         sourceResponse ??
         administrationResponse ??
         conversationResponse ??
+        workbenchResponse ??
         publicResponse)
       ? statusCode < 400
         ? "success"
@@ -240,6 +262,10 @@ export async function routeRequest(
       conversationResponse.statusCode,
       headers,
     );
+  }
+
+  if (workbenchResponse) {
+    return res.json(workbenchResponse.body, workbenchResponse.statusCode, headers);
   }
 
   if (publicResponse) {
