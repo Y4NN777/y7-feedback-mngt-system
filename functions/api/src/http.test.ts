@@ -549,4 +549,48 @@ describe("trusted API entrypoint", () => {
       expect.objectContaining({ body: undefined }),
     );
   });
+
+  it("routes the provider outbox before every product API", async () => {
+    const providerIssueOutbox = {
+      handle: vi.fn().mockResolvedValue({
+        statusCode: 200,
+        body: { status: "delivered", attempt: 1 },
+      }),
+    };
+    const publicHandle = vi.fn();
+    const { context, json } = createContext(
+      "POST",
+      "/operational/provider-issue-outbox",
+      {
+        headers: { "content-type": "application/json" },
+        bodyJson: {},
+      },
+    );
+    await routeRequest(context, {
+      ...dependencies,
+      providerIssueOutbox,
+      publicApi: { handle: publicHandle },
+    });
+    expect(providerIssueOutbox.handle).toHaveBeenCalledWith(
+      expect.objectContaining({ body: {} }),
+    );
+    expect(publicHandle).not.toHaveBeenCalled();
+    expect(json).toHaveBeenCalledWith(
+      { status: "delivered", attempt: 1 },
+      200,
+      expect.objectContaining({ "cache-control": "no-store" }),
+    );
+    expect(context.log).toHaveBeenCalledWith(
+      expect.stringContaining('"operation":"provider_issue_outbox"'),
+    );
+
+    const multipart = createContext("POST", context.req.path, {
+      headers: { "content-type": "multipart/form-data; boundary=test" },
+      bodyJson: { ignored: true },
+    });
+    await routeRequest(multipart.context, { ...dependencies, providerIssueOutbox });
+    expect(providerIssueOutbox.handle).toHaveBeenLastCalledWith(
+      expect.objectContaining({ body: undefined }),
+    );
+  });
 });

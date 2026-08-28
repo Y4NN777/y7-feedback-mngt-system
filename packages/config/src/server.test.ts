@@ -185,6 +185,25 @@ describe("trusted environment contract", () => {
     }
   });
 
+  it("BDD-ISSUE-CONFIG-002 validates the optional provider worker trigger secret", () => {
+    expect(
+      parseServerConfig({
+        ...validServer,
+        PROVIDER_OUTBOX_TRIGGER_SECRET: "trigger-secret-with-at-least-32-characters",
+      }).providerOutboxTriggerSecret,
+    ).toBe("trigger-secret-with-at-least-32-characters");
+    expect(parseServerConfig(validServer).providerOutboxTriggerSecret).toBeUndefined();
+    expect(
+      parseServerConfig({ ...validServer, PROVIDER_OUTBOX_TRIGGER_SECRET: "   " })
+        .providerOutboxTriggerSecret,
+    ).toBeUndefined();
+    for (const value of ["too-short", "x".repeat(501)]) {
+      expect(() =>
+        parseServerConfig({ ...validServer, PROVIDER_OUTBOX_TRIGGER_SECRET: value }),
+      ).toThrow(new ConfigError("PROVIDER_OUTBOX_TRIGGER_SECRET_INVALID"));
+    }
+  });
+
   it("BDD-SRC-REAL-005 accepts provider authority only as a complete server-only set", () => {
     const providerVariables = {
       GITHUB_APP_CLIENT_ID: "github-client-id",

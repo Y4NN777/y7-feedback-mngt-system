@@ -14,6 +14,7 @@ export interface ServerConfig {
   readonly appwriteProjectId: string;
   readonly appwriteApiKey: string;
   readonly webOrigin: string;
+  readonly providerOutboxTriggerSecret?: string;
   readonly appwriteSchema: {
     readonly databaseId: string;
     readonly workspacesTableId: string;
@@ -161,6 +162,15 @@ function parseWebOrigin(
   return url.origin;
 }
 
+function parseOptionalTriggerSecret(value: string | undefined): string | undefined {
+  const normalized = value?.trim();
+  if (normalized === undefined || normalized === "") return undefined;
+  if (normalized.length < 32 || normalized.length > 500) {
+    throw new ConfigError("PROVIDER_OUTBOX_TRIGGER_SECRET_INVALID");
+  }
+  return normalized;
+}
+
 function parseProviderGrantKey(
   value: string | undefined,
   proofEnvelopeKey: string,
@@ -305,6 +315,9 @@ export function parseServerConfig(
     [accessProofEnvelopeKey, providerGrantEnvelopeKey],
   );
   const providers = parseProviders(input);
+  const providerOutboxTriggerSecret = parseOptionalTriggerSecret(
+    input.PROVIDER_OUTBOX_TRIGGER_SECRET,
+  );
   return {
     environment,
     backendEnvironment,
@@ -312,6 +325,9 @@ export function parseServerConfig(
     appwriteProjectId: requireValue(input.APPWRITE_PROJECT_ID),
     appwriteApiKey: requireValue(input.APPWRITE_API_KEY),
     webOrigin: parseWebOrigin(input.Y7_WEB_ORIGIN, environment),
+    ...(providerOutboxTriggerSecret === undefined
+      ? {}
+      : { providerOutboxTriggerSecret }),
     appwriteSchema: parseAppwriteSchema(input),
     accessProofEnvelopeKey,
     providerGrantEnvelopeKey,
