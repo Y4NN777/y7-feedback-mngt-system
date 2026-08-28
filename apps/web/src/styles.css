@@ -38,7 +38,8 @@ body {
 button,
 a,
 input,
-textarea {
+textarea,
+select {
   font: inherit;
 }
 
@@ -48,6 +49,85 @@ input:focus-visible,
 textarea:focus-visible {
   outline: 3px solid #002fa7;
   outline-offset: 3px;
+}
+
+.administration-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+  padding: 3rem 0;
+  border-bottom: 1px solid #111111;
+}
+
+.administration-form label {
+  display: grid;
+  gap: 0.5rem;
+  font-weight: 700;
+}
+
+.administration-form input,
+.administration-form textarea,
+.administration-form select {
+  width: 100%;
+  border: 1px solid #111111;
+  border-radius: 0;
+  padding: 0.85rem;
+  color: #111111;
+  background: #ffffff;
+}
+
+.administration-form button,
+.session-banner button {
+  min-height: 3rem;
+  border: 1px solid #111111;
+  padding: 0.75rem 1.25rem;
+  color: #ffffff;
+  background: #002fa7;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.administration-form button {
+  align-self: end;
+}
+
+.checkbox-label {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+}
+
+.checkbox-label input {
+  width: 1.4rem;
+  height: 1.4rem;
+}
+
+.session-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid #111111;
+}
+
+.session-banner p,
+.administration-outcome {
+  margin: 0;
+}
+
+.administration-outcome {
+  border-left: 0.5rem solid #002fa7;
+  padding: 1.25rem;
+  background: #ffffff;
+  font-weight: 700;
+}
+
+.outcome-denied,
+.outcome-invalid,
+.outcome-conflict,
+.outcome-slug_reserved,
+.outcome-retryable {
+  border-left-color: #a3261f;
 }
 
 h1,
@@ -70,6 +150,7 @@ h1 {
   margin-bottom: 1.5rem;
   font-size: clamp(3.25rem, 9vw, 8.25rem);
   line-height: 0.9;
+  overflow-wrap: anywhere;
 }
 
 .root-page,
@@ -667,6 +748,7 @@ h1 {
 
   .type-picker,
   .form-card,
+  .administration-form,
   .review-facts,
   .review-band,
   .access-pair,

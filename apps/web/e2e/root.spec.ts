@@ -261,3 +261,32 @@ test("BDD-ACC-UX-001 retrieval is accessible without overflow at 320 px", async 
   expect(seriousViolations).toEqual([]);
   expect(hasHorizontalOverflow).toBe(false);
 });
+
+test("BDD-ADMIN-001 administration sign-in preserves input and is accessible at 320 px", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await page.goto("/manage");
+
+  await expect(
+    page.getByRole("heading", { name: "Administration des projets" }),
+  ).toBeVisible();
+  await page.getByLabel("Adresse e-mail").fill("owner@example.test");
+  await page.getByRole("button", { name: "English" }).click();
+  await expect(page.getByLabel("Email address")).toHaveValue("owner@example.test");
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+
+  const accessibility = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa"])
+    .analyze();
+  expect(
+    accessibility.violations.filter(
+      (violation) => violation.impact === "serious" || violation.impact === "critical",
+    ),
+  ).toEqual([]);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+    ),
+  ).toBe(false);
+});

@@ -36,6 +36,24 @@ afterEach(() => {
 });
 
 describe("root orientation", () => {
+  it("routes /manage to first-party administration instead of a public Project", () => {
+    window.history.replaceState({}, "", "/manage");
+    renderApp({
+      administrationGateway: {
+        execute: () => Promise.resolve({ status: "retryable" }),
+      },
+      administrationSession: {
+        createJwt: () => Promise.resolve("jwt"),
+        signIn: () => Promise.resolve("authenticated"),
+        signOut: () => Promise.resolve(),
+      },
+    });
+    expect(
+      screen.getByRole("heading", { name: "Administration des projets" }),
+    ).toBeVisible();
+    expect(screen.getByLabelText("Adresse e-mail")).toBeVisible();
+  });
+
   it("BDD-ROOT-001 shows exactly the three French intents without enumeration", () => {
     renderApp();
 
