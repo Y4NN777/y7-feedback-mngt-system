@@ -15,6 +15,8 @@ import type { ProjectGateway } from "./ProjectGateway";
 import { RetrieveFeedback, type AccountlessGateway } from "./RetrieveFeedback";
 import type { WorkbenchGateway } from "./WorkbenchGateway";
 import { WorkbenchPage } from "./WorkbenchPage";
+import type { SourceManagementGateway } from "./SourceManagementGateway";
+import { SourceManagementPage } from "./SourceManagementPage";
 
 const unavailableGateway: AccountlessGateway = {
   retrieve: () => Promise.resolve({ status: "retryable" }),
@@ -48,6 +50,13 @@ const unavailableWorkbenchGateway: WorkbenchGateway = {
 };
 const unavailableNotificationInvalidation: NotificationInvalidation = {
   subscribe: () => Promise.resolve(() => Promise.resolve()),
+};
+const unavailableSourceManagementGateway: SourceManagementGateway = {
+  list: () => Promise.resolve({ status: "retryable" }),
+  begin: () => Promise.resolve({ status: "retryable" }),
+  select: () => Promise.resolve({ status: "retryable" }),
+  refresh: () => Promise.resolve({ status: "retryable" }),
+  disconnect: () => Promise.resolve({ status: "retryable" }),
 };
 const projectSlugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 
@@ -144,6 +153,7 @@ export function App({
   },
   workbenchGateway = unavailableWorkbenchGateway,
   notificationInvalidation = unavailableNotificationInvalidation,
+  sourceManagementGateway = unavailableSourceManagementGateway,
 }: {
   readonly accountlessGateway?: AccountlessGateway;
   readonly administrationGateway?: AdministrationGateway;
@@ -155,6 +165,7 @@ export function App({
   readonly redirectProject?: (canonicalSlug: string) => void;
   readonly workbenchGateway?: WorkbenchGateway;
   readonly notificationInvalidation?: NotificationInvalidation;
+  readonly sourceManagementGateway?: SourceManagementGateway;
 }) {
   const [locale, setLocale] = useState<Locale>("fr");
   const copy = messages[locale];
@@ -192,6 +203,16 @@ export function App({
         gateway={workbenchGateway}
         locale={locale}
         notificationInvalidation={notificationInvalidation}
+        onLocaleChange={selectLocale}
+        session={administrationSession}
+      />
+    );
+  }
+  if (window.location.pathname === "/manage/sources") {
+    return (
+      <SourceManagementPage
+        gateway={sourceManagementGateway}
+        locale={locale}
         onLocaleChange={selectLocale}
         session={administrationSession}
       />

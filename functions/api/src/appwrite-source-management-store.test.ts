@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createAppwriteSourceManagementStore,
   createAppwriteSourceProjectSlugPort,
+  type AppwriteSourceManagementTablesPort,
 } from "./appwrite-source-management-store";
 
 const selected = {
@@ -22,10 +23,15 @@ const selected = {
 
 function setup() {
   let row: Record<string, unknown> = selected;
-  const listRows = vi.fn(() => Promise.resolve({ rows: [row] }));
+  const listRows = vi.fn(
+    (input: Parameters<AppwriteSourceManagementTablesPort["listRows"]>[0]) => {
+      void input;
+      return Promise.resolve<{ readonly rows: readonly unknown[] }>({ rows: [row] });
+    },
+  );
   const getRow = vi.fn(() => Promise.resolve(row));
   const updateRow = vi.fn(
-    (input: { readonly data: Readonly<Record<string, unknown>> }) => {
+    (input: Parameters<AppwriteSourceManagementTablesPort["updateRow"]>[0]) => {
       row = { ...row, ...input.data };
       return Promise.resolve(row);
     },
@@ -120,10 +126,9 @@ describe("Appwrite source management store", () => {
         updatedAt: "2026-08-28T12:00:00.000Z",
       },
     ]);
-    expect(target.listRows).toHaveBeenCalledWith(
-      expect.objectContaining({
-        queries: expect.arrayContaining(["equal:status:selecting"]),
-      }),
+    expect(target.listRows).toHaveBeenCalledWith(expect.anything());
+    expect(target.listRows.mock.calls[0]?.[0].queries).toContain(
+      "equal:status:selecting",
     );
   });
 
@@ -196,12 +201,9 @@ describe("Appwrite source management store", () => {
     await expect(store.saveImport(command)).resolves.toMatchObject({
       importedRepositories: [repository],
     });
-    expect(updateRow).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        transactionId: "transaction_1",
-        data: expect.objectContaining({ updatedAt: repository.observedAt }),
-      }),
-    );
+    const update = updateRow.mock.calls.at(-1)?.[0];
+    expect(update?.transactionId).toBe("transaction_1");
+    expect(update?.data.updatedAt).toBe(repository.observedAt);
     expect(updateTransaction).toHaveBeenLastCalledWith({
       transactionId: "transaction_1",
       commit: true,
@@ -400,7 +402,7 @@ describe("Appwrite source management store", () => {
     for (const row of invalidRows) {
       const target = setup();
       target.listRows.mockResolvedValueOnce({
-        rows: [row as Record<string, unknown>],
+        rows: [row],
       });
       await expect(
         target.store.list({
@@ -444,6 +446,17 @@ describe("Appwrite source management store", () => {
         projectId: "project_1",
       }),
     ).rejects.toThrow("unavailable");
+
+    const invalidFailure = setup();
+    invalidFailure.getRow.mockRejectedValueOnce("unavailable");
+    await expect(
+      invalidFailure.store.active({
+        connectionId: "connection_1",
+        ownerUserId: "owner_1",
+        workspaceId: "workspace_1",
+        projectId: "project_1",
+      }),
+    ).rejects.toThrow("APPWRITE_SOURCE_MANAGEMENT_UNAVAILABLE");
 
     const disconnected = setup();
     disconnected.getRow.mockResolvedValueOnce({

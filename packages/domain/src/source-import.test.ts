@@ -155,9 +155,9 @@ describe("source repository import policy", () => {
         label: "Feedback",
       }),
     ).toEqual({
-      destination: "https://feedback.y7labs.dev/p/wise-money",
+      destination: "https://feedback.y7labs.dev/wise-money",
       markdown:
-        "[![Feedback](https://img.shields.io/badge/Y7-Feedback-5b5bd6)](https://feedback.y7labs.dev/p/wise-money)",
+        "[![Feedback](https://img.shields.io/badge/Y7-Feedback-5b5bd6)](https://feedback.y7labs.dev/wise-money)",
     });
     expect(() =>
       createProjectBadge({

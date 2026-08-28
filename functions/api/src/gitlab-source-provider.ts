@@ -2,7 +2,6 @@ import type {
   ProviderReleaseMetadata,
   ProviderRepositoryMetadata,
   RepositoryIdentity,
-  RepositoryVisibility,
 } from "@y7-feedback/domain";
 
 import type {
@@ -133,7 +132,7 @@ function repositoryMetadata(
     id: expectedId,
     name: required(value.path, 500),
     owner: required(value.namespace.full_path, 500),
-    visibility: visibility as RepositoryVisibility,
+    visibility,
     webUrl: required(value.web_url, 2_000),
     defaultBranch: required(value.default_branch, 200),
     releases: [],

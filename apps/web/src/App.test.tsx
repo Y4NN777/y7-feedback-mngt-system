@@ -54,6 +54,29 @@ describe("root orientation", () => {
     expect(screen.getByLabelText("Adresse e-mail")).toBeVisible();
   });
 
+  it("routes /manage/sources to bilingual first-party source management", async () => {
+    window.history.replaceState({}, "", "/manage/sources");
+    const user = userEvent.setup();
+    renderApp({
+      administrationSession: {
+        createJwt: () => Promise.resolve("jwt"),
+        signIn: () => Promise.resolve("authenticated"),
+        signOut: () => Promise.resolve(),
+      },
+      sourceManagementGateway: {
+        list: () => Promise.resolve({ status: "retryable" }),
+        begin: () => Promise.resolve({ status: "retryable" }),
+        select: () => Promise.resolve({ status: "retryable" }),
+        refresh: () => Promise.resolve({ status: "retryable" }),
+        disconnect: () => Promise.resolve({ status: "retryable" }),
+      },
+    });
+    expect(screen.getByRole("heading", { name: "Sources du projet" })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "English" }));
+    expect(screen.getByRole("heading", { name: "Project sources" })).toBeVisible();
+    expect(document.documentElement.lang).toBe("en");
+  });
+
   it("BDD-ROOT-001 shows exactly the three French intents without enumeration", () => {
     renderApp();
 

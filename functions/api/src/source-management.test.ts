@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/unbound-method -- Vitest inspects capability mocks without invoking detached methods. */
 import { describe, expect, it, vi } from "vitest";
 
 import type { SourceProviderAdapter } from "./source-provider";
@@ -31,7 +32,7 @@ function setup() {
         encryptedGrantRef: "grant_1",
       }),
     ),
-    saveImport: vi.fn((input) => {
+    saveImport: vi.fn((input: Parameters<SourceManagementStore["saveImport"]>[0]) => {
       current = {
         ...current,
         importedRepositories: [input.repository],

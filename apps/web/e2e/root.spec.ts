@@ -262,6 +262,33 @@ test("BDD-ACC-UX-001 retrieval is accessible without overflow at 320 px", async 
   expect(hasHorizontalOverflow).toBe(false);
 });
 
+test("BDD-SRC-219 source management entry is bilingual and accessible at 320 px", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await page.goto("/manage/sources");
+
+  await expect(page.getByRole("heading", { name: "Sources du projet" })).toBeVisible();
+  await expect(page.getByLabel("Adresse e-mail")).toBeVisible();
+  await page.getByRole("button", { name: "English" }).click();
+  await expect(page.getByRole("heading", { name: "Project sources" })).toBeVisible();
+  await expect(page.getByLabel("Email address")).toBeVisible();
+
+  const accessibility = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa"])
+    .analyze();
+  expect(
+    accessibility.violations.filter(
+      (violation) => violation.impact === "serious" || violation.impact === "critical",
+    ),
+  ).toEqual([]);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+    ),
+  ).toBe(false);
+});
+
 test("BDD-CONV-001 Reporter answers without Internal Notes in FR/EN at 320 px", async ({
   page,
 }) => {
