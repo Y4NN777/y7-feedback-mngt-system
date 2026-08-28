@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { ActorAccess } from "@y7-feedback/domain";
 
@@ -198,5 +198,120 @@ describe("Appwrite Workbench mutation store", () => {
         }),
       ),
     ).rejects.toEqual(new AppwriteWorkbenchError("ERR-WORK-DENIED"));
+  });
+
+  it("fails closed for invalid schema, inputs, duplicates and malformed replay facts", async () => {
+    expect(() =>
+      createAppwriteWorkbenchMutationStore(
+        new Tables(),
+        { ...schema, feedbackTableId: "bad id" },
+        queries,
+      ),
+    ).toThrow("APPWRITE_WORKBENCH_MUTATION_SCHEMA_INVALID");
+    expect(() =>
+      createAppwriteWorkbenchMutationStore(
+        new Tables(),
+        { ...schema, idempotencyTableId: schema.feedbackTableId },
+        queries,
+      ),
+    ).toThrow("APPWRITE_WORKBENCH_MUTATION_SCHEMA_INVALID");
+    for (const override of [
+      { feedbackId: "bad id" },
+      { occurredAt: "invalid" },
+      { payloadDigest: "short" },
+      {
+        command: {
+          kind: "assign_feedback",
+          operationId: "operation_7",
+          maintainerId: "bad id",
+        },
+      },
+    ])
+      await expect(
+        createAppwriteWorkbenchMutationStore(new Tables(), schema, queries).execute(
+          input(override),
+        ),
+      ).rejects.toEqual(new AppwriteWorkbenchError("ERR-WORK-RETRYABLE"));
+
+    const invalidTransaction = new Tables();
+    vi.spyOn(invalidTransaction, "createTransaction").mockResolvedValueOnce({
+      $id: "bad id",
+    });
+    await expect(
+      createAppwriteWorkbenchMutationStore(invalidTransaction, schema, queries).execute(
+        input(),
+      ),
+    ).rejects.toEqual(new AppwriteWorkbenchError("ERR-WORK-RETRYABLE"));
+    for (const rows of [
+      [{}, {}],
+      [{}],
+      [
+        {
+          feedbackId: "feedback_1",
+          operationId: "operation_1",
+          payloadDigest: "digest_1234567890",
+          action: "classify_feedback",
+          resultJson: "invalid",
+        },
+      ],
+      [
+        {
+          feedbackId: "feedback_1",
+          operationId: "operation_1",
+          payloadDigest: "digest_1234567890",
+          action: "classify_feedback",
+          resultJson: "{}",
+        },
+      ],
+    ]) {
+      const tables = new Tables();
+      tables.rows = rows;
+      await expect(
+        createAppwriteWorkbenchMutationStore(tables, schema, queries).execute(input()),
+      ).rejects.toEqual(new AppwriteWorkbenchError("ERR-WORK-RETRYABLE"));
+    }
+  });
+
+  it("rolls back failed writes and preserves a stable retryable outcome", async () => {
+    for (const method of ["updateRow", "createRow"] as const) {
+      const tables = new Tables();
+      vi.spyOn(tables, method).mockResolvedValueOnce({ $id: "wrong" });
+      await expect(
+        createAppwriteWorkbenchMutationStore(tables, schema, queries).execute(input()),
+      ).rejects.toEqual(new AppwriteWorkbenchError("ERR-WORK-RETRYABLE"));
+      expect(tables.transactions).toContainEqual({
+        transactionId: "transaction_1",
+        rollback: true,
+      });
+    }
+    const transport = new Tables();
+    vi.spyOn(transport, "getRow").mockRejectedValueOnce(new Error("transport"));
+    vi.spyOn(transport, "updateTransaction").mockRejectedValueOnce(
+      new Error("rollback failed"),
+    );
+    await expect(
+      createAppwriteWorkbenchMutationStore(transport, schema, queries).execute(input()),
+    ).rejects.toEqual(new AppwriteWorkbenchError("ERR-WORK-RETRYABLE"));
+  });
+
+  it("denies malformed, deleted and cross-scope feedback records", async () => {
+    for (const feedback of [
+      null,
+      { $id: "other", workspaceId: "workspace_1", projectId: "project_1" },
+      { $id: "feedback_1", workspaceId: "workspace_2", projectId: "project_1" },
+      { $id: "feedback_1", workspaceId: "workspace_1", projectId: "project_2" },
+      {
+        $id: "feedback_1",
+        workspaceId: "workspace_1",
+        projectId: "project_1",
+        deletedAt: "2026-08-28T10:00:00+00:00",
+      },
+    ]) {
+      const tables = new Tables();
+      tables.feedback = feedback;
+      await expect(
+        createAppwriteWorkbenchMutationStore(tables, schema, queries).execute(input()),
+      ).rejects.toEqual(new AppwriteWorkbenchError("ERR-WORK-DENIED"));
+    }
   });
 });

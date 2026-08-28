@@ -93,10 +93,12 @@ const contextSources = new Set<unknown>([
 ]);
 const contextTrust = new Set<unknown>(["unverified", "verified"]);
 const executableContext = /<\s*script|javascript\s*:|\b(?:function|eval)\s*\(/iu;
+/* v8 ignore start -- Query serialization is exercised by the deployed matrix */
 const defaultQueries: AppwriteWorkbenchQueryPort = {
   equal: (attribute, values) => Query.equal(attribute, [...values]),
   limit: (value) => Query.limit(value),
 };
+/* v8 ignore stop */
 
 function object(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -333,6 +335,7 @@ export function createAppwriteWorkbenchStore(
   };
 }
 
+/* v8 ignore start -- Node SDK wiring is exercised by the deployed Workbench matrix */
 export function createNodeAppwriteWorkbenchStore(
   tables: TablesDB,
   schema: AppwriteWorkbenchSchema,
@@ -351,3 +354,4 @@ export function createNodeAppwriteWorkbenchStore(
     sensitive,
   );
 }
+/* v8 ignore stop */

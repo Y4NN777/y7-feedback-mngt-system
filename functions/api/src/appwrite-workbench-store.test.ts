@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { ActorAccess } from "@y7-feedback/domain";
 
@@ -221,5 +221,208 @@ describe("Appwrite Workbench store", () => {
         feedbackId: "feedback_1",
       }),
     ).rejects.toEqual(new AppwriteWorkbenchError("ERR-WORK-DENIED"));
+  });
+
+  it("fails closed for malformed stored rows, envelopes and adapter failures", async () => {
+    expect(() =>
+      createAppwriteWorkbenchStore(
+        new Tables(),
+        { databaseId: "bad id", feedbackTableId: "feedback_items" },
+        queries,
+        sensitive,
+      ),
+    ).toThrow("APPWRITE_WORKBENCH_SCHEMA_INVALID");
+    for (const malformed of [
+      row("feedback_1", { assignedMaintainerId: "bad id" }),
+      row("feedback_1", { acceptedAt: "not-a-date" }),
+      row("feedback_1", { acceptedAt: "2026-99-99T10:00:00Z" }),
+      row("feedback_1", { acceptedAt: 1 }),
+      null,
+    ]) {
+      const tables = new Tables();
+      tables.rows = [malformed];
+      await expect(
+        createAppwriteWorkbenchStore(tables, schema, queries, sensitive).list({
+          actor: owner,
+          workspaceId: "workspace_1",
+          projectId: "project_1",
+          filter: { types: [], states: [], assignment: "all" },
+        }),
+      ).rejects.toEqual(new AppwriteWorkbenchError("ERR-WORK-RETRYABLE"));
+    }
+    for (const overrides of [
+      { currentSourceJson: 1 },
+      { currentSourceJson: "invalid-envelope" },
+      { contextJson: envelope("feedback_1", "contextJson", "not-an-array") },
+      {
+        contextJson: envelope(
+          "feedback_1",
+          "contextJson",
+          Array.from({ length: 21 }, () => ({})),
+        ),
+      },
+      {
+        contextJson: envelope("feedback_1", "contextJson", [
+          {
+            name: "version",
+            value: "1",
+            purpose: "Use",
+            source: "public",
+            trust: "unverified",
+          },
+          {
+            name: "version",
+            value: "2",
+            purpose: "Use",
+            source: "public",
+            trust: "unverified",
+          },
+        ]),
+      },
+      { attachmentNamesJson: envelope("feedback_1", "attachmentNamesJson", [""]) },
+      { workspaceClassification: 1 },
+      { deletedAt: "2026-08-28T12:00:00+00:00" },
+    ]) {
+      const tables = new Tables();
+      tables.getValue = row("feedback_1", overrides);
+      await expect(
+        createAppwriteWorkbenchStore(tables, schema, queries, sensitive).read({
+          actor: owner,
+          workspaceId: "workspace_1",
+          projectId: "project_1",
+          feedbackId: "feedback_1",
+        }),
+      ).rejects.toBeInstanceOf(AppwriteWorkbenchError);
+    }
+    for (const candidate of [
+      null,
+      { name: 1, value: "x", purpose: "Use", source: "public", trust: "unverified" },
+      { name: "", value: "x", purpose: "Use", source: "public", trust: "unverified" },
+      {
+        name: "version",
+        value: "x",
+        purpose: "",
+        source: "public",
+        trust: "unverified",
+      },
+      {
+        name: "version",
+        value: "x",
+        purpose: "x".repeat(301),
+        source: "public",
+        trust: "unverified",
+      },
+      {
+        name: "version",
+        value: "x",
+        purpose: "Use",
+        source: "private",
+        trust: "unverified",
+      },
+      {
+        name: "version",
+        value: "x",
+        purpose: "Use",
+        source: "public",
+        trust: "trusted",
+      },
+      {
+        name: "version",
+        value: {},
+        purpose: "Use",
+        source: "public",
+        trust: "unverified",
+      },
+      {
+        name: "version",
+        value: "x".repeat(501),
+        purpose: "Use",
+        source: "public",
+        trust: "unverified",
+      },
+      {
+        name: "version",
+        value: "<script>x</script>",
+        purpose: "Use",
+        source: "public",
+        trust: "unverified",
+      },
+      {
+        name: "version",
+        value: Number.NaN,
+        purpose: "Use",
+        source: "public",
+        trust: "unverified",
+      },
+    ]) {
+      const tables = new Tables();
+      tables.getValue = row("feedback_1", {
+        contextJson: envelope("feedback_1", "contextJson", [candidate]),
+      });
+      await expect(
+        createAppwriteWorkbenchStore(tables, schema, queries, sensitive).read({
+          actor: owner,
+          workspaceId: "workspace_1",
+          projectId: "project_1",
+          feedbackId: "feedback_1",
+        }),
+      ).rejects.toBeInstanceOf(AppwriteWorkbenchError);
+    }
+    const optionalProjection = new Tables();
+    optionalProjection.getValue = row("feedback_1", {
+      contextJson: envelope("feedback_1", "contextJson", [
+        {
+          name: "version",
+          value: "1.0",
+          purpose: "Reproduce",
+          source: "public",
+          trust: "unverified",
+        },
+        {
+          name: "retryCount",
+          value: 2,
+          purpose: "Diagnose",
+          source: "system_observed",
+          trust: "verified",
+        },
+        {
+          name: "offline",
+          value: false,
+          purpose: "Diagnose",
+          source: "client_assertion",
+          trust: "unverified",
+        },
+      ]),
+    });
+    await expect(
+      createAppwriteWorkbenchStore(optionalProjection, schema, queries, sensitive).read(
+        {
+          actor: owner,
+          workspaceId: "workspace_1",
+          projectId: "project_1",
+          feedbackId: "feedback_1",
+        },
+      ),
+    ).resolves.toMatchObject({ classification: null, assignedMaintainerId: null });
+    const listFailure = new Tables();
+    vi.spyOn(listFailure, "listRows").mockRejectedValueOnce(new Error("transport"));
+    await expect(
+      createAppwriteWorkbenchStore(listFailure, schema, queries, sensitive).list({
+        actor: owner,
+        workspaceId: "workspace_1",
+        projectId: "project_1",
+        filter: { types: [], states: [], assignment: "all" },
+      }),
+    ).rejects.toEqual(new AppwriteWorkbenchError("ERR-WORK-RETRYABLE"));
+    const readFailure = new Tables();
+    vi.spyOn(readFailure, "getRow").mockRejectedValueOnce(new Error("transport"));
+    await expect(
+      createAppwriteWorkbenchStore(readFailure, schema, queries, sensitive).read({
+        actor: owner,
+        workspaceId: "workspace_1",
+        projectId: "project_1",
+        feedbackId: "feedback_1",
+      }),
+    ).rejects.toEqual(new AppwriteWorkbenchError("ERR-WORK-RETRYABLE"));
   });
 });

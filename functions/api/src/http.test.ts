@@ -460,4 +460,47 @@ describe("trusted API entrypoint", () => {
       expect.objectContaining({ "cache-control": "no-store" }),
     );
   });
+
+  it("routes trusted workbench responses before the public API", async () => {
+    const workbench = {
+      handle: vi.fn().mockResolvedValue({
+        statusCode: 200,
+        body: { status: "ok", result: [] },
+      }),
+    };
+    const publicHandle = vi.fn();
+    const publicApi: PublicApi = { handle: publicHandle };
+    const { context, json } = createContext(
+      "POST",
+      "/v1/workspaces/workspace_1/projects/project_1/workbench/feedback_1",
+      {
+        headers: { "content-type": "application/json" },
+        bodyJson: { kind: "delete_feedback" },
+      },
+    );
+
+    await routeRequest(context, { ...dependencies, workbench, publicApi });
+
+    expect(workbench.handle).toHaveBeenCalledWith(
+      expect.objectContaining({ method: "POST", body: { kind: "delete_feedback" } }),
+    );
+    expect(publicHandle).not.toHaveBeenCalled();
+    expect(json).toHaveBeenCalledWith(
+      { status: "ok", result: [] },
+      200,
+      expect.objectContaining({ "cache-control": "no-store" }),
+    );
+    expect(context.log).toHaveBeenCalledWith(
+      expect.stringContaining('"operation":"workbench"'),
+    );
+
+    const multipart = createContext("POST", context.req.path, {
+      headers: { "content-type": "multipart/form-data; boundary=test" },
+      bodyJson: { ignored: true },
+    });
+    await routeRequest(multipart.context, { ...dependencies, workbench });
+    expect(workbench.handle).toHaveBeenLastCalledWith(
+      expect.objectContaining({ method: "POST", body: undefined }),
+    );
+  });
 });

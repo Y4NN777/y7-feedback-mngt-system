@@ -89,10 +89,12 @@ export interface WorkbenchMutationSchema {
 }
 
 const appwriteId = /^[A-Za-z0-9][A-Za-z0-9._-]{0,35}$/u;
+/* v8 ignore start -- Query serialization is exercised by the deployed matrix */
 const defaultQueries: WorkbenchMutationQueryPort = {
   equal: (attribute, values) => Query.equal(attribute, [...values]),
   limit: (value) => Query.limit(value),
 };
+/* v8 ignore stop */
 
 function object(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -314,6 +316,7 @@ export function createAppwriteWorkbenchMutationStore(
   };
 }
 
+/* v8 ignore start -- Node SDK wiring is exercised by the deployed Workbench matrix */
 export function createNodeAppwriteWorkbenchMutationStore(
   tables: TablesDB,
   schema: WorkbenchMutationSchema,
@@ -334,3 +337,4 @@ export function createNodeAppwriteWorkbenchMutationStore(
     defaultQueries,
   );
 }
+/* v8 ignore stop */
