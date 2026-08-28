@@ -10,7 +10,13 @@ import type { AppwritePrincipalVerifier } from "./workspace-attachment-download.
 export type ProjectAdministrationOutcome =
   | {
       readonly status: "ok";
-      readonly result: { readonly projectId: string; readonly slug: string };
+      readonly result: {
+        readonly projectId: string;
+        readonly slug?: string;
+        readonly action?: string;
+        readonly active?: boolean;
+        readonly maintainerId?: string;
+      };
     }
   | {
       readonly status:
@@ -18,7 +24,7 @@ export type ProjectAdministrationOutcome =
     };
 
 export interface ProjectAdministration {
-  create(input: {
+  execute(input: {
     readonly jwt: string;
     readonly command: unknown;
   }): Promise<ProjectAdministrationOutcome>;
@@ -37,15 +43,13 @@ export function createProjectAdministration(
   dependencies: ProjectAdministrationDependencies,
 ): ProjectAdministration {
   return {
-    async create(input) {
+    async execute(input) {
       let command;
       try {
         command = validateProjectAdministrationCommand(input.command);
       } catch {
         return { status: "invalid" };
       }
-      if (command.kind !== "create_project") return { status: "invalid" };
-
       const verification = await principal.verify(input.jwt);
       if (verification.status !== "verified") return verification;
       const authorization = await ownerScope.resolve({
@@ -55,16 +59,22 @@ export function createProjectAdministration(
       if (authorization.status !== "authorized") return authorization;
 
       try {
-        const result = await store.create({
-          command,
+        const common = {
           actorId: authorization.principalId,
           auditId: dependencies.createAuditId(),
           occurredAt: dependencies.now(),
           payloadDigest: dependencies.digest(command),
-        });
+        };
+        const result =
+          command.kind === "create_project"
+            ? await store.create({ command, ...common })
+            : await store.mutate({ command, ...common });
+        const publicResult = Object.fromEntries(
+          Object.entries(result).filter(([key]) => key !== "status"),
+        ) as Extract<ProjectAdministrationOutcome, { status: "ok" }>["result"];
         return {
           status: "ok",
-          result: { projectId: result.projectId, slug: result.slug },
+          result: publicResult,
         };
       } catch (error: unknown) {
         if (error instanceof AppwriteProjectAdministrationError) {
@@ -73,6 +83,10 @@ export function createProjectAdministration(
           }
           if (error.code === "ERR-ADMIN-SLUG-RESERVED") {
             return { status: "slug_reserved" };
+          }
+          if (error.code === "ERR-ADMIN-DENIED") return { status: "denied" };
+          if (error.code === "ERR-ADMIN-MUTATION-INVALID") {
+            return { status: "invalid" };
           }
         }
         return { status: "retryable" };

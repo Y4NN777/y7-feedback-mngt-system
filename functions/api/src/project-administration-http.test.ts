@@ -4,13 +4,13 @@ import type { ProjectAdministration } from "./project-administration";
 import { createProjectAdministrationHttp } from "./project-administration-http";
 
 function setup() {
-  const create = vi.fn<ProjectAdministration["create"]>(() =>
+  const execute = vi.fn<ProjectAdministration["execute"]>(() =>
     Promise.resolve({
       status: "ok",
       result: { projectId: "project_1", slug: "wise-money" },
     }),
   );
-  return { create, http: createProjectAdministrationHttp({ create }) };
+  return { execute, http: createProjectAdministrationHttp({ execute }) };
 }
 
 const body = {
@@ -41,9 +41,50 @@ describe("Project administration HTTP contract", () => {
         project: { projectId: "project_1", slug: "wise-money" },
       },
     });
-    expect(target.create).toHaveBeenCalledWith({
+    expect(target.execute).toHaveBeenCalledWith({
       jwt: "valid-jwt",
       command: body,
+    });
+  });
+
+  it("BDD-ADMIN-003..008 exposes scoped Project command routes", async () => {
+    const target = setup();
+    const rename = {
+      kind: "rename_project",
+      operationId: "operation_2",
+      workspaceId: "workspace_1",
+      projectId: "project_1",
+      slug: "new-slug",
+    };
+    target.execute.mockResolvedValueOnce({
+      status: "ok",
+      result: {
+        projectId: "project_1",
+        action: "rename_project",
+        slug: "new-slug",
+      },
+    });
+    await expect(
+      target.http.handle({
+        method: "POST",
+        path: "/v1/workspaces/workspace_1/projects/project_1/commands",
+        headers: { authorization: "Bearer valid-jwt" },
+        body: rename,
+      }),
+    ).resolves.toEqual({
+      statusCode: 200,
+      body: {
+        status: "ok",
+        project: {
+          projectId: "project_1",
+          action: "rename_project",
+          slug: "new-slug",
+        },
+      },
+    });
+    expect(target.execute).toHaveBeenCalledWith({
+      jwt: "valid-jwt",
+      command: rename,
     });
   });
 
@@ -57,7 +98,7 @@ describe("Project administration HTTP contract", () => {
         target.http.handle({ ...request, headers: {}, body }),
       ).resolves.toBeUndefined();
     }
-    expect(target.create).not.toHaveBeenCalled();
+    expect(target.execute).not.toHaveBeenCalled();
   });
 
   it("BDD-ADMIN-002 rejects missing authority and path/body scope mismatch without invoking the use case", async () => {
@@ -82,6 +123,11 @@ describe("Project administration HTTP contract", () => {
         headers: { authorization: "Bearer valid-jwt" },
         body: { ...body, workspaceId: "workspace_2" },
       },
+      {
+        headers: { authorization: "Bearer valid-jwt" },
+        body: { ...body, kind: "rename_project", projectId: "project_2" },
+        path: "/v1/workspaces/workspace_1/projects/project_1/commands",
+      },
     ]) {
       const target = setup();
       await expect(
@@ -94,7 +140,7 @@ describe("Project administration HTTP contract", () => {
         statusCode: 403,
         body: { error: "ERR-ADMIN-DENIED" },
       });
-      expect(target.create).not.toHaveBeenCalled();
+      expect(target.execute).not.toHaveBeenCalled();
     }
   });
 
@@ -107,7 +153,7 @@ describe("Project administration HTTP contract", () => {
       [{ status: "retryable" }, [503, "ERR-ADMIN-RETRYABLE"]],
     ] as const) {
       const target = setup();
-      target.create.mockResolvedValueOnce(outcome);
+      target.execute.mockResolvedValueOnce(outcome);
       const response = await target.http.handle({
         method: "POST",
         path: "/v1/workspaces/workspace_1/projects",

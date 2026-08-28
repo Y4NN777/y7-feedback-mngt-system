@@ -61,7 +61,7 @@ describe("trusted Project administration orchestration", () => {
     const target = setup();
 
     await expect(
-      target.administration.create({ jwt: "valid-jwt", command }),
+      target.administration.execute({ jwt: "valid-jwt", command }),
     ).resolves.toEqual({
       status: "ok",
       result: { projectId: "project_1", slug: "wise-money" },
@@ -86,17 +86,52 @@ describe("trusted Project administration orchestration", () => {
       {},
       {
         kind: "rename_project",
-        operationId: "operation_1",
+        operationId: "bad operation",
         workspaceId: "workspace_1",
         projectId: "project_1",
         slug: "new-slug",
       },
     ]) {
       await expect(
-        target.administration.create({ jwt: "valid-jwt", command: invalid }),
+        target.administration.execute({ jwt: "valid-jwt", command: invalid }),
       ).resolves.toEqual({ status: "invalid" });
     }
     expect(target.verify).not.toHaveBeenCalled();
+  });
+
+  it("BDD-ADMIN-003..008 dispatches a validated mutation after Owner authorization", async () => {
+    const target = setup();
+    target.mutate.mockResolvedValueOnce({
+      status: "applied",
+      projectId: "project_1",
+      action: "rename_project",
+      slug: "new-slug",
+    });
+    const rename = {
+      kind: "rename_project",
+      operationId: "operation_2",
+      workspaceId: "workspace_1",
+      projectId: "project_1",
+      slug: "new-slug",
+    };
+    await expect(
+      target.administration.execute({ jwt: "valid-jwt", command: rename }),
+    ).resolves.toEqual({
+      status: "ok",
+      result: {
+        projectId: "project_1",
+        action: "rename_project",
+        slug: "new-slug",
+      },
+    });
+    expect(target.mutate).toHaveBeenCalledWith({
+      command: rename,
+      actorId: "owner_1",
+      auditId: "audit_1",
+      occurredAt: "2026-08-28T09:00:00.000Z",
+      payloadDigest: "digest_1",
+    });
+    expect(target.create).not.toHaveBeenCalled();
   });
 
   it("BDD-ADMIN-002 returns non-disclosing denial without resolving Project data", async () => {
@@ -107,7 +142,7 @@ describe("trusted Project administration orchestration", () => {
       const target = setup();
       target.verify.mockResolvedValueOnce(verification);
       await expect(
-        target.administration.create({ jwt: "bad-jwt", command }),
+        target.administration.execute({ jwt: "bad-jwt", command }),
       ).resolves.toEqual(verification);
       expect(target.resolve).not.toHaveBeenCalled();
       expect(target.create).not.toHaveBeenCalled();
@@ -120,7 +155,7 @@ describe("trusted Project administration orchestration", () => {
       const target = setup();
       target.resolve.mockResolvedValueOnce(authorization);
       await expect(
-        target.administration.create({ jwt: "valid-jwt", command }),
+        target.administration.execute({ jwt: "valid-jwt", command }),
       ).resolves.toEqual(authorization);
       expect(target.create).not.toHaveBeenCalled();
     }
@@ -131,18 +166,20 @@ describe("trusted Project administration orchestration", () => {
       ["ERR-ADMIN-IDEMPOTENCY-CONFLICT", { status: "conflict" }],
       ["ERR-ADMIN-SLUG-RESERVED", { status: "slug_reserved" }],
       ["ERR-ADMIN-RETRYABLE", { status: "retryable" }],
+      ["ERR-ADMIN-DENIED", { status: "denied" }],
+      ["ERR-ADMIN-MUTATION-INVALID", { status: "invalid" }],
     ] as const) {
       const target = setup();
       target.create.mockRejectedValueOnce(new AppwriteProjectAdministrationError(code));
       await expect(
-        target.administration.create({ jwt: "valid-jwt", command }),
+        target.administration.execute({ jwt: "valid-jwt", command }),
       ).resolves.toEqual(expected);
     }
 
     const target = setup();
     target.create.mockRejectedValueOnce(new Error("raw SDK detail"));
     await expect(
-      target.administration.create({ jwt: "valid-jwt", command }),
+      target.administration.execute({ jwt: "valid-jwt", command }),
     ).resolves.toEqual({ status: "retryable" });
   });
 });
