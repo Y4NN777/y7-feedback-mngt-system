@@ -51,6 +51,7 @@ function setup(scopeStatus: "authorized" | "denied" | "retryable" = "authorized"
   };
   const notifications = {
     list: vi.fn(() => Promise.resolve([{ id: "notification-a" }])),
+    markRead: vi.fn(() => Promise.resolve({ status: "read" as const })),
   };
   const realtime = {
     authorize: vi.fn(() => Promise.resolve({ channel: "project-a" })),
@@ -98,12 +99,18 @@ describe("trusted Workspace Project operations", () => {
     await expect(target.operations.listNotifications(request)).resolves.toMatchObject({
       status: "ok",
     });
+    await expect(
+      target.operations.markNotificationRead({
+        ...request,
+        notificationId: "notification-a",
+      }),
+    ).resolves.toMatchObject({ status: "ok" });
     await expect(target.operations.authorizeRealtime(request)).resolves.toMatchObject({
       status: "ok",
     });
 
-    expect(target.principal.verify).toHaveBeenCalledTimes(8);
-    expect(target.scope.resolve).toHaveBeenCalledTimes(8);
+    expect(target.principal.verify).toHaveBeenCalledTimes(9);
+    expect(target.scope.resolve).toHaveBeenCalledTimes(9);
     expect(target.scope.resolve.mock.calls.map(([input]) => input.capability)).toEqual([
       "feedback.write",
       "feedback.read",
@@ -111,6 +118,7 @@ describe("trusted Workspace Project operations", () => {
       "feedback.write",
       "feedback.search",
       "feedback.aggregate",
+      "notification.read",
       "notification.read",
       "realtime.subscribe",
     ]);
@@ -132,15 +140,20 @@ describe("trusted Workspace Project operations", () => {
         target.operations.searchFeedback({ ...request, query: "private" }),
         target.operations.aggregateFeedback(request),
         target.operations.listNotifications(request),
+        target.operations.markNotificationRead({
+          ...request,
+          notificationId: "notification-a",
+        }),
         target.operations.authorizeRealtime(request),
       ]);
 
       expect(outcomes).toEqual(
-        Array.from({ length: 8 }, () => ({ status: scopeStatus })),
+        Array.from({ length: 9 }, () => ({ status: scopeStatus })),
       );
       for (const operation of [
         ...Object.values(target.feedback),
         target.notifications.list,
+        target.notifications.markRead,
         target.realtime.authorize,
       ]) {
         expect(operation).not.toHaveBeenCalled();

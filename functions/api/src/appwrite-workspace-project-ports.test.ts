@@ -17,6 +17,12 @@ const scope = {
   workspaceId: "workspace-a",
   projectId: "project-a",
 };
+const ownerAccess = {
+  principalId: scope.principalId,
+  responsibility: "workspace_owner" as const,
+  workspaceIds: [scope.workspaceId],
+  projectIds: [],
+};
 
 function setup() {
   const createRow = vi.fn(() => Promise.resolve({ $id: "feedback-new" }));
@@ -56,6 +62,22 @@ function setup() {
 }
 
 describe("Appwrite Workspace Project operation ports", () => {
+  it("leaves notification read mutation to the dedicated scoped feed adapter", async () => {
+    const target = setup();
+    await expect(
+      target.ports.notifications.markRead(
+        scope,
+        {
+          principalId: scope.principalId,
+          responsibility: "workspace_owner",
+          workspaceIds: [scope.workspaceId],
+          projectIds: [],
+        },
+        "notification-a",
+      ),
+    ).rejects.toThrow("APPWRITE_WORKSPACE_OPERATION_UNAVAILABLE");
+  });
+
   it("BDD-OWN-FUNCTION-001 seals create and read to authoritative scope", async () => {
     const target = setup();
     await expect(
@@ -210,7 +232,7 @@ describe("Appwrite Workspace Project operation ports", () => {
     await expect(target.ports.feedback.aggregate(scope)).resolves.toEqual({
       count: 7,
     });
-    await expect(target.ports.notifications.list(scope)).resolves.toEqual({
+    await expect(target.ports.notifications.list(scope, ownerAccess)).resolves.toEqual({
       ids: ["notification-a"],
     });
     await expect(target.ports.realtime.authorize(scope)).resolves.toEqual({
@@ -384,13 +406,15 @@ describe("Appwrite Workspace Project operation ports", () => {
     }
 
     const empty = setup();
-    await expect(empty.ports.notifications.list(scope)).resolves.toEqual({ ids: [] });
+    await expect(empty.ports.notifications.list(scope, ownerAccess)).resolves.toEqual({
+      ids: [],
+    });
 
     const badFeedback = setup();
     badFeedback.listRows.mockResolvedValueOnce({ rows: [{}], total: 1 });
-    await expect(badFeedback.ports.notifications.list(scope)).rejects.toThrow(
-      "APPWRITE_WORKSPACE_OPERATION_UNAVAILABLE",
-    );
+    await expect(
+      badFeedback.ports.notifications.list(scope, ownerAccess),
+    ).rejects.toThrow("APPWRITE_WORKSPACE_OPERATION_UNAVAILABLE");
 
     for (const notification of [
       {},
@@ -411,7 +435,7 @@ describe("Appwrite Workspace Project operation ports", () => {
           total: 1,
         })
         .mockResolvedValueOnce({ rows: [notification], total: 1 });
-      await expect(target.ports.notifications.list(scope)).rejects.toThrow(
+      await expect(target.ports.notifications.list(scope, ownerAccess)).rejects.toThrow(
         "APPWRITE_WORKSPACE_OPERATION_UNAVAILABLE",
       );
     }

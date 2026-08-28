@@ -118,7 +118,10 @@ function instant(value: unknown): string | undefined {
 
 function validateSchema(schema: AppwriteNotificationFeedSchema): void {
   const ids = [schema.databaseId, schema.feedbackTableId, schema.notificationsTableId];
-  if (ids.some((id) => !appwriteId.test(id)) || new Set(ids).size !== ids.length) {
+  if (
+    ids.some((id) => !appwriteId.test(id)) ||
+    schema.feedbackTableId === schema.notificationsTableId
+  ) {
     throw new Error("APPWRITE_NOTIFICATION_FEED_SCHEMA_INVALID");
   }
 }
