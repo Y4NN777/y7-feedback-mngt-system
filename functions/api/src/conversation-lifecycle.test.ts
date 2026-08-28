@@ -236,6 +236,33 @@ describe("trusted Conversation and lifecycle orchestration", () => {
     expect(committed?.command.occurredAt).toBe("2026-08-28T12:00:00.000Z");
   });
 
+  it("keeps the idempotency digest stable when a response-loss retry gets a new server time", async () => {
+    const target = setup();
+    const now = vi
+      .fn()
+      .mockReturnValueOnce("2026-08-28T12:00:00.000Z")
+      .mockReturnValueOnce("2026-08-28T12:01:00.000Z");
+    const coordinator = createConversationLifecycleCoordinator(
+      { verify: target.verify },
+      { resolve: target.resolve },
+      { authorize: target.authorize } as unknown as AccountlessAccessCoordinator,
+      { execute: target.execute },
+      { readWorkspace: target.readWorkspace, readReporter: target.readReporter },
+      {
+        digest: (value) => `digest:${JSON.stringify(value)}`,
+        now,
+        reporterActorId: () => "reporter_1",
+      },
+    );
+    const input = { ...context, jwt: "valid.jwt.token", command: message };
+    await coordinator.executeWorkspace(input);
+    await coordinator.executeWorkspace(input);
+    const first = target.execute.mock.calls[0]?.[0];
+    const second = target.execute.mock.calls[1]?.[0];
+    expect(first?.command.occurredAt).not.toBe(second?.command.occurredAt);
+    expect(first?.payloadDigest).toBe(second?.payloadDigest);
+  });
+
   it("BDD-CONV-REPORTER-001 requires proof and binds it to the exact Feedback", async () => {
     const target = setup();
     await expect(
