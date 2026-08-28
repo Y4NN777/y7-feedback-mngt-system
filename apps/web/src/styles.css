@@ -6,6 +6,58 @@
   text-rendering: optimizeLegibility;
 }
 
+.workbench-page {
+  min-width: 0;
+}
+
+.workbench-grid,
+.workbench-detail {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.workbench-filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  border: 1px solid var(--ink, #1c1c1c);
+  padding: 1rem;
+}
+
+.workbench-filters label,
+.workbench-detail dl div {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.workbench-list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.workbench-list button {
+  display: grid;
+  grid-template-columns: minmax(5rem, 0.6fr) minmax(8rem, 1fr) minmax(8rem, 1fr) auto;
+  gap: 1rem;
+  width: 100%;
+  padding: 1rem;
+  text-align: left;
+}
+
+.workbench-detail article {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .workbench-filters,
+  .workbench-list button {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 * {
   box-sizing: border-box;
 }

@@ -12,6 +12,8 @@ import { messages } from "./i18n/messages";
 import type { IntakeGateway } from "./IntakeGateway";
 import type { ProjectGateway } from "./ProjectGateway";
 import { RetrieveFeedback, type AccountlessGateway } from "./RetrieveFeedback";
+import type { WorkbenchGateway } from "./WorkbenchGateway";
+import { WorkbenchPage } from "./WorkbenchPage";
 
 const unavailableGateway: AccountlessGateway = {
   retrieve: () => Promise.resolve({ status: "retryable" }),
@@ -33,6 +35,10 @@ const unavailableAdministrationSession: AdministrationSession = {
 const unavailableConversationGateway: ConversationGateway = {
   retrieve: () => Promise.resolve({ status: "retryable" }),
   execute: () => Promise.resolve({ status: "retryable" }),
+};
+const unavailableWorkbenchGateway: WorkbenchGateway = {
+  list: () => Promise.resolve({ status: "retryable" }),
+  read: () => Promise.resolve({ status: "retryable" }),
 };
 const projectSlugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 
@@ -127,6 +133,7 @@ export function App({
   redirectProject = (canonicalSlug) => {
     window.location.replace(`/${canonicalSlug}`);
   },
+  workbenchGateway = unavailableWorkbenchGateway,
 }: {
   readonly accountlessGateway?: AccountlessGateway;
   readonly administrationGateway?: AdministrationGateway;
@@ -136,6 +143,7 @@ export function App({
   readonly intakeGateway?: IntakeGateway;
   readonly projectGateway?: ProjectGateway;
   readonly redirectProject?: (canonicalSlug: string) => void;
+  readonly workbenchGateway?: WorkbenchGateway;
 }) {
   const [locale, setLocale] = useState<Locale>("fr");
   const copy = messages[locale];
@@ -160,6 +168,16 @@ export function App({
     return (
       <AdministrationPage
         gateway={administrationGateway}
+        locale={locale}
+        onLocaleChange={selectLocale}
+        session={administrationSession}
+      />
+    );
+  }
+  if (window.location.pathname === "/workbench") {
+    return (
+      <WorkbenchPage
+        gateway={workbenchGateway}
         locale={locale}
         onLocaleChange={selectLocale}
         session={administrationSession}
