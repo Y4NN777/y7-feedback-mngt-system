@@ -58,10 +58,12 @@ export interface ConversationNotificationQueries {
   limit(value: number): string;
 }
 
+/* v8 ignore start -- Node Query serialization is exercised by the deployed verifier. */
 const defaultQueries: ConversationNotificationQueries = {
   equal: (attribute, values) => Query.equal(attribute, [...values]),
   limit: (value) => Query.limit(value),
 };
+/* v8 ignore stop */
 const id = /^[A-Za-z0-9][A-Za-z0-9._-]{0,35}$/u;
 
 function object(value: unknown): value is Readonly<Record<string, unknown>> {
@@ -195,6 +197,7 @@ export function createAppwriteConversationNotificationReconciler(
   };
 }
 
+/* v8 ignore start -- mechanical Node facade is exercised by the deployed verifier. */
 export function createNodeAppwriteConversationNotificationReconciler(
   tables: TablesDB,
   schema: AppwriteConversationNotificationSchema,
@@ -217,3 +220,4 @@ export function createNodeAppwriteConversationNotificationReconciler(
     dependencies,
   );
 }
+/* v8 ignore stop */

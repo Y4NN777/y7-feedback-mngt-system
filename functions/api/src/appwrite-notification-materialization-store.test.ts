@@ -135,5 +135,32 @@ describe("Appwrite notification materialization", () => {
     await expect(invalid.store.commit(commit)).rejects.toThrow(
       "APPWRITE_NOTIFICATION_WRITE_UNAVAILABLE",
     );
+
+    const invalidTransaction = setup();
+    vi.mocked(invalidTransaction.tables.createTransaction).mockResolvedValueOnce({
+      $id: "bad id",
+    });
+    await expect(invalidTransaction.store.commit(commit)).rejects.toThrow(
+      "APPWRITE_NOTIFICATION_TRANSACTION_INVALID",
+    );
+
+    const invalidOutbox = setup();
+    vi.mocked(invalidOutbox.tables.createRow)
+      .mockResolvedValueOnce({ $id: "notification_1" })
+      .mockResolvedValueOnce({ $id: "wrong" });
+    await expect(invalidOutbox.store.commit(commit)).rejects.toThrow(
+      "APPWRITE_NOTIFICATION_WRITE_UNAVAILABLE",
+    );
+
+    const rollbackFailure = setup();
+    vi.mocked(rollbackFailure.tables.createRow).mockRejectedValueOnce(
+      new Error("write failed"),
+    );
+    vi.mocked(rollbackFailure.tables.updateTransaction).mockRejectedValueOnce(
+      new Error("rollback failed"),
+    );
+    await expect(rollbackFailure.store.commit(commit)).rejects.toThrow(
+      "APPWRITE_NOTIFICATION_WRITE_UNAVAILABLE",
+    );
   });
 });

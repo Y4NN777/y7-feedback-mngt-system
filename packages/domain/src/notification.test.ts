@@ -97,5 +97,43 @@ describe("Day 3 notification recipient policy", () => {
         participants,
       ),
     ).toThrow(new NotificationPolicyError("ERR-NOTIFICATION-FACT-INVALID"));
+    expect(() =>
+      planNotificationRecipients({ ...publicFact, eventId: " " }, participants),
+    ).toThrow(new NotificationPolicyError("ERR-NOTIFICATION-FACT-INVALID"));
+    expect(() =>
+      planNotificationRecipients(publicFact, { ...participants, ownerIds: [] }),
+    ).toThrow(new NotificationPolicyError("ERR-NOTIFICATION-FACT-INVALID"));
+    expect(() =>
+      planNotificationRecipients(
+        { ...publicFact, visibility: "workspace" },
+        participants,
+      ),
+    ).toThrow(new NotificationPolicyError("ERR-NOTIFICATION-VISIBILITY-INVALID"));
+  });
+
+  it("BDD-NOT-003 keeps a workspace-only Message inside the product feed", () => {
+    expect(
+      planNotificationRecipients(
+        {
+          ...publicFact,
+          kind: "conversation_message",
+          visibility: "workspace",
+          actorId: "reporter-one",
+          actorKind: "reporter",
+        },
+        participants,
+      ),
+    ).toEqual([
+      {
+        principalId: "owner-one",
+        kind: "workspace_owner",
+        channels: ["in_product"],
+      },
+      {
+        principalId: "maintainer-one",
+        kind: "assigned_maintainer",
+        channels: ["in_product"],
+      },
+    ]);
   });
 });

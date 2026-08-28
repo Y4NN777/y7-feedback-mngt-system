@@ -10,7 +10,10 @@ import type { AdministrationSession } from "./AdministrationSession";
 import type { WorkbenchGateway } from "./WorkbenchGateway";
 import { WorkbenchPage } from "./WorkbenchPage";
 
-function setup(list?: WorkbenchGateway["list"]) {
+function setup(
+  list?: WorkbenchGateway["list"],
+  notificationList?: WorkbenchGateway["notifications"],
+) {
   let invalidateNotifications: (() => void) | undefined;
   const listMock = vi.fn<WorkbenchGateway["list"]>(
     list ??
@@ -31,19 +34,21 @@ function setup(list?: WorkbenchGateway["list"]) {
   const executeMock = vi.fn<WorkbenchGateway["execute"]>(() =>
     Promise.resolve({ status: "ok" as const, result: { status: "applied" } }),
   );
-  const notificationsMock = vi.fn<WorkbenchGateway["notifications"]>(() =>
-    Promise.resolve({
-      status: "ok" as const,
-      result: [
-        {
-          id: "notification_1",
-          feedbackId: "feedback_1",
-          kind: "lifecycle_changed",
-          createdAt: "2026-08-28T10:05:00.000Z",
-          readAt: null,
-        },
-      ],
-    }),
+  const notificationsMock = vi.fn<WorkbenchGateway["notifications"]>(
+    () =>
+      notificationList?.({ workspaceId: "workspace_1", projectId: "project_1" }) ??
+      Promise.resolve({
+        status: "ok" as const,
+        result: [
+          {
+            id: "notification_1",
+            feedbackId: "feedback_1",
+            kind: "lifecycle_changed",
+            createdAt: "2026-08-28T10:05:00.000Z",
+            readAt: null,
+          },
+        ],
+      }),
   );
   const markNotificationReadMock = vi.fn<WorkbenchGateway["markNotificationRead"]>(
     (input) =>
@@ -220,6 +225,64 @@ describe("Workbench experience", () => {
         notificationId: "notification_1",
       }),
     );
+  });
+
+  it("renders empty, read and retryable notification feed states", async () => {
+    const user = userEvent.setup();
+    setup(undefined, () => Promise.resolve({ status: "ok", result: [] }));
+    await open(user);
+    expect(await screen.findByText("Aucune notification.")).toBeVisible();
+
+    document.body.replaceChildren();
+    setup(undefined, () => Promise.resolve({ status: "retryable" }));
+    await open(user);
+    expect(
+      await screen.findByText("Les notifications sont indisponibles."),
+    ).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Réessayer" }));
+
+    document.body.replaceChildren();
+    setup(undefined, () =>
+      Promise.resolve({
+        status: "ok",
+        result: [
+          {
+            id: "notification_read",
+            feedbackId: "feedback_1",
+            kind: "conversation_message",
+            createdAt: "2026-08-28T10:05:00.000Z",
+            readAt: "2026-08-28T10:06:00.000Z",
+          },
+        ],
+      }),
+    );
+    await open(user);
+    expect(await screen.findByText(/Lue/u)).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: "Marquer comme lue" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders a stable denied detail outcome", async () => {
+    const user = userEvent.setup();
+    const target = setup();
+    vi.spyOn(target.gateway, "read").mockResolvedValueOnce({ status: "denied" });
+    await open(user);
+    await user.click(await screen.findByRole("button", { name: /feedback_1/u }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Accès refusé");
+  });
+
+  it("renders a retryable conversation outcome", async () => {
+    const user = userEvent.setup();
+    const target = setup();
+    vi.spyOn(target.gateway, "conversation").mockResolvedValueOnce({
+      status: "retryable",
+    });
+    await open(user);
+    await user.click(await screen.findByRole("button", { name: /feedback_1/u }));
+    expect(
+      await screen.findByText("Le service est indisponible. Réessayez."),
+    ).toBeVisible();
   });
 
   it("BDD-WORK-WEB-006 executes classification only through the trusted gateway", async () => {

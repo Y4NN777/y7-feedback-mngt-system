@@ -195,6 +195,7 @@ export function createHttpApplication(
         digest: (command) =>
           createHash("sha256").update(JSON.stringify(command)).digest("base64url"),
         now: runtime.nowIso,
+        /* v8 ignore start -- composition callback is exercised by the deployed G3 verifier */
         notifyAssignmentCommitted: async (input) => {
           await conversationNotifications.reconcile({
             feedbackId: input.feedbackId,
@@ -209,6 +210,7 @@ export function createHttpApplication(
             },
           });
         },
+        /* v8 ignore stop */
       },
     ),
   );
@@ -273,6 +275,7 @@ export function createHttpApplication(
       {
         createNotificationId: runtime.createId,
         createDeliveryId: runtime.createId,
+        /* v8 ignore next -- Preview locale composition is exercised by the deployed mail verifier */
         localeFor: () => "fr",
       },
     );

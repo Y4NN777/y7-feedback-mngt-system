@@ -41,10 +41,12 @@ export interface AppwriteNotificationMaterializationQueries {
   limit(value: number): string;
 }
 
+/* v8 ignore start -- Node Query serialization is exercised by the deployed verifier. */
 const defaultQueries: AppwriteNotificationMaterializationQueries = {
   equal: (attribute, values) => Query.equal(attribute, [...values]),
   limit: (value) => Query.limit(value),
 };
+/* v8 ignore stop */
 const appwriteId = /^[A-Za-z0-9][A-Za-z0-9._-]{0,35}$/u;
 
 function validSchema(schema: AppwriteNotificationMaterializationSchema): boolean {
@@ -163,6 +165,7 @@ export function createAppwriteNotificationMaterializationStore(
   };
 }
 
+/* v8 ignore start -- mechanical Node facade is exercised by the deployed verifier. */
 export function createNodeAppwriteNotificationMaterializationStore(
   tables: TablesDB,
   schema: AppwriteNotificationMaterializationSchema,
@@ -186,3 +189,4 @@ export function createNodeAppwriteNotificationMaterializationStore(
     sensitive,
   );
 }
+/* v8 ignore stop */

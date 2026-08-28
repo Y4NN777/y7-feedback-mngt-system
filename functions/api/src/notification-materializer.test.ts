@@ -6,7 +6,13 @@ import {
   type NotificationMaterializationStore,
 } from "./notification-materializer";
 
-function setup(existing = false) {
+function setup(
+  existing = false,
+  ids: {
+    readonly notification?: () => string;
+    readonly delivery?: () => string;
+  } = {},
+) {
   const commits: NotificationMaterializationCommit[] = [];
   const commit = vi.fn((input: NotificationMaterializationCommit) => {
     commits.push(input);
@@ -23,8 +29,9 @@ function setup(existing = false) {
     commit,
     store,
     materializer: createNotificationMaterializer(store, {
-      createNotificationId: () => `notification_${String(++notification)}`,
-      createDeliveryId: () => `delivery_${String(++delivery)}`,
+      createNotificationId:
+        ids.notification ?? (() => `notification_${String(++notification)}`),
+      createDeliveryId: ids.delivery ?? (() => `delivery_${String(++delivery)}`),
       localeFor: (principalId) => (principalId === "reporter_1" ? "fr" : "en"),
     }),
   };
@@ -133,6 +140,29 @@ describe("notification reconciliation", () => {
         ...command,
         fact: { ...command.fact, eventId: "invalid id" },
       }),
+    ).resolves.toEqual({ status: "retryable" });
+
+    const invalidVisibility = setup();
+    await expect(
+      invalidVisibility.materializer.reconcile({
+        ...command,
+        fact: { ...command.fact, visibility: "workspace" },
+      }),
+    ).resolves.toEqual({ status: "retryable" });
+
+    const unsupportedEmailEvent = setup();
+    await expect(
+      unsupportedEmailEvent.materializer.reconcile({
+        ...command,
+        fact: { ...command.fact, kind: "feedback_received" },
+      }),
+    ).resolves.toEqual({ status: "retryable" });
+
+    await expect(
+      setup(false, { notification: () => "bad id" }).materializer.reconcile(command),
+    ).resolves.toEqual({ status: "retryable" });
+    await expect(
+      setup(false, { delivery: () => "bad id" }).materializer.reconcile(command),
     ).resolves.toEqual({ status: "retryable" });
   });
 });

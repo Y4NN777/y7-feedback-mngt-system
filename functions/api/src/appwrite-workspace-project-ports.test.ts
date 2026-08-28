@@ -305,6 +305,36 @@ describe("Appwrite Workspace Project operation ports", () => {
         "2026-08-28T12:30:00.000Z",
       ),
     ).rejects.toThrow(new WorkspaceOperationDeniedError());
+
+    for (const [notificationId, readAt] of [
+      ["bad id", "2026-08-28T12:30:00.000Z"],
+      ["notification-a", "not-an-instant"],
+    ] as const) {
+      await expect(
+        setup().ports.notifications.markRead(scope, notificationId, readAt),
+      ).rejects.toThrow("APPWRITE_WORKSPACE_OPERATION_INPUT_INVALID");
+    }
+
+    const foreign = setup();
+    foreign.listRows.mockResolvedValueOnce({
+      rows: [
+        {
+          $id: "notification-a",
+          feedbackId: "feedback-a",
+          recipientId: "user-b",
+          workspaceId: scope.workspaceId,
+          projectId: scope.projectId,
+        },
+      ],
+      total: 1,
+    });
+    await expect(
+      foreign.ports.notifications.markRead(
+        scope,
+        "notification-a",
+        "2026-08-28T12:30:00.000Z",
+      ),
+    ).rejects.toThrow(new WorkspaceOperationDeniedError());
   });
 
   it("BDD-OWN-FUNCTION-002 fails closed if a scoped query returns a foreign row", async () => {
@@ -465,11 +495,33 @@ describe("Appwrite Workspace Project operation ports", () => {
       kind: "conversation_message",
       createdAt: "2026-08-28T12:00:00.000Z",
     };
+    const readNotification = setup();
+    readNotification.listRows.mockResolvedValueOnce({
+      rows: [{ ...validNotification, readAt: "2026-08-28T12:10:00.000Z" }],
+      total: 1,
+    });
+    await expect(readNotification.ports.notifications.list(scope)).resolves.toEqual({
+      notifications: [
+        {
+          id: "notification-a",
+          feedbackId: "feedback-a",
+          kind: "conversation_message",
+          createdAt: "2026-08-28T12:00:00.000Z",
+          readAt: "2026-08-28T12:10:00.000Z",
+        },
+      ],
+    });
     for (const notification of [
+      null,
       {},
       { ...validNotification, $id: "bad id" },
       { ...validNotification, feedbackId: 7 },
       { ...validNotification, feedbackId: "feedback-b", recipientId: "user-b" },
+      { ...validNotification, workspaceId: "workspace-b" },
+      { ...validNotification, projectId: "project-b" },
+      { ...validNotification, kind: 7 },
+      { ...validNotification, createdAt: 7 },
+      { ...validNotification, readAt: 7 },
     ]) {
       const target = setup();
       target.listRows.mockResolvedValueOnce({ rows: [notification], total: 1 });

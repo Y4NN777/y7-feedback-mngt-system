@@ -13,14 +13,20 @@ const schema = {
   accessGrantsTableId: "access_grants",
 };
 
-function setup() {
+function setup(
+  options: {
+    readonly feedback?: Readonly<Record<string, unknown>>;
+    readonly owners?: readonly unknown[];
+    readonly grants?: readonly unknown[];
+  } = {},
+) {
   const commit = vi.fn<NotificationMaterializationStore["commit"]>(() =>
     Promise.resolve(),
   );
   const listRows = vi
     .fn<ConversationNotificationTablesPort["listRows"]>()
     .mockResolvedValueOnce({
-      rows: [
+      rows: options.owners ?? [
         {
           $id: "membership_1",
           workspaceId: "workspace_1",
@@ -31,7 +37,7 @@ function setup() {
       ],
     })
     .mockResolvedValueOnce({
-      rows: [
+      rows: options.grants ?? [
         {
           $id: "grant_1",
           feedbackId: "feedback_1",
@@ -47,6 +53,7 @@ function setup() {
         projectId: "project_1",
         reporterId: "reporter_1",
         assignedMaintainerId: "maintainer_1",
+        ...options.feedback,
       }),
     ),
     listRows,
@@ -144,6 +151,118 @@ describe("Appwrite conversation notification reconciliation", () => {
     ).toEqual(["reporter_1", "maintainer_1"]);
   });
 
+  it.each([
+    ["reporter", "reporter"],
+    ["workspace", "workspace"],
+  ] as const)(
+    "BDD-NOT-RECON-006 maps a %s-audience Message to %s visibility",
+    async (audience, visibility) => {
+      const target = setup();
+      await target.reconciler.reconcile({
+        feedbackId: "feedback_1",
+        actorId: "maintainer_1",
+        actorKind: "workspace",
+        command: {
+          kind: "append_message",
+          eventId: `message_${audience}`,
+          actorId: "maintainer_1",
+          actorKind: "workspace",
+          audience,
+          occurredAt: "2026-08-28T12:01:40.000Z",
+          content: "message sentinel",
+        },
+      });
+      expect(target.commit).toHaveBeenCalled();
+      const first = target.commit.mock.calls[0]?.[0];
+      expect(first?.notification.kind).toBe("conversation_message");
+      expect(JSON.stringify(target.commit.mock.calls)).not.toContain(
+        "message sentinel",
+      );
+      expect(
+        first?.deliveries.every(({ channel }) =>
+          visibility === "workspace" ? channel === "in_product" : true,
+        ),
+      ).toBe(true);
+    },
+  );
+
+  it.each([
+    [{ workspaceId: "workspace_other" }],
+    [{ role: "project_maintainer" }],
+    [{ status: "removed" }],
+    [{ userId: 7 }],
+    [{ userId: "bad id" }],
+  ])("rejects malformed owner context %#", async (override) => {
+    const target = setup({
+      owners: [
+        {
+          $id: "membership_1",
+          workspaceId: "workspace_1",
+          userId: "owner_1",
+          role: "workspace_owner",
+          status: "active",
+          ...override,
+        },
+      ],
+    });
+    await expect(
+      target.reconciler.reconcile({
+        feedbackId: "feedback_1",
+        actorId: "maintainer_1",
+        actorKind: "workspace",
+        command: {
+          kind: "resolve",
+          eventId: "event_invalid_owner",
+          expectedVersion: 2,
+          actorId: "maintainer_1",
+          actorKind: "workspace",
+          occurredAt: "2026-08-28T12:03:00.000Z",
+          reason: "Resolved",
+        },
+      }),
+    ).rejects.toThrow("APPWRITE_NOTIFICATION_CONTEXT_INVALID");
+  });
+
+  it("rejects a non-object owner row", async () => {
+    const target = setup({ owners: [null] });
+    await expect(
+      target.reconciler.reconcile({
+        feedbackId: "feedback_1",
+        actorId: "maintainer_1",
+        actorKind: "workspace",
+        command: {
+          kind: "resolve",
+          eventId: "event_invalid_owner_row",
+          expectedVersion: 2,
+          actorId: "maintainer_1",
+          actorKind: "workspace",
+          occurredAt: "2026-08-28T12:03:30.000Z",
+          reason: "Resolved",
+        },
+      }),
+    ).rejects.toThrow("APPWRITE_NOTIFICATION_CONTEXT_INVALID");
+  });
+
+  it("supports a Feedback without a current Maintainer", async () => {
+    const target = setup({ feedback: { assignedMaintainerId: undefined } });
+    await expect(
+      target.reconciler.reconcile({
+        feedbackId: "feedback_1",
+        actorId: "reporter_1",
+        actorKind: "reporter",
+        command: {
+          kind: "reopen",
+          eventId: "event_unassigned",
+          expectedVersion: 2,
+          actorId: "reporter_1",
+          actorKind: "reporter",
+          occurredAt: "2026-08-28T12:04:00.000Z",
+          reason: "More evidence",
+        },
+      }),
+    ).resolves.toEqual({ status: "materialized", count: 1 });
+  });
+
   it("BDD-NOT-RECON-003 fails closed for missing owner or ambiguous grant", async () => {
     const target = setup();
     target.listRows.mockReset();
@@ -166,5 +285,21 @@ describe("Appwrite conversation notification reconciliation", () => {
         },
       }),
     ).rejects.toThrow("APPWRITE_NOTIFICATION_CONTEXT_INVALID");
+
+    expect(() =>
+      createAppwriteConversationNotificationReconciler(
+        target.tables,
+        { ...schema, accessGrantsTableId: "bad id" },
+        {
+          hasEventRecipient: () => Promise.resolve(false),
+          commit: () => Promise.resolve(),
+        },
+        {
+          createNotificationId: () => "notification_1",
+          createDeliveryId: () => "delivery_1",
+          localeFor: () => "fr",
+        },
+      ),
+    ).toThrow("APPWRITE_NOTIFICATION_CONTEXT_SCHEMA_INVALID");
   });
 });

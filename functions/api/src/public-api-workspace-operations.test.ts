@@ -136,6 +136,21 @@ describe("trusted Workspace operation HTTP boundary", () => {
       });
     }
     expect(target.method).not.toHaveBeenCalled();
+
+    await expect(
+      target.api.handle({
+        method: "POST",
+        path: `${base}/notifications/read`,
+        headers,
+        body: {
+          notificationId: "bad id",
+          readAt: "2026-08-28T12:00:00.000Z",
+        },
+      }),
+    ).resolves.toEqual({
+      statusCode: 404,
+      body: { error: "ERR-WORKSPACE-DENIED" },
+    });
   });
 
   it("does not expose raw persistence create, update, or delete commands", async () => {
