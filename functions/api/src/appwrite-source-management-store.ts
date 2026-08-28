@@ -226,8 +226,16 @@ function connection(
 }
 
 function view(value: ActiveSourceManagementConnection): SourceManagementConnection {
-  const { encryptedGrantRef: _grant, ownerUserId: _owner, ...safe } = value;
-  return safe;
+  return {
+    id: value.id,
+    workspaceId: value.workspaceId,
+    projectId: value.projectId,
+    provider: value.provider,
+    state: value.state,
+    selectedRepositories: value.selectedRepositories,
+    importedRepositories: value.importedRepositories,
+    updatedAt: value.updatedAt,
+  };
 }
 
 function pendingSelection(
@@ -331,7 +339,13 @@ export function createAppwriteSourceManagementStore(
         );
         return value?.state === "active" ? value : null;
       } catch (error: unknown) {
-        return object(error) && error.code === 404 ? null : Promise.reject(error);
+        return object(error) && error.code === 404
+          ? null
+          : Promise.reject(
+              error instanceof Error
+                ? error
+                : new Error("APPWRITE_SOURCE_MANAGEMENT_UNAVAILABLE"),
+            );
       }
     },
     async saveImport(input) {

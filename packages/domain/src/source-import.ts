@@ -51,6 +51,10 @@ export class SourceImportError extends Error {
 const identifier = /^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$/u;
 const slug = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/u;
 
+function object(value: unknown): value is Readonly<Record<string, unknown>> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function text(value: unknown, maximum: number): string {
   if (typeof value !== "string") throw new SourceImportError();
   const normalized = value.trim();
@@ -88,18 +92,18 @@ function httpsUrl(value: unknown): string {
   }
 }
 
-export function importRepositoryMetadata(input: {
-  readonly connectionId: string;
-  readonly repository: ProviderRepositoryMetadata;
-  readonly observedAt: string;
-}): ImportedRepositoryMetadata {
+export function importRepositoryMetadata(input: unknown): ImportedRepositoryMetadata {
   if (
+    !object(input) ||
     Object.keys(input).sort().join(",") !== "connectionId,observedAt,repository" ||
+    !object(input.repository) ||
     Object.keys(input.repository).sort().join(",") !==
       "defaultBranch,id,name,owner,provider,releases,visibility,webUrl" ||
     (input.repository.provider !== "github" &&
       input.repository.provider !== "gitlab") ||
-    !["public", "private", "internal"].includes(input.repository.visibility) ||
+    (input.repository.visibility !== "public" &&
+      input.repository.visibility !== "private" &&
+      input.repository.visibility !== "internal") ||
     !Array.isArray(input.repository.releases) ||
     input.repository.releases.length > 100
   ) {
@@ -113,7 +117,10 @@ export function importRepositoryMetadata(input: {
   const observedAt = timestamp(input.observedAt);
   const seen = new Set<string>();
   const releases = input.repository.releases.map((release) => {
-    if (Object.keys(release).sort().join(",") !== "id,name,publishedAt,tag,webUrl") {
+    if (
+      !object(release) ||
+      Object.keys(release).sort().join(",") !== "id,name,publishedAt,tag,webUrl"
+    ) {
       throw new SourceImportError();
     }
     const providerReleaseId = text(release.id, 200);
@@ -161,7 +168,7 @@ export function createProjectBadge(input: {
     ) {
       throw new Error("SOURCE_BADGE_INVALID");
     }
-    const destination = new URL(`p/${input.projectSlug}`, origin).toString();
+    const destination = new URL(input.projectSlug, origin).toString();
     return {
       destination,
       markdown: `[![Feedback](https://img.shields.io/badge/Y7-Feedback-5b5bd6)](${destination})`,

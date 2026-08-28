@@ -13,6 +13,7 @@ import { createHttpIntakeGateway } from "./IntakeGateway";
 import { createAppwriteNotificationInvalidation } from "./NotificationInvalidation";
 import { createHttpProjectGateway } from "./ProjectGateway";
 import { createHttpWorkbenchGateway } from "./WorkbenchGateway";
+import { createHttpSourceManagementGateway } from "./SourceManagementGateway";
 import { OperationalTelemetry } from "./observability/OperationalTelemetry";
 import "./styles.css";
 
@@ -37,6 +38,10 @@ const notificationInvalidation = createAppwriteNotificationInvalidation(
   config.appwriteEndpoint,
   config.appwriteProjectId,
 );
+const sourceManagementGateway = createHttpSourceManagementGateway(
+  config.apiEndpoint,
+  () => administrationSession.createJwt(),
+);
 
 if (!root) {
   throw new Error("Application root is missing");
@@ -54,6 +59,7 @@ createRoot(root).render(
         notificationInvalidation={notificationInvalidation}
         projectGateway={projectGateway}
         workbenchGateway={workbenchGateway}
+        sourceManagementGateway={sourceManagementGateway}
       />
       <OperationalTelemetry />
     </QueryClientProvider>
