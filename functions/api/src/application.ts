@@ -25,6 +25,10 @@ import { createNodeAppwriteWorkbenchStore } from "./appwrite-workbench-store.js"
 import { createNodeAppwriteWorkbenchMutationStore } from "./appwrite-workbench-mutation-store.js";
 import { createNodeAppwriteProviderGrantVault } from "./appwrite-provider-grant-vault.js";
 import { createNodeAppwriteSourceConnectionStore } from "./appwrite-source-connection-store.js";
+import {
+  createAppwriteSourceProjectSlugPort,
+  createNodeAppwriteSourceManagementStore,
+} from "./appwrite-source-management-store.js";
 import type { HttpDependencies } from "./http.js";
 import { createIntakeCoordinator } from "./intake.js";
 import { createConversationLifecycleCoordinator } from "./conversation-lifecycle.js";
@@ -46,6 +50,7 @@ import { createReporterAttachmentDownload } from "./reporter-attachment-download
 import { createSensitiveDataProtector } from "./sensitive-data-protector.js";
 import { createSourceConnectionCoordinator } from "./source-connection-coordinator.js";
 import { createSourceConnectionHttp } from "./source-connection-http.js";
+import { createSourceManagementCoordinator } from "./source-management.js";
 import {
   createWorkspaceAttachmentDownload,
   type AppwritePrincipalVerifier,
@@ -346,52 +351,69 @@ export function createHttpApplication(
   );
   /* v8 ignore start -- provider composition is exercised by real Preview OAuth */
   const sourceConnections = config.providers
-    ? createSourceConnectionHttp(
-        createSourceConnectionCoordinator({
-          principalVerifier,
-          scopeResolver: workspaceScope,
-          store: createNodeAppwriteSourceConnectionStore(runtime.tables, {
+    ? (() => {
+        const vault = createNodeAppwriteProviderGrantVault(
+          runtime.tables,
+          {
             databaseId: config.appwriteSchema.databaseId,
-            sourceConnectionsTableId: config.appwriteSchema.sourceConnectionsTableId,
+            providerGrantsTableId: config.appwriteSchema.providerGrantsTableId,
+          },
+          Buffer.from(config.providerGrantEnvelopeKey, "base64url"),
+        );
+        const providers = [
+          createGitHubSourceProvider(
+            config.providers.github,
+            vault,
+            globalThis.fetch,
+            Date.now,
+            100,
+            (event) => runtime.providerDiagnostic?.({ provider: "github", ...event }),
+          ),
+          createGitLabSourceProvider(config.providers.gitlab, vault),
+        ] as const;
+        return createSourceConnectionHttp(
+          createSourceConnectionCoordinator({
+            principalVerifier,
+            scopeResolver: workspaceScope,
+            store: createNodeAppwriteSourceConnectionStore(runtime.tables, {
+              databaseId: config.appwriteSchema.databaseId,
+              sourceConnectionsTableId: config.appwriteSchema.sourceConnectionsTableId,
+            }),
+            providers,
+            createStateId: runtime.createId,
+            createNonce:
+              runtime.createProviderNonce ??
+              (() => randomBytes(24).toString("base64url")),
+            digestNonce:
+              runtime.digestProviderNonce ??
+              ((nonce) => createHash("sha256").update(nonce).digest("base64url")),
+            now: runtime.nowMs,
+            nowIso: runtime.nowIso,
+            ttlMs: 5 * 60 * 1_000,
           }),
-          providers: (() => {
-            const vault = createNodeAppwriteProviderGrantVault(
-              runtime.tables,
+          {
+            github: config.providers.github.callbackUrl,
+            gitlab: config.providers.gitlab.callbackUrl,
+          },
+          createSourceManagementCoordinator({
+            principalVerifier,
+            scopeResolver: workspaceScope,
+            store: createNodeAppwriteSourceManagementStore(runtime.tables, {
+              databaseId: config.appwriteSchema.databaseId,
+              sourceConnectionsTableId: config.appwriteSchema.sourceConnectionsTableId,
+            }),
+            providers,
+            projectSlug: createAppwriteSourceProjectSlugPort(
+              (input) => runtime.tables.getRow(input),
               {
                 databaseId: config.appwriteSchema.databaseId,
-                providerGrantsTableId: config.appwriteSchema.providerGrantsTableId,
+                projectsTableId: config.appwriteSchema.projectsTableId,
               },
-              Buffer.from(config.providerGrantEnvelopeKey, "base64url"),
-            );
-            return [
-              createGitHubSourceProvider(
-                config.providers.github,
-                vault,
-                globalThis.fetch,
-                Date.now,
-                100,
-                (event) =>
-                  runtime.providerDiagnostic?.({ provider: "github", ...event }),
-              ),
-              createGitLabSourceProvider(config.providers.gitlab, vault),
-            ];
-          })(),
-          createStateId: runtime.createId,
-          createNonce:
-            runtime.createProviderNonce ??
-            (() => randomBytes(24).toString("base64url")),
-          digestNonce:
-            runtime.digestProviderNonce ??
-            ((nonce) => createHash("sha256").update(nonce).digest("base64url")),
-          now: runtime.nowMs,
-          nowIso: runtime.nowIso,
-          ttlMs: 5 * 60 * 1_000,
-        }),
-        {
-          github: config.providers.github.callbackUrl,
-          gitlab: config.providers.gitlab.callbackUrl,
-        },
-      )
+            ),
+            nowIso: runtime.nowIso,
+          }),
+        );
+      })()
     : undefined;
   /* v8 ignore stop */
 

@@ -30,14 +30,34 @@ function fixture() {
     ),
     disconnect: vi.fn(() => Promise.resolve({ status: "disconnected" as const })),
   };
+  const management = {
+    list: vi.fn(() =>
+      Promise.resolve({
+        status: "ok" as const,
+        projectSlug: "wise-money",
+        connections: [],
+      }),
+    ),
+    refresh: vi.fn(() =>
+      Promise.resolve({
+        status: "ok" as const,
+        connection: { id: "connection_1" },
+      }),
+    ),
+  };
   return {
     coordinator,
-    http: createSourceConnectionHttp(coordinator, {
-      github:
-        "https://y7-feedback-api-preview.appwrite.network/providers/github/callback",
-      gitlab:
-        "https://y7-feedback-api-preview.appwrite.network/providers/gitlab/callback",
-    }),
+    management,
+    http: createSourceConnectionHttp(
+      coordinator,
+      {
+        github:
+          "https://y7-feedback-api-preview.appwrite.network/providers/github/callback",
+        gitlab:
+          "https://y7-feedback-api-preview.appwrite.network/providers/gitlab/callback",
+      },
+      management as never,
+    ),
   };
 }
 
@@ -127,6 +147,77 @@ describe("source connection HTTP boundary", () => {
     ).resolves.toEqual({
       statusCode: 200,
       body: { status: "disconnected" },
+    });
+  });
+
+  it("BDD-SRC-211 exposes scoped management list and refresh commands", async () => {
+    const { http, management } = fixture();
+    await expect(
+      http.handle({
+        method: "POST",
+        path: "/v1/workspaces/workspace_1/projects/project_1/source-connections/manage/list",
+        headers: { authorization: "Bearer valid.jwt.value" },
+        query: {},
+        body: {},
+      }),
+    ).resolves.toEqual({
+      statusCode: 200,
+      body: { status: "ok", projectSlug: "wise-money", connections: [] },
+    });
+    await expect(
+      http.handle({
+        method: "POST",
+        path: "/v1/workspaces/workspace_1/projects/project_1/source-connections/connection_1/refresh",
+        headers: { authorization: "Bearer valid.jwt.value" },
+        query: {},
+        body: { repositoryId: "repo_1" },
+      }),
+    ).resolves.toEqual({
+      statusCode: 200,
+      body: { status: "ok", connection: { id: "connection_1" } },
+    });
+    expect(management.refresh).toHaveBeenCalledWith({
+      jwt: "valid.jwt.value",
+      workspaceId: "workspace_1",
+      projectId: "project_1",
+      connectionId: "connection_1",
+      repositoryId: "repo_1",
+    });
+  });
+
+  it("BDD-SRC-212 fails closed when source management is unavailable or malformed", async () => {
+    const { coordinator, http } = fixture();
+    const callbacks = {
+      github:
+        "https://y7-feedback-api-preview.appwrite.network/providers/github/callback",
+      gitlab:
+        "https://y7-feedback-api-preview.appwrite.network/providers/gitlab/callback",
+    } as const;
+    const unavailable = createSourceConnectionHttp(coordinator, callbacks);
+
+    await expect(
+      unavailable.handle({
+        method: "POST",
+        path: "/v1/workspaces/workspace_1/projects/project_1/source-connections/manage/list",
+        headers: { authorization: "Bearer valid.jwt.value" },
+        query: {},
+        body: {},
+      }),
+    ).resolves.toEqual({
+      statusCode: 503,
+      body: { error: "ERR-SOURCE-UNAVAILABLE" },
+    });
+    await expect(
+      http.handle({
+        method: "POST",
+        path: "/v1/workspaces/workspace_1/projects/project_1/source-connections/connection_1/refresh",
+        headers: { authorization: "Bearer valid.jwt.value" },
+        query: {},
+        body: {},
+      }),
+    ).resolves.toEqual({
+      statusCode: 404,
+      body: { error: "ERR-SOURCE-DENIED" },
     });
   });
 
