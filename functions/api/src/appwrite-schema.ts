@@ -286,6 +286,12 @@ export function createAppwriteInfrastructureManifest(
         ],
       ),
       table(
+        schema.notificationSignalsTableId,
+        "Notification invalidation signals",
+        [varchar("recipientId", 36), datetime("createdAt")],
+        [index("recipient_created", ["recipientId", "createdAt"])],
+      ),
+      table(
         schema.outboxTableId,
         "Notification outbox",
         [

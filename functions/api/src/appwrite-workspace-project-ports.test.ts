@@ -11,6 +11,7 @@ const schema = {
   databaseId: "feedback",
   feedbackTableId: "feedback_rows",
   notificationsTableId: "notifications",
+  notificationSignalsTableId: "notification_signals",
 };
 const scope = {
   principalId: "user-a",
@@ -236,7 +237,8 @@ describe("Appwrite Workspace Project operation ports", () => {
       ids: ["notification-a"],
     });
     await expect(target.ports.realtime.authorize(scope)).resolves.toEqual({
-      channel: "workspace.workspace-a.project.project-a",
+      databaseId: "feedback",
+      tableId: "notification_signals",
     });
   });
 

@@ -228,6 +228,7 @@ export function createHttpApplication(
       databaseId: config.appwriteSchema.databaseId,
       feedbackTableId: config.appwriteSchema.feedbackTableId,
       notificationsTableId: config.appwriteSchema.notificationsTableId,
+      notificationSignalsTableId: config.appwriteSchema.notificationSignalsTableId,
     },
     runtime.createId,
   );
@@ -281,6 +282,7 @@ export function createHttpApplication(
             config.appwriteSchema.workspaceMembershipsTableId,
           projectAssignmentsTableId: config.appwriteSchema.projectAssignmentsTableId,
           notificationsTableId: config.appwriteSchema.notificationsTableId,
+          notificationSignalsTableId: config.appwriteSchema.notificationSignalsTableId,
           outboxTableId: config.appwriteSchema.outboxTableId,
         },
         sensitive,

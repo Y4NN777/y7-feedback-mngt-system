@@ -10,6 +10,7 @@ export interface AppwriteWorkspaceProjectOperationSchema {
   readonly databaseId: string;
   readonly feedbackTableId: string;
   readonly notificationsTableId: string;
+  readonly notificationSignalsTableId: string;
 }
 
 export interface AppwriteWorkspaceProjectTablesPort {
@@ -66,10 +67,15 @@ function isObject(value: unknown): value is Readonly<Record<string, unknown>> {
 }
 
 function validateSchema(schema: AppwriteWorkspaceProjectOperationSchema): void {
-  const ids = [schema.databaseId, schema.feedbackTableId, schema.notificationsTableId];
+  const ids = [
+    schema.databaseId,
+    schema.feedbackTableId,
+    schema.notificationsTableId,
+    schema.notificationSignalsTableId,
+  ];
   if (
     ids.some((id) => !appwriteId.test(id)) ||
-    schema.feedbackTableId === schema.notificationsTableId
+    new Set(ids.slice(1)).size !== ids.length - 1
   ) {
     throw new Error("APPWRITE_WORKSPACE_OPERATION_SCHEMA_INVALID");
   }
@@ -340,7 +346,8 @@ export function createAppwriteWorkspaceProjectOperationPorts(
       authorize(scope) {
         validateScope(scope);
         return Promise.resolve({
-          channel: `workspace.${scope.workspaceId}.project.${scope.projectId}`,
+          databaseId: schema.databaseId,
+          tableId: schema.notificationSignalsTableId,
         });
       },
     },

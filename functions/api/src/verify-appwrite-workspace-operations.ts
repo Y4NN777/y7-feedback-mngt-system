@@ -81,6 +81,7 @@ async function main(): Promise<void> {
       databaseId: config.appwriteSchema.databaseId,
       feedbackTableId: config.appwriteSchema.feedbackTableId,
       notificationsTableId: config.appwriteSchema.notificationsTableId,
+      notificationSignalsTableId: config.appwriteSchema.notificationSignalsTableId,
     },
     () => {
       const id = rowIds.shift();

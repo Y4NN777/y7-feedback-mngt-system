@@ -25,6 +25,7 @@ export interface ServerConfig {
     readonly lifecycleTableId: string;
     readonly accessGrantsTableId: string;
     readonly notificationsTableId: string;
+    readonly notificationSignalsTableId: string;
     readonly outboxTableId: string;
     readonly idempotencyTableId: string;
     readonly attachmentBucketId: string;
@@ -86,6 +87,9 @@ function parseAppwriteSchema(input: Readonly<Record<string, string | undefined>>
     lifecycleTableId: requireAppwriteId(input.APPWRITE_LIFECYCLE_TABLE_ID),
     accessGrantsTableId: requireAppwriteId(input.APPWRITE_ACCESS_GRANTS_TABLE_ID),
     notificationsTableId: requireAppwriteId(input.APPWRITE_NOTIFICATIONS_TABLE_ID),
+    notificationSignalsTableId: requireAppwriteId(
+      input.APPWRITE_NOTIFICATION_SIGNALS_TABLE_ID,
+    ),
     outboxTableId: requireAppwriteId(input.APPWRITE_OUTBOX_TABLE_ID),
     idempotencyTableId: requireAppwriteId(input.APPWRITE_IDEMPOTENCY_TABLE_ID),
     attachmentBucketId: requireAppwriteId(input.APPWRITE_ATTACHMENT_BUCKET_ID),

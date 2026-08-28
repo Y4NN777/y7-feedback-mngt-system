@@ -1,4 +1,29 @@
-import type { Locale } from "@y7-feedback/domain";
+import type { Locale, NotificationEventKind } from "@y7-feedback/domain";
+
+export const workbenchNotificationMessages = {
+  fr: {
+    feedback_received: "Nouveau retour reçu",
+    message_added: "Nouveau message",
+    feedback_under_review: "Retour en cours d’analyse",
+    clarification_requested: "Précision demandée",
+    reporter_answered: "Nouvelle réponse",
+    feedback_resolved: "Retour résolu",
+    feedback_closed: "Retour clôturé",
+    feedback_reopened: "Retour rouvert",
+    assignment_changed: "Attribution modifiée",
+  },
+  en: {
+    feedback_received: "New feedback received",
+    message_added: "New message",
+    feedback_under_review: "Feedback under review",
+    clarification_requested: "Clarification requested",
+    reporter_answered: "New reply",
+    feedback_resolved: "Feedback resolved",
+    feedback_closed: "Feedback closed",
+    feedback_reopened: "Feedback reopened",
+    assignment_changed: "Assignment changed",
+  },
+} as const satisfies Record<Locale, Record<NotificationEventKind, string>>;
 
 export const workbenchMessages = {
   fr: {
@@ -45,6 +70,11 @@ export const workbenchMessages = {
     invalid: "Action invalide.",
     conflict: "Cette opération entre en conflit avec une tentative précédente.",
     language: "Langue",
+    notifications: "Notifications",
+    unreadNotifications: "non lues",
+    noNotifications: "Aucune notification.",
+    markRead: "Marquer comme lue",
+    notificationRead: "Lue",
   },
   en: {
     title: "Feedback workbench",
@@ -90,5 +120,10 @@ export const workbenchMessages = {
     invalid: "Invalid action.",
     conflict: "This operation conflicts with an earlier attempt.",
     language: "Language",
+    notifications: "Notifications",
+    unreadNotifications: "unread",
+    noNotifications: "No notification.",
+    markRead: "Mark as read",
+    notificationRead: "Read",
   },
 } as const satisfies Record<Locale, Record<string, string>>;

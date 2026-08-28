@@ -5,6 +5,7 @@ import {
   type FeedbackType,
   type ValidatedContext,
   type WorkbenchFilter,
+  type NotificationEventKind,
 } from "@y7-feedback/domain";
 
 export interface WorkbenchItem {
@@ -49,6 +50,22 @@ export interface WorkbenchConversation {
   readonly lifecycle: readonly WorkbenchLifecycleFact[];
 }
 
+export interface WorkbenchNotification {
+  readonly id: string;
+  readonly eventId: string;
+  readonly feedbackId: string;
+  readonly kind: NotificationEventKind;
+  readonly reference: string;
+  readonly locale: "fr" | "en";
+  readonly createdAt: string;
+  readonly readAt: string | null;
+}
+
+export interface WorkbenchNotificationFeed {
+  readonly items: readonly WorkbenchNotification[];
+  readonly unreadCount: number;
+}
+
 export type WorkbenchGatewayOutcome<T> =
   | { readonly status: "ok"; readonly result: T }
   | { readonly status: "invalid" | "denied" | "conflict" | "retryable" };
@@ -75,6 +92,24 @@ export interface WorkbenchGateway {
     readonly projectId: string;
     readonly feedbackId: string;
   }): Promise<WorkbenchGatewayOutcome<WorkbenchConversation>>;
+  notifications(input: {
+    readonly workspaceId: string;
+    readonly projectId: string;
+  }): Promise<WorkbenchGatewayOutcome<WorkbenchNotificationFeed>>;
+  markNotificationRead(input: {
+    readonly workspaceId: string;
+    readonly projectId: string;
+    readonly notificationId: string;
+  }): Promise<WorkbenchGatewayOutcome<{ readonly status: "read" | "already_read" }>>;
+  authorizeNotificationRealtime(input: {
+    readonly workspaceId: string;
+    readonly projectId: string;
+  }): Promise<
+    WorkbenchGatewayOutcome<{
+      readonly databaseId: string;
+      readonly tableId: string;
+    }>
+  >;
 }
 
 type Fetcher = (input: string, init: RequestInit) => Promise<Response>;
@@ -257,6 +292,71 @@ function conversation(value: unknown): WorkbenchConversation | undefined {
   };
 }
 
+const notificationKinds = new Set<NotificationEventKind>([
+  "feedback_received",
+  "message_added",
+  "feedback_under_review",
+  "clarification_requested",
+  "reporter_answered",
+  "feedback_resolved",
+  "feedback_closed",
+  "feedback_reopened",
+  "assignment_changed",
+]);
+
+function notification(value: unknown): WorkbenchNotification | undefined {
+  if (
+    !object(value) ||
+    typeof value.id !== "string" ||
+    typeof value.eventId !== "string" ||
+    typeof value.feedbackId !== "string" ||
+    typeof value.kind !== "string" ||
+    !notificationKinds.has(value.kind as NotificationEventKind) ||
+    typeof value.reference !== "string" ||
+    (value.locale !== "fr" && value.locale !== "en") ||
+    typeof value.createdAt !== "string" ||
+    !Number.isFinite(Date.parse(value.createdAt)) ||
+    (value.readAt !== null && typeof value.readAt !== "string") ||
+    (typeof value.readAt === "string" && !Number.isFinite(Date.parse(value.readAt)))
+  ) {
+    return undefined;
+  }
+  return {
+    id: value.id,
+    eventId: value.eventId,
+    feedbackId: value.feedbackId,
+    kind: value.kind as NotificationEventKind,
+    reference: value.reference,
+    locale: value.locale,
+    createdAt: value.createdAt,
+    readAt: value.readAt,
+  };
+}
+
+function notificationFeed(value: unknown): WorkbenchNotificationFeed | undefined {
+  if (
+    !object(value) ||
+    !Array.isArray(value.items) ||
+    typeof value.unreadCount !== "number" ||
+    !Number.isSafeInteger(value.unreadCount) ||
+    value.unreadCount < 0
+  ) {
+    return undefined;
+  }
+  const items = value.items.map(notification);
+  if (
+    items.some((item) => item === undefined) ||
+    value.unreadCount > items.length ||
+    value.unreadCount !== items.filter((item) => item?.readAt === null).length
+  ) {
+    return undefined;
+  }
+  return {
+    items: items as readonly WorkbenchNotification[],
+    unreadCount: value.unreadCount,
+  };
+}
+
 export function createHttpWorkbenchGateway(
   endpoint: string,
   getJwt: () => Promise<string>,
@@ -337,6 +437,47 @@ export function createHttpWorkbenchGateway(
         conversation,
         { method: "GET" },
         (body) => body.conversation,
+      );
+    },
+    notifications(input) {
+      const path = `/v1/workspaces/${encodeURIComponent(input.workspaceId)}/projects/${encodeURIComponent(input.projectId)}/operations/notifications/list`;
+      return request(
+        path,
+        notificationFeed,
+        {
+          method: "POST",
+          body: JSON.stringify({}),
+        },
+        (body) => body.data,
+      );
+    },
+    markNotificationRead(input) {
+      const path = `/v1/workspaces/${encodeURIComponent(input.workspaceId)}/projects/${encodeURIComponent(input.projectId)}/operations/notifications/read`;
+      return request(
+        path,
+        (value) =>
+          object(value) && (value.status === "read" || value.status === "already_read")
+            ? { status: value.status }
+            : undefined,
+        {
+          method: "POST",
+          body: JSON.stringify({ notificationId: input.notificationId }),
+        },
+        (body) => body.data,
+      );
+    },
+    authorizeNotificationRealtime(input) {
+      const path = `/v1/workspaces/${encodeURIComponent(input.workspaceId)}/projects/${encodeURIComponent(input.projectId)}/operations/realtime/authorize`;
+      return request(
+        path,
+        (value) =>
+          object(value) &&
+          typeof value.databaseId === "string" &&
+          typeof value.tableId === "string"
+            ? { databaseId: value.databaseId, tableId: value.tableId }
+            : undefined,
+        { method: "POST", body: JSON.stringify({}) },
+        (body) => body.data,
       );
     },
   };
