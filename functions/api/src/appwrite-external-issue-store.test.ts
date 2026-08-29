@@ -227,6 +227,48 @@ describe("Appwrite external issue store", () => {
     );
   });
 
+  it("BDD-ISSUE-STORE-002 normalizes Appwrite UTC offsets before rebuilding consent", async () => {
+    const { store, created } = setup({
+      consents: [
+        {
+          feedbackId: "feedback_1",
+          reporterId: "reporter_1",
+          version: 1,
+          state: "active",
+          disclosureVersion: "public-issue-v1",
+          audience: "github:repository_1",
+          occurredAt: "2026-08-28T12:00:00.000+00:00",
+        },
+      ],
+    });
+
+    await store.requestLink({ ...input(), consentVersion: 1 });
+    expect((created[1]?.data as { payloadJson: string }).payloadJson).toContain(
+      "Submit does not work",
+    );
+  });
+
+  it("BDD-ISSUE-STORE-002 rejects an invalid stored consent timestamp", async () => {
+    const { store, created } = setup({
+      consents: [
+        {
+          feedbackId: "feedback_1",
+          reporterId: "reporter_1",
+          version: 1,
+          state: "active",
+          disclosureVersion: "public-issue-v1",
+          audience: "github:repository_1",
+          occurredAt: "invalid",
+        },
+      ],
+    });
+
+    await expect(
+      store.requestLink({ ...input(), consentVersion: 1 }),
+    ).rejects.toMatchObject({ code: "ERR-ISSUE-RETRYABLE" });
+    expect(created).toEqual([]);
+  });
+
   it("BDD-ISSUE-STORE-003 replays an identical operation and rejects key reuse", async () => {
     const prior = {
       operationId: "operation_1",
