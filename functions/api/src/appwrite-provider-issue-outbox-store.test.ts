@@ -183,6 +183,18 @@ describe("Appwrite provider issue outbox store", () => {
     });
   });
 
+  it("BDD-ISSUE-OUTBOX-DB-001 accepts Appwrite-normalized UTC offsets", async () => {
+    const normalized = {
+      ...outbox,
+      createdAt: "2026-08-28T11:00:00.000+00:00",
+      updatedAt: "2026-08-28T11:00:00.000+00:00",
+      nextAttemptAt: null,
+    };
+    await expect(
+      setup({ outboxRow: normalized, listed: [normalized] }).store.claim(claimInput),
+    ).resolves.toMatchObject({ outboxId: "outbox_1", attempt: 1 });
+  });
+
   it("BDD-ISSUE-OUTBOX-DB-002 reclaims stale processing but ignores future or fresh rows", async () => {
     await expect(
       setup({

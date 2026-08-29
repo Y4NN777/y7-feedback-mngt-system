@@ -57,6 +57,14 @@ const instant = (value: unknown): value is string =>
   Number.isFinite(Date.parse(value)) &&
   new Date(Date.parse(value)).toISOString() === value;
 
+const storedInstant = (value: unknown): string | undefined => {
+  if (typeof value !== "string") return undefined;
+  const milliseconds = Date.parse(value);
+  return Number.isFinite(milliseconds)
+    ? new Date(milliseconds).toISOString()
+    : undefined;
+};
+
 /* v8 ignore start -- Node Query serialization is covered by deployed verification. */
 const defaultQueries: AppwriteProviderIssueOutboxQueryPort = {
   equal: (attribute, values) => Query.equal(attribute, [...values]),
@@ -172,6 +180,8 @@ function importedRepository(
 }
 
 function candidate(value: unknown, now: string, staleBefore: string) {
+  const updatedAt = object(value) ? storedInstant(value.updatedAt) : undefined;
+  const nextAttemptAt = object(value) ? storedInstant(value.nextAttemptAt) : undefined;
   if (
     !object(value) ||
     typeof value.$id !== "string" ||
@@ -188,16 +198,17 @@ function candidate(value: unknown, now: string, staleBefore: string) {
     typeof value.attempts !== "number" ||
     !Number.isSafeInteger(value.attempts) ||
     value.attempts < 0 ||
-    !instant(value.updatedAt) ||
+    updatedAt === undefined ||
     (value.status !== "pending" && value.status !== "processing")
   ) {
     return undefined;
   }
   const due =
     value.status === "processing"
-      ? value.updatedAt <= staleBefore
+      ? updatedAt <= staleBefore
       : value.nextAttemptAt === undefined ||
-        (instant(value.nextAttemptAt) && value.nextAttemptAt <= now);
+        value.nextAttemptAt === null ||
+        (nextAttemptAt !== undefined && nextAttemptAt <= now);
   return due ? value : undefined;
 }
 

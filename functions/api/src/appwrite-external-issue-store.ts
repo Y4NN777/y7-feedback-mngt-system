@@ -93,6 +93,14 @@ function timestamp(value: string): boolean {
   );
 }
 
+function normalizedTimestamp(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const milliseconds = Date.parse(value);
+  return Number.isFinite(milliseconds)
+    ? new Date(milliseconds).toISOString()
+    : undefined;
+}
+
 function stableId(prefix: "link" | "pout" | "cons", ...parts: readonly string[]) {
   return `${prefix}_${createHash("sha256").update(parts.join("\0")).digest("hex").slice(0, 31)}`;
 }
@@ -221,6 +229,9 @@ function rebuildConsent(
   const ledger = createPublicationConsentLedger();
   let expectedVersion = 1;
   for (const value of rows) {
+    const occurredAt = object(value)
+      ? normalizedTimestamp(value.occurredAt)
+      : undefined;
     if (
       !object(value) ||
       value.feedbackId !== feedbackId ||
@@ -228,7 +239,7 @@ function rebuildConsent(
       typeof value.reporterId !== "string" ||
       typeof value.disclosureVersion !== "string" ||
       typeof value.audience !== "string" ||
-      typeof value.occurredAt !== "string" ||
+      occurredAt === undefined ||
       (value.state !== "active" && value.state !== "revoked")
     ) {
       throw new AppwriteExternalIssueError("ERR-ISSUE-RETRYABLE");
@@ -239,13 +250,13 @@ function rebuildConsent(
         reporterId: value.reporterId,
         disclosureVersion: value.disclosureVersion,
         audience: value.audience,
-        occurredAt: value.occurredAt,
+        occurredAt,
       });
     } else {
       ledger.revoke({
         feedbackId,
         reporterId: value.reporterId,
-        occurredAt: value.occurredAt,
+        occurredAt,
       });
     }
     expectedVersion += 1;
