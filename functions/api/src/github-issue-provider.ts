@@ -63,7 +63,7 @@ export function createGitHubIssueProvider(
         };
         const search = new URL("search/issues", apiOrigin);
         search.search = new URLSearchParams({
-          q: `repo:${input.repository.owner}/${input.repository.name} "${document.marker}"`,
+          q: `repo:${input.repository.owner}/${input.repository.name} is:issue "${document.marker}"`,
           per_page: "2",
         }).toString();
         const searched = await fetcher(search.toString(), {

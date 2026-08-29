@@ -49,6 +49,9 @@ describe("GitHub issue provider", () => {
       replayed: false,
     });
     expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(new URL(fetcher.mock.calls[0]?.[0] ?? "").searchParams.get("q")).toBe(
+      'repo:Y4NN777/feedback is:issue "<!-- y7-feedback-operation:operation_1 -->"',
+    );
     expect(fetcher.mock.calls[1]?.[1]?.method).toBe("POST");
     const requestBody = fetcher.mock.calls[1]?.[1]?.body;
     expect(typeof requestBody).toBe("string");

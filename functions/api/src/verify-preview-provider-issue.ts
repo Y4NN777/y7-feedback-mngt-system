@@ -6,7 +6,6 @@ import { Client, Query, TablesDB, Users } from "node-appwrite";
 import { parseServerConfig } from "@y7-feedback/config/server";
 
 import { createAppwriteProviderGrantVault } from "./appwrite-provider-grant-vault.js";
-import { issueMarker } from "./provider-issue.js";
 import { createAccessProof, hashAccessProof } from "./proof-crypto.js";
 import { createSensitiveDataProtector } from "./sensitive-data-protector.js";
 
@@ -79,7 +78,7 @@ async function closeProviderIssue(input: {
     readonly owner: string;
     readonly name: string;
   };
-  readonly operationId: string;
+  readonly issueUrl: string;
   readonly gitlabOrigin: string;
 }): Promise<void> {
   const material = await createAppwriteProviderGrantVault(
@@ -95,33 +94,30 @@ async function closeProviderIssue(input: {
     },
     Buffer.from(input.providerGrantEnvelopeKey, "base64url"),
   ).open(input.provider, input.providerGrantRef);
-  const marker = issueMarker(input.operationId);
+  let issueUrl: URL;
+  try {
+    issueUrl = new URL(input.issueUrl);
+  } catch {
+    throw new Error("ISSUE_VERIFY_PROVIDER_CLEANUP_FAILED");
+  }
   if (input.provider === "github") {
-    const search = new URL("https://api.github.com/search/issues");
-    search.search = new URLSearchParams({
-      q: `repo:${input.repository.owner}/${input.repository.name} "${marker}"`,
-      per_page: "2",
-    }).toString();
-    const searched = await fetch(search, {
-      headers: {
-        accept: "application/vnd.github+json",
-        authorization: `Bearer ${material.accessToken}`,
-        "x-github-api-version": "2022-11-28",
-      },
-      signal: AbortSignal.timeout(30_000),
-    });
-    const body = await responseBody(searched);
-    const items = Array.isArray(body.items) ? (body.items as readonly unknown[]) : [];
-    const match = items.find(
-      (item) =>
-        object(item) && typeof item.body === "string" && item.body.includes(marker),
-    );
-    if (searched.status !== 200 || !object(match) || typeof match.number !== "number") {
+    const parts = issueUrl.pathname.split("/").filter(Boolean);
+    const issueNumber = parts[3];
+    if (
+      issueUrl.protocol !== "https:" ||
+      issueUrl.hostname !== "github.com" ||
+      parts.length !== 4 ||
+      parts[0] !== input.repository.owner ||
+      parts[1] !== input.repository.name ||
+      parts[2] !== "issues" ||
+      !issueNumber ||
+      !/^\d+$/u.test(issueNumber)
+    ) {
       throw new Error("ISSUE_VERIFY_PROVIDER_CLEANUP_FAILED");
     }
     const closed = await fetch(
       new URL(
-        `https://api.github.com/repos/${encodeURIComponent(input.repository.owner)}/${encodeURIComponent(input.repository.name)}/issues/${String(match.number)}`,
+        `https://api.github.com/repos/${encodeURIComponent(input.repository.owner)}/${encodeURIComponent(input.repository.name)}/issues/${issueNumber}`,
       ),
       {
         method: "PATCH",
@@ -140,34 +136,16 @@ async function closeProviderIssue(input: {
   }
   const origin = new URL(input.gitlabOrigin.replace(/\/?$/u, "/"));
   const issuePath = `api/v4/projects/${encodeURIComponent(input.repository.id)}/issues`;
-  const search = new URL(issuePath, origin);
-  search.search = new URLSearchParams({
-    scope: "all",
-    state: "all",
-    search: marker,
-    in: "description",
-    per_page: "2",
-  }).toString();
-  const searched = await fetch(search, {
-    headers: {
-      accept: "application/json",
-      authorization: `Bearer ${material.accessToken}`,
-    },
-    signal: AbortSignal.timeout(30_000),
-  });
-  const body: unknown = await searched.json();
-  const match = Array.isArray(body)
-    ? (body as readonly unknown[]).find(
-        (item) =>
-          object(item) &&
-          typeof item.description === "string" &&
-          item.description.includes(marker),
-      )
-    : undefined;
-  if (searched.status !== 200 || !object(match) || typeof match.iid !== "number") {
+  const issueNumber = issueUrl.pathname.split("/").filter(Boolean).at(-1);
+  if (
+    issueUrl.protocol !== origin.protocol ||
+    issueUrl.host !== origin.host ||
+    !issueNumber ||
+    !/^\d+$/u.test(issueNumber)
+  ) {
     throw new Error("ISSUE_VERIFY_PROVIDER_CLEANUP_FAILED");
   }
-  const closed = await fetch(new URL(`${issuePath}/${String(match.iid)}`, origin), {
+  const closed = await fetch(new URL(`${issuePath}/${issueNumber}`, origin), {
     method: "PUT",
     headers: {
       accept: "application/json",
@@ -251,7 +229,7 @@ async function main(): Promise<void> {
       cache: "no-store",
       headers: { authorization, "content-type": "application/json" },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(90_000),
     });
     return { response, body: await responseBody(response) };
   };
@@ -476,13 +454,16 @@ async function main(): Promise<void> {
     if (second.response.status !== 409) {
       throw new Error("ISSUE_VERIFY_SECOND_LINK_NOT_DENIED");
     }
-    const delivery = await request(
-      "/operational/provider-issue-outbox",
-      `Bearer ${config.providerOutboxTriggerSecret}`,
-      {},
-    );
-    if (delivery.response.status !== 200 || delivery.body.status !== "delivered") {
-      throw new Error("ISSUE_VERIFY_PROVIDER_DELIVERY_FAILED");
+    const expectedDeliveries = visibility === "public" ? 2 : 1;
+    for (let index = 0; index < expectedDeliveries; index += 1) {
+      const delivery = await request(
+        "/operational/provider-issue-outbox",
+        `Bearer ${config.providerOutboxTriggerSecret}`,
+        {},
+      );
+      if (delivery.response.status !== 200 || delivery.body.status !== "delivered") {
+        throw new Error("ISSUE_VERIFY_PROVIDER_DELIVERY_FAILED");
+      }
     }
     const links = await feedbackRows(
       config.appwriteSchema.externalIssueLinksTableId,
@@ -507,17 +488,36 @@ async function main(): Promise<void> {
         throw new Error("ISSUE_VERIFY_REVOCATION_FAILED");
       }
     }
-    await closeProviderIssue({
-      tables,
-      databaseId: config.appwriteSchema.databaseId,
-      providerGrantsTableId: config.appwriteSchema.providerGrantsTableId,
-      providerGrantEnvelopeKey: config.providerGrantEnvelopeKey,
-      provider: state.provider,
-      providerGrantRef: connection.encryptedGrantRef,
-      repository,
-      operationId,
-      gitlabOrigin,
-    });
+    const retainedProviderGrantRef = providerGrantRef;
+    const closeIssue = (issueUrl: string) =>
+      closeProviderIssue({
+        tables,
+        databaseId: config.appwriteSchema.databaseId,
+        providerGrantsTableId: config.appwriteSchema.providerGrantsTableId,
+        providerGrantEnvelopeKey: config.providerGrantEnvelopeKey,
+        provider: state.provider,
+        providerGrantRef: retainedProviderGrantRef,
+        repository,
+        issueUrl,
+        gitlabOrigin,
+      });
+    if (visibility === "public") {
+      const minimalLinks = await feedbackRows(
+        config.appwriteSchema.externalIssueLinksTableId,
+        minimalFeedbackId,
+      );
+      const minimalLink = minimalLinks[0];
+      if (
+        minimalLinks.length !== 1 ||
+        minimalLink === undefined ||
+        minimalLink.synchronizationState !== "synchronized" ||
+        typeof minimalLink.providerIssueUrl !== "string"
+      ) {
+        throw new Error("ISSUE_VERIFY_LINK_PROJECTION_INVALID");
+      }
+      await closeIssue(minimalLink.providerIssueUrl);
+    }
+    await closeIssue(link.providerIssueUrl);
     process.stdout.write(
       `${JSON.stringify({
         result: "PROVIDER_G3_ISSUE_LINK_PASSED",
