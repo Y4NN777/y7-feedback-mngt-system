@@ -7,7 +7,7 @@ import { parseServerConfig } from "@y7-feedback/config/server";
 
 import { createAppwriteProviderGrantVault } from "./appwrite-provider-grant-vault.js";
 import { issueMarker } from "./provider-issue.js";
-import { hashAccessProof } from "./proof-crypto.js";
+import { createAccessProof, hashAccessProof } from "./proof-crypto.js";
 import { createSensitiveDataProtector } from "./sensitive-data-protector.js";
 
 interface RetainedSourceState {
@@ -188,11 +188,11 @@ async function main(): Promise<void> {
   const state = retained(JSON.parse(await readFile(path, "utf8")) as unknown);
   const config = parseServerConfig(process.env);
   const domain = process.env.Y7_FUNCTION_DOMAIN_URL?.trim();
+  const gitlabOrigin = process.env.GITLAB_OAUTH_ORIGIN?.trim() || "https://gitlab.com/";
   if (
     config.environment !== "preview" ||
     !domain ||
-    !config.providerOutboxTriggerSecret ||
-    !config.providers
+    !config.providerOutboxTriggerSecret
   ) {
     throw new Error("ISSUE_VERIFY_PREVIEW_CONFIG_REQUIRED");
   }
@@ -204,8 +204,8 @@ async function main(): Promise<void> {
   const maintainerMembershipId = `ismb_${suffix}`;
   const reference = `Y7-ISSUE-${suffix.toUpperCase()}`;
   const minimalReference = `Y7-MIN-${suffix.toUpperCase()}`;
-  const proof = `proof_${randomBytes(32).toString("base64url")}`;
-  const minimalProof = `proof_${randomBytes(32).toString("base64url")}`;
+  const proof = createAccessProof();
+  const minimalProof = createAccessProof();
   const createdRows: Array<readonly [string, string]> = [];
   const createdUsers: string[] = [];
   const client = new Client()
@@ -314,11 +314,19 @@ async function main(): Promise<void> {
     const now = new Date().toISOString();
     await users.create({ userId: maintainerId, name: "Issue verifier unassigned" });
     createdUsers.push(maintainerId);
-    const session = await users.createSession({ userId: maintainerId });
+    const ownerSession = await users.createSession({ userId: state.userId });
+    const ownerJwt = (
+      await users.createJWT({
+        userId: state.userId,
+        sessionId: ownerSession.$id,
+        duration: 900,
+      })
+    ).jwt;
+    const maintainerSession = await users.createSession({ userId: maintainerId });
     const maintainerJwt = (
       await users.createJWT({
         userId: maintainerId,
-        sessionId: session.$id,
+        sessionId: maintainerSession.$id,
         duration: 900,
       })
     ).jwt;
@@ -388,7 +396,7 @@ async function main(): Promise<void> {
     if (unassigned.response.status !== 404) {
       throw new Error("ISSUE_VERIFY_UNASSIGNED_NOT_DENIED");
     }
-    const unselected = await request(issuePath(feedbackId), `Bearer ${state.jwt}`, {
+    const unselected = await request(issuePath(feedbackId), `Bearer ${ownerJwt}`, {
       operationId: `ius_${suffix}`,
       connectionId: state.connectionId,
       repositoryId: `missing_${suffix}`,
@@ -401,7 +409,7 @@ async function main(): Promise<void> {
     if (visibility === "public") {
       const noConsent = await request(
         issuePath(minimalFeedbackId),
-        `Bearer ${state.jwt}`,
+        `Bearer ${ownerJwt}`,
         {
           operationId: `imn_${suffix}`,
           connectionId: state.connectionId,
@@ -450,7 +458,7 @@ async function main(): Promise<void> {
     }
 
     const operationId = `ilk_${suffix}`;
-    const linked = await request(issuePath(feedbackId), `Bearer ${state.jwt}`, {
+    const linked = await request(issuePath(feedbackId), `Bearer ${ownerJwt}`, {
       operationId,
       connectionId: state.connectionId,
       repositoryId: state.repositoryId,
@@ -459,7 +467,7 @@ async function main(): Promise<void> {
     if (linked.response.status !== 201 || linked.body.status !== "accepted") {
       throw new Error("ISSUE_VERIFY_LINK_FAILED");
     }
-    const second = await request(issuePath(feedbackId), `Bearer ${state.jwt}`, {
+    const second = await request(issuePath(feedbackId), `Bearer ${ownerJwt}`, {
       operationId: `ilk2_${suffix}`,
       connectionId: state.connectionId,
       repositoryId: state.repositoryId,
@@ -508,7 +516,7 @@ async function main(): Promise<void> {
       providerGrantRef: connection.encryptedGrantRef,
       repository,
       operationId,
-      gitlabOrigin: config.providers.gitlab.origin,
+      gitlabOrigin,
     });
     process.stdout.write(
       `${JSON.stringify({
