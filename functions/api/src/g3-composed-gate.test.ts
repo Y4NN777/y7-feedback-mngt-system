@@ -18,6 +18,12 @@ function complete(): G3ComposedEvidence {
 }
 
 describe("composed Day 3 gate", () => {
+  it("BDD-G3-000 rejects an unscoped fixture identity", () => {
+    expect(() =>
+      evaluateG3ComposedEvidence({ ...complete(), fixtureId: "another-fixture" }),
+    ).toThrow("G3_COMPOSED_FIXTURE_ID_INVALID");
+  });
+
   it("BDD-G3-001 accepts all nine outcomes from one cleaned fixture", () => {
     expect(evaluateG3ComposedEvidence(complete())).toEqual({
       result: "APPWRITE_G3_COMPOSED_PASSED",
