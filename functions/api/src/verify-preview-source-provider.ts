@@ -389,6 +389,70 @@ async function finalize(path: string, callbackPath: string): Promise<void> {
   }
 }
 
+async function finalizeAuthoritative(
+  path: string,
+  callbackPath: string,
+): Promise<void> {
+  const config = parseServerConfig(process.env);
+  if (config.environment !== "preview") {
+    throw new Error("SOURCE_VERIFY_PREVIEW_REQUIRED");
+  }
+  const rawState = JSON.parse(await readFile(path, "utf8")) as unknown;
+  if (!isObject(rawState) || typeof rawState.authorizationUrl !== "string") {
+    throw new Error("SOURCE_VERIFY_STATE_INVALID");
+  }
+  const state = rawState as unknown as StateFile;
+  const opaqueState = new URL(state.authorizationUrl).searchParams.get("state");
+  const connectionId = opaqueState?.split(".", 1)[0];
+  if (!connectionId || !/^[a-f0-9]{20}$/u.test(connectionId)) {
+    throw new Error("SOURCE_VERIFY_STATE_INVALID");
+  }
+  const tables = new TablesDB(
+    new Client()
+      .setEndpoint(config.appwriteEndpoint)
+      .setProject(config.appwriteProjectId)
+      .setKey(config.appwriteApiKey),
+  );
+  const connection = await tables.getRow({
+    databaseId: config.appwriteSchema.databaseId,
+    tableId: config.appwriteSchema.sourceConnectionsTableId,
+    rowId: connectionId,
+  });
+  let selected: unknown;
+  try {
+    selected =
+      typeof connection.selectedRepositoriesJson === "string"
+        ? (JSON.parse(connection.selectedRepositoriesJson) as unknown)
+        : undefined;
+  } catch {
+    throw new Error("SOURCE_VERIFY_AUTHORITATIVE_CALLBACK_INVALID");
+  }
+  if (
+    connection.status !== "selecting" ||
+    connection.workspaceId !== state.workspaceId ||
+    connection.projectId !== state.projectId ||
+    connection.provider !== state.provider ||
+    !isObject(selected) ||
+    selected.kind !== "authorized" ||
+    !Array.isArray(selected.repositories) ||
+    selected.repositories.length === 0
+  ) {
+    throw new Error("SOURCE_VERIFY_AUTHORITATIVE_CALLBACK_PENDING");
+  }
+  await writeFile(
+    callbackPath,
+    JSON.stringify({
+      status: "pending_selection",
+      connectionId,
+      authorizedRepositories: selected.repositories,
+      returnPath: "/settings/sources",
+    }),
+    { encoding: "utf8", mode: 0o600 },
+  );
+  await chmod(callbackPath, 0o600);
+  await finalize(path, callbackPath);
+}
+
 async function cleanup(path: string): Promise<void> {
   const config = parseServerConfig(process.env);
   if (config.environment !== "preview") {
@@ -531,6 +595,13 @@ async function main(): Promise<void> {
   }
   if (process.argv.includes("--finalize")) {
     await finalize(temporaryPath("state-file"), temporaryPath("response-file"));
+    return;
+  }
+  if (process.argv.includes("--finalize-authoritative")) {
+    await finalizeAuthoritative(
+      temporaryPath("state-file"),
+      temporaryPath("response-file"),
+    );
     return;
   }
   if (process.argv.includes("--cleanup")) {
