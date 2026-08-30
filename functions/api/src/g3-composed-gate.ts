@@ -14,12 +14,14 @@ export type G3ComposedStep = (typeof g3ComposedSteps)[number];
 
 export const g3ResidueKinds = [
   "feedback",
+  "intake_idempotency",
   "access_grants",
   "reporters",
   "lifecycle",
   "messages",
   "internal_notes",
   "conversation_idempotency",
+  "workbench_idempotency",
   "notifications",
   "notification_signals",
   "notification_delivery_attempts",
@@ -28,6 +30,10 @@ export const g3ResidueKinds = [
   "provider_outbox",
   "source_connections",
   "provider_grants",
+  "project_assignments",
+  "workspace_memberships",
+  "projects",
+  "users",
 ] as const;
 
 export type G3ResidueKind = (typeof g3ResidueKinds)[number];
