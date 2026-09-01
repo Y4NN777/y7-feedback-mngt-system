@@ -25,6 +25,8 @@ import { createNodeAppwriteWorkbenchStore } from "./appwrite-workbench-store.js"
 import { createNodeAppwriteWorkbenchMutationStore } from "./appwrite-workbench-mutation-store.js";
 import { createNodeAppwriteExternalIssueStore } from "./appwrite-external-issue-store.js";
 import { createNodeAppwriteProviderIssueOutboxStore } from "./appwrite-provider-issue-outbox-store.js";
+import { createNodeAppwriteProviderEventInboxStore } from "./appwrite-provider-event-inbox-store.js";
+import { createAppwriteProviderWebhookAuthorityStore } from "./appwrite-provider-webhook-authority-store.js";
 import { createNodeAppwriteReporterConsentVerifier } from "./appwrite-reporter-consent-verifier.js";
 import { createNodeAppwriteProviderGrantVault } from "./appwrite-provider-grant-vault.js";
 import { createNodeAppwriteSourceConnectionStore } from "./appwrite-source-connection-store.js";
@@ -70,6 +72,8 @@ import { createExternalIssueCoordinator } from "./external-issue-coordination.js
 import { createExternalIssueHttp } from "./external-issue-http.js";
 import { createProviderIssueOutboxWorker } from "./provider-issue-outbox.js";
 import { createProviderIssueOutboxHttp } from "./provider-issue-outbox-http.js";
+import { createProviderWebhookIngress } from "./provider-webhook-ingress.js";
+import { createProviderWebhookHttp } from "./provider-webhook-http.js";
 
 export function digestExternalIssueCommand(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(value)).digest("base64url");
@@ -505,6 +509,31 @@ export function createHttpApplication(
           );
         })()
       : undefined;
+  const providerWebhookAuthority = createAppwriteProviderWebhookAuthorityStore(
+    runtime.tables,
+    {
+      databaseId: config.appwriteSchema.databaseId,
+      sourceConnectionsTableId: config.appwriteSchema.sourceConnectionsTableId,
+      providerGrantsTableId: config.appwriteSchema.providerGrantsTableId,
+    },
+    sensitive,
+  );
+  const providerWebhookInbox = createNodeAppwriteProviderEventInboxStore(
+    runtime.tables,
+    {
+      databaseId: config.appwriteSchema.databaseId,
+      providerEventInboxTableId: config.appwriteSchema.providerEventInboxTableId,
+    },
+    sensitive,
+    { createId: runtime.createId },
+  );
+  const providerWebhook = createProviderWebhookHttp(
+    createProviderWebhookIngress({
+      authorities: providerWebhookAuthority,
+      inbox: providerWebhookInbox,
+      now: () => new Date(runtime.nowIso()),
+    }),
+  );
   /* v8 ignore stop */
 
   return {
@@ -514,6 +543,7 @@ export function createHttpApplication(
     externalIssue,
     now: runtime.nowMs,
     projectAdministration,
+    providerWebhook,
     publicApi: createPublicApi(
       projects,
       intake,
