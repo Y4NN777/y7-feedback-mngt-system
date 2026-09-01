@@ -305,10 +305,27 @@ function safeFailureCode(error: unknown): string {
   return code;
 }
 
+function safeFailureChain(error: unknown): readonly string[] {
+  const result: string[] = [];
+  let current = error;
+  for (let depth = 0; depth < 8 && current instanceof Error; depth += 1) {
+    if (/^[A-Z][A-Z0-9_:.-]{2,200}$/u.test(current.message)) {
+      result.push(current.message);
+    }
+    current = current.cause;
+  }
+  return result;
+}
+
 main().catch((error: unknown) => {
   const code = safeFailureCode(error);
   process.stderr.write(
-    `${JSON.stringify({ status: "error", code, service: lastServiceFailure })}\n`,
+    `${JSON.stringify({
+      status: "error",
+      code,
+      chain: safeFailureChain(error),
+      service: lastServiceFailure,
+    })}\n`,
   );
   process.exitCode = 1;
 });

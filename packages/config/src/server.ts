@@ -44,6 +44,14 @@ export interface ServerConfig {
     readonly publicationConsentsTableId: string;
     readonly externalIssueLinksTableId: string;
     readonly providerOutboxTableId: string;
+    readonly providerEventInboxTableId: string;
+    readonly providerSyncOutboxTableId: string;
+    readonly offlineConflictProjectionsTableId: string;
+    readonly intelligenceProvenanceTableId: string;
+    readonly deletionRecordsTableId: string;
+    readonly abuseCountersTableId: string;
+    readonly exceptionalAccessGrantsTableId: string;
+    readonly exceptionalAccessAuditTableId: string;
   };
   readonly accessProofEnvelopeKey: string;
   readonly providerGrantEnvelopeKey: string;
@@ -131,6 +139,31 @@ function parseAppwriteSchema(input: Readonly<Record<string, string | undefined>>
       input.APPWRITE_EXTERNAL_ISSUE_LINKS_TABLE_ID,
     ),
     providerOutboxTableId: requireAppwriteId(input.APPWRITE_PROVIDER_OUTBOX_TABLE_ID),
+    providerEventInboxTableId: requireAppwriteId(
+      input.APPWRITE_PROVIDER_EVENT_INBOX_TABLE_ID ?? "provider_event_inbox",
+    ),
+    providerSyncOutboxTableId: requireAppwriteId(
+      input.APPWRITE_PROVIDER_SYNC_OUTBOX_TABLE_ID ?? "provider_sync_outbox",
+    ),
+    offlineConflictProjectionsTableId: requireAppwriteId(
+      input.APPWRITE_OFFLINE_CONFLICT_PROJECTIONS_TABLE_ID ??
+        "offline_conflict_projections",
+    ),
+    intelligenceProvenanceTableId: requireAppwriteId(
+      input.APPWRITE_INTELLIGENCE_PROVENANCE_TABLE_ID ?? "intelligence_provenance",
+    ),
+    deletionRecordsTableId: requireAppwriteId(
+      input.APPWRITE_DELETION_RECORDS_TABLE_ID ?? "deletion_records",
+    ),
+    abuseCountersTableId: requireAppwriteId(
+      input.APPWRITE_ABUSE_COUNTERS_TABLE_ID ?? "abuse_counters",
+    ),
+    exceptionalAccessGrantsTableId: requireAppwriteId(
+      input.APPWRITE_EXCEPTIONAL_ACCESS_GRANTS_TABLE_ID ?? "exceptional_access_grants",
+    ),
+    exceptionalAccessAuditTableId: requireAppwriteId(
+      input.APPWRITE_EXCEPTIONAL_ACCESS_AUDIT_TABLE_ID ?? "exceptional_access_audit",
+    ),
   };
   if (new Set(Object.values(tableIds)).size !== Object.values(tableIds).length) {
     throw new ConfigError("APPWRITE_SCHEMA_INVALID");

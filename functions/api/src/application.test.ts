@@ -8,6 +8,7 @@ import {
   deriveReporterActorId,
   digestExternalIssueCommand,
 } from "./application";
+import { canonicalDay4SchemaIds } from "./appwrite-day4-migration";
 import { routeRequest, type FunctionContext } from "./http";
 import { createSensitiveDataProtector } from "./sensitive-data-protector";
 
@@ -23,6 +24,7 @@ const config: ServerConfig = {
   appwriteApiKey: "server-only-key",
   webOrigin: "https://y7-feedback.vercel.app",
   appwriteSchema: {
+    ...canonicalDay4SchemaIds,
     databaseId: "feedback",
     workspacesTableId: "workspaces",
     workspaceMembershipsTableId: "workspace_memberships",

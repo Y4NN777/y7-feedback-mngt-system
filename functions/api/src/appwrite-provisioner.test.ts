@@ -10,9 +10,11 @@ import {
   type ExistingAppwriteDatabase,
   type ExistingAppwriteTable,
 } from "./appwrite-provisioner";
+import { canonicalDay4SchemaIds } from "./appwrite-day4-migration";
 import { createAppwriteInfrastructureManifest } from "./appwrite-schema";
 
 const schema: ServerConfig["appwriteSchema"] = {
+  ...canonicalDay4SchemaIds,
   databaseId: "feedback",
   workspacesTableId: "workspaces",
   workspaceMembershipsTableId: "workspace_memberships",
