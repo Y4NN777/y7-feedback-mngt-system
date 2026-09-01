@@ -45,8 +45,9 @@ The verifier returned `APPWRITE_D4_MIGRATION_PASSED` with
 - G2 passed on Preview with the real ClamAV gateway: clean/infected scanning,
   private file access, cross-scope denial, lifecycle restoration/purge,
   Workspace authorization, orphan sweeping and cleanup.
-- G3 remains the final real-service regression because its previous OAuth
-  fixture was correctly removed after the composed evidence run.
+- G3 passed on Preview for fixture `g3c_745dac6d41b4a7`: all nine composed
+  steps passed, the selected GitHub issue was closed and cleanup reported zero
+  residue.
 
 ## Local quality evidence
 
