@@ -364,7 +364,11 @@ export function createAppwriteInfrastructureManifest(
       table(
         schema.providerGrantsTableId,
         "Provider grant vault",
-        [varchar("provider", 16), text("envelope")],
+        [
+          varchar("provider", 16),
+          text("envelope"),
+          text("webhookCredentialEnvelope", { required: false }),
+        ],
         [index("provider", ["provider"])],
       ),
       table(

@@ -109,6 +109,7 @@ describe("Appwrite infrastructure manifest", () => {
       "intake_idempotency.proofVerifier",
       "attachments.displayName",
       "provider_grants.envelope",
+      "provider_grants.webhookCredentialEnvelope",
       "source_connections.selectedRepositoriesJson",
       "administration_idempotency.resultJson",
       "conversation_messages.contentEnvelope",

@@ -348,6 +348,52 @@ describe("trusted API entrypoint", () => {
     );
   });
 
+  it("BDD-SYNC-031 routes raw signed webhook bytes before every JSON capability", async () => {
+    const bodyBinary = new TextEncoder().encode('{"repository":{"id":1}}');
+    const handle = vi.fn(() =>
+      Promise.resolve({ statusCode: 202, body: { accepted: true } }),
+    );
+    const sourceHandle = vi.fn(() => Promise.resolve(null));
+    const publicHandle = vi.fn<PublicApi["handle"]>();
+    const { context, json } = createContext(
+      "POST",
+      "/providers/github/webhooks/connection_1",
+      {
+        headers: { "x-hub-signature-256": "sha256=bounded" },
+        bodyBinary,
+      },
+    );
+    Object.defineProperty(context.req, "bodyJson", {
+      get() {
+        throw new Error("signed webhook raw bytes must not be reparsed first");
+      },
+    });
+
+    await routeRequest(context, {
+      ...dependencies,
+      providerWebhook: { handle },
+      sourceConnections: { handle: sourceHandle },
+      publicApi: { handle: publicHandle },
+    });
+
+    expect(handle).toHaveBeenCalledWith({
+      method: "POST",
+      path: "/providers/github/webhooks/connection_1",
+      headers: { "x-hub-signature-256": "sha256=bounded" },
+      body: bodyBinary,
+    });
+    expect(sourceHandle).not.toHaveBeenCalled();
+    expect(publicHandle).not.toHaveBeenCalled();
+    expect(json).toHaveBeenCalledWith(
+      { accepted: true },
+      202,
+      expect.objectContaining({ "cache-control": "no-store" }),
+    );
+    expect(context.log).toHaveBeenCalledWith(
+      expect.stringContaining('"operation":"provider_webhook"'),
+    );
+  });
+
   it("BDD-SRC-REAL-005 defaults absent query and excludes multipart bodies", async () => {
     const sourceHandle = vi.fn(() => Promise.resolve(null));
     const { context } = createContext("POST", "/providers/upload", {
