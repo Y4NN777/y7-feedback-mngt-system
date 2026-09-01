@@ -8,8 +8,10 @@ import {
   type G1FixtureRow,
   type G1FixtureStore,
 } from "./appwrite-g1-fixtures";
+import { canonicalDay4SchemaIds } from "./appwrite-day4-migration";
 
 const schema: ServerConfig["appwriteSchema"] = {
+  ...canonicalDay4SchemaIds,
   databaseId: "feedback",
   workspacesTableId: "workspaces",
   workspaceMembershipsTableId: "workspace_memberships",

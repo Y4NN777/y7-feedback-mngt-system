@@ -19,6 +19,7 @@
     "verify:appwrite:g3:workbench": "node dist/verify-appwrite-g3-workbench.js --apply",
     "verify:appwrite:g3:notifications": "node dist/verify-appwrite-g3-workbench.js --apply",
     "verify:appwrite:g3:composed": "node dist/verify-appwrite-g3-composed.js --apply",
+    "verify:appwrite:d4:migration": "node dist/verify-appwrite-d4-migration.js --apply",
     "verify:appwrite:antivirus": "node dist/verify-appwrite-antivirus.js --apply",
     "verify:appwrite:direct-access": "node dist/verify-appwrite-direct-access.js --apply",
     "verify:appwrite:workspace-operations": "node dist/verify-appwrite-workspace-operations.js --apply",

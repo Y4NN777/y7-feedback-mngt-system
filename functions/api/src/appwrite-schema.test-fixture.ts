@@ -1,0 +1,35 @@
+import type { ServerConfig } from "@y7-feedback/config/server";
+
+import { canonicalDay4SchemaIds } from "./appwrite-day4-migration.js";
+
+export const schema: ServerConfig["appwriteSchema"] = {
+  databaseId: "feedback",
+  workspacesTableId: "workspaces",
+  workspaceMembershipsTableId: "workspace_memberships",
+  projectAssignmentsTableId: "project_assignments",
+  projectSlugsTableId: "project_slugs",
+  projectsTableId: "projects",
+  reportersTableId: "reporters",
+  feedbackTableId: "feedback_items",
+  lifecycleTableId: "feedback_lifecycle",
+  accessGrantsTableId: "access_grants",
+  notificationsTableId: "notifications",
+  notificationSignalsTableId: "notification_signals",
+  outboxTableId: "notification_outbox",
+  idempotencyTableId: "intake_idempotency",
+  attachmentBucketId: "private_attachments",
+  attachmentStagingTableId: "attachment_staging",
+  attachmentsTableId: "attachments",
+  providerGrantsTableId: "provider_grants",
+  sourceConnectionsTableId: "source_connections",
+  administrationAuditTableId: "administration_audit",
+  administrationIdempotencyTableId: "administration_idempotency",
+  conversationMessagesTableId: "conversation_messages",
+  conversationInternalNotesTableId: "conversation_internal_notes",
+  conversationIdempotencyTableId: "conversation_idempotency",
+  conversationLifecycleTableId: "conversation_lifecycle",
+  publicationConsentsTableId: "publication_consents",
+  externalIssueLinksTableId: "external_issue_links",
+  providerOutboxTableId: "provider_outbox",
+  ...canonicalDay4SchemaIds,
+};

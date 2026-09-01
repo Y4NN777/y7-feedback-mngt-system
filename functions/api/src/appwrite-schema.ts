@@ -1,5 +1,7 @@
 import type { ServerConfig } from "@y7-feedback/config/server";
 
+import { createDay4TableDefinitions } from "./appwrite-day4-migration.js";
+
 export type AppwriteColumn =
   | {
       readonly key: string;
@@ -573,6 +575,7 @@ export function createAppwriteInfrastructureManifest(
           index("workspace_project", ["workspaceId", "projectId"]),
         ],
       ),
+      ...createDay4TableDefinitions(schema),
     ],
     attachmentBucket: {
       id: schema.attachmentBucketId,
