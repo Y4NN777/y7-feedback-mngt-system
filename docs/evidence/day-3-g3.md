@@ -69,11 +69,12 @@ The `TASK-G3-001` branch currently passes:
 - `pnpm test:e2e` — 26 desktop/320 px scenarios;
 - `pnpm security:scan` — zero findings.
 
-## Pending authoritative evidence
+## Authoritative completion evidence
 
 - [x] `APPWRITE_G3_COMPOSED_PASSED` from clean Preview on 2026-08-30 for
       fixture `g3c_1c224aae85f726`;
 - [x] zero residue in every category above (`cleanupPassed: true`);
 - [x] selected GitHub issue confirmed closed (`providerIssueClosed: true`);
-- [ ] `TASK-G3-001` PR green and merged into `main`;
-- [ ] Goal ledger changed from G3 `IN_PROGRESS` to `DONE`.
+- [x] PR [#29](https://github.com/Y4NN777/y7-feedback-mngt-system/pull/29)
+      green and rebased into `main` on 2026-08-30;
+- [x] Goal ledger changed from G3 `IN_REVIEW` to `DONE` on 2026-09-01.
