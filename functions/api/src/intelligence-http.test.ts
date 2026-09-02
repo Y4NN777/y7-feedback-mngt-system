@@ -88,4 +88,83 @@ describe("intelligence HTTP boundary", () => {
     }
     expect(analyze).not.toHaveBeenCalled();
   });
+
+  it("BDD-INT-320 forwards provenance commands through the same authenticated scope", async () => {
+    const analyze = vi.fn();
+    const execute = vi.fn().mockResolvedValue({
+      status: "ok",
+      result: {
+        disposition: "applied",
+        associationId: "association_1",
+        eventId: "event_1",
+        revision: 1,
+      },
+    });
+    const http = createIntelligenceHttp({ analyze }, { execute });
+    const body = {
+      kind: "record_theme",
+      operationId: "operation_1",
+      feedbackId: "feedback_1",
+      label: "Checkout friction",
+    };
+    await expect(
+      http.handle(
+        request({
+          path: "/v1/workspaces/workspace_1/projects/project_1/intelligence/provenance",
+          body,
+        }),
+      ),
+    ).resolves.toEqual({
+      statusCode: 200,
+      body: {
+        status: "ok",
+        result: {
+          disposition: "applied",
+          associationId: "association_1",
+          eventId: "event_1",
+          revision: 1,
+        },
+      },
+    });
+    expect(execute).toHaveBeenCalledWith({
+      jwt: "jwt_1",
+      workspaceId: "workspace_1",
+      projectId: "project_1",
+      command: body,
+    });
+    expect(analyze).not.toHaveBeenCalled();
+  });
+
+  it("BDD-INT-321 maps provenance denial, validation, conflict and retry outcomes", async () => {
+    const execute = vi.fn();
+    const http = createIntelligenceHttp({ analyze: vi.fn() }, { execute });
+    for (const [status, expected] of [
+      ["denied", [404, "ERR-INTELLIGENCE-DENIED"]],
+      ["invalid", [400, "ERR-INTELLIGENCE-INVALID"]],
+      ["conflict", [409, "ERR-INTELLIGENCE-CONFLICT"]],
+      ["retryable", [503, "ERR-INTELLIGENCE-RETRYABLE"]],
+    ] as const) {
+      execute.mockResolvedValueOnce({ status });
+      await expect(
+        http.handle(
+          request({
+            path: "/v1/workspaces/workspace_1/projects/project_1/intelligence/provenance",
+          }),
+        ),
+      ).resolves.toEqual({
+        statusCode: expected[0],
+        body: { error: expected[1] },
+      });
+    }
+    await expect(
+      createIntelligenceHttp({ analyze: vi.fn() }).handle(
+        request({
+          path: "/v1/workspaces/workspace_1/projects/project_1/intelligence/provenance",
+        }),
+      ),
+    ).resolves.toEqual({
+      statusCode: 503,
+      body: { error: "ERR-INTELLIGENCE-RETRYABLE" },
+    });
+  });
 });

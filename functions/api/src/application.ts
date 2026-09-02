@@ -8,6 +8,7 @@ import { createNodeAppwriteAccountlessRepository } from "./appwrite-accountless-
 import { createNodeAppwriteAttachmentAcceptanceStore } from "./appwrite-attachment-acceptance-store.js";
 import { createNodeAppwriteIntakeStore } from "./appwrite-intake-store.js";
 import { createNodeAppwriteIntelligenceStore } from "./appwrite-intelligence-store.js";
+import { createNodeAppwriteIntelligenceProvenanceStore } from "./appwrite-intelligence-provenance-store.js";
 import { createNodeAppwritePrivateAttachmentStorage } from "./appwrite-private-attachment-storage.js";
 import { createNodeAppwritePrincipalVerifier } from "./appwrite-principal-verifier.js";
 import { createNodeAppwriteConversationLifecycleStore } from "./appwrite-conversation-lifecycle-store.js";
@@ -40,6 +41,7 @@ import {
 import type { HttpDependencies } from "./http.js";
 import { createIntakeCoordinator } from "./intake.js";
 import { createIntelligenceCoordinator } from "./intelligence.js";
+import { createIntelligenceProvenanceCoordinator } from "./intelligence-provenance.js";
 import { createIntelligenceHttp } from "./intelligence-http.js";
 import { createConversationLifecycleCoordinator } from "./conversation-lifecycle.js";
 import { createConversationLifecycleHttp } from "./conversation-lifecycle-http.js";
@@ -235,6 +237,24 @@ export function createHttpApplication(
           reportersTableId: config.appwriteSchema.reportersTableId,
         },
         sensitive,
+      ),
+    ),
+    createIntelligenceProvenanceCoordinator(
+      principalVerifier,
+      workspaceScope,
+      createNodeAppwriteIntelligenceProvenanceStore(
+        runtime.tables,
+        {
+          databaseId: config.appwriteSchema.databaseId,
+          feedbackTableId: config.appwriteSchema.feedbackTableId,
+          provenanceTableId: config.appwriteSchema.intelligenceProvenanceTableId,
+        },
+        sensitive,
+        {
+          createAssociationId: runtime.createId,
+          createEventId: runtime.createId,
+          now: runtime.nowIso,
+        },
       ),
     ),
   );
