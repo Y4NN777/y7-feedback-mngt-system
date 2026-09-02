@@ -119,6 +119,18 @@ describe("Appwrite Intelligence store", () => {
     );
   });
 
+  it("BDD-INT-201 normalizes Appwrite UTC offset timestamps", async () => {
+    const { store } = setup({
+      feedback: [feedback({ acceptedAt: "2026-08-10T12:00:00.000+00:00" })],
+    });
+
+    await expect(
+      store.list({ workspaceId: "workspace_1", projectId: "project_1" }),
+    ).resolves.toEqual([
+      expect.objectContaining({ createdAt: "2026-08-10T12:00:00.000Z" }),
+    ]);
+  });
+
   it("BDD-INT-202 maps contact and verified provider assertions without identifiers", async () => {
     const target = setup({
       reporters: [

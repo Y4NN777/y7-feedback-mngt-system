@@ -54,7 +54,7 @@ function object(value: unknown): value is Readonly<Record<string, unknown>> {
 }
 
 function timestamp(value: unknown): string {
-  if (typeof value !== "string" || !value.endsWith("Z"))
+  if (typeof value !== "string" || !/(?:Z|[+-]00:00)$/u.test(value))
     throw new Error("APPWRITE_INTELLIGENCE_UNAVAILABLE");
   const parsed = Date.parse(value);
   if (!Number.isFinite(parsed)) throw new Error("APPWRITE_INTELLIGENCE_UNAVAILABLE");
