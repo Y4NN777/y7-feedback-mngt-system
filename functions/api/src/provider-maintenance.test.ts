@@ -13,6 +13,7 @@ describe("scheduled provider maintenance", () => {
       inbox: { runOnce: inbox },
       outbox: { runOnce: outbox },
       webhooks: { runOnce: webhooks },
+      privacy: { runOnce: () => Promise.resolve({ status: "idle" }) },
     });
 
     await expect(maintenance.runOnce()).resolves.toEqual({
@@ -20,6 +21,7 @@ describe("scheduled provider maintenance", () => {
       inbox: "processed",
       outbox: "delivered",
       webhooks: "reconciled",
+      privacy: "idle",
     });
     expect(inbox).toHaveBeenCalledOnce();
     expect(outbox).toHaveBeenCalledOnce();
@@ -52,5 +54,16 @@ describe("scheduled provider maintenance", () => {
     await expect(maintenance.runOnce()).resolves.toMatchObject({
       inbox: "completed",
     });
+  });
+
+  it("BDD-PRIV-044 supports privacy-only schedules and rejects an empty schedule", async () => {
+    const privacy = vi.fn(() => Promise.resolve({ purged: 1 }));
+    await expect(
+      createProviderMaintenance({ privacy: { runOnce: privacy } }).runOnce(),
+    ).resolves.toEqual({ status: "completed", privacy: "completed" });
+    expect(privacy).toHaveBeenCalledOnce();
+    expect(() => createProviderMaintenance({})).toThrow(
+      "PROVIDER_MAINTENANCE_CONFIGURATION_INVALID",
+    );
   });
 });
