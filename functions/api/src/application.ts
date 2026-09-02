@@ -31,6 +31,7 @@ import { createNodeAppwriteProviderIssueStateStore } from "./appwrite-provider-i
 import { createNodeAppwriteReporterConsentVerifier } from "./appwrite-reporter-consent-verifier.js";
 import { createNodeAppwriteProviderGrantVault } from "./appwrite-provider-grant-vault.js";
 import { createNodeAppwriteSourceConnectionStore } from "./appwrite-source-connection-store.js";
+import { createNodeAppwriteActiveSourceGrantReader } from "./appwrite-active-source-grant-reader.js";
 import {
   createAppwriteSourceProjectSlugPort,
   createNodeAppwriteSourceManagementStore,
@@ -79,6 +80,8 @@ import { createProviderWebhookProvisioner } from "./provider-webhook-provisioner
 import { createProviderIssueEventHandler } from "./provider-issue-event.js";
 import { createProviderEventInboxWorker } from "./provider-event-inbox.js";
 import { createProviderEventInboxHttp } from "./provider-event-inbox-http.js";
+import { createProviderMaintenance } from "./provider-maintenance.js";
+import { createProviderWebhookReconciliation } from "./provider-webhook-reconciliation.js";
 
 export function digestExternalIssueCommand(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(value)).digest("base64url");
@@ -505,7 +508,7 @@ export function createHttpApplication(
         );
       })()
     : undefined;
-  const providerIssueOutbox =
+  const providerIssueOutboxWorker =
     config.providers && config.providerOutboxTriggerSecret
       ? (() => {
           const vault = createNodeAppwriteProviderGrantVault(
@@ -516,29 +519,32 @@ export function createHttpApplication(
             },
             Buffer.from(config.providerGrantEnvelopeKey, "base64url"),
           );
-          return createProviderIssueOutboxHttp(
-            createProviderIssueOutboxWorker({
-              workerId: `${config.environment}-provider-worker`,
-              store: createNodeAppwriteProviderIssueOutboxStore(runtime.tables, {
-                databaseId: config.appwriteSchema.databaseId,
-                providerOutboxTableId: config.appwriteSchema.providerOutboxTableId,
-                externalIssueLinksTableId:
-                  config.appwriteSchema.externalIssueLinksTableId,
-                sourceConnectionsTableId:
-                  config.appwriteSchema.sourceConnectionsTableId,
-              }),
-              providers: [
-                createGitHubIssueProvider(vault),
-                createGitLabIssueProvider(config.providers.gitlab.origin, vault),
-              ],
-              now: () => new Date(runtime.nowIso()),
-              staleAfterMs: 5 * 60 * 1_000,
-              maximumAttempts: 5,
-              retryDelayMs: (attempt) => 2 ** attempt * 1_000,
+          return createProviderIssueOutboxWorker({
+            workerId: `${config.environment}-provider-worker`,
+            store: createNodeAppwriteProviderIssueOutboxStore(runtime.tables, {
+              databaseId: config.appwriteSchema.databaseId,
+              providerOutboxTableId: config.appwriteSchema.providerOutboxTableId,
+              externalIssueLinksTableId:
+                config.appwriteSchema.externalIssueLinksTableId,
+              sourceConnectionsTableId: config.appwriteSchema.sourceConnectionsTableId,
             }),
-            config.providerOutboxTriggerSecret,
-          );
+            providers: [
+              createGitHubIssueProvider(vault),
+              createGitLabIssueProvider(config.providers.gitlab.origin, vault),
+            ],
+            now: () => new Date(runtime.nowIso()),
+            staleAfterMs: 5 * 60 * 1_000,
+            maximumAttempts: 5,
+            retryDelayMs: (attempt) => 2 ** attempt * 1_000,
+          });
         })()
+      : undefined;
+  const providerIssueOutbox =
+    providerIssueOutboxWorker && config.providerOutboxTriggerSecret
+      ? createProviderIssueOutboxHttp(
+          providerIssueOutboxWorker,
+          config.providerOutboxTriggerSecret,
+        )
       : undefined;
   const providerWebhookAuthority = createAppwriteProviderWebhookAuthorityStore(
     runtime.tables,
@@ -565,26 +571,72 @@ export function createHttpApplication(
       now: () => new Date(runtime.nowIso()),
     }),
   );
-  const providerEventInbox = config.providerOutboxTriggerSecret
-    ? createProviderEventInboxHttp(
-        createProviderEventInboxWorker({
-          store: providerWebhookInbox,
-          handler: createProviderIssueEventHandler(
-            createNodeAppwriteProviderIssueStateStore(runtime.tables, {
-              databaseId: config.appwriteSchema.databaseId,
-              externalIssueLinksTableId:
-                config.appwriteSchema.externalIssueLinksTableId,
-            }),
-          ),
-          workerId: "provider-event-worker",
-          now: () => new Date(runtime.nowIso()),
-          staleAfterMs: 5 * 60 * 1_000,
-          maximumAttempts: 5,
-          retryDelayMs: (attempt) => 2 ** attempt * 1_000,
-        }),
-        config.providerOutboxTriggerSecret,
-      )
+  const providerEventInboxWorker = config.providerOutboxTriggerSecret
+    ? createProviderEventInboxWorker({
+        store: providerWebhookInbox,
+        handler: createProviderIssueEventHandler(
+          createNodeAppwriteProviderIssueStateStore(runtime.tables, {
+            databaseId: config.appwriteSchema.databaseId,
+            externalIssueLinksTableId: config.appwriteSchema.externalIssueLinksTableId,
+          }),
+        ),
+        workerId: "provider-event-worker",
+        now: () => new Date(runtime.nowIso()),
+        staleAfterMs: 5 * 60 * 1_000,
+        maximumAttempts: 5,
+        retryDelayMs: (attempt) => 2 ** attempt * 1_000,
+      })
     : undefined;
+  const providerEventInbox =
+    providerEventInboxWorker && config.providerOutboxTriggerSecret
+      ? createProviderEventInboxHttp(
+          providerEventInboxWorker,
+          config.providerOutboxTriggerSecret,
+        )
+      : undefined;
+  const providerMaintenance =
+    config.providers && providerIssueOutboxWorker && providerEventInboxWorker
+      ? (() => {
+          const vault = createNodeAppwriteProviderGrantVault(
+            runtime.tables,
+            {
+              databaseId: config.appwriteSchema.databaseId,
+              providerGrantsTableId: config.appwriteSchema.providerGrantsTableId,
+            },
+            Buffer.from(config.providerGrantEnvelopeKey, "base64url"),
+          );
+          const webhookBase = (callbackUrl: string, provider: "github" | "gitlab") => {
+            const origin = new URL(callbackUrl).origin;
+            return `${origin}/providers/${provider}/webhooks/`;
+          };
+          const webhooks = createProviderWebhookProvisioner(
+            {
+              githubApiOrigin: "https://api.github.com/",
+              gitlabOrigin: config.providers.gitlab.origin,
+              callbackBaseUrls: {
+                github: webhookBase(config.providers.github.callbackUrl, "github"),
+                gitlab: webhookBase(config.providers.gitlab.callbackUrl, "gitlab"),
+              },
+            },
+            vault,
+            providerWebhookAuthority,
+            () => randomBytes(32).toString("base64url"),
+          );
+          return createProviderMaintenance({
+            inbox: providerEventInboxWorker,
+            outbox: providerIssueOutboxWorker,
+            webhooks: createProviderWebhookReconciliation(
+              createNodeAppwriteActiveSourceGrantReader(runtime.tables, {
+                databaseId: config.appwriteSchema.databaseId,
+                sourceConnectionsTableId:
+                  config.appwriteSchema.sourceConnectionsTableId,
+              }),
+              webhooks,
+              25,
+            ),
+          });
+        })()
+      : undefined;
   /* v8 ignore stop */
 
   return {
@@ -597,6 +649,8 @@ export function createHttpApplication(
     providerWebhook,
     /* v8 ignore next -- optional composition is covered by configuration parsing. */
     ...(providerEventInbox === undefined ? {} : { providerEventInbox }),
+    /* v8 ignore next -- optional composition is covered by configuration parsing. */
+    ...(providerMaintenance === undefined ? {} : { providerMaintenance }),
     publicApi: createPublicApi(
       projects,
       intake,

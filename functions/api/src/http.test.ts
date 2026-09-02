@@ -394,6 +394,51 @@ describe("trusted API entrypoint", () => {
     );
   });
 
+  it("BDD-SYNC-067 routes native Appwrite schedules only to provider maintenance", async () => {
+    const runOnce = vi.fn(() => Promise.resolve({ status: "completed" }));
+    const webhookHandle = vi.fn();
+    const publicHandle = vi.fn<PublicApi["handle"]>();
+    const { context, json } = createContext("POST", "/", {
+      headers: { "x-appwrite-trigger": "schedule" },
+    });
+
+    await routeRequest(context, {
+      ...dependencies,
+      providerMaintenance: { runOnce },
+      providerWebhook: { handle: webhookHandle },
+      publicApi: { handle: publicHandle },
+    });
+
+    expect(runOnce).toHaveBeenCalledOnce();
+    expect(webhookHandle).not.toHaveBeenCalled();
+    expect(publicHandle).not.toHaveBeenCalled();
+    expect(json).toHaveBeenCalledWith(
+      { status: "completed" },
+      200,
+      expect.objectContaining({ "cache-control": "no-store" }),
+    );
+    expect(context.log).toHaveBeenCalledWith(
+      expect.stringContaining('"operation":"provider_maintenance"'),
+    );
+  });
+
+  it("BDD-SYNC-068 fails a scheduled execution when maintenance is unavailable", async () => {
+    const { context, json } = createContext("POST", "/", {
+      headers: { "x-appwrite-trigger": "schedule" },
+    });
+    await routeRequest(context, {
+      ...dependencies,
+      providerMaintenance: {
+        runOnce: () => Promise.reject(new Error("outage")),
+      },
+    });
+    expect(json).toHaveBeenCalledWith(
+      { error: "ERR-PROVIDER-MAINTENANCE-RETRYABLE" },
+      503,
+      expect.any(Object),
+    );
+  });
+
   it("BDD-SRC-REAL-005 defaults absent query and excludes multipart bodies", async () => {
     const sourceHandle = vi.fn(() => Promise.resolve(null));
     const { context } = createContext("POST", "/providers/upload", {
