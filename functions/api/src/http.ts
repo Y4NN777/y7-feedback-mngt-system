@@ -4,6 +4,7 @@ import { serializeOperationalEvent } from "./observability.js";
 import type { ConversationLifecycleHttp } from "./conversation-lifecycle-http.js";
 import type { ExternalIssueHttp } from "./external-issue-http.js";
 import type { IntelligenceHttp } from "./intelligence-http.js";
+import type { PrivacyHttp } from "./privacy-http.js";
 import type { PublicApi } from "./public-api.js";
 import type { ProjectAdministrationHttp } from "./project-administration-http.js";
 import type { ProviderIssueOutboxHttp } from "./provider-issue-outbox-http.js";
@@ -50,6 +51,7 @@ export interface HttpDependencies {
   readonly conversationLifecycle?: ConversationLifecycleHttp;
   readonly externalIssue?: ExternalIssueHttp;
   readonly intelligence?: IntelligenceHttp;
+  readonly privacy?: PrivacyHttp;
   readonly projectAdministration?: ProjectAdministrationHttp;
   readonly providerIssueOutbox?: ProviderIssueOutboxHttp;
   readonly providerEventInbox?: ProviderEventInboxHttp;
@@ -301,6 +303,28 @@ export async function routeRequest(
               ? req.bodyJson
               : undefined,
         });
+  const privacyResponse =
+    isHealth ||
+    isIngressProbe ||
+    maintenanceResponse ||
+    providerWebhookResponse ||
+    providerOutboxResponse ||
+    sourceResponse ||
+    administrationResponse ||
+    conversationResponse ||
+    workbenchResponse ||
+    externalIssueResponse ||
+    intelligenceResponse
+      ? null
+      : await dependencies.privacy?.handle({
+          method,
+          path: req.path,
+          headers: requestHeaders,
+          body:
+            method === "POST" && !contentType.startsWith("multipart/form-data")
+              ? req.bodyJson
+              : undefined,
+        });
   const publicResponse =
     isHealth ||
     isIngressProbe ||
@@ -314,7 +338,8 @@ export async function routeRequest(
           conversationResponse ||
           workbenchResponse ||
           externalIssueResponse ||
-          intelligenceResponse
+          intelligenceResponse ||
+          privacyResponse
         ? null
         : await dependencies.publicApi?.handle({
             method,
@@ -338,6 +363,7 @@ export async function routeRequest(
       workbenchResponse?.statusCode ??
       externalIssueResponse?.statusCode ??
       intelligenceResponse?.statusCode ??
+      privacyResponse?.statusCode ??
       publicResponse?.statusCode ??
       404);
   const operation = isHealth
@@ -364,9 +390,11 @@ export async function routeRequest(
                         ? "external_issue"
                         : intelligenceResponse
                           ? "intelligence"
-                          : publicResponse
-                            ? "public_api"
-                            : "unknown";
+                          : privacyResponse
+                            ? "privacy"
+                            : publicResponse
+                              ? "public_api"
+                              : "unknown";
   const outcome = isHealth
     ? "success"
     : (probeResponse ??
@@ -380,6 +408,7 @@ export async function routeRequest(
         workbenchResponse ??
         externalIssueResponse ??
         intelligenceResponse ??
+        privacyResponse ??
         publicResponse)
       ? statusCode < 400
         ? "success"
@@ -472,6 +501,10 @@ export async function routeRequest(
       intelligenceResponse.statusCode,
       headers,
     );
+  }
+
+  if (privacyResponse) {
+    return res.json(privacyResponse.body, privacyResponse.statusCode, headers);
   }
 
   if (publicResponse) {

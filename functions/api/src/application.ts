@@ -9,6 +9,7 @@ import { createNodeAppwriteAttachmentAcceptanceStore } from "./appwrite-attachme
 import { createNodeAppwriteIntakeStore } from "./appwrite-intake-store.js";
 import { createNodeAppwriteIntelligenceStore } from "./appwrite-intelligence-store.js";
 import { createNodeAppwriteIntelligenceProvenanceStore } from "./appwrite-intelligence-provenance-store.js";
+import { createNodeAppwritePrivacyStore } from "./appwrite-privacy-store.js";
 import { createNodeAppwritePrivateAttachmentStorage } from "./appwrite-private-attachment-storage.js";
 import { createNodeAppwritePrincipalVerifier } from "./appwrite-principal-verifier.js";
 import { createNodeAppwriteConversationLifecycleStore } from "./appwrite-conversation-lifecycle-store.js";
@@ -43,6 +44,8 @@ import { createIntakeCoordinator } from "./intake.js";
 import { createIntelligenceCoordinator } from "./intelligence.js";
 import { createIntelligenceProvenanceCoordinator } from "./intelligence-provenance.js";
 import { createIntelligenceHttp } from "./intelligence-http.js";
+import { createPrivacyCoordinator } from "./privacy.js";
+import { createPrivacyHttp } from "./privacy-http.js";
 import { createConversationLifecycleCoordinator } from "./conversation-lifecycle.js";
 import { createConversationLifecycleHttp } from "./conversation-lifecycle-http.js";
 import { createGitHubSourceProvider } from "./github-source-provider.js";
@@ -256,6 +259,47 @@ export function createHttpApplication(
           now: runtime.nowIso,
         },
       ),
+    ),
+  );
+  const privacy = createPrivacyHttp(
+    createPrivacyCoordinator(
+      principalVerifier,
+      workspaceScope,
+      {
+        authorize: async ({ reference, proof }) => {
+          const outcome = await accountless.authorize({ reference, proof });
+          return outcome.status === "ok"
+            ? { status: "authorized" as const, feedbackId: outcome.feedbackId }
+            : outcome.status === "denied"
+              ? { status: "denied" as const }
+              : { status: "retryable" as const };
+        },
+      },
+      createNodeAppwritePrivacyStore(
+        runtime.tables,
+        {
+          databaseId: config.appwriteSchema.databaseId,
+          feedbackTableId: config.appwriteSchema.feedbackTableId,
+          reportersTableId: config.appwriteSchema.reportersTableId,
+          accessGrantsTableId: config.appwriteSchema.accessGrantsTableId,
+          attachmentsTableId: config.appwriteSchema.attachmentsTableId,
+          notificationsTableId: config.appwriteSchema.notificationsTableId,
+          publicationConsentsTableId: config.appwriteSchema.publicationConsentsTableId,
+          externalIssueLinksTableId: config.appwriteSchema.externalIssueLinksTableId,
+          offlineConflictProjectionsTableId:
+            config.appwriteSchema.offlineConflictProjectionsTableId,
+          intelligenceProvenanceTableId:
+            config.appwriteSchema.intelligenceProvenanceTableId,
+          deletionRecordsTableId: config.appwriteSchema.deletionRecordsTableId,
+        },
+        sensitive,
+        {
+          createId: runtime.createId,
+          createEventId: runtime.createId,
+          now: runtime.nowIso,
+        },
+      ),
+      (value) => createHash("sha256").update(value).digest("base64url"),
     ),
   );
   const workbench = createWorkbenchHttp(
@@ -682,6 +726,7 @@ export function createHttpApplication(
     createCorrelationId: runtime.createCorrelationId,
     environment: config.environment,
     intelligence,
+    privacy,
     conversationLifecycle,
     externalIssue,
     now: runtime.nowMs,

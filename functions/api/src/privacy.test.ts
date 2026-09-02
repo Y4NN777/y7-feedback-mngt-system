@@ -106,6 +106,13 @@ describe("privacy coordinator", () => {
         },
       }),
     ).resolves.toEqual({ status: "denied" });
+    proof.authorize.mockResolvedValueOnce({ status: "retryable" });
+    await expect(
+      coordinator().execute({
+        ...base,
+        authority: { kind: "access_proof", reference: "ref", proof: "proof" },
+      }),
+    ).resolves.toEqual({ status: "retryable" });
   });
 
   it("BDD-PRIV-012 denies unverifiable principal, scope and proof indistinguishably", async () => {
