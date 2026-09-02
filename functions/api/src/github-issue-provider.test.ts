@@ -38,13 +38,14 @@ describe("GitHub issue provider", () => {
       .mockResolvedValueOnce(
         response(201, {
           id: 42,
+          number: 1,
           html_url: "https://github.com/Y4NN777/feedback/issues/1",
         }),
       );
     await expect(
       createGitHubIssueProvider(vault(), fetcher).createIssue(input),
     ).resolves.toEqual({
-      issueId: "42",
+      issueId: "1",
       issueUrl: "https://github.com/Y4NN777/feedback/issues/1",
       replayed: false,
     });

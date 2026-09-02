@@ -19,7 +19,10 @@ function object(value: unknown): value is Readonly<Record<string, unknown>> {
 function result(value: unknown, replayed: boolean): ProviderIssueResult {
   if (
     !object(value) ||
-    (typeof value.id !== "number" && typeof value.id !== "string") ||
+    (typeof value.number !== "number" &&
+      typeof value.number !== "string" &&
+      typeof value.id !== "number" &&
+      typeof value.id !== "string") ||
     typeof value.html_url !== "string"
   ) {
     throw new ProviderIssueError("retryable");
@@ -27,7 +30,11 @@ function result(value: unknown, replayed: boolean): ProviderIssueResult {
   try {
     const url = new URL(value.html_url);
     if (url.protocol !== "https:" || url.hostname !== "github.com") throw new Error();
-    return { issueId: String(value.id), issueUrl: url.toString(), replayed };
+    return {
+      issueId: String(value.number ?? value.id),
+      issueUrl: url.toString(),
+      replayed,
+    };
   } catch {
     throw new ProviderIssueError("retryable");
   }

@@ -1,4 +1,4 @@
-import { Compression } from "node-appwrite";
+import { Compression, TablesDBIndexType } from "node-appwrite";
 
 import type {
   AppwriteProvisioningPort,
@@ -61,6 +61,18 @@ interface TablesAdminClient {
     readonly size: number;
     readonly required: boolean;
     readonly encrypt?: boolean;
+  }): Promise<unknown>;
+  createIndex(input: {
+    readonly databaseId: string;
+    readonly tableId: string;
+    readonly key: string;
+    readonly type: TablesDBIndexType;
+    readonly columns: string[];
+  }): Promise<unknown>;
+  getIndex(input: {
+    readonly databaseId: string;
+    readonly tableId: string;
+    readonly key: string;
   }): Promise<unknown>;
 }
 
@@ -269,6 +281,34 @@ export function createNodeAppwriteProvisioningPort(
           });
           return;
       }
+    },
+    async createIndex(databaseId, tableId, definition) {
+      await tables.createIndex({
+        databaseId,
+        tableId,
+        key: definition.key,
+        type:
+          definition.type === "key" ? TablesDBIndexType.Key : TablesDBIndexType.Unique,
+        columns: [...definition.columns],
+      });
+      for (let attempt = 0; attempt < 60; attempt += 1) {
+        const current = await tables.getIndex({
+          databaseId,
+          tableId,
+          key: definition.key,
+        });
+        if (
+          isRecord(current) &&
+          current.status === "available" &&
+          (current.error === "" || current.error === undefined)
+        )
+          return;
+        if (isRecord(current) && current.status === "failed") {
+          throw new Error("APPWRITE_INFRASTRUCTURE_INDEX_FAILED");
+        }
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+      throw new Error("APPWRITE_INFRASTRUCTURE_INDEX_TIMEOUT");
     },
     getBucket: (bucketId) => optional(storage.getBucket({ bucketId }), bucket),
     async createBucket(definition) {
