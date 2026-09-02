@@ -108,4 +108,29 @@ describe("Day 4 additive Appwrite migration", () => {
       { key: "operationIdsJson", required: false },
     ]);
   });
+
+  it("BDD-PRIV-009 evolves deletion records additively for immutable audit", () => {
+    const deletion = createDay4AdditiveMigration(g3Tables()).createTables.find(
+      ({ id }) => id === "deletion_records",
+    );
+    expect(
+      deletion?.columns
+        .filter(({ key }) =>
+          [
+            "revision",
+            "identityErased",
+            "auditEnvelope",
+            "operationIdsJson",
+            "updatedAt",
+          ].includes(key),
+        )
+        .map(({ key, required }) => ({ key, required })),
+    ).toEqual([
+      { key: "revision", required: false },
+      { key: "identityErased", required: false },
+      { key: "auditEnvelope", required: false },
+      { key: "operationIdsJson", required: false },
+      { key: "updatedAt", required: false },
+    ]);
+  });
 });
