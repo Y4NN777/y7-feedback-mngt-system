@@ -687,6 +687,53 @@ describe("trusted API entrypoint", () => {
     );
   });
 
+  it("routes privacy responses before the public API", async () => {
+    const privacy = {
+      handle: vi.fn().mockResolvedValue({
+        statusCode: 200,
+        body: { status: "ok", result: { feedbackId: "feedback_1" } },
+      }),
+    };
+    const publicHandle = vi.fn();
+    const { context, json } = createContext(
+      "POST",
+      "/v1/workspaces/workspace_1/projects/project_1/privacy",
+      {
+        headers: { "content-type": "application/json" },
+        bodyJson: { command: { kind: "request_deletion" } },
+      },
+    );
+    await routeRequest(context, {
+      ...dependencies,
+      privacy,
+      publicApi: { handle: publicHandle },
+    });
+    expect(privacy.handle).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: "POST",
+        body: { command: { kind: "request_deletion" } },
+      }),
+    );
+    expect(publicHandle).not.toHaveBeenCalled();
+    expect(json).toHaveBeenCalledWith(
+      { status: "ok", result: { feedbackId: "feedback_1" } },
+      200,
+      expect.objectContaining({ "cache-control": "no-store" }),
+    );
+    expect(context.log).toHaveBeenCalledWith(
+      expect.stringContaining('"operation":"privacy"'),
+    );
+
+    const multipart = createContext("POST", context.req.path, {
+      headers: { "content-type": "multipart/form-data; boundary=test" },
+      bodyJson: { ignored: true },
+    });
+    await routeRequest(multipart.context, { ...dependencies, privacy });
+    expect(privacy.handle).toHaveBeenLastCalledWith(
+      expect.objectContaining({ body: undefined }),
+    );
+  });
+
   it("routes the provider outbox before every product API", async () => {
     const providerIssueOutbox = {
       handle: vi.fn().mockResolvedValue({

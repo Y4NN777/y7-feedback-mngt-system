@@ -29,7 +29,7 @@ export interface PrivacyProofAuthority {
     readonly proof: string;
   }): Promise<
     | { readonly status: "authorized"; readonly feedbackId: string }
-    | { readonly status: "denied" }
+    | { readonly status: "denied" | "retryable" }
   >;
 }
 
@@ -157,6 +157,7 @@ export function createPrivacyCoordinator(
           requesterDigest = actorDigest;
         } else {
           const authorized = await proof.authorize(input.authority);
+          if (authorized.status === "retryable") return { status: "retryable" };
           if (
             authorized.status !== "authorized" ||
             authorized.feedbackId !== parsed.feedbackId
