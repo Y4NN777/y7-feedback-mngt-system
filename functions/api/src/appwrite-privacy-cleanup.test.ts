@@ -169,7 +169,7 @@ describe("Appwrite physical privacy cleanup", () => {
       createAppwritePrivacyCleanup(
         new FakeTables(),
         { deleteFile: vi.fn() },
-        { ...schema, feedbackTableId: "database" },
+        { ...schema, feedbackTableId: "access_grants" },
         queries,
       ),
     ).toThrow("APPWRITE_PRIVACY_CLEANUP_SCHEMA_INVALID");
