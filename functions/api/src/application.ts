@@ -27,6 +27,7 @@ import { createNodeAppwriteExternalIssueStore } from "./appwrite-external-issue-
 import { createNodeAppwriteProviderIssueOutboxStore } from "./appwrite-provider-issue-outbox-store.js";
 import { createNodeAppwriteProviderEventInboxStore } from "./appwrite-provider-event-inbox-store.js";
 import { createAppwriteProviderWebhookAuthorityStore } from "./appwrite-provider-webhook-authority-store.js";
+import { createNodeAppwriteProviderIssueStateStore } from "./appwrite-provider-issue-state-store.js";
 import { createNodeAppwriteReporterConsentVerifier } from "./appwrite-reporter-consent-verifier.js";
 import { createNodeAppwriteProviderGrantVault } from "./appwrite-provider-grant-vault.js";
 import { createNodeAppwriteSourceConnectionStore } from "./appwrite-source-connection-store.js";
@@ -75,6 +76,9 @@ import { createProviderIssueOutboxHttp } from "./provider-issue-outbox-http.js";
 import { createProviderWebhookIngress } from "./provider-webhook-ingress.js";
 import { createProviderWebhookHttp } from "./provider-webhook-http.js";
 import { createProviderWebhookProvisioner } from "./provider-webhook-provisioner.js";
+import { createProviderIssueEventHandler } from "./provider-issue-event.js";
+import { createProviderEventInboxWorker } from "./provider-event-inbox.js";
+import { createProviderEventInboxHttp } from "./provider-event-inbox-http.js";
 
 export function digestExternalIssueCommand(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(value)).digest("base64url");
@@ -561,6 +565,26 @@ export function createHttpApplication(
       now: () => new Date(runtime.nowIso()),
     }),
   );
+  const providerEventInbox = config.providerOutboxTriggerSecret
+    ? createProviderEventInboxHttp(
+        createProviderEventInboxWorker({
+          store: providerWebhookInbox,
+          handler: createProviderIssueEventHandler(
+            createNodeAppwriteProviderIssueStateStore(runtime.tables, {
+              databaseId: config.appwriteSchema.databaseId,
+              externalIssueLinksTableId:
+                config.appwriteSchema.externalIssueLinksTableId,
+            }),
+          ),
+          workerId: "provider-event-worker",
+          now: () => new Date(runtime.nowIso()),
+          staleAfterMs: 5 * 60 * 1_000,
+          maximumAttempts: 5,
+          retryDelayMs: (attempt) => 2 ** attempt * 1_000,
+        }),
+        config.providerOutboxTriggerSecret,
+      )
+    : undefined;
   /* v8 ignore stop */
 
   return {
@@ -571,6 +595,8 @@ export function createHttpApplication(
     now: runtime.nowMs,
     projectAdministration,
     providerWebhook,
+    /* v8 ignore next -- optional composition is covered by configuration parsing. */
+    ...(providerEventInbox === undefined ? {} : { providerEventInbox }),
     publicApi: createPublicApi(
       projects,
       intake,

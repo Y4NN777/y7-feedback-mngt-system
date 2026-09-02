@@ -639,4 +639,44 @@ describe("trusted API entrypoint", () => {
       expect.objectContaining({ body: undefined }),
     );
   });
+
+  it("BDD-SYNC-055 routes the provider inbox worker before the issue outbox", async () => {
+    const providerEventInbox = {
+      handle: vi.fn().mockResolvedValue({
+        statusCode: 200,
+        body: { status: "completed", outcome: "applied" },
+      }),
+    };
+    const providerIssueOutbox = { handle: vi.fn() };
+    const request = createContext("POST", "/operational/provider-event-inbox", {
+      headers: { "content-type": "application/json" },
+      bodyJson: {},
+    });
+    await routeRequest(request.context, {
+      ...dependencies,
+      providerEventInbox,
+      providerIssueOutbox,
+    });
+    expect(providerEventInbox.handle).toHaveBeenCalledWith(
+      expect.objectContaining({ body: {} }),
+    );
+    expect(providerIssueOutbox.handle).not.toHaveBeenCalled();
+    expect(request.json).toHaveBeenCalledWith(
+      { status: "completed", outcome: "applied" },
+      200,
+      expect.objectContaining({ "cache-control": "no-store" }),
+    );
+    expect(request.context.log).toHaveBeenCalledWith(
+      expect.stringContaining('"operation":"provider_event_inbox"'),
+    );
+
+    const multipart = createContext("POST", request.context.req.path, {
+      headers: { "content-type": "multipart/form-data; boundary=test" },
+    });
+    providerEventInbox.handle.mockResolvedValueOnce(undefined);
+    await routeRequest(multipart.context, { ...dependencies, providerEventInbox });
+    expect(providerEventInbox.handle).toHaveBeenLastCalledWith(
+      expect.objectContaining({ body: undefined }),
+    );
+  });
 });
