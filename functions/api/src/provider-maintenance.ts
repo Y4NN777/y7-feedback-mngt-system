@@ -22,13 +22,15 @@ export function createProviderMaintenance(input: {
 }): ProviderMaintenance {
   const capabilities = Object.entries(input) as Array<
     [
-      | "inbox"
-      | "outbox"
-      | "messages"
-      | "messageReconciliation"
-      | "webhooks"
-      | "privacy"
-      | "platform",
+      (
+        | "inbox"
+        | "outbox"
+        | "messages"
+        | "messageReconciliation"
+        | "webhooks"
+        | "privacy"
+        | "platform"
+      ),
       ProviderMaintenanceCapability,
     ]
   >;

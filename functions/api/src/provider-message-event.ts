@@ -106,7 +106,7 @@ function github(
           : null;
   const body = payload.comment.body;
   if (marker(body)) return { kind: "self_generated" };
-  const issueId = identifier(payload.issue.id);
+  const issueId = identifier(payload.issue.number ?? payload.issue.id);
   const commentId = identifier(payload.comment.id);
   const authorId = identifier(payload.comment.user.id);
   const authorLogin = text(payload.comment.user.login, 200);

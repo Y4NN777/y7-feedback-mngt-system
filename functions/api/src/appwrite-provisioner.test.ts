@@ -83,6 +83,18 @@ class MemoryProvisioningPort implements AppwriteProvisioningPort {
     return Promise.resolve();
   }
 
+  createIndex(
+    _databaseId: string,
+    tableId: string,
+    definition: ExistingAppwriteTable["indexes"][number],
+  ) {
+    this.mutations.push(`index:${tableId}:${definition.key}`);
+    const table = this.tables.get(tableId);
+    if (!table) throw new Error("missing table");
+    this.tables.set(tableId, { ...table, indexes: [...table.indexes, definition] });
+    return Promise.resolve();
+  }
+
   async getBucket() {
     return Promise.resolve(this.bucket);
   }
@@ -163,6 +175,51 @@ describe("Appwrite infrastructure provisioner", () => {
       "column:feedback_items:assignedMaintainerId",
       "column:feedback_items:deletedAt",
     ]);
+  });
+
+  it("BDD-INFRA-015 applies only missing additive indexes after their columns", async () => {
+    const port = new MemoryProvisioningPort();
+    const manifest = createAppwriteInfrastructureManifest(schema);
+    await provisionAppwriteInfrastructure(port, manifest);
+    const messages = port.tables.get("conversation_messages");
+    if (!messages) throw new Error("test manifest lacks messages");
+    port.tables.set("conversation_messages", {
+      ...messages,
+      indexes: messages.indexes.filter(({ key }) => key !== "provider_comment_time"),
+    });
+    port.mutations.length = 0;
+
+    await expect(
+      provisionAppwriteInfrastructure(port, manifest),
+    ).resolves.toMatchObject({ created: 1 });
+    expect(port.mutations).toEqual([
+      "index:conversation_messages:provider_comment_time",
+    ]);
+  });
+
+  it("BDD-INFRA-016 rejects unknown or changed indexes before applying mutations", async () => {
+    const manifest = createAppwriteInfrastructureManifest(schema);
+    const port = new MemoryProvisioningPort();
+    await provisionAppwriteInfrastructure(port, manifest);
+    const messages = port.tables.get("conversation_messages");
+    if (!messages) throw new Error("test manifest lacks messages");
+    port.tables.set("conversation_messages", {
+      ...messages,
+      indexes: [
+        ...messages.indexes.filter(({ key }) => key !== "provider_comment_time"),
+        {
+          key: "provider_comment_time",
+          type: "unique",
+          columns: ["providerCommentId"],
+        },
+      ],
+    });
+    port.mutations.length = 0;
+
+    await expect(provisionAppwriteInfrastructure(port, manifest)).rejects.toThrow(
+      "APPWRITE_INFRASTRUCTURE_DRIFT:table:conversation_messages",
+    );
+    expect(port.mutations).toEqual([]);
   });
 
   it("rejects database, unknown-column and missing required-column drift", async () => {
