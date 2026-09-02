@@ -37,6 +37,7 @@ async function main(): Promise<void> {
     `g4ic_${suffix}`,
     `g4id_${suffix}`,
   ] as const;
+  const siblingFeedbackId = `g4iy_${suffix}`;
   const client = new Client()
     .setEndpoint(config.appwriteEndpoint)
     .setProject(config.appwriteProjectId)
@@ -143,6 +144,36 @@ async function main(): Promise<void> {
       );
     return { body, durationMs: performance.now() - started };
   };
+  const mutate = async (
+    jwt: string,
+    targetWorkspaceId: string,
+    targetProjectId: string,
+    command: unknown,
+    expectedStatus: number,
+  ) => {
+    const response = await fetch(
+      new URL(
+        `/v1/workspaces/${targetWorkspaceId}/projects/${targetProjectId}/intelligence/provenance`,
+        domain,
+      ),
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${jwt}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(command),
+        redirect: "error",
+        signal: AbortSignal.timeout(30_000),
+      },
+    );
+    const body: unknown = await response.json();
+    if (response.status !== expectedStatus)
+      throw new Error(
+        `APPWRITE_G4_PROVENANCE_HTTP_${String(expectedStatus)}_GOT_${String(response.status)}`,
+      );
+    return body;
+  };
 
   let filterPassed = false;
   let trendPassed = false;
@@ -152,6 +183,9 @@ async function main(): Promise<void> {
   let workspaceIsolationPassed = false;
   let boundedQueryMs = 0;
   let coldStartWarmupMs = 0;
+  let themeProvenancePassed = false;
+  let correctionAttributionPassed = false;
+  let relationshipScopePassed = false;
   try {
     await users.create({ userId: principalId, name: "G4 Intelligence verifier" });
     userCreated = true;
@@ -224,6 +258,16 @@ async function main(): Promise<void> {
       type: "suggestion",
       state: "received",
       acceptedAt: "2026-08-05T12:00:00.000Z",
+      context: reviewedContext,
+    });
+    await createFeedback({
+      id: siblingFeedbackId,
+      targetWorkspaceId: workspaceId,
+      targetProjectId: siblingProjectId,
+      reporterId: reporters[0],
+      type: "bug",
+      state: "received",
+      acceptedAt: "2026-08-10T12:00:00.000Z",
       context: reviewedContext,
     });
     await createFeedback({
@@ -308,9 +352,119 @@ async function main(): Promise<void> {
     projectIsolationPassed = true;
     await request(jwt, siblingWorkspaceId, foreignProjectId, { filter: {} }, 404);
     workspaceIsolationPassed = true;
+
+    const recordBody = await mutate(
+      jwt,
+      workspaceId,
+      projectId,
+      {
+        kind: "record_theme",
+        operationId: `g4io1_${suffix}`,
+        feedbackId: feedback[0],
+        label: "Checkout friction",
+      },
+      200,
+    );
+    if (!object(recordBody) || !object(recordBody.result))
+      throw new Error("APPWRITE_G4_PROVENANCE_RECORD_INVALID");
+    const associationId = recordBody.result.associationId;
+    if (typeof associationId !== "string")
+      throw new Error("APPWRITE_G4_PROVENANCE_RECORD_INVALID");
+    rows.push([config.appwriteSchema.intelligenceProvenanceTableId, associationId]);
+    const replayBody = await mutate(
+      jwt,
+      workspaceId,
+      projectId,
+      {
+        kind: "record_theme",
+        operationId: `g4io1_${suffix}`,
+        feedbackId: feedback[0],
+        label: "Checkout friction",
+      },
+      200,
+    );
+    if (
+      !object(replayBody) ||
+      !object(replayBody.result) ||
+      replayBody.result.disposition !== "replayed"
+    )
+      throw new Error("APPWRITE_G4_PROVENANCE_REPLAY_INVALID");
+    await mutate(
+      jwt,
+      workspaceId,
+      projectId,
+      {
+        kind: "correct_theme",
+        operationId: `g4io2_${suffix}`,
+        associationId,
+        expectedRevision: 1,
+        label: "Payment friction",
+      },
+      200,
+    );
+    const provenanceRow = await tables.getRow({
+      databaseId: config.appwriteSchema.databaseId,
+      tableId: config.appwriteSchema.intelligenceProvenanceTableId,
+      rowId: associationId,
+    });
+    const provenance = JSON.parse(
+      protector.open(
+        {
+          environment: config.environment,
+          tableId: config.appwriteSchema.intelligenceProvenanceTableId,
+          rowId: associationId,
+          field: "provenanceEnvelope",
+        },
+        String(provenanceRow.provenanceEnvelope),
+      ),
+    ) as unknown;
+    themeProvenancePassed =
+      Array.isArray(provenance) &&
+      provenance.length === 2 &&
+      provenance.every(
+        (event) =>
+          object(event) &&
+          event.feedbackId === feedback[0] &&
+          event.sourceVersion === 1,
+      );
+    correctionAttributionPassed =
+      provenanceRow.updatedByActorId === principalId && provenanceRow.revision === 2;
+    await mutate(
+      jwt,
+      workspaceId,
+      projectId,
+      {
+        kind: "record_relationship",
+        operationId: `g4io3_${suffix}`,
+        feedbackId: feedback[0],
+        relatedFeedbackId: siblingFeedbackId,
+        relationType: "related",
+      },
+      404,
+    );
+    relationshipScopePassed = true;
+    await mutate(
+      jwt,
+      workspaceId,
+      projectId,
+      {
+        kind: "remove_association",
+        operationId: `g4io4_${suffix}`,
+        associationId,
+        expectedRevision: 2,
+      },
+      200,
+    );
     if (boundedQueryMs > 10_000)
       throw new Error("APPWRITE_G4_INTELLIGENCE_QUERY_TOO_SLOW");
-    if (!filterPassed || !trendPassed || !paginationPassed || !deletedExcluded)
+    if (
+      !filterPassed ||
+      !trendPassed ||
+      !paginationPassed ||
+      !deletedExcluded ||
+      !themeProvenancePassed ||
+      !correctionAttributionPassed
+    )
       throw new Error("APPWRITE_G4_INTELLIGENCE_ASSERTION_FAILED");
   } finally {
     for (const [tableId, rowId] of rows.reverse()) {
@@ -347,6 +501,9 @@ async function main(): Promise<void> {
       workspaceIsolationPassed,
       boundedQueryMs: Math.round(boundedQueryMs),
       coldStartWarmupMs: Math.round(coldStartWarmupMs),
+      themeProvenancePassed,
+      correctionAttributionPassed,
+      relationshipScopePassed,
       cleanupPassed: true,
     })}\n`,
   );
