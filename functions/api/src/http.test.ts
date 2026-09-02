@@ -641,6 +641,43 @@ describe("trusted API entrypoint", () => {
     );
   });
 
+  it("routes intelligence responses before the public API", async () => {
+    const intelligence = {
+      handle: vi.fn().mockResolvedValue({
+        statusCode: 200,
+        body: { status: "ok", result: { ids: [] } },
+      }),
+    };
+    const publicHandle = vi.fn();
+    const { context, json } = createContext(
+      "POST",
+      "/v1/workspaces/workspace_1/projects/project_1/intelligence",
+      {
+        headers: { "content-type": "application/json" },
+        bodyJson: { filter: {} },
+      },
+    );
+
+    await routeRequest(context, {
+      ...dependencies,
+      intelligence,
+      publicApi: { handle: publicHandle },
+    });
+
+    expect(intelligence.handle).toHaveBeenCalledWith(
+      expect.objectContaining({ method: "POST", body: { filter: {} } }),
+    );
+    expect(publicHandle).not.toHaveBeenCalled();
+    expect(json).toHaveBeenCalledWith(
+      { status: "ok", result: { ids: [] } },
+      200,
+      expect.objectContaining({ "cache-control": "no-store" }),
+    );
+    expect(context.log).toHaveBeenCalledWith(
+      expect.stringContaining('"operation":"intelligence"'),
+    );
+  });
+
   it("routes the provider outbox before every product API", async () => {
     const providerIssueOutbox = {
       handle: vi.fn().mockResolvedValue({
