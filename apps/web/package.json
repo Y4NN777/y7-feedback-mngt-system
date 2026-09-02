@@ -12,7 +12,8 @@
     "appwrite": "26.2.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "web-vitals": "^6.1.0"
+    "web-vitals": "^6.1.0",
+    "workbox-window": "7.4.1"
   },
   "scripts": {
     "build": "pnpm typecheck && vite build",
@@ -21,6 +22,7 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
+    "test:e2e:offline": "playwright test e2e/offline.spec.ts --project=chromium",
     "typecheck": "tsc -p tsconfig.app.json --noEmit --pretty false && tsc -p tsconfig.node.json --noEmit --pretty false"
   },
   "devDependencies": {

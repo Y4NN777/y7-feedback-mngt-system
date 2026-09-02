@@ -1,4 +1,4 @@
-export type OfflineEnvironment = "preview" | "production";
+export type OfflineEnvironment = "development" | "preview" | "production";
 
 export interface OfflineScope {
   readonly environment: OfflineEnvironment;
@@ -71,7 +71,9 @@ const maximumBlobSize = 10 * 1024 * 1024;
 function validScope(scope: OfflineScope): boolean {
   const environment: unknown = scope.environment;
   return (
-    (environment === "preview" || environment === "production") &&
+    (environment === "development" ||
+      environment === "preview" ||
+      environment === "production") &&
     identifier.test(scope.workspaceId) &&
     identifier.test(scope.projectId) &&
     identifier.test(scope.actorId) &&
@@ -230,6 +232,13 @@ export function createIndexedDbOfflineStore(input: {
     async loadDraft(scope: OfflineScope, id: string) {
       return (await read<StoredDraft>("drafts", key(scopeKey(scope), id))) ?? null;
     },
+    async deleteDraft(scope: OfflineScope, id: string) {
+      const partition = scopeKey(scope);
+      const db = await database();
+      const transaction = db.transaction("drafts", "readwrite");
+      transaction.objectStore("drafts").delete(key(partition, id));
+      await completion(transaction);
+    },
     async putBlob(scope: OfflineScope, id: string, value: Blob) {
       if (value.size > maximumBlobSize)
         throw new OfflineStoreError("OFFLINE_BLOB_SIZE");
@@ -273,6 +282,11 @@ export function createIndexedDbOfflineStore(input: {
         updatedAt: now(),
       };
       await write("projections", record);
+    },
+    async loadProjection(scope: OfflineScope, id: string) {
+      return (
+        (await read<StoredProjection>("projections", key(scopeKey(scope), id))) ?? null
+      );
     },
     async enqueue(scope: OfflineScope, value: OfflineOperationInput) {
       const partition = scopeKey(scope);

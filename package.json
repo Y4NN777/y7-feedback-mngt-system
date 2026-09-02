@@ -47,8 +47,10 @@
     "test": "pnpm test:runtime-deps && node --test tests/*.test.mjs && pnpm -r --if-present test",
     "test:coverage": "pnpm test:runtime-deps && node --test tests/*.test.mjs && pnpm -r --if-present test:coverage",
     "test:e2e": "pnpm --filter @y7-feedback/web test:e2e",
+    "test:e2e:offline": "pnpm --filter @y7-feedback/web test:e2e:offline",
     "test:runtime-deps": "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build",
-    "typecheck": "pnpm -r --if-present typecheck"
+    "typecheck": "pnpm -r --if-present typecheck",
+    "verify:pwa:g4": "pnpm --filter @y7-feedback/web build && pnpm test:e2e:offline"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

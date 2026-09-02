@@ -18,7 +18,8 @@ export type IntakeGatewayOutcome =
       readonly accessProof: string;
       readonly replayed: boolean;
     }
-  | { readonly status: "conflict" | "invalid" | "retryable" };
+  | { readonly status: "conflict" | "invalid" }
+  | { readonly status: "retryable"; readonly retryAfterMs?: number };
 
 export interface IntakeGateway {
   accept(command: IntakeGatewayCommand): Promise<IntakeGatewayOutcome>;
@@ -121,7 +122,14 @@ export function createHttpIntakeGateway(
         if (response.status === 409) return { status: "conflict" };
         if (response.status === 400) return { status: "invalid" };
         if (response.status !== 200 && response.status !== 201) {
-          return { status: "retryable" };
+          const retryAfter = response.headers.get("retry-after");
+          const seconds = retryAfter === null ? Number.NaN : Number(retryAfter);
+          return Number.isFinite(seconds) && seconds > 0
+            ? {
+                status: "retryable",
+                retryAfterMs: Math.min(300_000, Math.ceil(seconds * 1_000)),
+              }
+            : { status: "retryable" };
         }
         return accepted((await response.json()) as unknown) ?? { status: "retryable" };
       } catch {

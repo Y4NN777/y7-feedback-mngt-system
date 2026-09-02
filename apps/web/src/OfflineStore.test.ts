@@ -144,9 +144,13 @@ describe("partitioned offline persistence", () => {
     });
     await offline.saveDraft(sibling, "intake", { value: "retain" });
 
+    await expect(offline.loadProjection(preview, "feedback_1")).resolves.toMatchObject({
+      payload: { state: "open" },
+    });
     await expect(offline.eraseScope(preview)).resolves.toEqual({ deleted: 4 });
     await expect(offline.loadDraft(preview, "intake")).resolves.toBeNull();
     await expect(offline.listOperations(preview)).resolves.toEqual([]);
+    await expect(offline.loadProjection(preview, "feedback_1")).resolves.toBeNull();
     await expect(offline.loadDraft(sibling, "intake")).resolves.toMatchObject({
       payload: { value: "retain" },
     });

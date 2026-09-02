@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: "autoUpdate",
+      registerType: "prompt",
       includeAssets: ["grain.svg", "y7-mark.svg"],
       manifest: {
         name: "Y7 Feedback",
@@ -33,7 +33,7 @@ export default defineConfig({
         navigateFallback: "/index.html",
         navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [],
-        skipWaiting: true,
+        skipWaiting: false,
       },
     }),
   ],

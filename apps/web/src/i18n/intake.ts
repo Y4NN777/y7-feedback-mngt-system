@@ -14,6 +14,8 @@ interface IntakeMessages {
   readonly confirmationHint: string;
   readonly confirmationTitle: string;
   readonly conflictError: string;
+  readonly draftRestored: string;
+  readonly draftSaved: string;
   readonly context: string;
   readonly contextNone: string;
   readonly contextPurpose: string;
@@ -25,6 +27,8 @@ interface IntakeMessages {
   readonly intro: string;
   readonly languageLabel: string;
   readonly observed: string;
+  readonly offlineQueued: string;
+  readonly offlineUnavailable: string;
   readonly problem: string;
   readonly project: string;
   readonly proposal: string;
@@ -68,6 +72,8 @@ export const intakeMessages = {
     confirmationTitle: "Retour envoyé",
     conflictError:
       "Cette tentative ne correspond plus au retour relu. Modifiez puis relisez le retour.",
+    draftRestored: "Brouillon hors ligne restauré sur cet appareil.",
+    draftSaved: "Brouillon enregistré sur cet appareil.",
     context: "Contexte",
     contextNone: "Aucun contexte facultatif",
     contextPurpose: "Identifier la version concernée par le retour",
@@ -80,6 +86,10 @@ export const intakeMessages = {
       "Décrivez votre expérience avec vos propres mots. Vous pourrez tout relire avant de continuer.",
     languageLabel: "Langue",
     observed: "Qu’avez-vous observé ? (facultatif)",
+    offlineQueued:
+      "Retour placé dans la file d’attente de cet appareil. Il sera envoyé après le retour du service.",
+    offlineUnavailable:
+      "Le stockage hors ligne est indisponible. Gardez cette page ouverte pour ne pas perdre votre saisie.",
     problem: "Quel problème avez-vous rencontré ?",
     project: "Projet",
     proposal: "Que proposez-vous ?",
@@ -125,6 +135,8 @@ export const intakeMessages = {
     confirmationTitle: "Feedback sent",
     conflictError:
       "This attempt no longer matches the reviewed feedback. Edit and review it again.",
+    draftRestored: "Offline draft restored on this device.",
+    draftSaved: "Draft saved on this device.",
     context: "Context",
     contextNone: "No optional context",
     contextPurpose: "Identify the application version related to the feedback",
@@ -137,6 +149,10 @@ export const intakeMessages = {
       "Describe your experience in your own words. You can review everything before continuing.",
     languageLabel: "Language",
     observed: "What did you observe? (optional)",
+    offlineQueued:
+      "Feedback queued on this device. It will be sent when the service is available again.",
+    offlineUnavailable:
+      "Offline storage is unavailable. Keep this page open to avoid losing your input.",
     problem: "What problem did you encounter?",
     project: "Project",
     proposal: "What do you propose?",
