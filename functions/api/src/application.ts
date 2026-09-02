@@ -7,6 +7,7 @@ import { createAccountlessAccessCoordinator } from "./accountless-access.js";
 import { createNodeAppwriteAccountlessRepository } from "./appwrite-accountless-repository.js";
 import { createNodeAppwriteAttachmentAcceptanceStore } from "./appwrite-attachment-acceptance-store.js";
 import { createNodeAppwriteIntakeStore } from "./appwrite-intake-store.js";
+import { createNodeAppwriteIntelligenceStore } from "./appwrite-intelligence-store.js";
 import { createNodeAppwritePrivateAttachmentStorage } from "./appwrite-private-attachment-storage.js";
 import { createNodeAppwritePrincipalVerifier } from "./appwrite-principal-verifier.js";
 import { createNodeAppwriteConversationLifecycleStore } from "./appwrite-conversation-lifecycle-store.js";
@@ -38,6 +39,8 @@ import {
 } from "./appwrite-source-management-store.js";
 import type { HttpDependencies } from "./http.js";
 import { createIntakeCoordinator } from "./intake.js";
+import { createIntelligenceCoordinator } from "./intelligence.js";
+import { createIntelligenceHttp } from "./intelligence-http.js";
 import { createConversationLifecycleCoordinator } from "./conversation-lifecycle.js";
 import { createConversationLifecycleHttp } from "./conversation-lifecycle-http.js";
 import { createGitHubSourceProvider } from "./github-source-provider.js";
@@ -219,6 +222,21 @@ export function createHttpApplication(
   const workspaceScope = createNodeAppwriteWorkspaceCapabilityScopeResolver(
     runtime.tables,
     workspaceScopeSchema,
+  );
+  const intelligence = createIntelligenceHttp(
+    createIntelligenceCoordinator(
+      principalVerifier,
+      workspaceScope,
+      createNodeAppwriteIntelligenceStore(
+        runtime.tables,
+        {
+          databaseId: config.appwriteSchema.databaseId,
+          feedbackTableId: config.appwriteSchema.feedbackTableId,
+          reportersTableId: config.appwriteSchema.reportersTableId,
+        },
+        sensitive,
+      ),
+    ),
   );
   const workbench = createWorkbenchHttp(
     createWorkbenchCoordinator(
@@ -643,6 +661,7 @@ export function createHttpApplication(
   return {
     createCorrelationId: runtime.createCorrelationId,
     environment: config.environment,
+    intelligence,
     conversationLifecycle,
     externalIssue,
     now: runtime.nowMs,
