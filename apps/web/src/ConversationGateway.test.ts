@@ -12,6 +12,9 @@ const projection = {
       audience: "reporter",
       occurredAt: "2026-08-28T12:00:00.000Z",
       content: "Which version?",
+      provider: "github",
+      revisionKind: "revised",
+      supersedesMessageId: "message_0",
     },
   ],
   lifecycle: [
@@ -92,6 +95,43 @@ describe("Reporter Conversation HTTP gateway", () => {
         ...projection,
         messages: [{ ...projection.messages[0], audience: "workspace" }],
       },
+      {
+        ...projection,
+        messages: [{ ...projection.messages[0], provider: "unknown" }],
+      },
+      {
+        ...projection,
+        messages: [{ ...projection.messages[0], revisionKind: "unknown" }],
+      },
+      {
+        ...projection,
+        messages: [
+          {
+            ...projection.messages[0],
+            revisionKind: "created",
+            supersedesMessageId: "message_0",
+          },
+        ],
+      },
+      {
+        ...projection,
+        messages: [
+          {
+            ...projection.messages[0],
+            revisionKind: "tombstoned",
+            supersedesMessageId: undefined,
+          },
+        ],
+      },
+      {
+        ...projection,
+        messages: [
+          {
+            ...projection.messages[0],
+            supersedesMessageId: "x".repeat(37),
+          },
+        ],
+      },
       { ...projection, lifecycle: [{ ...projection.lifecycle[0], sequence: 1 }] },
     ]) {
       const gateway = createHttpConversationGateway("https://api.example.test", () =>
@@ -131,6 +171,39 @@ describe("Reporter Conversation HTTP gateway", () => {
           },
         }),
       ).resolves.toEqual({ status });
+    }
+  });
+
+  it("accepts local messages and provider-created messages without supersession", async () => {
+    for (const message of [
+      {
+        id: "local_1",
+        actorKind: "reporter",
+        audience: "reporter",
+        occurredAt: "2026-08-28T12:00:00.000Z",
+        content: "Local",
+      },
+      {
+        ...projection.messages[0],
+        revisionKind: "created",
+        supersedesMessageId: undefined,
+      },
+    ]) {
+      const conversation = { ...projection, messages: [message] };
+      const gateway = createHttpConversationGateway("https://api.example.test", () =>
+        Promise.resolve(
+          new Response(JSON.stringify({ status: "ok", conversation }), {
+            status: 200,
+          }),
+        ),
+      );
+      await expect(
+        gateway.retrieve({
+          feedbackId: "feedback_1",
+          reference: "ref",
+          proof: "proof",
+        }),
+      ).resolves.toEqual({ status: "ok", value: conversation });
     }
   });
 

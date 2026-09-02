@@ -102,6 +102,12 @@ export function ReporterConversation({
           {query.data.value.messages.map((message) => (
             <li key={message.id}>
               <strong>{copy.actor[message.actorKind]}</strong>
+              {message.provider && message.revisionKind ? (
+                <span>
+                  {copy.provider[message.provider]} ·{" "}
+                  {copy.revision[message.revisionKind]}
+                </span>
+              ) : null}
               <p>{message.content}</p>
               <time dateTime={message.occurredAt}>{message.occurredAt}</time>
             </li>

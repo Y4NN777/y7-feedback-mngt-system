@@ -14,13 +14,21 @@ function capabilityStatus(value: object) {
 export function createProviderMaintenance(input: {
   readonly inbox?: ProviderMaintenanceCapability;
   readonly outbox?: ProviderMaintenanceCapability;
+  readonly messages?: ProviderMaintenanceCapability;
+  readonly messageReconciliation?: ProviderMaintenanceCapability;
   readonly webhooks?: ProviderMaintenanceCapability;
   readonly privacy?: ProviderMaintenanceCapability;
   readonly platform?: ProviderMaintenanceCapability;
 }): ProviderMaintenance {
   const capabilities = Object.entries(input) as Array<
     [
-      "inbox" | "outbox" | "webhooks" | "privacy" | "platform",
+      | "inbox"
+      | "outbox"
+      | "messages"
+      | "messageReconciliation"
+      | "webhooks"
+      | "privacy"
+      | "platform",
       ProviderMaintenanceCapability,
     ]
   >;

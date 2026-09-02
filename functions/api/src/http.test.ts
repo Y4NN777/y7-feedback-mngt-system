@@ -559,6 +559,55 @@ describe("trusted API entrypoint", () => {
     );
   });
 
+  it("TASK-SYNC-002 routes an authenticated explicit maintenance trigger", async () => {
+    const handle = vi.fn(() =>
+      Promise.resolve({ statusCode: 200, body: { status: "completed" } }),
+    );
+    const { context, json } = createContext(
+      "POST",
+      "/operational/provider-maintenance",
+      { bodyJson: {}, headers: { authorization: "Bearer trigger" } },
+    );
+    await routeRequest(context, {
+      ...dependencies,
+      providerMaintenanceHttp: { handle },
+    });
+    expect(handle).toHaveBeenCalledOnce();
+    expect(json).toHaveBeenCalledWith(
+      { status: "completed" },
+      200,
+      expect.objectContaining({ "cache-control": "no-store" }),
+    );
+    expect(context.log).toHaveBeenCalledWith(
+      expect.stringContaining('"operation":"provider_maintenance"'),
+    );
+  });
+
+  it("never forwards non-JSON maintenance request bodies", async () => {
+    const handle = vi.fn(() => Promise.resolve(undefined));
+    for (const [method, contentType] of [
+      ["GET", "application/json"],
+      ["POST", "multipart/form-data; boundary=test"],
+    ] as const) {
+      const { context } = createContext(method, "/operational/provider-maintenance", {
+        bodyJson: { prohibited: true },
+        headers: { "content-type": contentType },
+      });
+      await routeRequest(context, {
+        ...dependencies,
+        providerMaintenanceHttp: { handle },
+      });
+    }
+    expect(handle).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ body: undefined }),
+    );
+    expect(handle).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ body: undefined }),
+    );
+  });
+
   it("BDD-SRC-REAL-005 defaults absent query and excludes multipart bodies", async () => {
     const sourceHandle = vi.fn(() => Promise.resolve(null));
     const { context } = createContext("POST", "/providers/upload", {

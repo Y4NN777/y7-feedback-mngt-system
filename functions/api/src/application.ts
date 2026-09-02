@@ -41,6 +41,9 @@ import { createNodeAppwriteProviderIssueOutboxStore } from "./appwrite-provider-
 import { createNodeAppwriteProviderEventInboxStore } from "./appwrite-provider-event-inbox-store.js";
 import { createAppwriteProviderWebhookAuthorityStore } from "./appwrite-provider-webhook-authority-store.js";
 import { createNodeAppwriteProviderIssueStateStore } from "./appwrite-provider-issue-state-store.js";
+import { createNodeAppwriteProviderMessageStore } from "./appwrite-provider-message-store.js";
+import { createNodeAppwriteProviderMessageFanout } from "./appwrite-provider-message-fanout.js";
+import { createNodeAppwriteProviderConsentCleanup } from "./appwrite-provider-consent-cleanup.js";
 import { createNodeAppwriteReporterConsentVerifier } from "./appwrite-reporter-consent-verifier.js";
 import { createNodeAppwriteProviderGrantVault } from "./appwrite-provider-grant-vault.js";
 import { createNodeAppwriteSourceConnectionStore } from "./appwrite-source-connection-store.js";
@@ -100,11 +103,20 @@ import { createProviderWebhookIngress } from "./provider-webhook-ingress.js";
 import { createProviderWebhookHttp } from "./provider-webhook-http.js";
 import { createProviderWebhookProvisioner } from "./provider-webhook-provisioner.js";
 import { createProviderIssueEventHandler } from "./provider-issue-event.js";
+import { createProviderMessageAuthorVerifier } from "./provider-message-authority.js";
+import { createProviderMessageEventHandler } from "./provider-message-event.js";
 import { createProviderEventInboxWorker } from "./provider-event-inbox.js";
 import { createProviderEventInboxHttp } from "./provider-event-inbox-http.js";
 import { createProviderMaintenance } from "./provider-maintenance.js";
+import { createProviderMaintenanceHttp } from "./provider-maintenance-http.js";
 import { createProviderWebhookReconciliation } from "./provider-webhook-reconciliation.js";
 import { createAbuseGate } from "./abuse.js";
+import { createNodeAppwriteProviderMessageOutboxStore } from "./appwrite-provider-message-outbox-store.js";
+import { createProviderMessageOutboxWorker } from "./provider-message-outbox.js";
+import { createGitHubMessageProvider } from "./github-message-provider.js";
+import { createGitLabMessageProvider } from "./gitlab-message-provider.js";
+import { createNodeAppwriteProviderMessageReconciliationReader } from "./appwrite-provider-message-reconciliation-reader.js";
+import { createProviderMessageReconciliation } from "./provider-message-reconciliation.js";
 
 export function digestExternalIssueCommand(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(value)).digest("base64url");
@@ -580,6 +592,18 @@ export function createHttpApplication(
           outboxTableId: config.appwriteSchema.outboxTableId,
         },
         sensitive,
+        undefined,
+        createNodeAppwriteProviderMessageFanout(
+          runtime.tables,
+          {
+            databaseId: config.appwriteSchema.databaseId,
+            externalIssueLinksTableId: config.appwriteSchema.externalIssueLinksTableId,
+            publicationConsentsTableId:
+              config.appwriteSchema.publicationConsentsTableId,
+            providerSyncOutboxTableId: config.appwriteSchema.providerSyncOutboxTableId,
+          },
+          sensitive,
+        ),
       ),
       createNodeAppwriteConversationProjectionStore(
         runtime.tables,
@@ -628,6 +652,15 @@ export function createHttpApplication(
       digest: digestExternalIssueCommand,
       feedbackUrl: createProtectedFeedbackUrl.bind(null, config.webOrigin),
       now: runtime.nowIso,
+      consentCleanup: createNodeAppwriteProviderConsentCleanup(
+        runtime.tables,
+        {
+          databaseId: config.appwriteSchema.databaseId,
+          externalIssueLinksTableId: config.appwriteSchema.externalIssueLinksTableId,
+          providerSyncOutboxTableId: config.appwriteSchema.providerSyncOutboxTableId,
+        },
+        sensitive,
+      ),
     }),
   );
   /* v8 ignore start -- provider composition is exercised by real Preview OAuth */
@@ -760,6 +793,43 @@ export function createHttpApplication(
           config.providerOutboxTriggerSecret,
         )
       : undefined;
+  const providerMessageOutboxWorker =
+    config.providers && config.providerOutboxTriggerSecret
+      ? (() => {
+          const vault = createNodeAppwriteProviderGrantVault(
+            runtime.tables,
+            {
+              databaseId: config.appwriteSchema.databaseId,
+              providerGrantsTableId: config.appwriteSchema.providerGrantsTableId,
+            },
+            Buffer.from(config.providerGrantEnvelopeKey, "base64url"),
+          );
+          return createProviderMessageOutboxWorker({
+            workerId: `${config.environment}-message-worker`,
+            store: createNodeAppwriteProviderMessageOutboxStore(
+              runtime.tables,
+              {
+                databaseId: config.appwriteSchema.databaseId,
+                providerSyncOutboxTableId:
+                  config.appwriteSchema.providerSyncOutboxTableId,
+                externalIssueLinksTableId:
+                  config.appwriteSchema.externalIssueLinksTableId,
+                sourceConnectionsTableId:
+                  config.appwriteSchema.sourceConnectionsTableId,
+              },
+              sensitive,
+            ),
+            providers: [
+              createGitHubMessageProvider(vault),
+              createGitLabMessageProvider(config.providers.gitlab.origin, vault),
+            ],
+            now: () => new Date(runtime.nowIso()),
+            staleAfterMs: 5 * 60 * 1_000,
+            maximumAttempts: 5,
+            retryDelayMs: (attempt) => 2 ** attempt * 1_000,
+          });
+        })()
+      : undefined;
   const providerWebhookAuthority = createAppwriteProviderWebhookAuthorityStore(
     runtime.tables,
     {
@@ -785,22 +855,54 @@ export function createHttpApplication(
       now: () => new Date(runtime.nowIso()),
     }),
   );
-  const providerEventInboxWorker = config.providerOutboxTriggerSecret
-    ? createProviderEventInboxWorker({
-        store: providerWebhookInbox,
-        handler: createProviderIssueEventHandler(
-          createNodeAppwriteProviderIssueStateStore(runtime.tables, {
-            databaseId: config.appwriteSchema.databaseId,
-            externalIssueLinksTableId: config.appwriteSchema.externalIssueLinksTableId,
-          }),
-        ),
-        workerId: "provider-event-worker",
-        now: () => new Date(runtime.nowIso()),
-        staleAfterMs: 5 * 60 * 1_000,
-        maximumAttempts: 5,
-        retryDelayMs: (attempt) => 2 ** attempt * 1_000,
-      })
-    : undefined;
+  const providerEventInboxWorker =
+    config.providers && config.providerOutboxTriggerSecret
+      ? (() => {
+          const vault = createNodeAppwriteProviderGrantVault(
+            runtime.tables,
+            {
+              databaseId: config.appwriteSchema.databaseId,
+              providerGrantsTableId: config.appwriteSchema.providerGrantsTableId,
+            },
+            Buffer.from(config.providerGrantEnvelopeKey, "base64url"),
+          );
+          const messages = createNodeAppwriteProviderMessageStore(
+            runtime.tables,
+            {
+              databaseId: config.appwriteSchema.databaseId,
+              sourceConnectionsTableId: config.appwriteSchema.sourceConnectionsTableId,
+              externalIssueLinksTableId:
+                config.appwriteSchema.externalIssueLinksTableId,
+              conversationMessagesTableId:
+                config.appwriteSchema.conversationMessagesTableId,
+            },
+            sensitive,
+          );
+          return createProviderEventInboxWorker({
+            store: providerWebhookInbox,
+            handler: createProviderMessageEventHandler({
+              contexts: messages,
+              authors: createProviderMessageAuthorVerifier(
+                config.providers.gitlab.origin,
+                vault,
+              ),
+              facts: messages,
+              fallback: createProviderIssueEventHandler(
+                createNodeAppwriteProviderIssueStateStore(runtime.tables, {
+                  databaseId: config.appwriteSchema.databaseId,
+                  externalIssueLinksTableId:
+                    config.appwriteSchema.externalIssueLinksTableId,
+                }),
+              ),
+            }),
+            workerId: "provider-event-worker",
+            now: () => new Date(runtime.nowIso()),
+            staleAfterMs: 5 * 60 * 1_000,
+            maximumAttempts: 5,
+            retryDelayMs: (attempt) => 2 ** attempt * 1_000,
+          });
+        })()
+      : undefined;
   const providerEventInbox =
     providerEventInboxWorker && config.providerOutboxTriggerSecret
       ? createProviderEventInboxHttp(
@@ -859,7 +961,12 @@ export function createHttpApplication(
     },
   );
   const providerMaintenance = (() => {
-    if (config.providers && providerIssueOutboxWorker && providerEventInboxWorker) {
+    if (
+      config.providers &&
+      providerIssueOutboxWorker &&
+      providerMessageOutboxWorker &&
+      providerEventInboxWorker
+    ) {
       const vault = createNodeAppwriteProviderGrantVault(
         runtime.tables,
         {
@@ -903,9 +1010,46 @@ export function createHttpApplication(
         privacyProviderPorts.closer,
         { limit: 25, now: runtime.nowIso },
       );
+      const messages = createNodeAppwriteProviderMessageStore(
+        runtime.tables,
+        {
+          databaseId: config.appwriteSchema.databaseId,
+          sourceConnectionsTableId: config.appwriteSchema.sourceConnectionsTableId,
+          externalIssueLinksTableId: config.appwriteSchema.externalIssueLinksTableId,
+          conversationMessagesTableId:
+            config.appwriteSchema.conversationMessagesTableId,
+        },
+        sensitive,
+      );
+      const messageAdapters = [
+        createGitHubMessageProvider(vault),
+        createGitLabMessageProvider(config.providers.gitlab.origin, vault),
+      ];
       return createProviderMaintenance({
         inbox: providerEventInboxWorker,
         outbox: providerIssueOutboxWorker,
+        messages: providerMessageOutboxWorker,
+        messageReconciliation: createProviderMessageReconciliation({
+          reader: createNodeAppwriteProviderMessageReconciliationReader(
+            runtime.tables,
+            {
+              databaseId: config.appwriteSchema.databaseId,
+              conversationMessagesTableId:
+                config.appwriteSchema.conversationMessagesTableId,
+              externalIssueLinksTableId:
+                config.appwriteSchema.externalIssueLinksTableId,
+            },
+            sensitive,
+          ),
+          contexts: messages,
+          authors: createProviderMessageAuthorVerifier(
+            config.providers.gitlab.origin,
+            vault,
+          ),
+          facts: messages,
+          providers: messageAdapters,
+          now: runtime.nowIso,
+        }),
         privacy: {
           async runOnce() {
             const providerCleanup = await privacyProviderCleanup.runOnce();
@@ -950,6 +1094,15 @@ export function createHttpApplication(
     /* v8 ignore next -- optional composition is covered by configuration parsing. */
     ...(providerEventInbox === undefined ? {} : { providerEventInbox }),
     providerMaintenance,
+    /* v8 ignore next -- optional composition is covered by the HTTP contract. */
+    ...(!config.providerOutboxTriggerSecret
+      ? {}
+      : {
+          providerMaintenanceHttp: createProviderMaintenanceHttp(
+            providerMaintenance,
+            config.providerOutboxTriggerSecret,
+          ),
+        }),
     publicApi: createPublicApi(
       projects,
       intake,

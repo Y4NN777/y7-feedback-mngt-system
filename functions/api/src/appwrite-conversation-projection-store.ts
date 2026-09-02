@@ -11,6 +11,9 @@ export interface ConversationProjectionMessage {
   readonly audience: "workspace" | "reporter";
   readonly occurredAt: string;
   readonly content: string;
+  readonly provider?: "github" | "gitlab";
+  readonly revisionKind?: "created" | "revised" | "tombstoned";
+  readonly supersedesMessageId?: string;
 }
 
 export interface ConversationProjectionLifecycleFact {
@@ -149,6 +152,20 @@ export function parseConversationProjectionMessage(
   ) {
     throw new AppwriteConversationProjectionError("ERR-CONV-RETRYABLE");
   }
+  const providerRevision = value.origin === "provider";
+  if (
+    providerRevision &&
+    ((value.provider !== "github" && value.provider !== "gitlab") ||
+      (value.revisionKind !== "created" &&
+        value.revisionKind !== "revised" &&
+        value.revisionKind !== "tombstoned") ||
+      (value.revisionKind === "created"
+        ? value.supersedesMessageId !== undefined
+        : typeof value.supersedesMessageId !== "string" ||
+          !appwriteId.test(value.supersedesMessageId)))
+  ) {
+    throw new AppwriteConversationProjectionError("ERR-CONV-RETRYABLE");
+  }
   return {
     id: value.$id,
     actorId: value.actorId,
@@ -164,6 +181,15 @@ export function parseConversationProjectionMessage(
       },
       value.contentEnvelope,
     ),
+    ...(providerRevision
+      ? {
+          provider: value.provider as "github" | "gitlab",
+          revisionKind: value.revisionKind as "created" | "revised" | "tombstoned",
+          ...(typeof value.supersedesMessageId === "string"
+            ? { supersedesMessageId: value.supersedesMessageId }
+            : {}),
+        }
+      : {}),
   };
 }
 
