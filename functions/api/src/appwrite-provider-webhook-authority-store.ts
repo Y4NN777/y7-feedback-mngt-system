@@ -42,6 +42,10 @@ function object(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function absent(error: unknown): boolean {
+  return object(error) && error.code === 404;
+}
+
 function credential(
   value: unknown,
   provider: SourceProvider,
@@ -128,15 +132,23 @@ export function createAppwriteProviderWebhookAuthorityStore(
     rowId,
     field: "webhookCredentialEnvelope",
   });
+  const get = async (tableId: string, rowId: string): Promise<unknown | null> => {
+    try {
+      return await tables.getRow({
+        databaseId: schema.databaseId,
+        tableId,
+        rowId,
+      });
+    } catch (error: unknown) {
+      if (absent(error)) return null;
+      throw error;
+    }
+  };
 
   return {
     async resolve(input): Promise<ProviderWebhookAuthority | null> {
       if (!appwriteId.test(input.connectionId)) return null;
-      const connection = await tables.getRow({
-        databaseId: schema.databaseId,
-        tableId: schema.sourceConnectionsTableId,
-        rowId: input.connectionId,
-      });
+      const connection = await get(schema.sourceConnectionsTableId, input.connectionId);
       if (
         !object(connection) ||
         connection.$id !== input.connectionId ||
@@ -156,11 +168,10 @@ export function createAppwriteProviderWebhookAuthorityStore(
         input.provider,
       );
       if (!selected) return null;
-      const grant = await tables.getRow({
-        databaseId: schema.databaseId,
-        tableId: schema.providerGrantsTableId,
-        rowId: connection.encryptedGrantRef,
-      });
+      const grant = await get(
+        schema.providerGrantsTableId,
+        connection.encryptedGrantRef,
+      );
       if (
         !object(grant) ||
         grant.$id !== connection.encryptedGrantRef ||

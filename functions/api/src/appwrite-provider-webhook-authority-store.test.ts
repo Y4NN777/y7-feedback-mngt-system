@@ -288,4 +288,28 @@ describe("Appwrite provider webhook authority store", () => {
       ).rejects.toThrow("PROVIDER_WEBHOOK_CREDENTIAL_INVALID");
     }
   });
+
+  it("BDD-SYNC-040 maps absent authority rows to denial and preserves outages", async () => {
+    const absent = harness();
+    absent.getRow.mockRejectedValueOnce({ code: 404 });
+    await expect(
+      absent.store.resolve({ provider: "github", connectionId: "connection_1" }),
+    ).resolves.toBeNull();
+
+    const absentGrant = harness();
+    absentGrant.getRow.mockResolvedValueOnce(connection());
+    absentGrant.getRow.mockRejectedValueOnce({ code: 404 });
+    await expect(
+      absentGrant.store.resolve({
+        provider: "github",
+        connectionId: "connection_1",
+      }),
+    ).resolves.toBeNull();
+
+    const outage = harness();
+    outage.getRow.mockRejectedValueOnce(new Error("unavailable"));
+    await expect(
+      outage.store.resolve({ provider: "github", connectionId: "connection_1" }),
+    ).rejects.toThrow("unavailable");
+  });
 });
