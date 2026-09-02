@@ -152,4 +152,89 @@ describe("HTTP Intelligence gateway", () => {
       ).resolves.toEqual({ status: "retryable" });
     }
   });
+
+  it("BDD-INT-322 sends provenance commands and validates attributable receipts", async () => {
+    const fetcher = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          result: {
+            disposition: "applied",
+            associationId: "association_1",
+            eventId: "event_1",
+            revision: 1,
+          },
+        }),
+        { status: 200 },
+      ),
+    );
+    const gateway = createHttpIntelligenceGateway(
+      "https://api.example/",
+      () => Promise.resolve("jwt_1"),
+      fetcher,
+    );
+    const command = {
+      kind: "record_theme",
+      operationId: "operation_1",
+      feedbackId: "feedback_1",
+      label: "Checkout friction",
+    } as const;
+    await expect(
+      gateway.mutate({ workspaceId: "workspace_1", projectId: "project_1", command }),
+    ).resolves.toEqual({
+      status: "ok",
+      result: {
+        disposition: "applied",
+        associationId: "association_1",
+        eventId: "event_1",
+        revision: 1,
+      },
+    });
+    expect(fetcher).toHaveBeenCalledWith(
+      "https://api.example/v1/workspaces/workspace_1/projects/project_1/intelligence/provenance",
+      expect.objectContaining({ method: "POST", body: JSON.stringify(command) }),
+    );
+  });
+
+  it("BDD-INT-323 fails closed for provenance transport and malformed receipts", async () => {
+    const command = {
+      kind: "remove_association",
+      operationId: "operation_1",
+      associationId: "association_1",
+      expectedRevision: 1,
+    } as const;
+    const input = { workspaceId: "w", projectId: "p", command };
+    const denied = createHttpIntelligenceGateway("https://api.example", () =>
+      Promise.reject(new Error("session")),
+    );
+    await expect(denied.mutate(input)).resolves.toEqual({ status: "denied" });
+    for (const [status, expected] of [
+      [404, "denied"],
+      [400, "invalid"],
+      [409, "conflict"],
+      [503, "retryable"],
+    ] as const) {
+      const gateway = createHttpIntelligenceGateway(
+        "https://api.example",
+        () => Promise.resolve("jwt"),
+        () => Promise.resolve(new Response("{}", { status })),
+      );
+      await expect(gateway.mutate(input)).resolves.toEqual({ status: expected });
+    }
+    for (const result of [
+      null,
+      {},
+      { disposition: "unknown", associationId: "a", eventId: "e", revision: 1 },
+      { disposition: "applied", associationId: 1, eventId: "e", revision: 1 },
+      { disposition: "applied", associationId: "a", eventId: 1, revision: 1 },
+      { disposition: "applied", associationId: "a", eventId: "e", revision: 0 },
+    ]) {
+      const gateway = createHttpIntelligenceGateway(
+        "https://api.example",
+        () => Promise.resolve("jwt"),
+        () =>
+          Promise.resolve(new Response(JSON.stringify({ result }), { status: 200 })),
+      );
+      await expect(gateway.mutate(input)).resolves.toEqual({ status: "retryable" });
+    }
+  });
 });

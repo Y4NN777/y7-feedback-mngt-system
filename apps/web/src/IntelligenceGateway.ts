@@ -4,6 +4,7 @@ import type {
   IntelligenceAggregate,
   IntelligenceFilter,
   IntelligenceReporterKind,
+  IntelligenceRelationType,
   IntelligenceTrend,
   IntelligenceTrendWindow,
 } from "@y7-feedback/domain";
@@ -19,6 +20,54 @@ export type IntelligenceGatewayOutcome =
   | { readonly status: "ok"; readonly result: IntelligenceResult }
   | { readonly status: "invalid" | "denied" | "retryable" };
 
+export type IntelligenceProvenanceCommand =
+  | {
+      readonly kind: "record_theme";
+      readonly operationId: string;
+      readonly feedbackId: string;
+      readonly label: string;
+    }
+  | {
+      readonly kind: "record_relationship";
+      readonly operationId: string;
+      readonly feedbackId: string;
+      readonly relatedFeedbackId: string;
+      readonly relationType: IntelligenceRelationType;
+    }
+  | {
+      readonly kind: "correct_theme";
+      readonly operationId: string;
+      readonly associationId: string;
+      readonly expectedRevision: number;
+      readonly label: string;
+    }
+  | {
+      readonly kind: "correct_relationship";
+      readonly operationId: string;
+      readonly associationId: string;
+      readonly expectedRevision: number;
+      readonly relatedFeedbackId: string;
+      readonly relationType: IntelligenceRelationType;
+    }
+  | {
+      readonly kind: "remove_association";
+      readonly operationId: string;
+      readonly associationId: string;
+      readonly expectedRevision: number;
+    };
+
+export type IntelligenceProvenanceOutcome =
+  | {
+      readonly status: "ok";
+      readonly result: {
+        readonly disposition: "applied" | "replayed";
+        readonly associationId: string;
+        readonly eventId: string;
+        readonly revision: number;
+      };
+    }
+  | { readonly status: "invalid" | "denied" | "conflict" | "retryable" };
+
 export interface IntelligenceGateway {
   analyze(input: {
     readonly workspaceId: string;
@@ -28,6 +77,11 @@ export interface IntelligenceGateway {
     readonly pageSize?: number;
     readonly cursor?: string;
   }): Promise<IntelligenceGatewayOutcome>;
+  mutate(input: {
+    readonly workspaceId: string;
+    readonly projectId: string;
+    readonly command: IntelligenceProvenanceCommand;
+  }): Promise<IntelligenceProvenanceOutcome>;
 }
 
 type Fetcher = (input: string, init: RequestInit) => Promise<Response>;
@@ -100,6 +154,24 @@ function result(value: unknown): IntelligenceResult | undefined {
   };
 }
 
+function provenanceResult(value: unknown) {
+  if (
+    !object(value) ||
+    (value.disposition !== "applied" && value.disposition !== "replayed") ||
+    typeof value.associationId !== "string" ||
+    typeof value.eventId !== "string" ||
+    !Number.isSafeInteger(value.revision) ||
+    Number(value.revision) < 1
+  )
+    return undefined;
+  return {
+    disposition: value.disposition,
+    associationId: value.associationId,
+    eventId: value.eventId,
+    revision: Number(value.revision),
+  } as const;
+}
+
 export function createHttpIntelligenceGateway(
   endpoint: string,
   getJwt: () => Promise<string>,
@@ -134,6 +206,36 @@ export function createHttpIntelligenceGateway(
         const body: unknown = await response.json();
         if (response.ok && object(body)) {
           const parsed = result(body.result);
+          if (parsed) return { status: "ok", result: parsed };
+        }
+      } catch {
+        // Network and malformed transport failures are safely retryable.
+      }
+      return { status: "retryable" };
+    },
+    async mutate(input) {
+      let jwt: string;
+      try {
+        jwt = await getJwt();
+      } catch {
+        return { status: "denied" };
+      }
+      try {
+        const path = `/v1/workspaces/${encodeURIComponent(input.workspaceId)}/projects/${encodeURIComponent(input.projectId)}/intelligence/provenance`;
+        const response = await fetcher(`${base}${path}`, {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${jwt}`,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify(input.command),
+        });
+        if (response.status === 404) return { status: "denied" };
+        if (response.status === 400) return { status: "invalid" };
+        if (response.status === 409) return { status: "conflict" };
+        const body: unknown = await response.json();
+        if (response.ok && object(body)) {
+          const parsed = provenanceResult(body.result);
           if (parsed) return { status: "ok", result: parsed };
         }
       } catch {
