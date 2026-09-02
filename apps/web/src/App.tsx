@@ -11,6 +11,8 @@ import type { ExternalIssueGateway } from "./ExternalIssueGateway";
 import { FeedbackIntake, type OfflineIntakePersistence } from "./FeedbackIntake";
 import { messages } from "./i18n/messages";
 import type { IntakeGateway } from "./IntakeGateway";
+import type { IntelligenceGateway } from "./IntelligenceGateway";
+import { IntelligencePage } from "./IntelligencePage";
 import type { NotificationInvalidation } from "./NotificationInvalidation";
 import type { OfflineIntakeReplay } from "./OfflineIntakeReplay";
 import type { ProjectGateway } from "./ProjectGateway";
@@ -26,6 +28,9 @@ const unavailableGateway: AccountlessGateway = {
 };
 const unavailableIntakeGateway: IntakeGateway = {
   accept: () => Promise.resolve({ status: "retryable" }),
+};
+const unavailableIntelligenceGateway: IntelligenceGateway = {
+  analyze: () => Promise.resolve({ status: "retryable" }),
 };
 const unavailableProjectGateway: ProjectGateway = {
   resolve: () => Promise.resolve({ status: "unavailable" }),
@@ -167,6 +172,7 @@ export function App({
   intakeGateway = unavailableIntakeGateway,
   offlinePersistence,
   offlineReplay,
+  intelligenceGateway = unavailableIntelligenceGateway,
   projectGateway = unavailableProjectGateway,
   publicationConsentGateway = unavailablePublicationConsentGateway,
   redirectProject = (canonicalSlug) => {
@@ -185,6 +191,7 @@ export function App({
   readonly intakeGateway?: IntakeGateway;
   readonly offlinePersistence?: OfflineIntakePersistence;
   readonly offlineReplay?: OfflineIntakeReplay;
+  readonly intelligenceGateway?: IntelligenceGateway;
   readonly projectGateway?: ProjectGateway;
   readonly publicationConsentGateway?: PublicationConsentGateway;
   readonly redirectProject?: (canonicalSlug: string) => void;
@@ -230,6 +237,16 @@ export function App({
         gateway={workbenchGateway}
         locale={locale}
         notificationInvalidation={notificationInvalidation}
+        onLocaleChange={selectLocale}
+        session={administrationSession}
+      />
+    );
+  }
+  if (window.location.pathname === "/intelligence") {
+    return (
+      <IntelligencePage
+        gateway={intelligenceGateway}
+        locale={locale}
         onLocaleChange={selectLocale}
         session={administrationSession}
       />
