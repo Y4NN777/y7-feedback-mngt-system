@@ -163,6 +163,23 @@ describe("External issue coordinator", () => {
     );
   });
 
+  it("FR-SYNC-008 keeps revocation authoritative when best-effort cleanup fails", async () => {
+    const { dependencies } = setup();
+    const request = vi.fn().mockRejectedValue(new Error("provider unavailable"));
+    const coordinator = createExternalIssueCoordinator({
+      ...dependencies,
+      consentCleanup: { request },
+    });
+    await expect(
+      coordinator.revokeConsent({
+        operationId: "consent_revoke_1",
+        reference: "Y7-ABC123",
+        proof: "proof",
+      }),
+    ).resolves.toEqual({ status: "ok", consent: { version: 2, state: "revoked" } });
+    expect(request).toHaveBeenCalledOnce();
+  });
+
   it("BDD-ISSUE-HTTP-005 returns non-disclosing denial for invalid proof or command", async () => {
     const { coordinator, dependencies } = setup();
     vi.mocked(dependencies.reporterProofVerifier.verify).mockResolvedValue({

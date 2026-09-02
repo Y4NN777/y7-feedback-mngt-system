@@ -383,6 +383,8 @@ describe("accountless access experience", () => {
       reference: view.reference,
       proof,
     });
-    expect(await screen.findByText("Autorisation révoquée, version 2.")).toBeVisible();
+    expect(
+      await screen.findByText(/Autorisation révoquée, version 2.*sans garantie/u),
+    ).toBeVisible();
   });
 });

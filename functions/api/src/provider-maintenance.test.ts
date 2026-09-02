@@ -12,6 +12,10 @@ describe("scheduled provider maintenance", () => {
     const maintenance = createProviderMaintenance({
       inbox: { runOnce: inbox },
       outbox: { runOnce: outbox },
+      messages: { runOnce: () => Promise.resolve({ status: "delivered" }) },
+      messageReconciliation: {
+        runOnce: () => Promise.resolve({ status: "reconciled" }),
+      },
       webhooks: { runOnce: webhooks },
       privacy: { runOnce: () => Promise.resolve({ status: "idle" }) },
     });
@@ -20,6 +24,8 @@ describe("scheduled provider maintenance", () => {
       status: "completed",
       inbox: "processed",
       outbox: "delivered",
+      messages: "delivered",
+      messageReconciliation: "reconciled",
       webhooks: "reconciled",
       privacy: "idle",
     });
@@ -35,6 +41,10 @@ describe("scheduled provider maintenance", () => {
     const maintenance = createProviderMaintenance({
       inbox: { runOnce: inbox },
       outbox: { runOnce: outbox },
+      messages: { runOnce: () => Promise.resolve({ status: "idle" }) },
+      messageReconciliation: {
+        runOnce: () => Promise.resolve({ status: "reconciled" }),
+      },
       webhooks: { runOnce: webhooks },
     });
 
@@ -49,6 +59,10 @@ describe("scheduled provider maintenance", () => {
     const maintenance = createProviderMaintenance({
       inbox: { runOnce: () => Promise.resolve({}) },
       outbox: { runOnce: () => Promise.resolve({ status: "idle" }) },
+      messages: { runOnce: () => Promise.resolve({ status: "idle" }) },
+      messageReconciliation: {
+        runOnce: () => Promise.resolve({ status: "reconciled" }),
+      },
       webhooks: { runOnce: () => Promise.resolve({ status: "reconciled" }) },
     });
     await expect(maintenance.runOnce()).resolves.toMatchObject({
