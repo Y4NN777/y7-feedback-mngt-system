@@ -122,6 +122,8 @@ describe("Day 4 additive Appwrite migration", () => {
             "auditEnvelope",
             "operationIdsJson",
             "updatedAt",
+            "purgeWorkerId",
+            "purgeClaimedAt",
           ].includes(key),
         )
         .map(({ key, required }) => ({ key, required })),
@@ -131,6 +133,8 @@ describe("Day 4 additive Appwrite migration", () => {
       { key: "auditEnvelope", required: false },
       { key: "operationIdsJson", required: false },
       { key: "updatedAt", required: false },
+      { key: "purgeWorkerId", required: false },
+      { key: "purgeClaimedAt", required: false },
     ]);
   });
 });
