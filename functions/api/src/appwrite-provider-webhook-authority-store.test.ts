@@ -43,11 +43,10 @@ function connection(overrides: Readonly<Record<string, unknown>> = {}) {
     encryptedGrantRef: "grant_1",
     selectedRepositoriesJson: JSON.stringify({
       kind: "selected",
-      imports: [
+      repositories: [
         {
-          connectionId: "connection_1",
           provider: "github",
-          repositoryId: "1329343404",
+          id: "1329343404",
         },
       ],
     }),
@@ -151,7 +150,10 @@ describe("Appwrite provider webhook authority store", () => {
     connection({ workspaceId: "bad/id" }),
     connection({ selectedRepositoriesJson: "invalid" }),
     connection({
-      selectedRepositoriesJson: JSON.stringify({ kind: "selected", imports: [] }),
+      selectedRepositoriesJson: JSON.stringify({
+        kind: "selected",
+        repositories: [],
+      }),
     }),
   ])(
     "BDD-SYNC-025 denies inactive, malformed or unselected authority %#",
@@ -249,8 +251,8 @@ describe("Appwrite provider webhook authority store", () => {
     for (const selectedRepositoriesJson of [
       undefined,
       JSON.stringify(null),
-      JSON.stringify({ kind: "other", imports: [] }),
-      JSON.stringify({ kind: "selected", imports: null }),
+      JSON.stringify({ kind: "other", repositories: [] }),
+      JSON.stringify({ kind: "selected", repositories: null }),
     ]) {
       const { store } = harness({
         connection: connection({ selectedRepositoriesJson }),

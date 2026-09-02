@@ -58,7 +58,11 @@ function fixtures() {
       }
       return Promise.resolve({
         id: input.connectionId,
+        workspaceId: authorized.workspaceId,
+        projectId: authorized.projectId,
+        ownerUserId: authorized.ownerUserId,
         provider: authorized.provider,
+        encryptedGrantRef: authorized.encryptedGrantRef,
         selectedRepositories: authorized.authorizedRepositories.filter(({ id }) =>
           input.repositoryIds.includes(id),
         ),
@@ -75,6 +79,7 @@ function fixtures() {
         ownerUserId: authorized.ownerUserId,
         provider: authorized.provider,
         encryptedGrantRef: authorized.encryptedGrantRef,
+        selectedRepositories: authorized.authorizedRepositories,
       });
     },
     disconnected: () => Promise.resolve(),
@@ -125,6 +130,10 @@ function fixtures() {
     },
     store,
     providers: [github, gitlab],
+    webhooks: {
+      ensure: vi.fn(() => Promise.resolve()),
+      remove: vi.fn(() => Promise.resolve()),
+    },
     createStateId: () => "state_1",
     createNonce: () => "nonce_1",
     digestNonce: (value: string) => `digest:${value}`,
@@ -284,7 +293,7 @@ describe("deployed source connection coordination", () => {
   });
 
   it("BDD-SRC-REAL-004 revokes the matching real provider before disconnect", async () => {
-    const { coordinator, githubRevokeGrant, store } = fixtures();
+    const { coordinator, dependencies, githubRevokeGrant, store } = fixtures();
     const disconnected = vi.spyOn(store, "disconnected");
     await coordinator.begin({
       jwt: "valid.jwt.value",
@@ -312,6 +321,9 @@ describe("deployed source connection coordination", () => {
       }),
     ).resolves.toEqual({ status: "disconnected" });
     expect(githubRevokeGrant).toHaveBeenCalledWith("grant_1");
+    expect(dependencies.webhooks.remove).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "state_1", encryptedGrantRef: "grant_1" }),
+    );
     expect(disconnected).toHaveBeenCalledWith("state_1");
   });
 
@@ -461,6 +473,7 @@ describe("deployed source connection coordination", () => {
             ownerUserId: "owner_1",
             provider: "bitbucket" as "github",
             encryptedGrantRef: "grant_1",
+            selectedRepositories: [{ provider: "github", id: "repository_1" }],
           }),
       },
     });
