@@ -243,4 +243,66 @@ describe("partitioned offline persistence", () => {
       });
     }
   });
+
+  it("BDD-OFF-009 transitions retries, conflicts and completion atomically", async () => {
+    const offline = store();
+    await offline.enqueue(preview, {
+      clientOperationId: "operation_1",
+      kind: "intake",
+      payloadDigest: digestOne,
+      payload: { value: 1 },
+      dependencies: [],
+    });
+    await expect(offline.claimOperation(preview, "operation_1")).resolves.toMatchObject(
+      { status: "processing", attempts: 1 },
+    );
+    await expect(
+      offline.retryOperation(preview, "operation_1", "invalid", "retryable"),
+    ).rejects.toEqual(new OfflineStoreError("OFFLINE_RETRY_INVALID"));
+    await offline.retryOperation(
+      preview,
+      "operation_1",
+      "2026-09-02T04:01:00.000Z",
+      "retryable",
+    );
+    await expect(offline.claimOperation(preview, "operation_1")).resolves.toMatchObject(
+      { status: "processing", attempts: 2 },
+    );
+    await offline.conflictOperation(preview, "operation_1");
+    await expect(offline.listOperations(preview)).resolves.toMatchObject([
+      { status: "conflict", lastErrorCode: "payload_conflict" },
+    ]);
+    await expect(offline.completeOperation(preview, "operation_1")).rejects.toEqual(
+      new OfflineStoreError("OFFLINE_OPERATION_STATE_CONFLICT"),
+    );
+
+    await offline.enqueue(preview, {
+      clientOperationId: "operation_2",
+      kind: "message",
+      payloadDigest: digestTwo,
+      payload: { value: 2 },
+      dependencies: [],
+    });
+    await offline.claimOperation(preview, "operation_2");
+    await offline.completeOperation(preview, "operation_2");
+    await expect(offline.listOperations(preview)).resolves.toHaveLength(1);
+    await offline.enqueue(preview, {
+      clientOperationId: "operation_3",
+      kind: "lifecycle",
+      payloadDigest: digestChanged,
+      payload: { value: 3 },
+      dependencies: [],
+    });
+    await offline.claimOperation(preview, "operation_3");
+    await expect(offline.recoverOperations(preview, "invalid")).rejects.toEqual(
+      new OfflineStoreError("OFFLINE_RECOVERY_INVALID"),
+    );
+    await expect(
+      offline.recoverOperations(preview, "2026-09-02T04:01:00.000Z"),
+    ).resolves.toEqual({ recovered: 1 });
+    await expect(offline.claimOperation(preview, "operation_3")).resolves.toMatchObject(
+      { status: "processing", attempts: 2 },
+    );
+    await offline.close();
+  });
 });
