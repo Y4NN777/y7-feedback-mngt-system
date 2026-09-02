@@ -132,7 +132,7 @@ export function createAppwriteProviderWebhookAuthorityStore(
     rowId,
     field: "webhookCredentialEnvelope",
   });
-  const get = async (tableId: string, rowId: string): Promise<unknown | null> => {
+  const get = async (tableId: string, rowId: string): Promise<unknown> => {
     try {
       return await tables.getRow({
         databaseId: schema.databaseId,

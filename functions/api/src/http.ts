@@ -6,6 +6,7 @@ import type { ExternalIssueHttp } from "./external-issue-http.js";
 import type { PublicApi } from "./public-api.js";
 import type { ProjectAdministrationHttp } from "./project-administration-http.js";
 import type { ProviderIssueOutboxHttp } from "./provider-issue-outbox-http.js";
+import type { ProviderEventInboxHttp } from "./provider-event-inbox-http.js";
 import type { ProviderWebhookHttpResponse } from "./provider-webhook-http.js";
 import type { SourceConnectionHttp } from "./source-connection-http.js";
 import type { WorkbenchHttp } from "./workbench-http.js";
@@ -48,6 +49,7 @@ export interface HttpDependencies {
   readonly externalIssue?: ExternalIssueHttp;
   readonly projectAdministration?: ProjectAdministrationHttp;
   readonly providerIssueOutbox?: ProviderIssueOutboxHttp;
+  readonly providerEventInbox?: ProviderEventInboxHttp;
   readonly providerWebhook?: {
     readonly handle: (request: {
       readonly method: string;
@@ -145,6 +147,18 @@ export async function routeRequest(
   const providerOutboxResponse =
     isHealth || isIngressProbe || providerWebhookResponse
       ? null
+      : await dependencies.providerEventInbox?.handle({
+          method,
+          path: req.path,
+          headers: requestHeaders,
+          body:
+            method === "POST" && !contentType.startsWith("multipart/form-data")
+              ? req.bodyJson
+              : undefined,
+        });
+  const providerIssueOutboxResponse =
+    isHealth || isIngressProbe || providerWebhookResponse || providerOutboxResponse
+      ? null
       : await dependencies.providerIssueOutbox?.handle({
           method,
           path: req.path,
@@ -155,7 +169,11 @@ export async function routeRequest(
               : undefined,
         });
   const sourceResponse =
-    isHealth || isIngressProbe || providerWebhookResponse || providerOutboxResponse
+    isHealth ||
+    isIngressProbe ||
+    providerWebhookResponse ||
+    providerOutboxResponse ||
+    providerIssueOutboxResponse
       ? null
       : await dependencies.sourceConnections?.handle({
           method,
@@ -172,6 +190,7 @@ export async function routeRequest(
     isIngressProbe ||
     providerWebhookResponse ||
     providerOutboxResponse ||
+    providerIssueOutboxResponse ||
     sourceResponse
       ? null
       : await dependencies.projectAdministration?.handle({
@@ -239,7 +258,11 @@ export async function routeRequest(
               : undefined,
         });
   const publicResponse =
-    isHealth || isIngressProbe || providerWebhookResponse || providerOutboxResponse
+    isHealth ||
+    isIngressProbe ||
+    providerWebhookResponse ||
+    providerOutboxResponse ||
+    providerIssueOutboxResponse
       ? null
       : sourceResponse ||
           administrationResponse ||
@@ -261,6 +284,7 @@ export async function routeRequest(
     : (probeResponse?.statusCode ??
       providerWebhookResponse?.statusCode ??
       providerOutboxResponse?.statusCode ??
+      providerIssueOutboxResponse?.statusCode ??
       sourceResponse?.statusCode ??
       administrationResponse?.statusCode ??
       conversationResponse?.statusCode ??
@@ -275,25 +299,28 @@ export async function routeRequest(
       : providerWebhookResponse
         ? "provider_webhook"
         : providerOutboxResponse
-          ? "provider_issue_outbox"
-          : sourceResponse
-            ? "source_connection"
-            : administrationResponse
-              ? "project_administration"
-              : conversationResponse
-                ? "conversation_lifecycle"
-                : workbenchResponse
-                  ? "workbench"
-                  : externalIssueResponse
-                    ? "external_issue"
-                    : publicResponse
-                      ? "public_api"
-                      : "unknown";
+          ? "provider_event_inbox"
+          : providerIssueOutboxResponse
+            ? "provider_issue_outbox"
+            : sourceResponse
+              ? "source_connection"
+              : administrationResponse
+                ? "project_administration"
+                : conversationResponse
+                  ? "conversation_lifecycle"
+                  : workbenchResponse
+                    ? "workbench"
+                    : externalIssueResponse
+                      ? "external_issue"
+                      : publicResponse
+                        ? "public_api"
+                        : "unknown";
   const outcome = isHealth
     ? "success"
     : (probeResponse ??
         providerWebhookResponse ??
         providerOutboxResponse ??
+        providerIssueOutboxResponse ??
         sourceResponse ??
         administrationResponse ??
         conversationResponse ??
@@ -337,6 +364,14 @@ export async function routeRequest(
     return res.json(
       providerOutboxResponse.body,
       providerOutboxResponse.statusCode,
+      headers,
+    );
+  }
+
+  if (providerIssueOutboxResponse) {
+    return res.json(
+      providerIssueOutboxResponse.body,
+      providerIssueOutboxResponse.statusCode,
       headers,
     );
   }
