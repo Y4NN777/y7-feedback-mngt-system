@@ -62,10 +62,10 @@ const integer = (key: string, required = true): AppwriteColumn => ({
   type: "integer",
   required,
 });
-const boolean = (key: string): AppwriteColumn => ({
+const boolean = (key: string, required = true): AppwriteColumn => ({
   key,
   type: "boolean",
-  required: true,
+  required,
 });
 const index = (
   key: string,
@@ -222,6 +222,11 @@ export function createDay4TableDefinitions(
         datetime("purgeEligibleAt"),
         datetime("restoredAt", false),
         datetime("purgedAt", false),
+        integer("revision", false),
+        boolean("identityErased", false),
+        text("auditEnvelope", false),
+        text("operationIdsJson", false),
+        datetime("updatedAt", false),
       ],
       [
         index("feedback_unique", ["feedbackId"], "unique"),
