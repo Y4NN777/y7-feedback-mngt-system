@@ -1,40 +1,45 @@
 export interface ProviderMaintenanceCapability {
-  runOnce(): Promise<Readonly<Record<string, unknown>>>;
+  runOnce(): Promise<object>;
 }
 
 export interface ProviderMaintenance {
   runOnce(): Promise<Readonly<Record<string, unknown>>>;
 }
 
-function capabilityStatus(value: Readonly<Record<string, unknown>>) {
-  return typeof value.status === "string" ? value.status : "completed";
+function capabilityStatus(value: object) {
+  const status = "status" in value ? value.status : undefined;
+  return typeof status === "string" ? status : "completed";
 }
 
 export function createProviderMaintenance(input: {
-  readonly inbox: ProviderMaintenanceCapability;
-  readonly outbox: ProviderMaintenanceCapability;
-  readonly webhooks: ProviderMaintenanceCapability;
+  readonly inbox?: ProviderMaintenanceCapability;
+  readonly outbox?: ProviderMaintenanceCapability;
+  readonly webhooks?: ProviderMaintenanceCapability;
+  readonly privacy?: ProviderMaintenanceCapability;
 }): ProviderMaintenance {
+  const capabilities = Object.entries(input) as Array<
+    ["inbox" | "outbox" | "webhooks" | "privacy", ProviderMaintenanceCapability]
+  >;
+  if (capabilities.length === 0)
+    throw new Error("PROVIDER_MAINTENANCE_CONFIGURATION_INVALID");
   return {
     async runOnce() {
-      const [inbox, outbox, webhooks] = await Promise.allSettled([
-        input.inbox.runOnce(),
-        input.outbox.runOnce(),
-        input.webhooks.runOnce(),
-      ]);
-      if (
-        inbox.status === "rejected" ||
-        outbox.status === "rejected" ||
-        webhooks.status === "rejected"
-      ) {
+      const outcomes = await Promise.allSettled(
+        capabilities.map(([, capability]) => capability.runOnce()),
+      );
+      if (outcomes.some(({ status }) => status === "rejected")) {
         throw new Error("PROVIDER_MAINTENANCE_RETRYABLE");
       }
-      return {
+      const fulfilled = outcomes.filter(
+        (outcome): outcome is PromiseFulfilledResult<object> =>
+          outcome.status === "fulfilled",
+      );
+      const result: Record<string, unknown> = {
         status: "completed",
-        inbox: capabilityStatus(inbox.value),
-        outbox: capabilityStatus(outbox.value),
-        webhooks: capabilityStatus(webhooks.value),
       };
+      for (const [index, outcome] of fulfilled.entries())
+        result[capabilities[index]![0]] = capabilityStatus(outcome.value);
+      return result;
     },
   };
 }

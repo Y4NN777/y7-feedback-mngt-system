@@ -10,6 +10,8 @@ import { createNodeAppwriteIntakeStore } from "./appwrite-intake-store.js";
 import { createNodeAppwriteIntelligenceStore } from "./appwrite-intelligence-store.js";
 import { createNodeAppwriteIntelligenceProvenanceStore } from "./appwrite-intelligence-provenance-store.js";
 import { createNodeAppwritePrivacyStore } from "./appwrite-privacy-store.js";
+import { createNodeAppwritePrivacyPurgeRepository } from "./appwrite-privacy-purge-repository.js";
+import { createNodeAppwritePrivacyCleanup } from "./appwrite-privacy-cleanup.js";
 import { createNodeAppwritePrivateAttachmentStorage } from "./appwrite-private-attachment-storage.js";
 import { createNodeAppwritePrincipalVerifier } from "./appwrite-principal-verifier.js";
 import { createNodeAppwriteConversationLifecycleStore } from "./appwrite-conversation-lifecycle-store.js";
@@ -46,6 +48,7 @@ import { createIntelligenceProvenanceCoordinator } from "./intelligence-provenan
 import { createIntelligenceHttp } from "./intelligence-http.js";
 import { createPrivacyCoordinator } from "./privacy.js";
 import { createPrivacyHttp } from "./privacy-http.js";
+import { createPrivacyPurgeWorker } from "./privacy-cleanup.js";
 import { createConversationLifecycleCoordinator } from "./conversation-lifecycle.js";
 import { createConversationLifecycleHttp } from "./conversation-lifecycle-http.js";
 import { createGitHubSourceProvider } from "./github-source-provider.js";
@@ -676,50 +679,100 @@ export function createHttpApplication(
           config.providerOutboxTriggerSecret,
         )
       : undefined;
-  const providerMaintenance =
-    config.providers && providerIssueOutboxWorker && providerEventInboxWorker
-      ? (() => {
-          const vault = createNodeAppwriteProviderGrantVault(
-            runtime.tables,
-            {
-              databaseId: config.appwriteSchema.databaseId,
-              providerGrantsTableId: config.appwriteSchema.providerGrantsTableId,
-            },
-            Buffer.from(config.providerGrantEnvelopeKey, "base64url"),
-          );
-          const webhookBase = (callbackUrl: string, provider: "github" | "gitlab") => {
-            const origin = new URL(callbackUrl).origin;
-            return `${origin}/providers/${provider}/webhooks/`;
-          };
-          const webhooks = createProviderWebhookProvisioner(
-            {
-              githubApiOrigin: "https://api.github.com/",
-              gitlabOrigin: config.providers.gitlab.origin,
-              callbackBaseUrls: {
-                github: webhookBase(config.providers.github.callbackUrl, "github"),
-                gitlab: webhookBase(config.providers.gitlab.callbackUrl, "gitlab"),
-              },
-            },
-            vault,
-            providerWebhookAuthority,
-            () => randomBytes(32).toString("base64url"),
-          );
-          return createProviderMaintenance({
-            inbox: providerEventInboxWorker,
-            outbox: providerIssueOutboxWorker,
-            webhooks: createProviderWebhookReconciliation(
-              createNodeAppwriteActiveSourceGrantReader(runtime.tables, {
-                databaseId: config.appwriteSchema.databaseId,
-                sourceConnectionsTableId:
-                  config.appwriteSchema.sourceConnectionsTableId,
-              }),
-              webhooks,
-              25,
-              runtime.nowIso,
-            ),
-          });
-        })()
-      : undefined;
+  const privacyPurgeWorker = createPrivacyPurgeWorker(
+    createNodeAppwritePrivacyPurgeRepository(
+      runtime.tables,
+      {
+        databaseId: config.appwriteSchema.databaseId,
+        deletionRecordsTableId: config.appwriteSchema.deletionRecordsTableId,
+      },
+      sensitive,
+      {
+        createEventId: runtime.createId,
+        workerDigest: (workerId) =>
+          createHash("sha256").update(workerId).digest("base64url"),
+      },
+    ),
+    [
+      createNodeAppwritePrivacyCleanup(runtime.tables, runtime.storage, {
+        databaseId: config.appwriteSchema.databaseId,
+        attachmentBucketId: config.appwriteSchema.attachmentBucketId,
+        feedbackTableId: config.appwriteSchema.feedbackTableId,
+        reportersTableId: config.appwriteSchema.reportersTableId,
+        accessGrantsTableId: config.appwriteSchema.accessGrantsTableId,
+        attachmentsTableId: config.appwriteSchema.attachmentsTableId,
+        attachmentStagingTableId: config.appwriteSchema.attachmentStagingTableId,
+        lifecycleTableId: config.appwriteSchema.lifecycleTableId,
+        notificationsTableId: config.appwriteSchema.notificationsTableId,
+        conversationMessagesTableId: config.appwriteSchema.conversationMessagesTableId,
+        conversationInternalNotesTableId:
+          config.appwriteSchema.conversationInternalNotesTableId,
+        conversationIdempotencyTableId:
+          config.appwriteSchema.conversationIdempotencyTableId,
+        conversationLifecycleTableId:
+          config.appwriteSchema.conversationLifecycleTableId,
+        publicationConsentsTableId: config.appwriteSchema.publicationConsentsTableId,
+        externalIssueLinksTableId: config.appwriteSchema.externalIssueLinksTableId,
+        providerOutboxTableId: config.appwriteSchema.providerOutboxTableId,
+        providerSyncOutboxTableId: config.appwriteSchema.providerSyncOutboxTableId,
+        offlineConflictProjectionsTableId:
+          config.appwriteSchema.offlineConflictProjectionsTableId,
+        intelligenceProvenanceTableId:
+          config.appwriteSchema.intelligenceProvenanceTableId,
+      }),
+    ],
+    {
+      workerId: `${config.environment}-privacy-worker`,
+      batchSize: 25,
+      now: runtime.nowIso,
+      createOperationId: (deletionId) =>
+        `privacy_purge_${createHash("sha256").update(deletionId).digest("hex").slice(0, 24)}`,
+    },
+  );
+  const providerMaintenance = (() => {
+    if (config.providers && providerIssueOutboxWorker && providerEventInboxWorker) {
+      const vault = createNodeAppwriteProviderGrantVault(
+        runtime.tables,
+        {
+          databaseId: config.appwriteSchema.databaseId,
+          providerGrantsTableId: config.appwriteSchema.providerGrantsTableId,
+        },
+        Buffer.from(config.providerGrantEnvelopeKey, "base64url"),
+      );
+      const webhookBase = (callbackUrl: string, provider: "github" | "gitlab") => {
+        const origin = new URL(callbackUrl).origin;
+        return `${origin}/providers/${provider}/webhooks/`;
+      };
+      const webhooks = createProviderWebhookProvisioner(
+        {
+          githubApiOrigin: "https://api.github.com/",
+          gitlabOrigin: config.providers.gitlab.origin,
+          callbackBaseUrls: {
+            github: webhookBase(config.providers.github.callbackUrl, "github"),
+            gitlab: webhookBase(config.providers.gitlab.callbackUrl, "gitlab"),
+          },
+        },
+        vault,
+        providerWebhookAuthority,
+        () => randomBytes(32).toString("base64url"),
+      );
+      return createProviderMaintenance({
+        inbox: providerEventInboxWorker,
+        outbox: providerIssueOutboxWorker,
+        privacy: privacyPurgeWorker,
+        webhooks: createProviderWebhookReconciliation(
+          createNodeAppwriteActiveSourceGrantReader(runtime.tables, {
+            databaseId: config.appwriteSchema.databaseId,
+            sourceConnectionsTableId: config.appwriteSchema.sourceConnectionsTableId,
+          }),
+          webhooks,
+          25,
+          runtime.nowIso,
+        ),
+      });
+    }
+    return createProviderMaintenance({ privacy: privacyPurgeWorker });
+  })();
   /* v8 ignore stop */
 
   return {
@@ -734,8 +787,7 @@ export function createHttpApplication(
     providerWebhook,
     /* v8 ignore next -- optional composition is covered by configuration parsing. */
     ...(providerEventInbox === undefined ? {} : { providerEventInbox }),
-    /* v8 ignore next -- optional composition is covered by configuration parsing. */
-    ...(providerMaintenance === undefined ? {} : { providerMaintenance }),
+    providerMaintenance,
     publicApi: createPublicApi(
       projects,
       intake,
