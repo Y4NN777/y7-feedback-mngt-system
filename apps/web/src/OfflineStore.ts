@@ -22,6 +22,8 @@ export interface OfflineOperation extends OfflineOperationInput {
   readonly attempts: number;
   readonly createdAt: string;
   readonly updatedAt: string;
+  readonly nextAttemptAt?: string;
+  readonly lastErrorCode?: string;
 }
 
 export class OfflineStoreError extends Error {
@@ -178,6 +180,33 @@ export function createIndexedDbOfflineStore(input: {
     transaction.objectStore(storeName).put(value);
     await completion(transaction);
   };
+  const transition = async (
+    scope: OfflineScope,
+    id: string,
+    expected: OfflineOperation["status"],
+    update: (current: StoredOperation) => StoredOperation | { readonly delete: true },
+  ) => {
+    const partition = scopeKey(scope);
+    const db = await database();
+    const transaction = db.transaction("outbox", "readwrite");
+    const target = transaction.objectStore("outbox");
+    const current = (await request(target.get(key(partition, id)))) as
+      StoredOperation | undefined;
+    if (!current || current.status !== expected) {
+      transaction.abort();
+      try {
+        await completion(transaction);
+      } catch {
+        // The stable state-conflict outcome takes precedence.
+      }
+      throw new OfflineStoreError("OFFLINE_OPERATION_STATE_CONFLICT");
+    }
+    const result = update(current);
+    if ("delete" in result) target.delete(current.key);
+    else target.put(result);
+    await completion(transaction);
+    return current;
+  };
   return {
     async saveDraft(
       scope: OfflineScope,
@@ -287,6 +316,83 @@ export function createIndexedDbOfflineStore(input: {
         transaction.objectStore("outbox").index("scope").getAll(partition),
       )) as StoredOperation[];
       return rows.sort((left, right) => left.sequence - right.sequence);
+    },
+    async recoverOperations(scope: OfflineScope, staleBefore: string) {
+      if (!Number.isFinite(Date.parse(staleBefore)))
+        throw new OfflineStoreError("OFFLINE_RECOVERY_INVALID");
+      const partition = scopeKey(scope);
+      const db = await database();
+      const transaction = db.transaction("outbox", "readwrite");
+      const target = transaction.objectStore("outbox");
+      const rows = (await request(
+        target.index("scope").getAll(partition),
+      )) as StoredOperation[];
+      let recovered = 0;
+      for (const current of rows) {
+        if (current.status !== "processing" || current.updatedAt > staleBefore)
+          continue;
+        target.put({
+          ...current,
+          status: "queued",
+          updatedAt: now(),
+          lastErrorCode: "claim_recovered",
+        });
+        recovered += 1;
+      }
+      await completion(transaction);
+      return { recovered };
+    },
+    async claimOperation(scope: OfflineScope, id: string) {
+      let claimed: StoredOperation | undefined;
+      await transition(scope, id, "queued", (current) => {
+        const {
+          nextAttemptAt: _nextAttemptAt,
+          lastErrorCode: _lastErrorCode,
+          ...base
+        } = current;
+        void _nextAttemptAt;
+        void _lastErrorCode;
+        const next: StoredOperation = {
+          ...base,
+          status: "processing",
+          attempts: current.attempts + 1,
+          updatedAt: now(),
+        };
+        claimed = next;
+        return next;
+      });
+      if (!claimed) throw new OfflineStoreError("OFFLINE_OPERATION_STATE_CONFLICT");
+      return claimed;
+    },
+    async completeOperation(scope: OfflineScope, id: string) {
+      await transition(scope, id, "processing", () => ({ delete: true }));
+    },
+    async retryOperation(
+      scope: OfflineScope,
+      id: string,
+      nextAttemptAt: string,
+      lastErrorCode: string,
+    ) {
+      if (
+        !Number.isFinite(Date.parse(nextAttemptAt)) ||
+        !identifier.test(lastErrorCode)
+      )
+        throw new OfflineStoreError("OFFLINE_RETRY_INVALID");
+      await transition(scope, id, "processing", (current) => ({
+        ...current,
+        status: "queued",
+        updatedAt: now(),
+        nextAttemptAt,
+        lastErrorCode,
+      }));
+    },
+    async conflictOperation(scope: OfflineScope, id: string) {
+      await transition(scope, id, "processing", (current) => ({
+        ...current,
+        status: "conflict",
+        updatedAt: now(),
+        lastErrorCode: "payload_conflict",
+      }));
     },
     async eraseScope(scope: OfflineScope) {
       const partition = scopeKey(scope);
