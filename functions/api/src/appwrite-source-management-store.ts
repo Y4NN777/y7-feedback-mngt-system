@@ -186,7 +186,7 @@ function connection(
     typeof id !== "string" ||
     !identifier.test(id) ||
     !sourceProvider ||
-    (state !== "active" && state !== "disconnected") ||
+    (state !== "active" && state !== "suspended" && state !== "disconnected") ||
     typeof value.ownerUserId !== "string" ||
     typeof value.workspaceId !== "string" ||
     typeof value.projectId !== "string" ||
@@ -212,7 +212,7 @@ function connection(
     : undefined;
   if (!selected || !imported) return undefined;
   const encryptedGrantRef =
-    state === "active" &&
+    (state === "active" || state === "suspended") &&
     typeof value.encryptedGrantRef === "string" &&
     identifier.test(value.encryptedGrantRef)
       ? value.encryptedGrantRef
@@ -308,7 +308,7 @@ export function createAppwriteSourceManagementStore(
           queries.equal("ownerUserId", [input.ownerUserId]),
           queries.equal("workspaceId", [input.workspaceId]),
           queries.equal("projectId", [input.projectId]),
-          queries.equal("status", ["active", "disconnected"]),
+          queries.equal("status", ["active", "suspended", "disconnected"]),
           queries.limit(10),
         ],
         total: false,
