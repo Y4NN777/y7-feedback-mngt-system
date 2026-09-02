@@ -18,6 +18,7 @@ export interface PrivacyPurgeRepository {
     readonly expectedRevision: number;
     readonly operationId: string;
     readonly purgedAt: string;
+    readonly workerId: string;
   }): Promise<"purged" | "replayed" | "stale">;
 }
 
@@ -78,6 +79,7 @@ export function createPrivacyPurgeWorker(
             expectedRevision: candidate.revision,
             operationId: dependencies.createOperationId(candidate.deletionId),
             purgedAt: now,
+            workerId: dependencies.workerId,
           });
           report[outcome] += 1;
         } catch {

@@ -227,6 +227,8 @@ export function createDay4TableDefinitions(
         text("auditEnvelope", false),
         text("operationIdsJson", false),
         datetime("updatedAt", false),
+        varchar("purgeWorkerId", 36, false),
+        datetime("purgeClaimedAt", false),
       ],
       [
         index("feedback_unique", ["feedbackId"], "unique"),

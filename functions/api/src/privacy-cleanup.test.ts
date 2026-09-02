@@ -70,6 +70,7 @@ describe("privacy purge worker", () => {
       expectedRevision: 1,
       operationId: "purge_deletion_1",
       purgedAt: "2026-10-02T00:00:00.000Z",
+      workerId: "privacy_worker_1",
     });
   });
 
