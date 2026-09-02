@@ -39,6 +39,64 @@
   min-width: 0;
 }
 
+.intelligence-page,
+.intelligence-form,
+.intelligence-results,
+.intelligence-form fieldset,
+.intelligence-breakdowns,
+.intelligence-breakdowns dl {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.intelligence-form fieldset {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border: 1px solid var(--ink, #1c1c1c);
+  padding: 1rem;
+}
+
+.intelligence-form legend {
+  padding: 0 0.4rem;
+  font-weight: 700;
+}
+
+.intelligence-form label,
+.intelligence-breakdowns dl div,
+.intelligence-results > section dl div {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.intelligence-form input {
+  min-width: 0;
+  width: 100%;
+}
+
+.intelligence-breakdowns {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.intelligence-breakdowns dl div,
+.intelligence-results > section dl div {
+  grid-template-columns: minmax(0, 1fr) auto;
+  border-top: 1px solid var(--ink, #1c1c1c);
+  padding: 0.5rem 0;
+}
+
+.intelligence-breakdowns dd,
+.intelligence-results dd {
+  margin: 0;
+}
+
+.intelligence-total {
+  display: flex;
+  justify-content: space-between;
+  border-block: 2px solid var(--ink, #1c1c1c);
+  padding: 1rem 0;
+  font-size: 1.25rem;
+}
+
 .workbench-grid,
 .workbench-detail {
   display: grid;
@@ -114,6 +172,11 @@
   .workbench-filters,
   .workbench-list button,
   .notification-feed li {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .intelligence-form fieldset,
+  .intelligence-breakdowns {
     grid-template-columns: minmax(0, 1fr);
   }
 }

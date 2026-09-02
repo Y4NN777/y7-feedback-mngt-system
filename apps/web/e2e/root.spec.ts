@@ -215,6 +215,29 @@ test("BDD-UX-INTAKE-001 is accessible without overflow at 320 px", async ({ page
   expect(hasHorizontalOverflow).toBe(false);
 });
 
+test("BDD-INT-218 keeps the Intelligence entry screen accessible at 320 px", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await page.goto("/intelligence");
+
+  await expect(page.getByRole("heading", { name: "Intelligence" })).toBeVisible();
+  await page.getByRole("button", { name: "English" }).click();
+  await expect(page.getByText(/Analyze feedback inside one Project/u)).toBeVisible();
+  const accessibility = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa"])
+    .analyze();
+  const seriousViolations = accessibility.violations.filter(
+    (violation) => violation.impact === "serious" || violation.impact === "critical",
+  );
+  const hasHorizontalOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  );
+
+  expect(seriousViolations).toEqual([]);
+  expect(hasHorizontalOverflow).toBe(false);
+});
+
 test("BDD-ACC-UX-001 preserves private retrieval input and fails honestly without an API", async ({
   page,
 }) => {

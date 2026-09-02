@@ -16,6 +16,7 @@ import { createOfflineIntakeReplay } from "./OfflineIntakeReplay";
 import { createOfflineProjectGateway } from "./OfflineProjectGateway";
 import { createHttpConnectivityProbe } from "./OfflineReplay";
 import { createIndexedDbOfflineStore } from "./OfflineStore";
+import { createHttpIntelligenceGateway } from "./IntelligenceGateway";
 import { createAppwriteNotificationInvalidation } from "./NotificationInvalidation";
 import { createHttpProjectGateway } from "./ProjectGateway";
 import { createHttpPublicationConsentGateway } from "./PublicationConsentGateway";
@@ -60,6 +61,9 @@ const administrationGateway = createHttpAdministrationGateway(config.apiEndpoint
 const workbenchGateway = createHttpWorkbenchGateway(config.apiEndpoint, () =>
   administrationSession.createJwt(),
 );
+const intelligenceGateway = createHttpIntelligenceGateway(config.apiEndpoint, () =>
+  administrationSession.createJwt(),
+);
 const notificationInvalidation = createAppwriteNotificationInvalidation(
   config.appwriteEndpoint,
   config.appwriteProjectId,
@@ -88,6 +92,7 @@ createRoot(root).render(
         intakeGateway={intakeGateway}
         offlinePersistence={offlinePersistence}
         offlineReplay={offlineReplay}
+        intelligenceGateway={intelligenceGateway}
         notificationInvalidation={notificationInvalidation}
         projectGateway={projectGateway}
         publicationConsentGateway={publicationConsentGateway}

@@ -78,6 +78,25 @@ describe("root orientation", () => {
     expect(document.documentElement.lang).toBe("en");
   });
 
+  it("BDD-INT-217 routes /intelligence to the protected bilingual screen", async () => {
+    window.history.replaceState({}, "", "/intelligence");
+    const user = userEvent.setup();
+    renderApp({
+      administrationSession: {
+        createJwt: () => Promise.resolve("jwt"),
+        signIn: () => Promise.resolve("authenticated"),
+        signOut: () => Promise.resolve(),
+      },
+      intelligenceGateway: {
+        analyze: () => Promise.resolve({ status: "retryable" }),
+      },
+    });
+    expect(screen.getByRole("heading", { name: "Intelligence" })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "English" }));
+    expect(document.documentElement.lang).toBe("en");
+    expect(screen.getByText(/Analyze feedback inside one Project/u)).toBeVisible();
+  });
+
   it("BDD-ROOT-001 shows exactly the three French intents without enumeration", () => {
     renderApp();
 
