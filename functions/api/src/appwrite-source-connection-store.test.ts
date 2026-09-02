@@ -132,7 +132,11 @@ describe("private Appwrite source connection store", () => {
       }),
     ).resolves.toEqual({
       id: "state_1",
+      workspaceId: "workspace_1",
+      projectId: "project_1",
+      ownerUserId: "owner_1",
       provider: "github",
+      encryptedGrantRef: "grant_1",
       selectedRepositories: [{ provider: "github", id: "repository_2" }],
     });
   });
@@ -174,6 +178,7 @@ describe("private Appwrite source connection store", () => {
       ownerUserId: "owner_1",
       provider: "github",
       encryptedGrantRef: "grant_1",
+      selectedRepositories: [{ provider: "github", id: "repository_1" }],
     });
   });
 
@@ -310,6 +315,42 @@ describe("private Appwrite source connection store", () => {
       projectId: "project_1",
       updatedAt: "2026-08-26T10:01:00.000Z",
     };
+    await expect(
+      store.select({
+        ...command,
+        ownerUserId: "other_owner",
+        repositoryIds: ["repository_1"],
+      }),
+    ).resolves.toBeNull();
+    rows.set("state_1", [] as never);
+    await expect(
+      store.select({ ...command, repositoryIds: ["repository_1"] }),
+    ).resolves.toBeNull();
+    await store.begin(pending).catch(() => undefined);
+    rows.set("state_1", {
+      $id: "state_1",
+      workspaceId: "workspace_1",
+      projectId: "project_1",
+      ownerUserId: "owner_1",
+      provider: "github",
+      status: "selecting",
+      encryptedGrantRef: "grant_1",
+      selectedRepositoriesJson: JSON.stringify({
+        kind: "authorized",
+        repositories: [{ provider: "github", id: "repository_1" }],
+      }),
+    });
+    rows.set("state_1", {
+      ...rows.get("state_1"),
+      encryptedGrantRef: "bad/id",
+    });
+    await expect(
+      store.select({ ...command, repositoryIds: ["repository_1"] }),
+    ).resolves.toBeNull();
+    rows.set("state_1", {
+      ...rows.get("state_1"),
+      encryptedGrantRef: "grant_1",
+    });
     for (const repositoryIds of [[], ["repository_1", "repository_1"], ["other"]]) {
       await expect(store.select({ ...command, repositoryIds })).resolves.toBeNull();
     }

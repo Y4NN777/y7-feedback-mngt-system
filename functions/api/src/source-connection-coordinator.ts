@@ -56,6 +56,12 @@ export interface ActiveSourceGrant {
   readonly ownerUserId: string;
   readonly provider: SourceProvider;
   readonly encryptedGrantRef: string;
+  readonly selectedRepositories: readonly RepositoryIdentity[];
+}
+
+export interface SourceWebhookProvisioner {
+  ensure(input: ActiveSourceGrant): Promise<void>;
+  remove(input: ActiveSourceGrant): Promise<void>;
 }
 
 export interface SourceConnectionStore {
@@ -74,11 +80,7 @@ export interface SourceConnectionStore {
     readonly projectId: string;
     readonly repositoryIds: readonly string[];
     readonly updatedAt: string;
-  }): Promise<{
-    readonly id: string;
-    readonly provider: SourceProvider;
-    readonly selectedRepositories: readonly RepositoryIdentity[];
-  } | null>;
+  }): Promise<ActiveSourceGrant | null>;
   active(input: {
     readonly connectionId: string;
     readonly ownerUserId: string;
@@ -93,6 +95,7 @@ export interface SourceConnectionCoordinatorDependencies {
   readonly scopeResolver: SourceScopeResolver;
   readonly store: SourceConnectionStore;
   readonly providers: readonly SourceProviderAdapter[];
+  readonly webhooks: SourceWebhookProvisioner;
   readonly createStateId: () => string;
   readonly createNonce: () => string;
   readonly digestNonce: (nonce: string) => string;
@@ -290,9 +293,16 @@ export function createSourceConnectionCoordinator(
           repositoryIds: input.repositoryIds,
           updatedAt: dependencies.nowIso(),
         });
-        return connection
-          ? ({ status: "active", connection } as const)
-          : ({ status: "denied" } as const);
+        if (!connection) return { status: "denied" } as const;
+        await dependencies.webhooks.ensure(connection);
+        return {
+          status: "active",
+          connection: {
+            id: connection.id,
+            provider: connection.provider,
+            selectedRepositories: connection.selectedRepositories,
+          },
+        } as const;
       } catch {
         return { status: "retryable" } as const;
       }
@@ -317,6 +327,7 @@ export function createSourceConnectionCoordinator(
         if (!active) return { status: "denied" } as const;
         const provider = providers.get(active.provider);
         if (!provider) return { status: "retryable" } as const;
+        await dependencies.webhooks.remove(active);
         await provider.revokeGrant(active.encryptedGrantRef);
         await dependencies.store.disconnected(active.id);
         return { status: "disconnected" } as const;

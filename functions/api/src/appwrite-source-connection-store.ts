@@ -275,19 +275,25 @@ export function createAppwriteSourceConnectionStore(
           ...coordinates(input.connectionId),
           ...(transactionId ? { transactionId } : {}),
         });
-        if (
-          !isObject(value) ||
-          value.status !== "selecting" ||
-          !exactScope(value, input)
-        ) {
+        if (!isObject(value) || !exactScope(value, input)) {
           return null;
         }
         const sourceProvider = provider(value.provider);
+        const grantReference = text(value.encryptedGrantRef, 36);
+        const encryptedGrantRef =
+          grantReference && identifier.test(grantReference)
+            ? grantReference
+            : undefined;
+        if (!encryptedGrantRef) return null;
         const state = json(value.selectedRepositoriesJson);
-        const authorized = sourceProvider
-          ? repositories(state?.repositories, sourceProvider)
-          : undefined;
-        if (state?.kind !== "authorized" || !authorized) return null;
+        const authorized =
+          sourceProvider &&
+          encryptedGrantRef &&
+          (value.status === "selecting" || value.status === "active")
+            ? repositories(state?.repositories, sourceProvider)
+            : undefined;
+        if ((state?.kind !== "authorized" && state?.kind !== "selected") || !authorized)
+          return null;
         const requested = new Set(input.repositoryIds);
         if (
           requested.size !== input.repositoryIds.length ||
@@ -311,7 +317,11 @@ export function createAppwriteSourceConnectionStore(
         });
         return {
           id: input.connectionId,
+          workspaceId: input.workspaceId,
+          projectId: input.projectId,
+          ownerUserId: input.ownerUserId,
           provider: sourceProvider as SourceProvider,
+          encryptedGrantRef,
           selectedRepositories,
         };
       });
@@ -329,7 +339,11 @@ export function createAppwriteSourceConnectionStore(
         }
         const sourceProvider = provider(value.provider);
         const encryptedGrantRef = text(value.encryptedGrantRef, 36);
-        return sourceProvider && encryptedGrantRef
+        const state = json(value.selectedRepositoriesJson);
+        const selectedRepositories = sourceProvider
+          ? repositories(state?.repositories, sourceProvider)
+          : undefined;
+        return sourceProvider && encryptedGrantRef && selectedRepositories
           ? {
               id: input.connectionId,
               workspaceId: input.workspaceId,
@@ -337,6 +351,7 @@ export function createAppwriteSourceConnectionStore(
               ownerUserId: input.ownerUserId,
               provider: sourceProvider,
               encryptedGrantRef,
+              selectedRepositories,
             }
           : null;
       } catch (error: unknown) {

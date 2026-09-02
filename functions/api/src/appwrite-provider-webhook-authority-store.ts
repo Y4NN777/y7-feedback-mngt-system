@@ -81,32 +81,25 @@ function credential(
   throw new Error("PROVIDER_WEBHOOK_CREDENTIAL_INVALID");
 }
 
-function selectedRepository(
-  value: unknown,
-  connectionId: string,
-  provider: SourceProvider,
-): string | null {
+function selectedRepository(value: unknown, provider: SourceProvider): string | null {
   if (typeof value !== "string") return null;
   try {
     const parsed: unknown = JSON.parse(value);
     if (
       !object(parsed) ||
       parsed.kind !== "selected" ||
-      !Array.isArray(parsed.imports)
+      !Array.isArray(parsed.repositories)
     ) {
       return null;
     }
-    const matches = parsed.imports.filter(
+    const matches = parsed.repositories.filter(
       (entry) =>
         object(entry) &&
-        entry.connectionId === connectionId &&
         entry.provider === provider &&
-        typeof entry.repositoryId === "string" &&
-        repositoryId.test(entry.repositoryId),
+        typeof entry.id === "string" &&
+        repositoryId.test(entry.id),
     );
-    return matches.length === 1 && object(matches[0])
-      ? String(matches[0].repositoryId)
-      : null;
+    return matches.length === 1 && object(matches[0]) ? String(matches[0].id) : null;
   } catch {
     return null;
   }
@@ -160,7 +153,6 @@ export function createAppwriteProviderWebhookAuthorityStore(
       }
       const selected = selectedRepository(
         connection.selectedRepositoriesJson,
-        input.connectionId,
         input.provider,
       );
       if (!selected) return null;

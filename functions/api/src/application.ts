@@ -74,6 +74,7 @@ import { createProviderIssueOutboxWorker } from "./provider-issue-outbox.js";
 import { createProviderIssueOutboxHttp } from "./provider-issue-outbox-http.js";
 import { createProviderWebhookIngress } from "./provider-webhook-ingress.js";
 import { createProviderWebhookHttp } from "./provider-webhook-http.js";
+import { createProviderWebhookProvisioner } from "./provider-webhook-provisioner.js";
 
 export function digestExternalIssueCommand(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(value)).digest("base64url");
@@ -430,6 +431,19 @@ export function createHttpApplication(
           ),
           createGitLabSourceProvider(config.providers.gitlab, vault),
         ] as const;
+        const webhookAuthority = createAppwriteProviderWebhookAuthorityStore(
+          runtime.tables,
+          {
+            databaseId: config.appwriteSchema.databaseId,
+            sourceConnectionsTableId: config.appwriteSchema.sourceConnectionsTableId,
+            providerGrantsTableId: config.appwriteSchema.providerGrantsTableId,
+          },
+          sensitive,
+        );
+        const webhookBase = (callbackUrl: string, provider: "github" | "gitlab") => {
+          const origin = new URL(callbackUrl).origin;
+          return `${origin}/providers/${provider}/webhooks/`;
+        };
         return createSourceConnectionHttp(
           createSourceConnectionCoordinator({
             principalVerifier,
@@ -439,6 +453,19 @@ export function createHttpApplication(
               sourceConnectionsTableId: config.appwriteSchema.sourceConnectionsTableId,
             }),
             providers,
+            webhooks: createProviderWebhookProvisioner(
+              {
+                githubApiOrigin: "https://api.github.com/",
+                gitlabOrigin: config.providers.gitlab.origin,
+                callbackBaseUrls: {
+                  github: webhookBase(config.providers.github.callbackUrl, "github"),
+                  gitlab: webhookBase(config.providers.gitlab.callbackUrl, "gitlab"),
+                },
+              },
+              vault,
+              webhookAuthority,
+              () => randomBytes(32).toString("base64url"),
+            ),
             createStateId: runtime.createId,
             createNonce:
               runtime.createProviderNonce ??
