@@ -151,6 +151,7 @@ async function main(): Promise<void> {
   let projectIsolationPassed = false;
   let workspaceIsolationPassed = false;
   let boundedQueryMs = 0;
+  let coldStartWarmupMs = 0;
   try {
     await users.create({ userId: principalId, name: "G4 Intelligence verifier" });
     userCreated = true;
@@ -257,6 +258,14 @@ async function main(): Promise<void> {
       context: reviewedContext,
     });
 
+    const warmupStarted = performance.now();
+    const warmup = await fetch(new URL("/health", domain), {
+      redirect: "error",
+      signal: AbortSignal.timeout(30_000),
+    });
+    coldStartWarmupMs = performance.now() - warmupStarted;
+    if (!warmup.ok) throw new Error("APPWRITE_G4_INTELLIGENCE_WARMUP_FAILED");
+
     const baseQuery = {
       filter: { versions: ["2.1.0"], places: ["checkout"], features: ["billing"] },
       pageSize: 1,
@@ -337,6 +346,7 @@ async function main(): Promise<void> {
       projectIsolationPassed,
       workspaceIsolationPassed,
       boundedQueryMs: Math.round(boundedQueryMs),
+      coldStartWarmupMs: Math.round(coldStartWarmupMs),
       cleanupPassed: true,
     })}\n`,
   );
