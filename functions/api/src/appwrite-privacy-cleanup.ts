@@ -81,7 +81,13 @@ export function createAppwritePrivacyCleanup(
   queries: AppwritePrivacyCleanupQueries,
 ): PrivacyCleanupPort {
   const values = Object.values(schema);
-  if (values.some((value) => !id.test(value)) || new Set(values).size !== values.length)
+  const tableIds = Object.entries(schema)
+    .filter(([key]) => key.endsWith("TableId"))
+    .map(([, value]) => value);
+  if (
+    values.some((value) => !id.test(value)) ||
+    new Set(tableIds).size !== tableIds.length
+  )
     throw new Error("APPWRITE_PRIVACY_CLEANUP_SCHEMA_INVALID");
 
   const list = async (tableId: string, attribute: string, value: string) =>

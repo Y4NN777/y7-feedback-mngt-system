@@ -188,8 +188,7 @@ export function createAppwritePrivacyStore(
   sensitive: AppwriteSensitivePersistence,
   dependencies: AppwritePrivacyDependencies,
 ): PrivacyStore {
-  const schemaIds = [
-    schema.databaseId,
+  const tableIds = [
     schema.feedbackTableId,
     schema.reportersTableId,
     schema.accessGrantsTableId,
@@ -202,8 +201,9 @@ export function createAppwritePrivacyStore(
     schema.deletionRecordsTableId,
   ];
   if (
-    schemaIds.some((value) => !id.test(value)) ||
-    new Set(schemaIds).size !== schemaIds.length
+    !id.test(schema.databaseId) ||
+    tableIds.some((value) => !id.test(value)) ||
+    new Set(tableIds).size !== tableIds.length
   )
     throw new Error("APPWRITE_PRIVACY_SCHEMA_INVALID");
   const list = (

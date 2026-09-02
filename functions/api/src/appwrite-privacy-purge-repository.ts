@@ -163,11 +163,7 @@ export function createAppwritePrivacyPurgeRepository(
   sensitive: AppwriteSensitivePersistence,
   dependencies: AppwritePrivacyPurgeDependencies,
 ): PrivacyPurgeRepository {
-  if (
-    !id.test(schema.databaseId) ||
-    !id.test(schema.deletionRecordsTableId) ||
-    schema.databaseId === schema.deletionRecordsTableId
-  )
+  if (!id.test(schema.databaseId) || !id.test(schema.deletionRecordsTableId))
     throw new Error("APPWRITE_PRIVACY_PURGE_SCHEMA_INVALID");
   return {
     async claimDue(input) {

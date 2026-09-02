@@ -232,7 +232,7 @@ describe("Appwrite privacy purge repository", () => {
     expect(() =>
       createAppwritePrivacyPurgeRepository(
         new FakeTables(),
-        { databaseId: "same", deletionRecordsTableId: "same" },
+        { databaseId: "bad/id", deletionRecordsTableId: "same" },
         queries,
         sensitive,
         { createEventId: () => "event", workerDigest: () => "x".repeat(64) },
