@@ -44,6 +44,11 @@ export interface AppwriteProvisioningPort {
     tableId: string,
     definition: AppwriteColumn,
   ): Promise<void>;
+  createIndex(
+    databaseId: string,
+    tableId: string,
+    definition: AppwriteIndex,
+  ): Promise<void>;
   getBucket(bucketId: string): Promise<ExistingAppwriteBucket | null>;
   createBucket(definition: ExistingAppwriteBucket): Promise<void>;
 }
@@ -84,11 +89,18 @@ function assertConforming(
   }
 }
 
-function additiveColumns(
+function additiveTableChanges(
   actual: ExistingAppwriteTable,
   expected: ExistingAppwriteTable,
-): readonly AppwriteColumn[] {
-  const actualBase = { ...actual, columns: expected.columns };
+): {
+  readonly columns: readonly AppwriteColumn[];
+  readonly indexes: readonly AppwriteIndex[];
+} {
+  const actualBase = {
+    ...actual,
+    columns: expected.columns,
+    indexes: expected.indexes,
+  };
   if (canonical(actualBase) !== canonical(expected)) {
     throw new Error(`APPWRITE_INFRASTRUCTURE_DRIFT:table:${expected.id}`);
   }
@@ -104,7 +116,18 @@ function additiveColumns(
   if (missing.some((column) => column.required)) {
     throw new Error(`APPWRITE_INFRASTRUCTURE_DRIFT:table:${expected.id}`);
   }
-  return missing;
+  const targetIndexes = new Map(expected.indexes.map((index) => [index.key, index]));
+  for (const index of actual.indexes) {
+    const definition = targetIndexes.get(index.key);
+    if (definition === undefined || canonical(index) !== canonical(definition)) {
+      throw new Error(`APPWRITE_INFRASTRUCTURE_DRIFT:table:${expected.id}`);
+    }
+  }
+  const presentIndexes = new Set(actual.indexes.map((index) => index.key));
+  return {
+    columns: missing,
+    indexes: expected.indexes.filter((index) => !presentIndexes.has(index.key)),
+  };
 }
 
 export async function provisionAppwriteInfrastructure(
@@ -118,7 +141,13 @@ export async function provisionAppwriteInfrastructure(
       existing: await port.getTable(manifest.database.id, definition.id),
     })),
   );
-  const pendingColumns = new Map<string, readonly AppwriteColumn[]>();
+  const pendingChanges = new Map<
+    string,
+    {
+      readonly columns: readonly AppwriteColumn[];
+      readonly indexes: readonly AppwriteIndex[];
+    }
+  >();
   const bucket = await port.getBucket(manifest.attachmentBucket.id);
 
   if (database) {
@@ -126,9 +155,9 @@ export async function provisionAppwriteInfrastructure(
   }
   for (const candidate of tables) {
     if (candidate.existing) {
-      pendingColumns.set(
+      pendingChanges.set(
         candidate.definition.id,
-        additiveColumns(candidate.existing, candidate.definition),
+        additiveTableChanges(candidate.existing, candidate.definition),
       );
     }
   }
@@ -152,9 +181,13 @@ export async function provisionAppwriteInfrastructure(
       created += 1;
     }
   }
-  for (const [tableId, columns] of pendingColumns) {
-    for (const column of columns) {
+  for (const [tableId, changes] of pendingChanges) {
+    for (const column of changes.columns) {
       await port.createColumn(manifest.database.id, tableId, column);
+      created += 1;
+    }
+    for (const index of changes.indexes) {
+      await port.createIndex(manifest.database.id, tableId, index);
       created += 1;
     }
   }

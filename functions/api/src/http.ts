@@ -506,23 +506,23 @@ export async function routeRequest(
                 ? "provider_issue_outbox"
                 : sourceResponse
                   ? "source_connection"
-                : administrationResponse
-                  ? "project_administration"
-                  : platformAccessResponse
-                    ? "platform_access"
-                    : conversationResponse
-                      ? "conversation_lifecycle"
-                      : workbenchResponse
-                        ? "workbench"
-                        : externalIssueResponse
-                          ? "external_issue"
-                          : intelligenceResponse
-                            ? "intelligence"
-                            : privacyResponse
-                              ? "privacy"
-                              : publicResponse
-                                ? "public_api"
-                                : "unknown";
+                  : administrationResponse
+                    ? "project_administration"
+                    : platformAccessResponse
+                      ? "platform_access"
+                      : conversationResponse
+                        ? "conversation_lifecycle"
+                        : workbenchResponse
+                          ? "workbench"
+                          : externalIssueResponse
+                            ? "external_issue"
+                            : intelligenceResponse
+                              ? "intelligence"
+                              : privacyResponse
+                                ? "privacy"
+                                : publicResponse
+                                  ? "public_api"
+                                  : "unknown";
   const outcome = isHealth
     ? "success"
     : (probeResponse ??

@@ -25,7 +25,7 @@ function github(action: "created" | "edited" | "deleted", body = "Visible reply"
     ...base,
     payloadEnvelope: JSON.stringify({
       action,
-      issue: { id: 41 },
+      issue: { id: 4100, number: 41 },
       comment: {
         id: 91,
         body,
@@ -157,7 +157,6 @@ it("parses provider fallback fields and rejects every malformed provenance bound
     unknown
   >;
   const comment = githubPayload.comment as Record<string, unknown>;
-  const issue = githubPayload.issue as Record<string, unknown>;
   expect(
     parseProviderMessageEvent({
       ...github("created"),
@@ -176,8 +175,8 @@ it("parses provider fallback fields and rejects every malformed provenance bound
     { ...githubPayload, comment: null },
     { ...githubPayload, comment: { ...comment, user: null } },
     { ...githubPayload, action: "unknown" },
-    { ...githubPayload, issue: { ...issue, id: null } },
-    { ...githubPayload, issue: { ...issue, id: "x".repeat(129) } },
+    { ...githubPayload, issue: { id: null, number: null } },
+    { ...githubPayload, issue: { id: "x".repeat(129), number: null } },
     { ...githubPayload, comment: { ...comment, id: null } },
     { ...githubPayload, comment: { ...comment, user: { id: null, login: "x" } } },
     { ...githubPayload, comment: { ...comment, user: { id: 7, login: "" } } },
