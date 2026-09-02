@@ -32,9 +32,18 @@ async function main(): Promise<void> {
     link: `syl_${suffix}`,
     feedback: `syf_${suffix}`,
     actor: `sya_${suffix}`,
+    gitlabConnection: `glc_${suffix}`,
+    gitlabGrant: `glg_${suffix}`,
+    gitlabWorkspace: `glw_${suffix}`,
+    gitlabProject: `glp_${suffix}`,
+    gitlabLink: `gll_${suffix}`,
+    gitlabFeedback: `glf_${suffix}`,
+    gitlabActor: `gla_${suffix}`,
   };
   const repositoryId = "1329343404";
+  const gitlabRepositoryId = "83836910";
   const issueId = "424242";
+  const gitlabIssueId = "848484";
   const webhookSecret = randomBytes(32).toString("base64url");
   const tables = new TablesDB(
     new Client()
@@ -86,6 +95,38 @@ async function main(): Promise<void> {
           "x-github-delivery": deliveryId,
           "x-github-event": "issues",
           "x-hub-signature-256": `sha256=${signature}`,
+        },
+        body: raw,
+        signal: AbortSignal.timeout(30_000),
+      },
+    );
+    return { status: response.status, body: (await response.json()) as unknown };
+  };
+  const sendGitLab = async (
+    deliveryId: string,
+    state: "open" | "closed",
+    updatedAt: string,
+    description = "external issue",
+  ) => {
+    const raw = JSON.stringify({
+      object_kind: "issue",
+      project: { id: Number(gitlabRepositoryId) },
+      object_attributes: {
+        id: Number(gitlabIssueId),
+        state: state === "open" ? "opened" : "closed",
+        updated_at: updatedAt,
+        description,
+      },
+    });
+    const response = await fetch(
+      new URL(`/providers/gitlab/webhooks/${ids.gitlabConnection}`, domain),
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-gitlab-event": "Issue Hook",
+          "x-gitlab-token": webhookSecret,
+          "idempotency-key": deliveryId,
         },
         body: raw,
         signal: AbortSignal.timeout(30_000),
@@ -151,6 +192,50 @@ async function main(): Promise<void> {
       createdAt: now,
       updatedAt: now,
     });
+    const gitlabWebhookCredentialEnvelope = protector.seal(
+      {
+        environment: "preview",
+        tableId: config.appwriteSchema.providerGrantsTableId,
+        rowId: ids.gitlabGrant,
+        field: "webhookCredentialEnvelope",
+      },
+      JSON.stringify({ kind: "gitlab_legacy", secret: webhookSecret }),
+    );
+    await create(config.appwriteSchema.providerGrantsTableId, ids.gitlabGrant, {
+      provider: "gitlab",
+      envelope: "preview-fixture",
+      webhookCredentialEnvelope: gitlabWebhookCredentialEnvelope,
+    });
+    await create(config.appwriteSchema.sourceConnectionsTableId, ids.gitlabConnection, {
+      workspaceId: ids.gitlabWorkspace,
+      projectId: ids.gitlabProject,
+      provider: "gitlab",
+      ownerUserId: ids.gitlabActor,
+      status: "active",
+      encryptedGrantRef: ids.gitlabGrant,
+      selectedRepositoriesJson: JSON.stringify({
+        kind: "selected",
+        repositories: [{ provider: "gitlab", id: gitlabRepositoryId }],
+      }),
+      createdAt: now,
+      updatedAt: now,
+    });
+    await create(config.appwriteSchema.externalIssueLinksTableId, ids.gitlabLink, {
+      feedbackId: ids.gitlabFeedback,
+      workspaceId: ids.gitlabWorkspace,
+      projectId: ids.gitlabProject,
+      connectionId: ids.gitlabConnection,
+      provider: "gitlab",
+      repositoryId: gitlabRepositoryId,
+      visibility: "private",
+      providerIssueId: gitlabIssueId,
+      providerIssueUrl: "https://gitlab.com/example/repo/-/issues/1",
+      state: "active",
+      synchronizationState: "synchronized",
+      actorId: ids.gitlabActor,
+      createdAt: now,
+      updatedAt: now,
+    });
     const deliveries = [
       await send(`a_${suffix}`, "open", "2026-09-02T00:02:00.000Z"),
       await send(`b_${suffix}`, "closed", "2026-09-02T00:04:00.000Z"),
@@ -163,12 +248,31 @@ async function main(): Promise<void> {
       ),
     ];
     const duplicate = await send(`a_${suffix}`, "open", "2026-09-02T00:02:00.000Z");
+    const gitlabDeliveries = [
+      await sendGitLab(`ga_${suffix}`, "open", "2026-09-02T00:02:00.000Z"),
+      await sendGitLab(`gb_${suffix}`, "closed", "2026-09-02T00:04:00.000Z"),
+      await sendGitLab(`gc_${suffix}`, "open", "2026-09-02T00:03:00.000Z"),
+      await sendGitLab(
+        `gd_${suffix}`,
+        "open",
+        "2026-09-02T00:05:00.000Z",
+        "<!-- y7-feedback-operation:operation_2 -->",
+      ),
+    ];
+    const gitlabDuplicate = await sendGitLab(
+      `ga_${suffix}`,
+      "open",
+      "2026-09-02T00:02:00.000Z",
+    );
     const runs = [];
-    for (let index = 0; index < 4; index += 1) runs.push(await run());
+    for (let index = 0; index < 8; index += 1) runs.push(await run());
     const inboxRows = await tables.listRows({
       databaseId,
       tableId: config.appwriteSchema.providerEventInboxTableId,
-      queries: [Query.equal("connectionId", [ids.connection]), Query.limit(100)],
+      queries: [
+        Query.equal("connectionId", [ids.connection, ids.gitlabConnection]),
+        Query.limit(100),
+      ],
       total: false,
     });
     const link: unknown = await tables.getRow({
@@ -176,21 +280,61 @@ async function main(): Promise<void> {
       tableId: config.appwriteSchema.externalIssueLinksTableId,
       rowId: ids.link,
     });
+    const gitlabLink: unknown = await tables.getRow({
+      databaseId,
+      tableId: config.appwriteSchema.externalIssueLinksTableId,
+      rowId: ids.gitlabLink,
+    });
+    for (const rowId of [ids.connection, ids.gitlabConnection]) {
+      await tables.updateRow({
+        databaseId,
+        tableId: config.appwriteSchema.sourceConnectionsTableId,
+        rowId,
+        data: {
+          status: "disconnected",
+          selectedRepositoriesJson: JSON.stringify({
+            kind: "selected",
+            repositories: [],
+          }),
+          updatedAt: "2026-09-02T00:06:00.000Z",
+        },
+      });
+    }
+    const deniedAfterRemoval = await send(
+      `revoked_${suffix}`,
+      "closed",
+      "2026-09-02T00:07:00.000Z",
+    );
+    const gitlabDeniedAfterRemoval = await sendGitLab(
+      `revoked_gl_${suffix}`,
+      "closed",
+      "2026-09-02T00:07:00.000Z",
+    );
     const failed =
       deliveries.some(({ status }) => status !== 202) ||
+      gitlabDeliveries.some(({ status }) => status !== 202) ||
       duplicate.status !== 202 ||
+      gitlabDuplicate.status !== 202 ||
       !duplicate.body ||
       typeof duplicate.body !== "object" ||
       field(duplicate.body, "accepted") !== true ||
-      inboxRows.rows.length !== deliveries.length ||
+      !gitlabDuplicate.body ||
+      typeof gitlabDuplicate.body !== "object" ||
+      field(gitlabDuplicate.body, "accepted") !== true ||
+      inboxRows.rows.length !== deliveries.length + gitlabDeliveries.length ||
       runs.some(({ status }) => status !== 200) ||
       field(link, "providerState") !== "closed" ||
-      field(link, "lastProviderDeliveryId") !== `b_${suffix}`;
+      field(link, "lastProviderDeliveryId") !== `b_${suffix}` ||
+      field(gitlabLink, "providerState") !== "closed" ||
+      field(gitlabLink, "lastProviderDeliveryId") !== `gb_${suffix}` ||
+      deniedAfterRemoval.status !== 401 ||
+      gitlabDeniedAfterRemoval.status !== 401;
     if (failed) {
       process.stderr.write(
         `${JSON.stringify({
           diagnostic: "SYNC_VERIFY_ASSERTION",
           deliveryStatuses: deliveries.map(({ status }) => status),
+          gitlabDeliveryStatuses: gitlabDeliveries.map(({ status }) => status),
           duplicateStatus: duplicate.status,
           duplicateOutcome:
             duplicate.body && typeof duplicate.body === "object"
@@ -202,6 +346,7 @@ async function main(): Promise<void> {
             body && typeof body === "object" ? field(body, "outcome") : null,
           ),
           finalState: field(link, "providerState") ?? null,
+          gitlabFinalState: field(gitlabLink, "providerState") ?? null,
           finalDeliveryMatched: field(link, "lastProviderDeliveryId") === `b_${suffix}`,
         })}\n`,
       );
@@ -211,10 +356,13 @@ async function main(): Promise<void> {
       `${JSON.stringify({
         result: "APPWRITE_G4_PROVIDER_STATE_SYNC_PASSED",
         accepted: deliveries.length,
+        gitlabAccepted: gitlabDeliveries.length,
         duplicate: true,
-        finalState: field(link, "providerState"),
+        githubFinalState: field(link, "providerState"),
+        gitlabFinalState: field(gitlabLink, "providerState"),
         delayedIgnored: true,
         selfGeneratedIgnored: true,
+        repositoryRemovalDenied: true,
         cleanupPassed: true,
       })}\n`,
     );
@@ -223,7 +371,10 @@ async function main(): Promise<void> {
       .listRows({
         databaseId,
         tableId: config.appwriteSchema.providerEventInboxTableId,
-        queries: [Query.equal("connectionId", [ids.connection]), Query.limit(100)],
+        queries: [
+          Query.equal("connectionId", [ids.connection, ids.gitlabConnection]),
+          Query.limit(100),
+        ],
         total: false,
       })
       .catch(() => ({ rows: [] }));
