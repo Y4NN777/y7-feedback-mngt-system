@@ -676,6 +676,15 @@ describe("trusted API entrypoint", () => {
     expect(context.log).toHaveBeenCalledWith(
       expect.stringContaining('"operation":"intelligence"'),
     );
+
+    const multipart = createContext("POST", context.req.path, {
+      headers: { "content-type": "multipart/form-data; boundary=test" },
+      bodyJson: { ignored: true },
+    });
+    await routeRequest(multipart.context, { ...dependencies, intelligence });
+    expect(intelligence.handle).toHaveBeenLastCalledWith(
+      expect.objectContaining({ method: "POST", body: undefined }),
+    );
   });
 
   it("routes the provider outbox before every product API", async () => {

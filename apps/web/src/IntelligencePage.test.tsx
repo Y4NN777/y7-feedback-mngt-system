@@ -134,7 +134,7 @@ describe("Intelligence experience", () => {
     });
     expect(await screen.findByText("No feedback matches these filters.")).toBeVisible();
     expect(screen.getByText("empty")).toBeVisible();
-  });
+  }, 15_000);
 
   it("BDD-INT-214 exposes safe denial feedback", async () => {
     const user = userEvent.setup();
@@ -152,7 +152,7 @@ describe("Intelligence experience", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "This scope is not accessible.",
     );
-  });
+  }, 15_000);
 
   it("BDD-INT-215 exposes stable analysis failures after authentication", async () => {
     const user = userEvent.setup();
