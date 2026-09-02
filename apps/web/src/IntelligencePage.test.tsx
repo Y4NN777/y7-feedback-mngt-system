@@ -15,7 +15,10 @@ const session: AdministrationSession = {
 describe("Intelligence experience", () => {
   it("BDD-INT-212 preserves entered scope across locale changes", async () => {
     const user = userEvent.setup();
-    const gateway: IntelligenceGateway = { analyze: vi.fn() };
+    const gateway: IntelligenceGateway = {
+      analyze: vi.fn(),
+      mutate: vi.fn(),
+    };
     const onLocaleChange = vi.fn();
     const view = render(
       <IntelligencePage
@@ -73,7 +76,7 @@ describe("Intelligence experience", () => {
     );
     render(
       <IntelligencePage
-        gateway={{ analyze }}
+        gateway={{ analyze, mutate: vi.fn() }}
         locale="en"
         onLocaleChange={vi.fn()}
         session={session}
@@ -140,7 +143,7 @@ describe("Intelligence experience", () => {
     const user = userEvent.setup();
     render(
       <IntelligencePage
-        gateway={{ analyze: vi.fn() }}
+        gateway={{ analyze: vi.fn(), mutate: vi.fn() }}
         locale="en"
         onLocaleChange={vi.fn()}
         session={{ ...session, signIn: () => Promise.resolve("denied") }}
@@ -158,7 +161,10 @@ describe("Intelligence experience", () => {
     const user = userEvent.setup();
     render(
       <IntelligencePage
-        gateway={{ analyze: () => Promise.resolve({ status: "invalid" }) }}
+        gateway={{
+          analyze: () => Promise.resolve({ status: "invalid" }),
+          mutate: () => Promise.resolve({ status: "retryable" }),
+        }}
         locale="en"
         onLocaleChange={vi.fn()}
         session={session}
@@ -173,5 +179,62 @@ describe("Intelligence experience", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "The filters or windows are invalid.",
     );
+  });
+
+  it("BDD-INT-324 creates attributable themes and preserves form state across locale changes", async () => {
+    const user = userEvent.setup();
+    const mutate = vi.fn<IntelligenceGateway["mutate"]>(() =>
+      Promise.resolve({
+        status: "ok",
+        result: {
+          disposition: "applied",
+          associationId: "association_1",
+          eventId: "event_1",
+          revision: 1,
+        },
+      }),
+    );
+    const onLocaleChange = vi.fn();
+    const { rerender } = render(
+      <IntelligencePage
+        gateway={{ analyze: vi.fn(), mutate }}
+        locale="fr"
+        onLocaleChange={onLocaleChange}
+        session={session}
+      />,
+    );
+    await user.type(screen.getByLabelText("Adresse e-mail"), "owner@example.test");
+    await user.type(screen.getByLabelText("Mot de passe"), "secret-value");
+    await user.click(screen.getByRole("button", { name: "Se connecter" }));
+    await user.type(screen.getByLabelText("Workspace"), "workspace_1");
+    await user.type(screen.getByLabelText("Projet"), "project_1");
+    await user.type(screen.getByLabelText("Identifiant du retour"), "feedback_1");
+    await user.type(screen.getByLabelText("Thème"), "Paiement");
+    await user.click(
+      screen.getByRole("button", { name: "Enregistrer avec provenance" }),
+    );
+    const mutation = mutate.mock.calls[0]?.[0];
+    expect(mutation?.workspaceId).toBe("workspace_1");
+    expect(mutation?.projectId).toBe("project_1");
+    expect(mutation?.command).toMatchObject({
+      kind: "record_theme",
+      feedbackId: "feedback_1",
+      label: "Paiement",
+    });
+    expect(typeof mutation?.command.operationId).toBe("string");
+    expect(await screen.findByText("association_1")).toBeVisible();
+    await user.selectOptions(screen.getByLabelText("Action"), "correct_theme");
+    await user.click(screen.getByRole("button", { name: "English" }));
+    expect(onLocaleChange).toHaveBeenCalledWith("en");
+    rerender(
+      <IntelligencePage
+        gateway={{ analyze: vi.fn(), mutate }}
+        locale="en"
+        onLocaleChange={onLocaleChange}
+        session={session}
+      />,
+    );
+    expect(screen.getByLabelText("Theme")).toHaveValue("Paiement");
+    expect(screen.getByLabelText("Association ID")).toHaveValue("association_1");
   });
 });

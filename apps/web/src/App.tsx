@@ -31,6 +31,7 @@ const unavailableIntakeGateway: IntakeGateway = {
 };
 const unavailableIntelligenceGateway: IntelligenceGateway = {
   analyze: () => Promise.resolve({ status: "retryable" }),
+  mutate: () => Promise.resolve({ status: "retryable" }),
 };
 const unavailableProjectGateway: ProjectGateway = {
   resolve: () => Promise.resolve({ status: "unavailable" }),

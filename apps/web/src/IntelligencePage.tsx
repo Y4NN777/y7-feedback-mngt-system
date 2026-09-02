@@ -10,10 +10,16 @@ import type { AdministrationSession } from "./AdministrationSession";
 import type {
   IntelligenceGateway,
   IntelligenceGatewayOutcome,
+  IntelligenceProvenanceCommand,
+  IntelligenceProvenanceOutcome,
 } from "./IntelligenceGateway";
 import { intelligenceMessages } from "./i18n/intelligence";
 
 type Result = Extract<IntelligenceGatewayOutcome, { status: "ok" }>["result"];
+type ProvenanceReceipt = Extract<
+  IntelligenceProvenanceOutcome,
+  { status: "ok" }
+>["result"];
 
 const split = (value: string) =>
   value
@@ -60,6 +66,20 @@ export function IntelligencePage({
     "idle" | "loading" | "denied" | "invalid" | "retryable"
   >("idle");
   const [result, setResult] = useState<Result>();
+  const [associationKind, setAssociationKind] =
+    useState<IntelligenceProvenanceCommand["kind"]>("record_theme");
+  const [feedbackId, setFeedbackId] = useState("");
+  const [associationId, setAssociationId] = useState("");
+  const [relatedFeedbackId, setRelatedFeedbackId] = useState("");
+  const [label, setLabel] = useState("");
+  const [relationType, setRelationType] = useState<
+    "duplicate" | "depends_on" | "related"
+  >("related");
+  const [expectedRevision, setExpectedRevision] = useState("1");
+  const [mutationStatus, setMutationStatus] = useState<
+    "idle" | "loading" | "denied" | "invalid" | "conflict" | "retryable"
+  >("idle");
+  const [receipt, setReceipt] = useState<ProvenanceReceipt>();
 
   async function signIn(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -109,6 +129,57 @@ export function IntelligencePage({
     } else {
       setResult(undefined);
       setStatus(outcome.status);
+    }
+  }
+
+  async function mutate(event: SyntheticEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setMutationStatus("loading");
+    const operationId = globalThis.crypto.randomUUID();
+    const revision = Number(expectedRevision);
+    const command: IntelligenceProvenanceCommand =
+      associationKind === "record_theme"
+        ? { kind: associationKind, operationId, feedbackId, label }
+        : associationKind === "record_relationship"
+          ? {
+              kind: associationKind,
+              operationId,
+              feedbackId,
+              relatedFeedbackId,
+              relationType,
+            }
+          : associationKind === "correct_theme"
+            ? {
+                kind: associationKind,
+                operationId,
+                associationId,
+                expectedRevision: revision,
+                label,
+              }
+            : associationKind === "correct_relationship"
+              ? {
+                  kind: associationKind,
+                  operationId,
+                  associationId,
+                  expectedRevision: revision,
+                  relatedFeedbackId,
+                  relationType,
+                }
+              : {
+                  kind: associationKind,
+                  operationId,
+                  associationId,
+                  expectedRevision: revision,
+                };
+    const outcome = await gateway.mutate({ workspaceId, projectId, command });
+    if (outcome.status === "ok") {
+      setReceipt(outcome.result);
+      setAssociationId(outcome.result.associationId);
+      setExpectedRevision(String(outcome.result.revision));
+      setMutationStatus("idle");
+    } else {
+      setReceipt(undefined);
+      setMutationStatus(outcome.status);
     }
   }
 
@@ -289,6 +360,101 @@ export function IntelligencePage({
               <p>{copy.noTrend}</p>
             )}
           </section>
+        </section>
+      ) : null}
+      {authenticated ? (
+        <section className="intelligence-results" aria-labelledby="provenance-title">
+          <h2 id="provenance-title">{copy.provenance}</h2>
+          <p>{copy.provenanceIntro}</p>
+          <form
+            className="intelligence-form"
+            onSubmit={(event) => {
+              void mutate(event);
+            }}
+          >
+            <label>
+              {copy.provenanceAction}
+              <select
+                value={associationKind}
+                onChange={(event) => {
+                  setAssociationKind(
+                    event.target.value as IntelligenceProvenanceCommand["kind"],
+                  );
+                }}
+              >
+                <option value="record_theme">{copy.recordTheme}</option>
+                <option value="record_relationship">{copy.recordRelationship}</option>
+                <option value="correct_theme">{copy.correctTheme}</option>
+                <option value="correct_relationship">{copy.correctRelationship}</option>
+                <option value="remove_association">{copy.removeAssociation}</option>
+              </select>
+            </label>
+            {associationKind.startsWith("record_")
+              ? field(copy.feedbackId, feedbackId, setFeedbackId, true)
+              : field(copy.associationId, associationId, setAssociationId, true)}
+            {associationKind === "record_theme" || associationKind === "correct_theme"
+              ? field(copy.theme, label, setLabel, true)
+              : null}
+            {associationKind === "record_relationship" ||
+            associationKind === "correct_relationship" ? (
+              <>
+                {field(
+                  copy.relatedFeedbackId,
+                  relatedFeedbackId,
+                  setRelatedFeedbackId,
+                  true,
+                )}
+                <label>
+                  {copy.relationType}
+                  <select
+                    value={relationType}
+                    onChange={(event) => {
+                      setRelationType(event.target.value as typeof relationType);
+                    }}
+                  >
+                    <option value="duplicate">duplicate</option>
+                    <option value="depends_on">depends_on</option>
+                    <option value="related">related</option>
+                  </select>
+                </label>
+              </>
+            ) : null}
+            {associationKind.startsWith("correct_") ||
+            associationKind === "remove_association"
+              ? field(
+                  copy.expectedRevision,
+                  expectedRevision,
+                  setExpectedRevision,
+                  true,
+                )
+              : null}
+            <button type="submit" disabled={mutationStatus === "loading"}>
+              {mutationStatus === "loading" ? copy.saving : copy.saveProvenance}
+            </button>
+          </form>
+          {mutationStatus !== "idle" && mutationStatus !== "loading" ? (
+            <p role="alert">{copy[mutationStatus]}</p>
+          ) : null}
+          {receipt ? (
+            <dl aria-live="polite">
+              <div>
+                <dt>{copy.disposition}</dt>
+                <dd>{receipt.disposition}</dd>
+              </div>
+              <div>
+                <dt>{copy.associationId}</dt>
+                <dd>{receipt.associationId}</dd>
+              </div>
+              <div>
+                <dt>{copy.eventId}</dt>
+                <dd>{receipt.eventId}</dd>
+              </div>
+              <div>
+                <dt>{copy.revision}</dt>
+                <dd>{receipt.revision}</dd>
+              </div>
+            </dl>
+          ) : null}
         </section>
       ) : null}
     </main>

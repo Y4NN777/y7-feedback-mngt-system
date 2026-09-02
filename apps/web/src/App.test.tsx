@@ -89,6 +89,7 @@ describe("root orientation", () => {
       },
       intelligenceGateway: {
         analyze: () => Promise.resolve({ status: "retryable" }),
+        mutate: () => Promise.resolve({ status: "retryable" }),
       },
     });
     expect(screen.getByRole("heading", { name: "Intelligence" })).toBeVisible();
