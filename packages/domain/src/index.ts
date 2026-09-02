@@ -14,3 +14,4 @@ export * from "./notification.js";
 export * from "./source-connection.js";
 export * from "./source-import.js";
 export * from "./workbench.js";
+export * from "./intelligence.js";
