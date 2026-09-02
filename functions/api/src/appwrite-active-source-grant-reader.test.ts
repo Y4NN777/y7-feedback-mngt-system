@@ -23,8 +23,9 @@ describe("Appwrite active source grant reader", () => {
         ],
       }),
     );
+    const updateRow = vi.fn(() => Promise.resolve({}));
     const reader = createAppwriteActiveSourceGrantReader(
-      { listRows },
+      { listRows, updateRow },
       { databaseId: "database_1", sourceConnectionsTableId: "connections_1" },
     );
 
@@ -45,6 +46,13 @@ describe("Appwrite active source grant reader", () => {
         tableId: "connections_1",
       }),
     );
+    await reader.suspend("connection_1", "2026-09-02T01:00:00.000Z");
+    expect(updateRow).toHaveBeenCalledWith({
+      databaseId: "database_1",
+      tableId: "connections_1",
+      rowId: "connection_1",
+      data: { status: "suspended", updatedAt: "2026-09-02T01:00:00.000Z" },
+    });
   });
 
   it("BDD-SYNC-066 fails closed on malformed active authority", async () => {
@@ -115,7 +123,10 @@ describe("Appwrite active source grant reader", () => {
     ];
     for (const row of malformed) {
       const reader = createAppwriteActiveSourceGrantReader(
-        { listRows: vi.fn(() => Promise.resolve({ rows: [row] })) },
+        {
+          listRows: vi.fn(() => Promise.resolve({ rows: [row] })),
+          updateRow: vi.fn(),
+        },
         { databaseId: "database_1", sourceConnectionsTableId: "connections_1" },
       );
       await expect(reader.list(25)).rejects.toThrow(
@@ -127,18 +138,18 @@ describe("Appwrite active source grant reader", () => {
   it("BDD-SYNC-070 rejects invalid schema and batch limits", async () => {
     expect(() =>
       createAppwriteActiveSourceGrantReader(
-        { listRows: vi.fn() },
+        { listRows: vi.fn(), updateRow: vi.fn() },
         { databaseId: "", sourceConnectionsTableId: "connections_1" },
       ),
     ).toThrow("APPWRITE_ACTIVE_SOURCE_GRANT_CONFIG_INVALID");
     expect(() =>
       createAppwriteActiveSourceGrantReader(
-        { listRows: vi.fn() },
+        { listRows: vi.fn(), updateRow: vi.fn() },
         { databaseId: "database_1", sourceConnectionsTableId: "" },
       ),
     ).toThrow("APPWRITE_ACTIVE_SOURCE_GRANT_CONFIG_INVALID");
     const reader = createAppwriteActiveSourceGrantReader(
-      { listRows: vi.fn() },
+      { listRows: vi.fn(), updateRow: vi.fn() },
       { databaseId: "database_1", sourceConnectionsTableId: "connections_1" },
     );
     await expect(reader.list(0)).rejects.toThrow(
@@ -146,6 +157,9 @@ describe("Appwrite active source grant reader", () => {
     );
     await expect(reader.list(101)).rejects.toThrow(
       "APPWRITE_ACTIVE_SOURCE_GRANT_CONFIG_INVALID",
+    );
+    await expect(reader.suspend("../invalid", "invalid-date")).rejects.toThrow(
+      "APPWRITE_ACTIVE_SOURCE_GRANT_INVALID",
     );
   });
 });

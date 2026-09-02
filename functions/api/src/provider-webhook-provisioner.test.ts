@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createProviderWebhookProvisioner } from "./provider-webhook-provisioner.js";
+import {
+  ProviderWebhookAuthorityDeniedError,
+  createProviderWebhookProvisioner,
+} from "./provider-webhook-provisioner.js";
 import type { ProviderWebhookCredentialWriter } from "./appwrite-provider-webhook-authority-store.js";
 
 const input = {
@@ -298,6 +301,21 @@ describe("provider webhook provisioner", () => {
       );
       await expect(invalid.provisioner.ensure(input)).rejects.toThrow(
         "PROVIDER_WEBHOOK_PROVISION_INVALID",
+      );
+    }
+  });
+
+  it("BDD-SYNC-072 distinguishes revoked authority from transient outage", async () => {
+    for (const status of [401, 403, 404]) {
+      const denied = harness([response(status, { error: "denied" })]);
+      await expect(denied.provisioner.ensure(input)).rejects.toBeInstanceOf(
+        ProviderWebhookAuthorityDeniedError,
+      );
+    }
+    for (const status of [429, 500, 503]) {
+      const retryable = harness([response(status, { error: "unavailable" })]);
+      await expect(retryable.provisioner.ensure(input)).rejects.toThrow(
+        "PROVIDER_WEBHOOK_PROVISION_UNAVAILABLE",
       );
     }
   });

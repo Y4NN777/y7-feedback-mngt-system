@@ -10,6 +10,13 @@ import type { ProviderWebhookAuthorityStore } from "./provider-webhook-ingress.j
 
 type Fetcher = (input: string, init: RequestInit) => Promise<Response>;
 
+export class ProviderWebhookAuthorityDeniedError extends Error {
+  constructor() {
+    super("PROVIDER_WEBHOOK_AUTHORITY_DENIED");
+    this.name = "ProviderWebhookAuthorityDeniedError";
+  }
+}
+
 export interface ProviderWebhookProvisionerConfig {
   readonly githubApiOrigin: string;
   readonly gitlabOrigin: string;
@@ -36,6 +43,8 @@ function endpoint(value: string): URL {
 }
 
 async function json(response: Response): Promise<unknown> {
+  if ([401, 403, 404].includes(response.status))
+    throw new ProviderWebhookAuthorityDeniedError();
   if (response.status < 200 || response.status >= 300)
     throw new Error("PROVIDER_WEBHOOK_PROVISION_UNAVAILABLE");
   return response.status === 204 ? null : ((await response.json()) as unknown);

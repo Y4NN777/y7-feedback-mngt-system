@@ -10,6 +10,117 @@ import {
 import { parseServerConfig } from "@y7-feedback/config/server";
 
 import { resolveAppwriteFunctionTarget } from "./appwrite-function-variables.js";
+import { createNodeAppwriteProviderGrantVault } from "./appwrite-provider-grant-vault.js";
+
+async function absentDelete(
+  tables: TablesDB,
+  input: {
+    readonly databaseId: string;
+    readonly tableId: string;
+    readonly rowId: string;
+  },
+): Promise<void> {
+  try {
+    await tables.deleteRow(input);
+  } catch (error: unknown) {
+    if (
+      typeof error !== "object" ||
+      error === null ||
+      !("code" in error) ||
+      error.code !== 404
+    )
+      throw error;
+  }
+}
+
+async function proveRevokedToken(input: {
+  readonly config: ReturnType<typeof parseServerConfig>;
+  readonly functions: Functions;
+  readonly tables: TablesDB;
+  readonly functionId: string;
+}): Promise<boolean> {
+  const connectionId = "sync_revoked_probe";
+  const grantId = "sync_revoked_grant";
+  const schema = input.config.appwriteSchema;
+  await absentDelete(input.tables, {
+    databaseId: schema.databaseId,
+    tableId: schema.sourceConnectionsTableId,
+    rowId: connectionId,
+  });
+  await absentDelete(input.tables, {
+    databaseId: schema.databaseId,
+    tableId: schema.providerGrantsTableId,
+    rowId: grantId,
+  });
+  const startedAt = new Date().toISOString();
+  try {
+    const vault = createNodeAppwriteProviderGrantVault(
+      input.tables,
+      {
+        databaseId: schema.databaseId,
+        providerGrantsTableId: schema.providerGrantsTableId,
+      },
+      Buffer.from(input.config.providerGrantEnvelopeKey, "base64url"),
+      { createReference: () => grantId, createNonce: () => Buffer.alloc(12, 7) },
+    );
+    await vault.seal("github", { accessToken: "definitely-revoked-preview-token" });
+    await input.tables.createRow({
+      databaseId: schema.databaseId,
+      tableId: schema.sourceConnectionsTableId,
+      rowId: connectionId,
+      data: {
+        workspaceId: "sync_probe_workspace",
+        projectId: "sync_probe_project",
+        provider: "github",
+        ownerUserId: "sync_probe_owner",
+        status: "active",
+        encryptedGrantRef: grantId,
+        selectedRepositoriesJson: JSON.stringify({
+          kind: "selected",
+          repositories: [{ provider: "github", id: "1329343404" }],
+        }),
+        createdAt: startedAt,
+        updatedAt: startedAt,
+      },
+      permissions: [],
+    });
+    for (let attempt = 0; attempt < 90; attempt += 1) {
+      const [row, executions] = await Promise.all([
+        input.tables.getRow({
+          databaseId: schema.databaseId,
+          tableId: schema.sourceConnectionsTableId,
+          rowId: connectionId,
+        }),
+        input.functions.listExecutions({
+          functionId: input.functionId,
+          queries: [Query.orderDesc("$createdAt"), Query.limit(10)],
+          total: false,
+        }),
+      ]);
+      const passed = executions.executions.some(
+        ({ trigger, status, responseStatusCode, $createdAt }) =>
+          trigger === ExecutionTrigger.Schedule &&
+          status === ExecutionStatus.Completed &&
+          responseStatusCode === 200 &&
+          $createdAt >= startedAt,
+      );
+      if (row.status === "suspended" && passed) return true;
+      await new Promise((resolve) => setTimeout(resolve, 5_000));
+    }
+    return false;
+  } finally {
+    await absentDelete(input.tables, {
+      databaseId: schema.databaseId,
+      tableId: schema.sourceConnectionsTableId,
+      rowId: connectionId,
+    });
+    await absentDelete(input.tables, {
+      databaseId: schema.databaseId,
+      tableId: schema.providerGrantsTableId,
+      rowId: grantId,
+    });
+  }
+}
 
 async function main(): Promise<void> {
   if (!process.argv.includes("--apply"))
@@ -65,7 +176,19 @@ async function main(): Promise<void> {
       "code" in error &&
       error.code === 404;
   }
-  if (failedIndex < 0 || !successBefore || !successAfter || !fixtureAbsent)
+  const tokenRevocationSuspended = await proveRevokedToken({
+    config,
+    functions,
+    tables,
+    functionId: target.id,
+  });
+  if (
+    failedIndex < 0 ||
+    !successBefore ||
+    !successAfter ||
+    !fixtureAbsent ||
+    !tokenRevocationSuspended
+  )
     throw new Error("PROVIDER_RECONCILIATION_EVIDENCE_INCOMPLETE");
   process.stdout.write(
     `${JSON.stringify({
@@ -75,6 +198,7 @@ async function main(): Promise<void> {
       successBefore,
       outageDetected: true,
       recoveryDetected: successAfter,
+      tokenRevocationSuspended,
       cleanupPassed: fixtureAbsent,
     })}\n`,
   );

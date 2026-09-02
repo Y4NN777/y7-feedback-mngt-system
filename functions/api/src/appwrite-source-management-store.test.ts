@@ -84,12 +84,37 @@ describe("Appwrite source management store", () => {
         "equal:ownerUserId:owner_1",
         "equal:workspaceId:workspace_1",
         "equal:projectId:project_1",
-        "equal:status:active,disconnected",
+        "equal:status:active,suspended,disconnected",
         "limit:10",
       ],
       total: false,
       ttl: 0,
     });
+  });
+
+  it("BDD-SYNC-073 exposes suspended health without exposing the grant", async () => {
+    const target = setup();
+    target.listRows.mockResolvedValueOnce({
+      rows: [{ ...selected, status: "suspended" }],
+    });
+    target.getRow.mockResolvedValueOnce({ ...selected, status: "suspended" });
+    await expect(
+      target.store.list({
+        ownerUserId: "owner_1",
+        workspaceId: "workspace_1",
+        projectId: "project_1",
+      }),
+    ).resolves.toEqual([
+      expect.objectContaining({ id: "connection_1", state: "suspended" }),
+    ]);
+    await expect(
+      target.store.active({
+        connectionId: "connection_1",
+        ownerUserId: "owner_1",
+        workspaceId: "workspace_1",
+        projectId: "project_1",
+      }),
+    ).resolves.toBeNull();
   });
 
   it("BDD-SRC-213 exposes authorized repositories for first-party selection", async () => {

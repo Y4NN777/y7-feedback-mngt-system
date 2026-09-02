@@ -13,6 +13,12 @@ export interface ActiveSourceGrantTablesPort {
     readonly queries: readonly string[];
     readonly total: false;
   }): Promise<{ readonly rows: readonly unknown[] }>;
+  updateRow(input: {
+    readonly databaseId: string;
+    readonly tableId: string;
+    readonly rowId: string;
+    readonly data: Readonly<Record<string, unknown>>;
+  }): Promise<unknown>;
 }
 
 const identifier = /^[A-Za-z0-9][A-Za-z0-9._-]{0,35}$/u;
@@ -110,6 +116,16 @@ export function createAppwriteActiveSourceGrantReader(
         throw new Error("APPWRITE_ACTIVE_SOURCE_GRANT_INVALID");
       return grants as readonly ActiveSourceGrant[];
     },
+    async suspend(connectionId, updatedAt) {
+      if (!id(connectionId) || Number.isNaN(Date.parse(updatedAt)))
+        throw new Error("APPWRITE_ACTIVE_SOURCE_GRANT_INVALID");
+      await tables.updateRow({
+        databaseId: schema.databaseId,
+        tableId: schema.sourceConnectionsTableId,
+        rowId: connectionId,
+        data: { status: "suspended", updatedAt },
+      });
+    },
   };
 }
 
@@ -119,7 +135,10 @@ export function createNodeAppwriteActiveSourceGrantReader(
   schema: AppwriteSourceConnectionSchema,
 ): ActiveSourceGrantReader {
   return createAppwriteActiveSourceGrantReader(
-    { listRows: (input) => tables.listRows({ ...input, queries: [...input.queries] }) },
+    {
+      listRows: (input) => tables.listRows({ ...input, queries: [...input.queries] }),
+      updateRow: (input) => tables.updateRow(input),
+    },
     schema,
   );
 }
