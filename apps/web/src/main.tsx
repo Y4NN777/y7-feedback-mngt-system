@@ -11,21 +11,42 @@ import { App } from "./App";
 import { createHttpConversationGateway } from "./ConversationGateway";
 import { createHttpExternalIssueGateway } from "./ExternalIssueGateway";
 import { createHttpIntakeGateway } from "./IntakeGateway";
+import { createOfflineIntakePersistence } from "./OfflineIntake";
+import { createOfflineIntakeReplay } from "./OfflineIntakeReplay";
+import { createOfflineProjectGateway } from "./OfflineProjectGateway";
+import { createHttpConnectivityProbe } from "./OfflineReplay";
+import { createIndexedDbOfflineStore } from "./OfflineStore";
 import { createAppwriteNotificationInvalidation } from "./NotificationInvalidation";
 import { createHttpProjectGateway } from "./ProjectGateway";
 import { createHttpPublicationConsentGateway } from "./PublicationConsentGateway";
 import { createHttpWorkbenchGateway } from "./WorkbenchGateway";
 import { createHttpSourceManagementGateway } from "./SourceManagementGateway";
 import { OperationalTelemetry } from "./observability/OperationalTelemetry";
+import { PwaLifecycle } from "./PwaLifecycle";
 import "./styles.css";
 
 const root = document.querySelector<HTMLDivElement>("#root");
 const queryClient = new QueryClient();
 const config = parsePublicConfig(import.meta.env);
 const intakeGateway = createHttpIntakeGateway(config.apiEndpoint);
+const offlineStore = createIndexedDbOfflineStore({});
+const offlinePersistence = createOfflineIntakePersistence(
+  offlineStore,
+  config.environment,
+);
+const offlineReplay = createOfflineIntakeReplay({
+  store: offlineStore,
+  environment: config.environment,
+  gateway: intakeGateway,
+  probe: createHttpConnectivityProbe(config.apiEndpoint),
+});
 const accountlessGateway = createHttpAccountlessGateway(config.apiEndpoint);
 const conversationGateway = createHttpConversationGateway(config.apiEndpoint);
-const projectGateway = createHttpProjectGateway(config.apiEndpoint);
+const projectGateway = createOfflineProjectGateway(
+  createHttpProjectGateway(config.apiEndpoint),
+  offlineStore,
+  config.environment,
+);
 const publicationConsentGateway = createHttpPublicationConsentGateway(
   config.apiEndpoint,
 );
@@ -65,6 +86,8 @@ createRoot(root).render(
         conversationGateway={conversationGateway}
         externalIssueGateway={externalIssueGateway}
         intakeGateway={intakeGateway}
+        offlinePersistence={offlinePersistence}
+        offlineReplay={offlineReplay}
         notificationInvalidation={notificationInvalidation}
         projectGateway={projectGateway}
         publicationConsentGateway={publicationConsentGateway}
@@ -72,6 +95,7 @@ createRoot(root).render(
         sourceManagementGateway={sourceManagementGateway}
       />
       <OperationalTelemetry />
+      <PwaLifecycle />
     </QueryClientProvider>
   </StrictMode>,
 );

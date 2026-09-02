@@ -8,10 +8,11 @@ import type { AdministrationGateway } from "./AdministrationGateway";
 import type { AdministrationSession } from "./AdministrationSession";
 import type { ConversationGateway } from "./ConversationGateway";
 import type { ExternalIssueGateway } from "./ExternalIssueGateway";
-import { FeedbackIntake } from "./FeedbackIntake";
+import { FeedbackIntake, type OfflineIntakePersistence } from "./FeedbackIntake";
 import { messages } from "./i18n/messages";
 import type { IntakeGateway } from "./IntakeGateway";
 import type { NotificationInvalidation } from "./NotificationInvalidation";
+import type { OfflineIntakeReplay } from "./OfflineIntakeReplay";
 import type { ProjectGateway } from "./ProjectGateway";
 import type { PublicationConsentGateway } from "./PublicationConsentGateway";
 import { RetrieveFeedback, type AccountlessGateway } from "./RetrieveFeedback";
@@ -74,6 +75,8 @@ function ProjectRoute({
   createOperationId,
   gateway,
   intakeGateway,
+  offlinePersistence,
+  offlineReplay,
   locale,
   onLocaleChange,
   redirect,
@@ -82,6 +85,8 @@ function ProjectRoute({
   readonly createOperationId: () => string;
   readonly gateway: ProjectGateway;
   readonly intakeGateway: IntakeGateway;
+  readonly offlinePersistence?: OfflineIntakePersistence;
+  readonly offlineReplay?: OfflineIntakeReplay;
   readonly locale: Locale;
   readonly onLocaleChange: (locale: Locale) => void;
   readonly redirect: (canonicalSlug: string) => void;
@@ -144,6 +149,8 @@ function ProjectRoute({
       gateway={intakeGateway}
       locale={locale}
       onLocaleChange={onLocaleChange}
+      {...(offlinePersistence ? { offlinePersistence } : {})}
+      {...(offlineReplay ? { offlineReplay } : {})}
       projectPurpose={query.data.purpose}
       projectSlug={query.data.slug}
     />
@@ -158,6 +165,8 @@ export function App({
   externalIssueGateway = unavailableExternalIssueGateway,
   createOperationId = () => crypto.randomUUID(),
   intakeGateway = unavailableIntakeGateway,
+  offlinePersistence,
+  offlineReplay,
   projectGateway = unavailableProjectGateway,
   publicationConsentGateway = unavailablePublicationConsentGateway,
   redirectProject = (canonicalSlug) => {
@@ -174,6 +183,8 @@ export function App({
   readonly externalIssueGateway?: ExternalIssueGateway;
   readonly createOperationId?: () => string;
   readonly intakeGateway?: IntakeGateway;
+  readonly offlinePersistence?: OfflineIntakePersistence;
+  readonly offlineReplay?: OfflineIntakeReplay;
   readonly projectGateway?: ProjectGateway;
   readonly publicationConsentGateway?: PublicationConsentGateway;
   readonly redirectProject?: (canonicalSlug: string) => void;
@@ -245,6 +256,8 @@ export function App({
         onLocaleChange={selectLocale}
         redirect={redirectProject}
         slug={candidateSlug}
+        {...(offlinePersistence ? { offlinePersistence } : {})}
+        {...(offlineReplay ? { offlineReplay } : {})}
       />
     );
   }

@@ -5,6 +5,7 @@ import type { ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "./App";
+import type { OfflineIntakePersistence } from "./FeedbackIntake";
 import type { IntakeGateway } from "./IntakeGateway";
 
 const projectGateway = {
@@ -112,6 +113,104 @@ describe("root orientation", () => {
 });
 
 describe("WiseMoney feedback intake", () => {
+  it("BDD-OFF-104 restores, saves and queues an accountless draft without claiming acceptance", async () => {
+    window.history.replaceState({}, "", "/wisemoney");
+    const user = userEvent.setup();
+    const restored = {
+      appreciation: "",
+      contact: "",
+      expected: "",
+      experience: "",
+      observed: "",
+      problem: "Brouillon restauré",
+      proposal: "",
+      rationale: "",
+      reproduction: "",
+      type: "bug" as const,
+      usageContext: "",
+      version: "",
+    };
+    const save = vi.fn(() => Promise.resolve());
+    const clear = vi.fn(() => Promise.resolve());
+    const queue = vi.fn(() => Promise.resolve());
+    const persistence: OfflineIntakePersistence = {
+      restore: vi.fn(() => Promise.resolve(restored)),
+      save,
+      clear,
+      queue,
+    };
+    renderApp({
+      createOperationId: () => "123e4567-e89b-42d3-a456-426614174000",
+      intakeGateway: {
+        accept: () => Promise.resolve({ status: "retryable" }),
+      },
+      offlinePersistence: persistence,
+    });
+    expect(
+      await screen.findByText("Brouillon hors ligne restauré sur cet appareil."),
+    ).toHaveAttribute("role", "status");
+    const problem = screen.getByRole("textbox", {
+      name: "Quel problème avez-vous rencontré ?",
+    });
+    expect(problem).toHaveValue("Brouillon restauré");
+    await user.type(problem, " et modifié");
+    await waitFor(() => {
+      expect(save).toHaveBeenCalled();
+    });
+    await user.click(screen.getByRole("button", { name: "Relire le retour" }));
+    await user.click(screen.getByRole("button", { name: "Envoyer le retour" }));
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Retour placé dans la file d’attente",
+    );
+    expect(screen.queryByRole("heading", { name: "Retour envoyé" })).toBeNull();
+    expect(queue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clientOperationId: "123e4567-e89b-42d3-a456-426614174000",
+        projectSlug: "wisemoney",
+      }),
+    );
+    expect(clear).not.toHaveBeenCalled();
+  });
+
+  it("BDD-OFF-105 replays on confirmed connectivity and exposes the returned proof only in memory", async () => {
+    window.history.replaceState({}, "", "/wisemoney");
+    const clear = vi.fn(() => Promise.resolve());
+    const runOnce = vi
+      .fn()
+      .mockResolvedValueOnce({ status: "offline" as const })
+      .mockResolvedValueOnce({
+        status: "accepted" as const,
+        outcome: {
+          status: "accepted" as const,
+          reference: "Y7-2026-OFFLINE",
+          accessProof: "proof_offline_abcdefghijklmnopqrstuvwxyz_0123456789",
+          replayed: true,
+        },
+      });
+    renderApp({
+      offlinePersistence: {
+        restore: () => Promise.resolve(null),
+        save: () => Promise.resolve(),
+        clear,
+        queue: () => Promise.resolve(),
+      },
+      offlineReplay: { runOnce },
+    });
+    await screen.findByRole("heading", {
+      name: "Partager un retour sur WiseMoney",
+    });
+    await waitFor(() => {
+      expect(runOnce).toHaveBeenCalledOnce();
+    });
+    window.dispatchEvent(new Event("online"));
+    expect(await screen.findByRole("heading", { name: "Retour envoyé" })).toBeVisible();
+    expect(screen.getByText("Y7-2026-OFFLINE")).toBeVisible();
+    expect(
+      screen.getByText("proof_offline_abcdefghijklmnopqrstuvwxyz_0123456789"),
+    ).toBeVisible();
+    expect(clear).toHaveBeenCalledWith("wisemoney");
+  });
+
   it("BDD-PROJ-002 redirects a historical slug to its canonical route", async () => {
     window.history.replaceState({}, "", "/wisemoney-legacy");
     const redirectProject = vi.fn();

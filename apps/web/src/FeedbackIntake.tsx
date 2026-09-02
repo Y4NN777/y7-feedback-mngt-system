@@ -1,4 +1,4 @@
-import { useState, type SyntheticEvent } from "react";
+import { useEffect, useState, type SyntheticEvent } from "react";
 
 import {
   validateFeedbackDraft,
@@ -10,18 +10,32 @@ import {
 } from "@y7-feedback/domain";
 
 import { intakeMessages } from "./i18n/intake";
-import type { IntakeGateway, IntakeGatewayOutcome } from "./IntakeGateway";
+import type {
+  IntakeGateway,
+  IntakeGatewayCommand,
+  IntakeGatewayOutcome,
+} from "./IntakeGateway";
+import type { OfflineIntakeReplay } from "./OfflineIntakeReplay";
+
+export interface OfflineIntakePersistence {
+  restore(projectSlug: string): Promise<DraftFields | null>;
+  save(projectSlug: string, draft: DraftFields): Promise<void>;
+  clear(projectSlug: string): Promise<void>;
+  queue(command: IntakeGatewayCommand): Promise<void>;
+}
 
 interface FeedbackIntakeProps {
   readonly createOperationId: () => string;
   readonly gateway: IntakeGateway;
   readonly locale: Locale;
   readonly onLocaleChange: (locale: Locale) => void;
+  readonly offlinePersistence?: OfflineIntakePersistence;
+  readonly offlineReplay?: OfflineIntakeReplay;
   readonly projectPurpose?: Readonly<Record<Locale, string>>;
   readonly projectSlug?: string;
 }
 
-interface DraftFields {
+export interface DraftFields {
   readonly appreciation: string;
   readonly contact: string;
   readonly expected: string;
@@ -243,6 +257,7 @@ function Review({
   outcome,
   pending,
   projectSlug,
+  queued,
 }: {
   readonly data: ValidatedFeedbackDraft;
   readonly locale: Locale;
@@ -251,6 +266,7 @@ function Review({
   readonly outcome: IntakeGatewayOutcome | null;
   readonly pending: boolean;
   readonly projectSlug: string;
+  readonly queued: boolean;
 }) {
   const copy = intakeMessages[locale];
   const contact =
@@ -295,7 +311,11 @@ function Review({
         <p>{copy.attachmentsNone}</p>
       </div>
 
-      {outcome && outcome.status !== "accepted" ? (
+      {queued ? (
+        <p className="form-status" role="status">
+          {copy.offlineQueued}
+        </p>
+      ) : outcome && outcome.status !== "accepted" ? (
         <p className="form-error" role="alert">
           {outcome.status === "conflict"
             ? copy.conflictError
@@ -360,6 +380,8 @@ export function FeedbackIntake({
   gateway,
   locale,
   onLocaleChange,
+  offlinePersistence,
+  offlineReplay,
   projectPurpose = {
     fr: "Partager un retour sur WiseMoney.",
     en: "Share feedback about WiseMoney.",
@@ -373,14 +395,84 @@ export function FeedbackIntake({
   const [operationId, setOperationId] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<IntakeGatewayOutcome | null>(null);
   const [pending, setPending] = useState(false);
+  const [offlineState, setOfflineState] = useState<
+    "none" | "restored" | "saved" | "queued" | "unavailable"
+  >("none");
+
+  useEffect(() => {
+    if (!offlinePersistence) return;
+    let active = true;
+    void offlinePersistence
+      .restore(projectSlug)
+      .then((restored) => {
+        if (!active || !restored) return;
+        setDraft(restored);
+        setOfflineState("restored");
+      })
+      .catch(() => {
+        if (active) setOfflineState("unavailable");
+      });
+    return () => {
+      active = false;
+    };
+  }, [offlinePersistence, projectSlug]);
+
+  useEffect(() => {
+    if (!offlineReplay) return;
+    let active = true;
+    let running = false;
+    const replay = async () => {
+      if (running) return;
+      running = true;
+      try {
+        const result = await offlineReplay.runOnce(projectSlug);
+        if (!active) return;
+        if (result.status === "accepted") {
+          setOutcome(result.outcome);
+          setOfflineState("none");
+          await offlinePersistence?.clear(projectSlug).catch(() => undefined);
+        } else if (result.status === "conflict") {
+          setOutcome({ status: "conflict" });
+          setOfflineState("none");
+        }
+      } finally {
+        running = false;
+      }
+    };
+    const onOnline = () => {
+      void replay();
+    };
+    window.addEventListener("online", onOnline);
+    void replay();
+    return () => {
+      active = false;
+      window.removeEventListener("online", onOnline);
+    };
+  }, [offlinePersistence, offlineReplay, projectSlug]);
+
+  function persist(next: DraftFields) {
+    if (!offlinePersistence) return;
+    void offlinePersistence
+      .save(projectSlug, next)
+      .then(() => {
+        setOfflineState("saved");
+      })
+      .catch(() => {
+        setOfflineState("unavailable");
+      });
+  }
 
   function update(field: keyof DraftFields, value: string) {
-    setDraft((current) => ({ ...current, [field]: value }));
+    const next = { ...draft, [field]: value };
+    setDraft(next);
+    persist(next);
     setError(null);
   }
 
   function selectType(type: FeedbackType) {
-    setDraft((current) => ({ ...current, type }));
+    const next = { ...draft, type };
+    setDraft(next);
+    persist(next);
     setError(null);
   }
 
@@ -439,16 +531,37 @@ export function FeedbackIntake({
     if (!review || !operationId || pending) return;
     setPending(true);
     try {
-      setOutcome(
-        await gateway.accept({
-          projectSlug,
-          clientOperationId: operationId,
-          locale,
-          draft: review,
-        }),
-      );
+      const command = {
+        projectSlug,
+        clientOperationId: operationId,
+        locale,
+        draft: review,
+      } satisfies IntakeGatewayCommand;
+      const result = await gateway.accept(command);
+      setOutcome(result);
+      if (result.status === "accepted") {
+        setOfflineState("none");
+        await offlinePersistence?.clear(projectSlug).catch(() => undefined);
+      } else if (result.status === "retryable" && offlinePersistence) {
+        await offlinePersistence.queue(command);
+        setOfflineState("queued");
+      }
     } catch {
-      setOutcome({ status: "retryable" });
+      if (offlinePersistence) {
+        try {
+          await offlinePersistence.queue({
+            projectSlug,
+            clientOperationId: operationId,
+            locale,
+            draft: review,
+          });
+          setOfflineState("queued");
+          setOutcome({ status: "retryable" });
+        } catch {
+          setOfflineState("unavailable");
+          setOutcome({ status: "retryable" });
+        }
+      } else setOutcome({ status: "retryable" });
     } finally {
       setPending(false);
     }
@@ -503,6 +616,7 @@ export function FeedbackIntake({
           outcome={outcome}
           pending={pending}
           projectSlug={projectSlug}
+          queued={offlineState === "queued"}
         />
       ) : (
         <>
@@ -574,6 +688,15 @@ export function FeedbackIntake({
             {error ? (
               <p className="form-error" role="alert">
                 {error}
+              </p>
+            ) : null}
+            {offlineState === "restored" || offlineState === "saved" ? (
+              <p className="form-status" role="status">
+                {offlineState === "restored" ? copy.draftRestored : copy.draftSaved}
+              </p>
+            ) : offlineState === "unavailable" ? (
+              <p className="form-error" role="alert">
+                {copy.offlineUnavailable}
               </p>
             ) : null}
             <button className="primary-action" type="submit">

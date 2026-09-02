@@ -73,6 +73,9 @@ importers:
       web-vitals:
         specifier: ^6.1.0
         version: 6.1.0
+      workbox-window:
+        specifier: 7.4.1
+        version: 7.4.1
     devDependencies:
       "@axe-core/playwright":
         specifier: ^4.12.1
