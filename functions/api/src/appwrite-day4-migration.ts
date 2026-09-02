@@ -47,20 +47,20 @@ const varchar = (key: string, size: number, required = true): AppwriteColumn => 
   size,
   required,
 });
-const text = (key: string): AppwriteColumn => ({
+const text = (key: string, required = true): AppwriteColumn => ({
   key,
   type: "text",
-  required: true,
+  required,
 });
 const datetime = (key: string, required = true): AppwriteColumn => ({
   key,
   type: "datetime",
   required,
 });
-const integer = (key: string): AppwriteColumn => ({
+const integer = (key: string, required = true): AppwriteColumn => ({
   key,
   type: "integer",
-  required: true,
+  required,
 });
 const boolean = (key: string): AppwriteColumn => ({
   key,
@@ -191,6 +191,14 @@ export function createDay4TableDefinitions(
         varchar("actorId", 36),
         datetime("createdAt"),
         datetime("removedAt", false),
+        varchar("associationKind", 16, false),
+        text("targetEnvelope", false),
+        varchar("relatedFeedbackId", 36, false),
+        text("provenanceEnvelope", false),
+        integer("revision", false),
+        varchar("updatedByActorId", 36, false),
+        datetime("updatedAt", false),
+        text("operationIdsJson", false),
       ],
       [
         index("theme_feedback_unique", ["themeId", "feedbackId"], "unique"),

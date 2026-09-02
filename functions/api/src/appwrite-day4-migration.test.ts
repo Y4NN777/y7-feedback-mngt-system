@@ -76,4 +76,36 @@ describe("Day 4 additive Appwrite migration", () => {
       ]),
     );
   });
+
+  it("BDD-INT-309 evolves provenance additively for correction history", () => {
+    const provenance = createDay4AdditiveMigration(g3Tables()).createTables.find(
+      ({ id }) => id === "intelligence_provenance",
+    );
+
+    expect(
+      provenance?.columns
+        .filter(({ key }) =>
+          [
+            "associationKind",
+            "targetEnvelope",
+            "relatedFeedbackId",
+            "provenanceEnvelope",
+            "revision",
+            "updatedByActorId",
+            "updatedAt",
+            "operationIdsJson",
+          ].includes(key),
+        )
+        .map(({ key, required }) => ({ key, required })),
+    ).toEqual([
+      { key: "associationKind", required: false },
+      { key: "targetEnvelope", required: false },
+      { key: "relatedFeedbackId", required: false },
+      { key: "provenanceEnvelope", required: false },
+      { key: "revision", required: false },
+      { key: "updatedByActorId", required: false },
+      { key: "updatedAt", required: false },
+      { key: "operationIdsJson", required: false },
+    ]);
+  });
 });
