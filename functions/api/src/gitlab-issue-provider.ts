@@ -34,7 +34,10 @@ function origin(value: string): URL {
 function result(value: unknown, replayed: boolean): ProviderIssueResult {
   if (
     !object(value) ||
-    (typeof value.id !== "number" && typeof value.id !== "string") ||
+    (typeof value.iid !== "number" &&
+      typeof value.iid !== "string" &&
+      typeof value.id !== "number" &&
+      typeof value.id !== "string") ||
     typeof value.web_url !== "string"
   ) {
     throw new ProviderIssueError("retryable");
@@ -42,7 +45,11 @@ function result(value: unknown, replayed: boolean): ProviderIssueResult {
   try {
     const url = new URL(value.web_url);
     if (url.protocol !== "https:") throw new Error();
-    return { issueId: String(value.id), issueUrl: url.toString(), replayed };
+    return {
+      issueId: String(value.iid ?? value.id),
+      issueUrl: url.toString(),
+      replayed,
+    };
   } catch {
     throw new ProviderIssueError("retryable");
   }

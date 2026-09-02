@@ -14,6 +14,7 @@ import {
   appendAppwriteNotificationFanout,
   type NotificationFanoutInput,
 } from "./appwrite-notification-fanout.js";
+import type { ProviderMessageFanout } from "./appwrite-provider-message-fanout.js";
 import type { AppwriteSensitivePersistence } from "./sensitive-data-protector.js";
 
 type Command = AppendConversationCommand | LifecycleTransitionCommand;
@@ -255,6 +256,9 @@ export function createAppwriteConversationLifecycleStore(
   queries: ConversationLifecycleQueryPort,
   persistence: AppwriteSensitivePersistence,
   fanout: ConversationNotificationFanout,
+  providerFanout: ProviderMessageFanout = {
+    append: () => Promise.resolve({ queued: 0 }),
+  },
 ): ConversationLifecycleStore {
   validateSchema(schema);
   return {
@@ -392,6 +396,23 @@ export function createAppwriteConversationLifecycleStore(
               }
             })(),
           );
+          if (input.command.kind === "append_message") {
+            primaryWrites.push(
+              providerFanout
+                .append({
+                  transactionId,
+                  feedbackId: input.feedbackId,
+                  workspaceId,
+                  projectId,
+                  messageId: input.command.eventId,
+                  actorKind: input.command.actorKind,
+                  audience: input.command.audience,
+                  content: input.command.content,
+                  occurredAt: input.command.occurredAt,
+                })
+                .then(() => undefined),
+            );
+          }
           result = { feedbackId: input.feedbackId, action: input.command.kind };
         } else {
           /* v8 ignore next -- non-entry commands always load lifecycle facts above */
@@ -545,6 +566,7 @@ export function createNodeAppwriteConversationLifecycleStore(
   schema: AppwriteConversationLifecycleSchema,
   persistence: AppwriteSensitivePersistence,
   fanoutOverride?: ConversationNotificationFanout,
+  providerFanoutOverride?: ProviderMessageFanout,
 ): ConversationLifecycleStore {
   const port: AppwriteConversationLifecycleTablesPort = {
     createTransaction: (input) => tables.createTransaction(input),
@@ -586,5 +608,6 @@ export function createNodeAppwriteConversationLifecycleStore(
           input,
         ),
     },
+    providerFanoutOverride,
   );
 }

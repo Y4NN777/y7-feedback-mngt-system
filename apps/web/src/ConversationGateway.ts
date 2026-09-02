@@ -6,6 +6,9 @@ export interface ReporterConversationMessage {
   readonly audience: "reporter";
   readonly occurredAt: string;
   readonly content: string;
+  readonly provider?: "github" | "gitlab";
+  readonly revisionKind?: "created" | "revised" | "tombstoned";
+  readonly supersedesMessageId?: string;
 }
 
 export interface ReporterConversationLifecycleFact {
@@ -98,6 +101,36 @@ function actor(value: unknown): "workspace" | "reporter" {
   return value;
 }
 
+function providerRevision(entry: Readonly<Record<string, unknown>>):
+  | Readonly<{
+      provider: "github" | "gitlab";
+      revisionKind: "created" | "revised" | "tombstoned";
+      supersedesMessageId?: string;
+    }>
+  | undefined {
+  const hasMetadata =
+    "provider" in entry || "revisionKind" in entry || "supersedesMessageId" in entry;
+  if (!hasMetadata) return undefined;
+  if (
+    (entry.provider !== "github" && entry.provider !== "gitlab") ||
+    (entry.revisionKind !== "created" &&
+      entry.revisionKind !== "revised" &&
+      entry.revisionKind !== "tombstoned") ||
+    (entry.revisionKind === "created"
+      ? entry.supersedesMessageId !== undefined
+      : typeof entry.supersedesMessageId !== "string")
+  ) {
+    throw new Error("CONVERSATION_RESPONSE_INVALID");
+  }
+  return {
+    provider: entry.provider,
+    revisionKind: entry.revisionKind,
+    ...(typeof entry.supersedesMessageId === "string"
+      ? { supersedesMessageId: text(entry.supersedesMessageId, 36) }
+      : {}),
+  };
+}
+
 function projection(value: unknown): ReporterConversationProjection {
   if (
     !object(value) ||
@@ -121,6 +154,7 @@ function projection(value: unknown): ReporterConversationProjection {
         audience: entry.audience,
         occurredAt: text(entry.occurredAt, 40),
         content: text(entry.content),
+        ...providerRevision(entry),
       };
     }),
     lifecycle: (value.lifecycle as readonly unknown[]).map((entry) => {
