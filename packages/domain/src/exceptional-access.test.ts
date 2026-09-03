@@ -77,7 +77,15 @@ describe("exceptional access policy", () => {
         now,
         expiresAt: "2026-09-03T12:30:00.000Z",
       }),
-    ).toMatchObject({ status: "denied", code: "EXCEPTIONAL_ACCESS_SELF_APPROVAL" });
+    ).toMatchObject({
+      status: "denied",
+      code: "EXCEPTIONAL_ACCESS_SELF_APPROVAL",
+      audit: {
+        type: "denied",
+        actorId: "operator_1",
+        reasonCode: "EXCEPTIONAL_ACCESS_SELF_APPROVAL",
+      },
+    });
     expect(
       approveExceptionalAccess(grant, {
         approverId: "owner_1",
