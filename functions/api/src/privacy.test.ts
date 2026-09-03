@@ -211,4 +211,88 @@ describe("privacy coordinator", () => {
       status: "retryable",
     });
   });
+
+  it("BDD-PRIV-016 derives accountless scope only after exact proof authorization", async () => {
+    proof.authorize.mockResolvedValue({
+      status: "authorized",
+      feedbackId: "feedback_1",
+    });
+    const resolveScope = vi.fn(() =>
+      Promise.resolve({ workspaceId: "workspace_1", projectId: "project_1" }),
+    );
+    execute.mockResolvedValue({
+      status: "applied",
+      feedbackId: "feedback_1",
+      revision: 1,
+      purgeEligibleAt: "2026-10-02T00:00:00.000Z",
+    });
+    const target = createPrivacyCoordinator(
+      principal,
+      scope,
+      proof,
+      { execute, resolveScope },
+      digest,
+    );
+    await expect(
+      target.execute({
+        authority: {
+          kind: "access_proof",
+          reference: "reference_1",
+          proof: "proof_1",
+        },
+        command,
+      }),
+    ).resolves.toMatchObject({ status: "ok" });
+    expect(resolveScope).toHaveBeenCalledWith("feedback_1");
+    expect(execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaceId: "workspace_1",
+        projectId: "project_1",
+      }),
+    );
+  });
+
+  it("BDD-PRIV-017 fails closed when accountless scope is absent or unavailable", async () => {
+    proof.authorize.mockResolvedValue({
+      status: "authorized",
+      feedbackId: "feedback_1",
+    });
+    const authority = {
+      kind: "access_proof" as const,
+      reference: "reference_1",
+      proof: "proof_1",
+    };
+    for (const [resolved, status] of [
+      [{ status: "denied" }, "denied"],
+      [{ status: "retryable" }, "retryable"],
+    ] as const) {
+      const target = createPrivacyCoordinator(
+        principal,
+        scope,
+        proof,
+        { execute, resolveScope: () => Promise.resolve(resolved) },
+        digest,
+      );
+      await expect(target.execute({ authority, command })).resolves.toEqual({
+        status,
+      });
+    }
+    await expect(coordinator().execute({ authority, command })).resolves.toEqual({
+      status: "retryable",
+    });
+    const invalidScope = createPrivacyCoordinator(
+      principal,
+      scope,
+      proof,
+      {
+        execute,
+        resolveScope: () =>
+          Promise.resolve({ workspaceId: "bad id", projectId: "project_1" }),
+      },
+      digest,
+    );
+    await expect(invalidScope.execute({ authority, command })).resolves.toEqual({
+      status: "invalid",
+    });
+  });
 });

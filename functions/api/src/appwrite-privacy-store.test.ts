@@ -187,6 +187,29 @@ const request = {
 };
 
 describe("Appwrite privacy store", () => {
+  it("BDD-PRIV-018 derives exact scope without disclosing absent feedback", async () => {
+    const { store, tables } = setup();
+    await expect(store.resolveScope?.("feedback_1")).resolves.toEqual({
+      workspaceId: "workspace_1",
+      projectId: "project_1",
+    });
+    await expect(store.resolveScope?.("missing")).resolves.toEqual({
+      status: "denied",
+    });
+    tables.fail = "get";
+    await expect(store.resolveScope?.("feedback_1")).resolves.toEqual({
+      status: "retryable",
+    });
+    tables.fail = undefined;
+    tables.table(schema.feedbackTableId).set("malformed", {
+      $id: "malformed",
+      workspaceId: "bad id",
+      projectId: "project_1",
+    });
+    await expect(store.resolveScope?.("malformed")).resolves.toEqual({
+      status: "retryable",
+    });
+  });
   it("BDD-PRIV-020 atomically hides, revokes, anonymizes and removes projections", async () => {
     const { store, tables } = setup();
     await expect(store.execute(request)).resolves.toEqual({

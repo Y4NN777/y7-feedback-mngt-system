@@ -34,6 +34,12 @@ export interface PrivacyProofAuthority {
 }
 
 export interface PrivacyStore {
+  resolveScope?(
+    feedbackId: string,
+  ): Promise<
+    | { readonly workspaceId: string; readonly projectId: string }
+    | { readonly status: "denied" | "retryable" }
+  >;
   execute(input: {
     readonly workspaceId: string;
     readonly projectId: string;
@@ -125,30 +131,33 @@ export function createPrivacyCoordinator(
 ) {
   return {
     async execute(input: {
-      readonly workspaceId: string;
-      readonly projectId: string;
+      readonly workspaceId?: string;
+      readonly projectId?: string;
       readonly authority: PrivacyAuthority;
       readonly command: unknown;
     }): Promise<PrivacyOutcome> {
       const parsed = command(input.command);
-      if (
-        !parsed ||
-        !id.test(input.workspaceId) ||
-        !id.test(input.projectId) ||
-        !authorityValid(input.authority)
-      )
-        return { status: "invalid" };
+      if (!parsed || !authorityValid(input.authority)) return { status: "invalid" };
+      let workspaceId = input.workspaceId;
+      let projectId = input.projectId;
       let actorDigest: string;
       let requesterKind: "principal" | "access_proof";
       let requesterDigest: string;
       try {
         if (input.authority.kind === "principal") {
+          if (
+            !workspaceId ||
+            !projectId ||
+            !id.test(workspaceId) ||
+            !id.test(projectId)
+          )
+            return { status: "invalid" };
           const verified = await principal.verify(input.authority.jwt);
           if (verified.status !== "verified") return { status: "denied" };
           const authorized = await scope.resolve({
             principalId: verified.principalId,
-            workspaceId: input.workspaceId,
-            projectId: input.projectId,
+            workspaceId,
+            projectId,
             capability: "feedback.write",
           });
           if (authorized.status !== "authorized") return { status: "denied" };
@@ -163,15 +172,24 @@ export function createPrivacyCoordinator(
             authorized.feedbackId !== parsed.feedbackId
           )
             return { status: "denied" };
+          if (workspaceId === undefined || projectId === undefined) {
+            const resolved = await store.resolveScope?.(parsed.feedbackId);
+            if (!resolved || "status" in resolved)
+              return { status: resolved?.status ?? "retryable" };
+            workspaceId = resolved.workspaceId;
+            projectId = resolved.projectId;
+          }
           actorDigest = digestAuthority(`proof:${input.authority.reference}`);
           requesterKind = "access_proof";
           requesterDigest = actorDigest;
         }
         if (!/^[A-Za-z0-9_-]{32,128}$/u.test(actorDigest))
           return { status: "retryable" };
+        if (!workspaceId || !projectId || !id.test(workspaceId) || !id.test(projectId))
+          return { status: "invalid" };
         const outcome = await store.execute({
-          workspaceId: input.workspaceId,
-          projectId: input.projectId,
+          workspaceId,
+          projectId,
           actorDigest,
           requesterKind,
           requesterDigest,

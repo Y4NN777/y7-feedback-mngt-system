@@ -111,4 +111,37 @@ describe("privacy HTTP boundary", () => {
     for (const candidate of [request({ method: "GET" }), request({ path: "/health" })])
       await expect(http.handle(candidate)).resolves.toBeUndefined();
   });
+
+  it("BDD-PRIV-045 exposes scope-derived privacy only to an Access Proof", async () => {
+    const execute = vi.fn().mockResolvedValue({ status: "ok", result: {} });
+    const http = createPrivacyHttp({ execute });
+    await expect(
+      http.handle(
+        request({
+          path: "/v1/feedback/privacy",
+          headers: {},
+          body: { reference: "reference_1", proof: "proof_1", command },
+        }),
+      ),
+    ).resolves.toEqual({ statusCode: 200, body: { status: "ok", result: {} } });
+    expect(execute).toHaveBeenCalledWith({
+      authority: {
+        kind: "access_proof",
+        reference: "reference_1",
+        proof: "proof_1",
+      },
+      command,
+    });
+    await expect(
+      http.handle(
+        request({
+          path: "/v1/feedback/privacy",
+          headers: { authorization: "Bearer jwt" },
+        }),
+      ),
+    ).resolves.toEqual({
+      statusCode: 404,
+      body: { error: "ERR-PRIVACY-DENIED" },
+    });
+  });
 });
