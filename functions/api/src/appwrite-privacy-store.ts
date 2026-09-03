@@ -18,6 +18,8 @@ export interface AppwritePrivacySchema {
   readonly notificationsTableId: string;
   readonly publicationConsentsTableId: string;
   readonly externalIssueLinksTableId: string;
+  readonly providerOutboxTableId: string;
+  readonly providerSyncOutboxTableId: string;
   readonly offlineConflictProjectionsTableId: string;
   readonly intelligenceProvenanceTableId: string;
   readonly deletionRecordsTableId: string;
@@ -200,6 +202,8 @@ export function createAppwritePrivacyStore(
     schema.notificationsTableId,
     schema.publicationConsentsTableId,
     schema.externalIssueLinksTableId,
+    schema.providerOutboxTableId,
+    schema.providerSyncOutboxTableId,
     schema.offlineConflictProjectionsTableId,
     schema.intelligenceProvenanceTableId,
     schema.deletionRecordsTableId,
@@ -416,6 +420,8 @@ export function createAppwritePrivacyStore(
           }
           for (const [tableId, attribute] of [
             [schema.notificationsTableId, "feedbackId"],
+            [schema.providerOutboxTableId, "feedbackId"],
+            [schema.providerSyncOutboxTableId, "feedbackId"],
             [schema.offlineConflictProjectionsTableId, "entityId"],
             [schema.intelligenceProvenanceTableId, "feedbackId"],
           ] as const) {
@@ -484,7 +490,10 @@ export function createAppwritePrivacyStore(
               databaseId: schema.databaseId,
               tableId: schema.externalIssueLinksTableId,
               rowId: row.$id,
-              data: { synchronizationState: "privacy_cleanup_pending" },
+              data: {
+                state: "privacy_deleted",
+                synchronizationState: "privacy_cleanup_pending",
+              },
               transactionId,
             });
           }

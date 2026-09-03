@@ -289,6 +289,8 @@ export function createHttpApplication(
           notificationsTableId: config.appwriteSchema.notificationsTableId,
           publicationConsentsTableId: config.appwriteSchema.publicationConsentsTableId,
           externalIssueLinksTableId: config.appwriteSchema.externalIssueLinksTableId,
+          providerOutboxTableId: config.appwriteSchema.providerOutboxTableId,
+          providerSyncOutboxTableId: config.appwriteSchema.providerSyncOutboxTableId,
           offlineConflictProjectionsTableId:
             config.appwriteSchema.offlineConflictProjectionsTableId,
           intelligenceProvenanceTableId:

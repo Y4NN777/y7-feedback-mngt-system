@@ -14,6 +14,8 @@ const schema = {
   notificationsTableId: "notifications",
   publicationConsentsTableId: "publication_consents",
   externalIssueLinksTableId: "external_issue_links",
+  providerOutboxTableId: "provider_outbox",
+  providerSyncOutboxTableId: "provider_sync_outbox",
   offlineConflictProjectionsTableId: "offline_conflicts",
   intelligenceProvenanceTableId: "intelligence_provenance",
   deletionRecordsTableId: "deletion_records",
@@ -138,6 +140,12 @@ function setup(
       { feedbackId: "feedback_1", lifecycle: "available" },
     ],
     [schema.notificationsTableId, "notification_1", { feedbackId: "feedback_1" }],
+    [schema.providerOutboxTableId, "provider_outbox_1", { feedbackId: "feedback_1" }],
+    [
+      schema.providerSyncOutboxTableId,
+      "provider_sync_outbox_1",
+      { feedbackId: "feedback_1" },
+    ],
     [schema.offlineConflictProjectionsTableId, "offline_1", { entityId: "feedback_1" }],
     [schema.intelligenceProvenanceTableId, "theme_1", { feedbackId: "feedback_1" }],
     [
@@ -224,6 +232,8 @@ describe("Appwrite privacy store", () => {
       "soft_deleted",
     );
     expect(tables.table(schema.notificationsTableId)).toHaveLength(0);
+    expect(tables.table(schema.providerOutboxTableId)).toHaveLength(0);
+    expect(tables.table(schema.providerSyncOutboxTableId)).toHaveLength(0);
     expect(tables.table(schema.offlineConflictProjectionsTableId)).toHaveLength(0);
     expect(tables.table(schema.intelligenceProvenanceTableId)).toHaveLength(0);
     const offlineQuery = tables.listRows.mock.calls.find(
@@ -237,6 +247,9 @@ describe("Appwrite privacy store", () => {
       tables.table(schema.externalIssueLinksTableId).get("link_1")
         ?.synchronizationState,
     ).toBe("privacy_cleanup_pending");
+    expect(tables.table(schema.externalIssueLinksTableId).get("link_1")?.state).toBe(
+      "privacy_deleted",
+    );
     expect([
       ...tables.table(schema.publicationConsentsTableId).values(),
     ]).toContainEqual(expect.objectContaining({ state: "revoked", version: 2 }));
