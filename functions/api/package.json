@@ -5,6 +5,8 @@
   "type": "module",
   "main": "dist/main.js",
   "dependencies": {
+    "@azure/identity": "^4.13.2",
+    "@azure/storage-blob": "^12.33.0",
     "@y7-feedback/config": "workspace:*",
     "@y7-feedback/domain": "workspace:*",
     "node-appwrite": "27.1.0",
