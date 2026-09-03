@@ -98,6 +98,25 @@ describe("root orientation", () => {
     expect(screen.getByText(/Analyze feedback inside one Project/u)).toBeVisible();
   });
 
+  it("BDD-PLAT-234 routes /platform/access to the protected bilingual workflow", async () => {
+    window.history.replaceState({}, "", "/platform/access");
+    const user = userEvent.setup();
+    renderApp({
+      administrationSession: {
+        createJwt: () => Promise.resolve("jwt"),
+        signIn: () => Promise.resolve("authenticated"),
+        signOut: () => Promise.resolve(),
+      },
+      platformAccessGateway: {
+        execute: () => Promise.resolve({ status: "retryable" }),
+      },
+    });
+    expect(screen.getByRole("heading", { name: "Accès exceptionnel" })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "English" }));
+    expect(screen.getByRole("heading", { name: "Exceptional access" })).toBeVisible();
+    expect(document.documentElement.lang).toBe("en");
+  });
+
   it("BDD-ROOT-001 shows exactly the three French intents without enumeration", () => {
     renderApp();
 
