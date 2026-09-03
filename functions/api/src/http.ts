@@ -5,6 +5,7 @@ import type { ConversationLifecycleHttp } from "./conversation-lifecycle-http.js
 import type { ExternalIssueHttp } from "./external-issue-http.js";
 import type { IntelligenceHttp } from "./intelligence-http.js";
 import type { PrivacyHttp } from "./privacy-http.js";
+import type { PlatformAccessHttp } from "./platform-access-http.js";
 import type { PublicApi } from "./public-api.js";
 import type { ProjectAdministrationHttp } from "./project-administration-http.js";
 import type { ProviderIssueOutboxHttp } from "./provider-issue-outbox-http.js";
@@ -61,6 +62,7 @@ export interface HttpDependencies {
   readonly externalIssue?: ExternalIssueHttp;
   readonly intelligence?: IntelligenceHttp;
   readonly privacy?: PrivacyHttp;
+  readonly platformAccess?: PlatformAccessHttp;
   readonly projectAdministration?: ProjectAdministrationHttp;
   readonly providerIssueOutbox?: ProviderIssueOutboxHttp;
   readonly providerEventInbox?: ProviderEventInboxHttp;
@@ -274,6 +276,25 @@ export async function routeRequest(
               ? req.bodyJson
               : undefined,
         });
+  const platformAccessResponse =
+    isHealth ||
+    isIngressProbe ||
+    maintenanceResponse ||
+    providerWebhookResponse ||
+    providerOutboxResponse ||
+    providerIssueOutboxResponse ||
+    sourceResponse ||
+    administrationResponse
+      ? null
+      : await dependencies.platformAccess?.handle({
+          method,
+          path: req.path,
+          headers: requestHeaders,
+          body:
+            method === "POST" && !contentType.startsWith("multipart/form-data")
+              ? req.bodyJson
+              : undefined,
+        });
   const conversationResponse =
     isHealth ||
     isIngressProbe ||
@@ -281,7 +302,8 @@ export async function routeRequest(
     providerWebhookResponse ||
     providerOutboxResponse ||
     sourceResponse ||
-    administrationResponse
+    administrationResponse ||
+    platformAccessResponse
       ? null
       : await dependencies.conversationLifecycle?.handle({
           method,
@@ -300,6 +322,7 @@ export async function routeRequest(
     providerOutboxResponse ||
     sourceResponse ||
     administrationResponse ||
+    platformAccessResponse ||
     conversationResponse
       ? null
       : await dependencies.workbench?.handle({
@@ -320,6 +343,7 @@ export async function routeRequest(
     providerOutboxResponse ||
     sourceResponse ||
     administrationResponse ||
+    platformAccessResponse ||
     conversationResponse ||
     workbenchResponse
       ? null
@@ -340,6 +364,7 @@ export async function routeRequest(
     providerOutboxResponse ||
     sourceResponse ||
     administrationResponse ||
+    platformAccessResponse ||
     conversationResponse ||
     workbenchResponse ||
     externalIssueResponse
@@ -361,6 +386,7 @@ export async function routeRequest(
     providerOutboxResponse ||
     sourceResponse ||
     administrationResponse ||
+    platformAccessResponse ||
     conversationResponse ||
     workbenchResponse ||
     externalIssueResponse ||
@@ -385,6 +411,7 @@ export async function routeRequest(
       ? null
       : sourceResponse ||
           administrationResponse ||
+          platformAccessResponse ||
           conversationResponse ||
           workbenchResponse ||
           externalIssueResponse ||
@@ -431,6 +458,7 @@ export async function routeRequest(
       providerIssueOutboxResponse?.statusCode ??
       sourceResponse?.statusCode ??
       administrationResponse?.statusCode ??
+      platformAccessResponse?.statusCode ??
       conversationResponse?.statusCode ??
       workbenchResponse?.statusCode ??
       externalIssueResponse?.statusCode ??
@@ -454,19 +482,21 @@ export async function routeRequest(
                 ? "source_connection"
                 : administrationResponse
                   ? "project_administration"
-                  : conversationResponse
-                    ? "conversation_lifecycle"
-                    : workbenchResponse
-                      ? "workbench"
-                      : externalIssueResponse
-                        ? "external_issue"
-                        : intelligenceResponse
-                          ? "intelligence"
-                          : privacyResponse
-                            ? "privacy"
-                            : publicResponse
-                              ? "public_api"
-                              : "unknown";
+                  : platformAccessResponse
+                    ? "platform_access"
+                    : conversationResponse
+                      ? "conversation_lifecycle"
+                      : workbenchResponse
+                        ? "workbench"
+                        : externalIssueResponse
+                          ? "external_issue"
+                          : intelligenceResponse
+                            ? "intelligence"
+                            : privacyResponse
+                              ? "privacy"
+                              : publicResponse
+                                ? "public_api"
+                                : "unknown";
   const outcome = isHealth
     ? "success"
     : (probeResponse ??
@@ -476,6 +506,7 @@ export async function routeRequest(
         providerIssueOutboxResponse ??
         sourceResponse ??
         administrationResponse ??
+        platformAccessResponse ??
         conversationResponse ??
         workbenchResponse ??
         externalIssueResponse ??
@@ -543,6 +574,14 @@ export async function routeRequest(
     return res.json(
       administrationResponse.body,
       administrationResponse.statusCode,
+      headers,
+    );
+  }
+
+  if (platformAccessResponse) {
+    return res.json(
+      platformAccessResponse.body,
+      platformAccessResponse.statusCode,
       headers,
     );
   }

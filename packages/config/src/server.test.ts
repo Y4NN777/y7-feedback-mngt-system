@@ -116,6 +116,43 @@ describe("trusted environment contract", () => {
     );
   });
 
+  it("BDD-ENV-012 enables Platform authority only with two teams and bounded MFA", () => {
+    expect(
+      parseServerConfig({
+        ...validServer,
+        APPWRITE_PLATFORM_OPERATOR_TEAM_ID: "platform_operators",
+        APPWRITE_PLATFORM_OWNER_TEAM_ID: "platform_owners",
+        PLATFORM_MFA_MAX_AGE_SECONDS: "300",
+      }).platformAccess,
+    ).toEqual({
+      operatorTeamId: "platform_operators",
+      ownerTeamId: "platform_owners",
+      maximumMfaAgeMs: 300_000,
+    });
+    expect(parseServerConfig(validServer).platformAccess).toBeUndefined();
+    for (const overrides of [
+      { APPWRITE_PLATFORM_OPERATOR_TEAM_ID: "platform_operators" },
+      {
+        APPWRITE_PLATFORM_OPERATOR_TEAM_ID: "same",
+        APPWRITE_PLATFORM_OWNER_TEAM_ID: "same",
+        PLATFORM_MFA_MAX_AGE_SECONDS: "300",
+      },
+      {
+        APPWRITE_PLATFORM_OPERATOR_TEAM_ID: "platform_operators",
+        APPWRITE_PLATFORM_OWNER_TEAM_ID: "platform_owners",
+        PLATFORM_MFA_MAX_AGE_SECONDS: "30",
+      },
+      {
+        APPWRITE_PLATFORM_OPERATOR_TEAM_ID: "platform_operators",
+        APPWRITE_PLATFORM_OWNER_TEAM_ID: "platform_owners",
+        PLATFORM_MFA_MAX_AGE_SECONDS: "901",
+      },
+    ])
+      expect(() => parseServerConfig({ ...validServer, ...overrides })).toThrow(
+        new ConfigError("PLATFORM_ACCESS_CONFIG_INVALID"),
+      );
+  });
+
   it("BDD-ENV-004 rejects incomplete Appwrite schema and malformed proof keys", () => {
     expect(() =>
       parseServerConfig({ ...validServer, APPWRITE_DATABASE_ID: "" }),

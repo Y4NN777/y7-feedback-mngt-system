@@ -15,6 +15,11 @@ export interface ServerConfig {
   readonly appwriteApiKey: string;
   readonly webOrigin: string;
   readonly providerOutboxTriggerSecret?: string;
+  readonly platformAccess?: {
+    readonly operatorTeamId: string;
+    readonly ownerTeamId: string;
+    readonly maximumMfaAgeMs: number;
+  };
   readonly appwriteSchema: {
     readonly databaseId: string;
     readonly workspacesTableId: string;
@@ -206,6 +211,31 @@ function parseOptionalTriggerSecret(value: string | undefined): string | undefin
   return normalized;
 }
 
+function parsePlatformAccess(
+  input: Readonly<Record<string, string | undefined>>,
+): ServerConfig["platformAccess"] {
+  const operatorTeamId = input.APPWRITE_PLATFORM_OPERATOR_TEAM_ID?.trim() ?? "";
+  const ownerTeamId = input.APPWRITE_PLATFORM_OWNER_TEAM_ID?.trim() ?? "";
+  const maximumMfaAge = input.PLATFORM_MFA_MAX_AGE_SECONDS?.trim() ?? "";
+  if (operatorTeamId === "" && ownerTeamId === "" && maximumMfaAge === "")
+    return undefined;
+  const maximumMfaAgeSeconds = Number(maximumMfaAge);
+  if (
+    !appwriteId.test(operatorTeamId) ||
+    !appwriteId.test(ownerTeamId) ||
+    operatorTeamId === ownerTeamId ||
+    !Number.isSafeInteger(maximumMfaAgeSeconds) ||
+    maximumMfaAgeSeconds < 60 ||
+    maximumMfaAgeSeconds > 15 * 60
+  )
+    throw new ConfigError("PLATFORM_ACCESS_CONFIG_INVALID");
+  return {
+    operatorTeamId,
+    ownerTeamId,
+    maximumMfaAgeMs: maximumMfaAgeSeconds * 1_000,
+  };
+}
+
 function parseProviderGrantKey(
   value: string | undefined,
   proofEnvelopeKey: string,
@@ -362,6 +392,7 @@ export function parseServerConfig(
   const providerOutboxTriggerSecret = parseOptionalTriggerSecret(
     input.PROVIDER_OUTBOX_TRIGGER_SECRET,
   );
+  const platformAccess = parsePlatformAccess(input);
   return {
     environment,
     backendEnvironment,
@@ -372,6 +403,7 @@ export function parseServerConfig(
     ...(providerOutboxTriggerSecret === undefined
       ? {}
       : { providerOutboxTriggerSecret }),
+    ...(platformAccess === undefined ? {} : { platformAccess }),
     appwriteSchema: parseAppwriteSchema(input),
     accessProofEnvelopeKey,
     providerGrantEnvelopeKey,

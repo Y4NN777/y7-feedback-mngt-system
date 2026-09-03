@@ -1,4 +1,4 @@
-import type { Storage, TablesDB } from "node-appwrite";
+import type { Storage, TablesDB, Users } from "node-appwrite";
 import { createHash, randomBytes } from "node:crypto";
 
 import type { ServerConfig } from "@y7-feedback/config/server";
@@ -16,6 +16,8 @@ import { createNodeAppwritePrivacyProviderCleanup } from "./appwrite-privacy-pro
 import { createNodeAppwriteAbuseCounterStore } from "./appwrite-abuse-counter-store.js";
 import { createNodeAppwritePrivateAttachmentStorage } from "./appwrite-private-attachment-storage.js";
 import { createNodeAppwritePrincipalVerifier } from "./appwrite-principal-verifier.js";
+import { createNodeAppwritePlatformAccessStore } from "./appwrite-platform-access-store.js";
+import { createNodeAppwritePlatformAuthority } from "./appwrite-platform-authority.js";
 import { createNodeAppwriteConversationLifecycleStore } from "./appwrite-conversation-lifecycle-store.js";
 import { createNodeAppwriteConversationProjectionStore } from "./appwrite-conversation-projection-store.js";
 import { createNodeAppwriteProjectAdministrationStore } from "./appwrite-project-administration-store.js";
@@ -50,6 +52,8 @@ import { createIntelligenceProvenanceCoordinator } from "./intelligence-provenan
 import { createIntelligenceHttp } from "./intelligence-http.js";
 import { createPrivacyCoordinator } from "./privacy.js";
 import { createPrivacyHttp } from "./privacy-http.js";
+import { createPlatformAccessCoordinator } from "./platform-access.js";
+import { createPlatformAccessHttp } from "./platform-access-http.js";
 import { createPrivacyPurgeWorker } from "./privacy-cleanup.js";
 import { createPrivacyProviderCleanup } from "./privacy-provider-cleanup.js";
 import { createConversationLifecycleCoordinator } from "./conversation-lifecycle.js";
@@ -117,6 +121,7 @@ export function createProtectedFeedbackUrl(
 export interface ApplicationRuntime {
   readonly tables: TablesDB;
   readonly storage: Storage;
+  readonly users?: Users;
   readonly createId: () => string;
   readonly createReference: () => string;
   readonly createCorrelationId: () => string;
@@ -258,6 +263,40 @@ export function createHttpApplication(
       endpoint: config.appwriteEndpoint,
       projectId: config.appwriteProjectId,
     });
+  /* v8 ignore start -- Platform composition is exercised by the real Preview matrix. */
+  const platformAccess = config.platformAccess
+    ? (() => {
+        if (!runtime.users) throw new Error("PLATFORM_ACCESS_USERS_UNAVAILABLE");
+        return createPlatformAccessHttp(
+          createPlatformAccessCoordinator(
+            principalVerifier,
+            createNodeAppwritePlatformAuthority(
+              runtime.users,
+              config.platformAccess,
+              runtime.nowMs,
+            ),
+            createNodeAppwritePlatformAccessStore(
+              runtime.tables,
+              {
+                databaseId: config.appwriteSchema.databaseId,
+                grantsTableId: config.appwriteSchema.exceptionalAccessGrantsTableId,
+                auditTableId: config.appwriteSchema.exceptionalAccessAuditTableId,
+              },
+              sensitive,
+              {
+                now: runtime.nowIso,
+                createAuditId: (grantId, sequence) =>
+                  createHash("sha256")
+                    .update(`${grantId}:${String(sequence)}`)
+                    .digest("base64url")
+                    .slice(0, 36),
+              },
+            ),
+          ),
+        );
+      })()
+    : undefined;
+  /* v8 ignore stop */
   const workspaceScopeSchema = {
     databaseId: config.appwriteSchema.databaseId,
     projectsTableId: config.appwriteSchema.projectsTableId,
@@ -858,6 +897,8 @@ export function createHttpApplication(
     conversationLifecycle,
     externalIssue,
     now: runtime.nowMs,
+    /* v8 ignore next -- optional composition is covered by config and Preview. */
+    ...(platformAccess === undefined ? {} : { platformAccess }),
     projectAdministration,
     providerWebhook,
     /* v8 ignore next -- optional composition is covered by configuration parsing. */

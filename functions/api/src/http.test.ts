@@ -854,6 +854,50 @@ describe("trusted API entrypoint", () => {
     );
   });
 
+  it("BDD-PLAT-123 routes Platform commands before product APIs", async () => {
+    const platformAccess = {
+      handle: vi.fn().mockResolvedValue({
+        statusCode: 200,
+        body: { status: "ok", result: { grantId: "grant_1" } },
+      }),
+    };
+    const publicHandle = vi.fn();
+    const request = createContext("POST", "/v1/platform/exceptional-access/commands", {
+      headers: { "content-type": "application/json" },
+      bodyJson: { kind: "request", grantId: "grant_1" },
+    });
+    await routeRequest(request.context, {
+      ...dependencies,
+      platformAccess,
+      publicApi: { handle: publicHandle },
+    });
+    expect(platformAccess.handle).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: "POST",
+        body: { kind: "request", grantId: "grant_1" },
+      }),
+    );
+    expect(publicHandle).not.toHaveBeenCalled();
+    expect(request.json).toHaveBeenCalledWith(
+      { status: "ok", result: { grantId: "grant_1" } },
+      200,
+      expect.objectContaining({ "cache-control": "no-store" }),
+    );
+    expect(request.context.log).toHaveBeenCalledWith(
+      expect.stringContaining('"operation":"platform_access"'),
+    );
+
+    const multipart = createContext("POST", request.context.req.path, {
+      headers: { "content-type": "multipart/form-data; boundary=test" },
+      bodyJson: { ignored: true },
+    });
+    platformAccess.handle.mockResolvedValueOnce(undefined);
+    await routeRequest(multipart.context, { ...dependencies, platformAccess });
+    expect(platformAccess.handle).toHaveBeenLastCalledWith(
+      expect.objectContaining({ body: undefined }),
+    );
+  });
+
   it("routes the provider outbox before every product API", async () => {
     const providerIssueOutbox = {
       handle: vi.fn().mockResolvedValue({
