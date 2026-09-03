@@ -57,7 +57,17 @@ class FakeTables implements AppwritePrivacyCleanupTables {
   });
   deleteRow = vi.fn(
     (input: Parameters<AppwritePrivacyCleanupTables["deleteRow"]>[0]) => {
-      if (this.deleteFailure !== undefined) return Promise.reject(this.deleteFailure);
+      if (this.deleteFailure !== undefined)
+        return Promise.reject(
+          this.deleteFailure instanceof Error
+            ? this.deleteFailure
+            : Object.assign(
+                new Error("forced deletion failure"),
+                typeof this.deleteFailure === "object" && this.deleteFailure !== null
+                  ? this.deleteFailure
+                  : {},
+              ),
+        );
       this.deleted.push(`${input.tableId}/${input.rowId}`);
       const rows = this.rows.get(input.tableId) ?? [];
       this.rows.set(

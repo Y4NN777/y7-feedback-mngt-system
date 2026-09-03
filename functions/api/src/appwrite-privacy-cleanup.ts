@@ -80,8 +80,8 @@ export function createAppwritePrivacyCleanup(
   schema: AppwritePrivacyCleanupSchema,
   queries: AppwritePrivacyCleanupQueries,
 ): PrivacyCleanupPort {
-  const values = Object.values(schema);
-  const tableIds = Object.entries(schema)
+  const values: readonly string[] = Object.values(schema) as readonly string[];
+  const tableIds = (Object.entries(schema) as [string, string][])
     .filter(([key]) => key.endsWith("TableId"))
     .map(([, value]) => value);
   if (
