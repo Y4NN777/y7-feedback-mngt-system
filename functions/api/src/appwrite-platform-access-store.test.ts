@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   createAppwritePlatformAccessStore,
+  createAppwritePlatformAccessExpiryWorker,
   createNodeAppwritePlatformAccessStore,
   type AppwritePlatformAccessTables,
 } from "./appwrite-platform-access-store";
@@ -49,6 +50,12 @@ class FakeTables implements AppwritePlatformAccessTables {
       ? Promise.resolve(row)
       : Promise.reject(Object.assign(new Error("absent"), { code: 404 }));
   });
+
+  listRows = vi.fn(() =>
+    Promise.resolve({
+      rows: [...this.grants.values()].filter((row) => row.state === "active"),
+    }),
+  );
 
   createRow = vi.fn(
     (input: Parameters<AppwritePlatformAccessTables["createRow"]>[0]) => {
@@ -436,5 +443,142 @@ describe("Appwrite exceptional access persistence", () => {
         },
       }),
     ).resolves.toMatchObject({ status: "applied", revision: 2 });
+  });
+
+  it("BDD-PLAT-031 expires grants and their immutable audits atomically", async () => {
+    const candidate = setup("2026-09-03T13:00:00.000Z");
+    const row = {
+      $id: "grant_due",
+      requesterId: "operator_1",
+      approverId: "owner_1",
+      workspaceId: "workspace_1",
+      projectId: null,
+      feedbackId: null,
+      state: "active",
+      reasonCode: "INCIDENT_RESPONSE",
+      breakGlass: false,
+      useCount: 0,
+      revision: 1,
+      auditSequence: 2,
+      justificationEnvelope: "sealed:Investigating the customer incident",
+      incidentSeverity: "ordinary",
+      actionsJson: '["feedback.read"]',
+      requestedAt: "2026-09-03T11:00:00.000Z",
+      approvedAt: "2026-09-03T11:30:00.000Z",
+      expiresAt: "2026-09-03T12:30:00.000Z",
+    };
+    candidate.tables.grants.set("grant_due", row);
+    const worker = createAppwritePlatformAccessExpiryWorker(
+      candidate.tables,
+      schema,
+      {
+        equal: (attribute, values) => `equal:${attribute}:${values.join(",")}`,
+        lessThanEqual: (attribute, value) => `lte:${attribute}:${value}`,
+        limit: (value) => `limit:${String(value)}`,
+      },
+      sensitive,
+      {
+        now: () => "2026-09-03T13:00:00.000Z",
+        createAuditId: (_grantId, sequence) => `expiry_${String(sequence)}`,
+      },
+    );
+    await expect(worker.runOnce()).resolves.toEqual({
+      status: "completed",
+      inspected: 1,
+      expired: 1,
+    });
+    expect(candidate.tables.listRows).toHaveBeenCalledWith(
+      expect.objectContaining({
+        queries: [
+          "equal:state:active",
+          "lte:expiresAt:2026-09-03T13:00:00.000Z",
+          "limit:25",
+        ],
+      }),
+    );
+    expect(candidate.tables.grants.get("grant_due")).toMatchObject({
+      state: "expired",
+      revision: 2,
+      auditSequence: 3,
+      expiredAt: "2026-09-03T13:00:00.000Z",
+    });
+    expect(candidate.tables.audits.get("expiry_3")).toMatchObject({
+      eventType: "expired",
+      sequence: 3,
+      actorId: "platform_expiry_worker",
+    });
+  });
+
+  it("BDD-PLAT-032 skips a concurrently changed grant and fails closed on faults", async () => {
+    const candidate = setup();
+    candidate.tables.grants.set("grant_changed", {
+      $id: "grant_changed",
+      requesterId: "operator_1",
+      workspaceId: "workspace_1",
+      state: "revoked",
+      reasonCode: "INCIDENT_RESPONSE",
+      breakGlass: false,
+      useCount: 0,
+      revision: 2,
+      auditSequence: 3,
+      justificationEnvelope: "sealed:Investigating the customer incident",
+      incidentSeverity: "ordinary",
+      actionsJson: '["feedback.read"]',
+      requestedAt: "2026-09-03T11:00:00.000Z",
+      expiresAt: "2026-09-03T11:30:00.000Z",
+    });
+    candidate.tables.listRows.mockResolvedValueOnce({
+      rows: [{ $id: "grant_changed", state: "active" }],
+    });
+    const worker = createAppwritePlatformAccessExpiryWorker(
+      candidate.tables,
+      schema,
+      { equal: () => "equal", lessThanEqual: () => "lte", limit: () => "limit" },
+      sensitive,
+      { now: () => "2026-09-03T12:00:00.000Z", createAuditId: () => "audit" },
+    );
+    await expect(worker.runOnce()).resolves.toEqual({
+      status: "completed",
+      inspected: 1,
+      expired: 0,
+    });
+
+    expect(() =>
+      createAppwritePlatformAccessExpiryWorker(
+        candidate.tables,
+        schema,
+        { equal: () => "", lessThanEqual: () => "", limit: () => "" },
+        sensitive,
+        { now: () => "now", createAuditId: () => "audit" },
+        0,
+      ),
+    ).toThrow("PLATFORM_EXPIRY_BATCH_INVALID");
+    candidate.tables.listRows.mockResolvedValueOnce({ rows: [{}] });
+    await expect(worker.runOnce()).rejects.toThrow("PLATFORM_EXPIRY_UNAVAILABLE");
+
+    candidate.tables.listRows.mockResolvedValueOnce({
+      rows: [{ $id: "grant_changed" }],
+    });
+    candidate.tables.createTransaction.mockResolvedValueOnce({ $id: "bad id" });
+    await expect(worker.runOnce()).rejects.toThrow("PLATFORM_EXPIRY_UNAVAILABLE");
+
+    const due = setup("2026-09-03T13:00:00.000Z");
+    due.tables.grants.set("grant_due", {
+      ...candidate.tables.grants.get("grant_changed"),
+      $id: "grant_due",
+      state: "active",
+      revision: 1,
+    });
+    due.tables.listRows.mockResolvedValue({ rows: [{ $id: "grant_due" }] });
+    const badAuditWorker = createAppwritePlatformAccessExpiryWorker(
+      due.tables,
+      schema,
+      { equal: () => "equal", lessThanEqual: () => "lte", limit: () => "limit" },
+      sensitive,
+      { now: () => "2026-09-03T13:00:00.000Z", createAuditId: () => "bad id" },
+    );
+    await expect(badAuditWorker.runOnce()).rejects.toThrow("invalid audit id");
+    due.tables.fail = "rollback";
+    await expect(badAuditWorker.runOnce()).rejects.toThrow("invalid audit id");
   });
 });

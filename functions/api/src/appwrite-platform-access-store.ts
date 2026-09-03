@@ -1,12 +1,13 @@
 import { createHash } from "node:crypto";
 
-import type { TablesDB } from "node-appwrite";
+import { Query, type TablesDB } from "node-appwrite";
 import {
   approveExceptionalAccess,
   denyExceptionalAccess,
   requestExceptionalAccess,
   reviewBreakGlass,
   revokeExceptionalAccess,
+  expireExceptionalAccess,
   useExceptionalAccess as executeExceptionalAccess,
   type ExceptionalAccessAuditEvent,
   type ExceptionalAccessDecision,
@@ -30,6 +31,12 @@ export interface AppwritePlatformAccessTables {
     readonly rowId: string;
     readonly transactionId: string;
   }): Promise<unknown>;
+  listRows(input: {
+    readonly databaseId: string;
+    readonly tableId: string;
+    readonly queries: readonly string[];
+    readonly total: false;
+  }): Promise<{ readonly rows: readonly unknown[] }>;
   createRow(input: {
     readonly databaseId: string;
     readonly tableId: string;
@@ -50,6 +57,20 @@ export interface AppwritePlatformAccessTables {
     readonly commit?: boolean;
     readonly rollback?: boolean;
   }): Promise<unknown>;
+}
+
+export interface AppwritePlatformAccessQueries {
+  readonly equal: (attribute: string, values: readonly string[]) => string;
+  readonly lessThanEqual: (attribute: string, value: string) => string;
+  readonly limit: (value: number) => string;
+}
+
+export interface PlatformAccessExpiryWorker {
+  runOnce(): Promise<{
+    readonly status: "completed";
+    readonly inspected: number;
+    readonly expired: number;
+  }>;
 }
 
 export interface AppwritePlatformAccessDependencies {
@@ -74,8 +95,27 @@ const actions = new Set([
   "internal_note.read",
 ]);
 
+/* v8 ignore start -- Query serialization is covered by deployed verification. */
+const nodeQueries: AppwritePlatformAccessQueries = {
+  equal: (attribute, values) => Query.equal(attribute, [...values]),
+  lessThanEqual: (attribute, value) => Query.lessThanEqual(attribute, value),
+  limit: (value) => Query.limit(value),
+};
+/* v8 ignore stop */
+
 function object(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+async function rollback(
+  tables: AppwritePlatformAccessTables,
+  transactionId: string,
+): Promise<void> {
+  try {
+    await tables.updateTransaction({ transactionId, rollback: true });
+  } catch {
+    // Appwrite expires abandoned transactions.
+  }
 }
 
 function absent(error: unknown): boolean {
@@ -441,6 +481,100 @@ export function createAppwritePlatformAccessStore(
   };
 }
 
+export function createAppwritePlatformAccessExpiryWorker(
+  tables: AppwritePlatformAccessTables,
+  schema: AppwritePlatformAccessSchema,
+  queries: AppwritePlatformAccessQueries,
+  sensitive: AppwriteSensitivePersistence,
+  dependencies: AppwritePlatformAccessDependencies,
+  batchSize = 25,
+): PlatformAccessExpiryWorker {
+  if (!Number.isSafeInteger(batchSize) || batchSize < 1 || batchSize > 100)
+    throw new Error("PLATFORM_EXPIRY_BATCH_INVALID");
+  return {
+    async runOnce() {
+      const now = dependencies.now();
+      const listed = await tables.listRows({
+        databaseId: schema.databaseId,
+        tableId: schema.grantsTableId,
+        queries: [
+          queries.equal("state", ["active"]),
+          queries.lessThanEqual("expiresAt", now),
+          queries.limit(batchSize),
+        ],
+        total: false,
+      });
+      let expired = 0;
+      for (const candidate of listed.rows) {
+        if (!object(candidate) || typeof candidate.$id !== "string")
+          throw new Error("PLATFORM_EXPIRY_UNAVAILABLE");
+        const transaction = await tables.createTransaction({ ttl: 60 });
+        if (!appwriteId.test(transaction.$id))
+          throw new Error("PLATFORM_EXPIRY_UNAVAILABLE");
+        try {
+          const current = parseGrant(
+            await tables.getRow({
+              databaseId: schema.databaseId,
+              tableId: schema.grantsTableId,
+              rowId: candidate.$id,
+              transactionId: transaction.$id,
+            }),
+            schema,
+            sensitive,
+          );
+          const decision = expireExceptionalAccess(current.grant, {
+            actorId: "platform_expiry_worker",
+            expectedRevision: current.grant.revision,
+            now,
+          });
+          if (decision.status !== "ok") {
+            await tables.updateTransaction({
+              transactionId: transaction.$id,
+              rollback: true,
+            });
+            continue;
+          }
+          const sequence = current.auditSequence + 1;
+          const auditId = dependencies.createAuditId(decision.grant.id, sequence);
+          if (!appwriteId.test(auditId)) throw new Error("invalid audit id");
+          await tables.updateRow({
+            databaseId: schema.databaseId,
+            tableId: schema.grantsTableId,
+            rowId: decision.grant.id,
+            data: grantData(decision.grant, sequence, schema, sensitive),
+            transactionId: transaction.$id,
+          });
+          await tables.createRow({
+            databaseId: schema.databaseId,
+            tableId: schema.auditTableId,
+            rowId: auditId,
+            permissions: [],
+            transactionId: transaction.$id,
+            data: {
+              grantId: decision.audit.grantId,
+              sequence,
+              eventType: decision.audit.type,
+              actorId: decision.audit.actorId,
+              scopeDigest: scopeDigest(decision.audit),
+              reasonCode: decision.audit.reasonCode,
+              occurredAt: decision.audit.occurredAt,
+            },
+          });
+          await tables.updateTransaction({
+            transactionId: transaction.$id,
+            commit: true,
+          });
+          expired += 1;
+        } catch (error) {
+          await rollback(tables, transaction.$id);
+          throw error;
+        }
+      }
+      return { status: "completed", inspected: listed.rows.length, expired };
+    },
+  };
+}
+
 /* v8 ignore start -- thin SDK mapping is covered by deployed verification. */
 export function createNodeAppwritePlatformAccessStore(
   tables: TablesDB,
@@ -452,11 +586,41 @@ export function createNodeAppwritePlatformAccessStore(
     {
       createTransaction: (input) => tables.createTransaction(input),
       getRow: (input) => tables.getRow(input),
+      listRows: async (input) => ({
+        rows: (await tables.listRows({ ...input, queries: [...input.queries] })).rows,
+      }),
       createRow: (input) => tables.createRow({ ...input, permissions: [] }),
       updateRow: (input) => tables.updateRow(input),
       updateTransaction: (input) => tables.updateTransaction(input),
     },
     schema,
+    sensitive,
+    dependencies,
+  );
+}
+/* v8 ignore stop */
+
+/* v8 ignore start -- thin SDK mapping is covered by deployed verification. */
+export function createNodeAppwritePlatformAccessExpiryWorker(
+  tables: TablesDB,
+  schema: AppwritePlatformAccessSchema,
+  sensitive: AppwriteSensitivePersistence,
+  dependencies: AppwritePlatformAccessDependencies,
+): PlatformAccessExpiryWorker {
+  const port: AppwritePlatformAccessTables = {
+    createTransaction: (input) => tables.createTransaction(input),
+    getRow: (input) => tables.getRow(input),
+    listRows: async (input) => ({
+      rows: (await tables.listRows({ ...input, queries: [...input.queries] })).rows,
+    }),
+    createRow: (input) => tables.createRow({ ...input, permissions: [] }),
+    updateRow: (input) => tables.updateRow(input),
+    updateTransaction: (input) => tables.updateTransaction(input),
+  };
+  return createAppwritePlatformAccessExpiryWorker(
+    port,
+    schema,
+    nodeQueries,
     sensitive,
     dependencies,
   );
