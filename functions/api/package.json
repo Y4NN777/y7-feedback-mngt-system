@@ -29,6 +29,7 @@
     "verify:mail-catcher": "node dist/verify-preview-mail-catcher.js",
     "verify:mail:g3": "node dist/verify-preview-mail-catcher.js",
     "verify:source-provider": "node dist/verify-preview-source-provider.js",
+    "recovery:backup": "node dist/run-recovery-backup.js --apply",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc -p tsconfig.json --noEmit"

@@ -18,7 +18,7 @@ interface AzureBlockBlobLike {
 }
 
 interface AzureContainerLike {
-  createIfNotExists(): Promise<unknown>;
+  getProperties(): Promise<{ readonly blobPublicAccess?: unknown }>;
   getBlockBlobClient(key: string): AzureBlockBlobLike;
 }
 
@@ -58,7 +58,11 @@ export function createAzureRecoveryObjectRepository(
   container: AzureContainerLike,
 ): RecoveryObjectRepository {
   let initialized: Promise<unknown> | undefined;
-  const initialize = () => (initialized ??= container.createIfNotExists());
+  const initialize = () =>
+    (initialized ??= container.getProperties().then((properties) => {
+      if (properties.blobPublicAccess !== undefined)
+        throw new Error("RECOVERY_DESTINATION_PUBLIC");
+    }));
   return {
     async put(key, value, options) {
       await initialize();
