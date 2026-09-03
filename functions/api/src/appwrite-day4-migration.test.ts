@@ -166,4 +166,27 @@ describe("Day 4 additive Appwrite migration", () => {
       { key: "reviewedAt", required: false },
     ]);
   });
+
+  it("BDD-PLAT-102 reserves exact idempotent replays for exceptional reads", () => {
+    const operations = createDay4AdditiveMigration(g3Tables()).createTables.find(
+      ({ id }) => id === "exceptional_access_operations",
+    );
+
+    expect(operations?.columns.map(({ key }) => key)).toEqual([
+      "grantId",
+      "operationId",
+      "payloadDigest",
+      "outcome",
+      "revision",
+      "resultEnvelope",
+      "createdAt",
+      "expiresAt",
+    ]);
+    expect(operations?.indexes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "grant_operation_unique", type: "unique" }),
+        expect.objectContaining({ key: "expiry", type: "key" }),
+      ]),
+    );
+  });
 });
