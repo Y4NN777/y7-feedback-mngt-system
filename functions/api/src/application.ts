@@ -13,6 +13,7 @@ import { createNodeAppwritePrivacyStore } from "./appwrite-privacy-store.js";
 import { createNodeAppwritePrivacyPurgeRepository } from "./appwrite-privacy-purge-repository.js";
 import { createNodeAppwritePrivacyCleanup } from "./appwrite-privacy-cleanup.js";
 import { createNodeAppwritePrivacyProviderCleanup } from "./appwrite-privacy-provider-cleanup.js";
+import { createNodeAppwriteAbuseCounterStore } from "./appwrite-abuse-counter-store.js";
 import { createNodeAppwritePrivateAttachmentStorage } from "./appwrite-private-attachment-storage.js";
 import { createNodeAppwritePrincipalVerifier } from "./appwrite-principal-verifier.js";
 import { createNodeAppwriteConversationLifecycleStore } from "./appwrite-conversation-lifecycle-store.js";
@@ -95,6 +96,7 @@ import { createProviderEventInboxWorker } from "./provider-event-inbox.js";
 import { createProviderEventInboxHttp } from "./provider-event-inbox-http.js";
 import { createProviderMaintenance } from "./provider-maintenance.js";
 import { createProviderWebhookReconciliation } from "./provider-webhook-reconciliation.js";
+import { createAbuseGate } from "./abuse.js";
 
 export function digestExternalIssueCommand(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(value)).digest("base64url");
@@ -187,6 +189,42 @@ export function createHttpApplication(
   const projects = createNodeAppwritePublicProjectReader(
     runtime.tables,
     config.appwriteSchema,
+  );
+  const abuseKeyEntries = Object.entries(config.abuseHmacKeys);
+  const activeAbuseKey = config.abuseHmacKeys[config.abuseHmacActiveKeyId];
+  if (!activeAbuseKey) throw new Error("ABUSE_KEYRING_INVALID");
+  const previousAbuseKey = abuseKeyEntries.find(
+    ([keyId]) => keyId !== config.abuseHmacActiveKeyId,
+  );
+  const abuse = createAbuseGate(
+    createNodeAppwriteAbuseCounterStore(runtime.tables, {
+      databaseId: config.appwriteSchema.databaseId,
+      abuseCountersTableId: config.appwriteSchema.abuseCountersTableId,
+    }),
+    {
+      active: {
+        id: config.abuseHmacActiveKeyId,
+        material: Buffer.from(activeAbuseKey, "base64url"),
+      },
+      ...(previousAbuseKey
+        ? {
+            previous: {
+              id: previousAbuseKey[0],
+              material: Buffer.from(previousAbuseKey[1], "base64url"),
+            },
+          }
+        : {}),
+    },
+    {
+      async resolve(slug) {
+        const result = await projects.resolve(slug);
+        if (result.kind !== "current") return { status: "denied" } as const;
+        return {
+          workspaceId: result.project.feedbackConfig.workspaceId,
+          projectId: result.project.feedbackConfig.projectId,
+        };
+      },
+    },
   );
   const attachmentMetadata = createNodeAppwriteAttachmentAcceptanceStore(
     runtime.tables,
@@ -808,6 +846,7 @@ export function createHttpApplication(
   /* v8 ignore stop */
 
   return {
+    abuse,
     createCorrelationId: runtime.createCorrelationId,
     environment: config.environment,
     intelligence,

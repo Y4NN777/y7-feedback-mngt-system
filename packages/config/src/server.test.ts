@@ -43,6 +43,8 @@ const validServer = {
   SENSITIVE_DATA_ACTIVE_KEY_ID: "data_2026_08",
   SENSITIVE_DATA_ENVELOPE_KEYS:
     '{"data_2026_07":"CQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk","data_2026_08":"CgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgo"}',
+  ABUSE_HMAC_ACTIVE_KEY_ID: "abuse_2026_08",
+  ABUSE_HMAC_KEYS: '{"abuse_2026_08":"CwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCws"}',
   RELEASE: "commit-123",
 };
 
@@ -99,6 +101,10 @@ describe("trusted environment contract", () => {
       sensitiveDataEnvelopeKeys: {
         data_2026_07: "CQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk",
         data_2026_08: "CgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgo",
+      },
+      abuseHmacActiveKeyId: "abuse_2026_08",
+      abuseHmacKeys: {
+        abuse_2026_08: "CwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCws",
       },
       release: "commit-123",
     });

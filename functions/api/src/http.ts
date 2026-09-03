@@ -13,6 +13,7 @@ import type { ProviderMaintenance } from "./provider-maintenance.js";
 import type { ProviderWebhookHttpResponse } from "./provider-webhook-http.js";
 import type { SourceConnectionHttp } from "./source-connection-http.js";
 import type { WorkbenchHttp } from "./workbench-http.js";
+import type { AbuseGateOutcome, AbuseRequest, AbuseReservation } from "./abuse.js";
 
 export interface FunctionRequest {
   readonly method: string;
@@ -44,6 +45,14 @@ export interface FunctionContext {
 }
 
 export interface HttpDependencies {
+  readonly abuse?: {
+    readonly reserve: (request: AbuseRequest, now: string) => Promise<AbuseGateOutcome>;
+    readonly settle: (
+      reservation: AbuseReservation,
+      accepted: boolean,
+      now: string,
+    ) => Promise<void>;
+  };
   readonly createCorrelationId: () => string;
   readonly environment: "development" | "preview" | "production";
   readonly now: () => number;
@@ -141,6 +150,45 @@ export async function routeRequest(
     dependencies.environment === "preview" &&
     method === "POST" &&
     req.path === "/operational/ingress-probe";
+  const abuseOutcome =
+    isHealth || isIngressProbe || isProviderMaintenance
+      ? ({ status: "allowed", reservation: {} } as const)
+      : await dependencies.abuse?.reserve(
+          {
+            method,
+            path: req.path,
+            headers: requestHeaders,
+            ...(req.bodyJson === undefined ? {} : { body: req.bodyJson }),
+          },
+          new Date(dependencies.now()).toISOString(),
+        );
+  if (abuseOutcome?.status === "limited" || abuseOutcome?.status === "unavailable") {
+    const statusCode = abuseOutcome.status === "limited" ? 429 : 503;
+    log(
+      serializeOperationalEvent({
+        event: "api.request.completed",
+        correlationId,
+        environment: dependencies.environment,
+        release: dependencies.release,
+        operation: "public_api",
+        outcome: "rejected",
+        statusCode,
+        durationMs: Math.max(0, dependencies.now() - startedAt),
+      }),
+    );
+    return res.json(
+      {
+        error:
+          abuseOutcome.status === "limited"
+            ? "ERR-ABUSE-LIMITED"
+            : "ERR-ABUSE-UNAVAILABLE",
+      },
+      statusCode,
+      abuseOutcome.status === "limited"
+        ? { ...headers, "retry-after": String(abuseOutcome.retryAfterSeconds) }
+        : headers,
+    );
+  }
   const probeResponse = isIngressProbe ? ingressProbe(req) : null;
   const maintenanceResponse = isProviderMaintenance
     ? await dependencies.providerMaintenance
@@ -350,6 +398,28 @@ export async function routeRequest(
                 ? req.bodyJson
                 : undefined,
           });
+  if (abuseOutcome?.status === "allowed") {
+    try {
+      await dependencies.abuse?.settle(
+        abuseOutcome.reservation,
+        publicResponse?.statusCode === 201,
+        new Date(dependencies.now()).toISOString(),
+      );
+    } catch {
+      log(
+        serializeOperationalEvent({
+          event: "api.abuse.reservation.release_failed",
+          correlationId,
+          environment: dependencies.environment,
+          release: dependencies.release,
+          operation: "public_api",
+          outcome: "rejected",
+          statusCode: 503,
+          durationMs: Math.max(0, dependencies.now() - startedAt),
+        }),
+      );
+    }
+  }
   const statusCode = isHealth
     ? 200
     : (probeResponse?.statusCode ??
