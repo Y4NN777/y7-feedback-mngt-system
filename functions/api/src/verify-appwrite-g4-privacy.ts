@@ -11,6 +11,7 @@ import {
 } from "./appwrite-g1-matrix.js";
 import { createNodeAppwritePrivacyCleanup } from "./appwrite-privacy-cleanup.js";
 import { createNodeAppwritePrivacyPurgeRepository } from "./appwrite-privacy-purge-repository.js";
+import { createNodeAppwriteProviderIssueStateStore } from "./appwrite-provider-issue-state-store.js";
 import { createPrivacyPurgeWorker } from "./privacy-cleanup.js";
 import { createSensitiveDataProtector } from "./sensitive-data-protector.js";
 
@@ -90,6 +91,32 @@ async function main(): Promise<void> {
   const extraRows: Array<readonly [string, string]> = [];
   let userCreated = false;
   let cleanupFailure: unknown;
+  const createRow = async (
+    tableId: string,
+    rowId: string,
+    data: Readonly<Record<string, unknown>>,
+  ) => {
+    await tables.createRow({
+      databaseId: config.appwriteSchema.databaseId,
+      tableId,
+      rowId,
+      permissions: [],
+      data,
+    });
+    extraRows.push([tableId, rowId]);
+  };
+  const requireAbsent = async (tableId: string, rowId: string, errorCode: string) => {
+    try {
+      await tables.getRow({
+        databaseId: config.appwriteSchema.databaseId,
+        tableId,
+        rowId,
+      });
+      throw new Error(errorCode);
+    } catch (error: unknown) {
+      if (!absent(error)) throw error;
+    }
+  };
 
   const accept = async (index: number) => {
     const response = await application.publicApi?.handle({
@@ -164,25 +191,124 @@ async function main(): Promise<void> {
       })
     ).jwt;
     const now = clock.toISOString();
-    await tables.createRow({
-      databaseId: config.appwriteSchema.databaseId,
-      tableId: config.appwriteSchema.workspaceMembershipsTableId,
-      rowId: membershipId,
-      permissions: [],
-      data: {
-        workspaceId: "workspace_alpha",
-        userId: principalId,
-        role: "workspace_owner",
-        status: "active",
-        createdAt: now,
-        updatedAt: now,
-      },
+    await createRow(config.appwriteSchema.workspaceMembershipsTableId, membershipId, {
+      workspaceId: "workspace_alpha",
+      userId: principalId,
+      role: "workspace_owner",
+      status: "active",
+      createdAt: now,
+      updatedAt: now,
     });
-    extraRows.push([config.appwriteSchema.workspaceMembershipsTableId, membershipId]);
 
     const restoreAccess = await accept(0);
     const purgeAccess = await accept(1);
     const siblingAccess = await accept(2);
+    const consentId = `g4pc_${suffix}`;
+    const linkId = `g4pl_${suffix}`;
+    const providerOutboxId = `g4po_${suffix}`;
+    const syncOutboxId = `g4py_${suffix}`;
+    const offlineId = `g4pf_${suffix}`;
+    const intelligenceId = `g4pi_${suffix}`;
+    const fixtureTime = clock.toISOString();
+    await createRow(config.appwriteSchema.publicationConsentsTableId, consentId, {
+      feedbackId: restoreIds.feedbackId,
+      workspaceId: "workspace_alpha",
+      projectId: "project_alpha",
+      reporterId: restoreIds.reporterId,
+      operationId: `g4pcop_${suffix}`,
+      payloadDigest: "c".repeat(64),
+      version: 1,
+      state: "active",
+      disclosureVersion: "g4-v1",
+      audience: "github:test/repository",
+      occurredAt: fixtureTime,
+    });
+    await createRow(config.appwriteSchema.externalIssueLinksTableId, linkId, {
+      feedbackId: restoreIds.feedbackId,
+      workspaceId: "workspace_alpha",
+      projectId: "project_alpha",
+      connectionId: `g4pn_${suffix}`,
+      provider: "github",
+      repositoryId: "1329343404",
+      visibility: "public",
+      providerIssueId: "424242",
+      providerIssueUrl:
+        "https://github.com/Y4NN777/y7-feedback-mngt-system/issues/424242",
+      state: "active",
+      synchronizationState: "current",
+      providerState: "open",
+      providerUpdatedAt: fixtureTime,
+      actorId: principalId,
+      createdAt: fixtureTime,
+      updatedAt: fixtureTime,
+    });
+    await createRow(config.appwriteSchema.providerOutboxTableId, providerOutboxId, {
+      operationId: `g4pop_${suffix}`,
+      feedbackId: restoreIds.feedbackId,
+      workspaceId: "workspace_alpha",
+      projectId: "project_alpha",
+      linkId,
+      connectionId: `g4pn_${suffix}`,
+      provider: "github",
+      repositoryId: "1329343404",
+      kind: "create_issue",
+      status: "pending",
+      attempts: 0,
+      payloadJson: "{}",
+      payloadDigest: "d".repeat(64),
+      createdAt: fixtureTime,
+      updatedAt: fixtureTime,
+    });
+    await createRow(config.appwriteSchema.providerSyncOutboxTableId, syncOutboxId, {
+      operationId: `g4pso_${suffix}`,
+      linkId,
+      feedbackId: restoreIds.feedbackId,
+      workspaceId: "workspace_alpha",
+      projectId: "project_alpha",
+      connectionId: `g4pn_${suffix}`,
+      provider: "github",
+      repositoryId: "1329343404",
+      kind: "message_sync",
+      status: "pending",
+      sequence: 1,
+      attempts: 0,
+      payloadEnvelope: "{}",
+      payloadDigest: "e".repeat(64),
+      originMarker: `g4-origin-${suffix}`,
+      createdAt: fixtureTime,
+      updatedAt: fixtureTime,
+    });
+    await createRow(
+      config.appwriteSchema.offlineConflictProjectionsTableId,
+      offlineId,
+      {
+        operationId: `g4pfo_${suffix}`,
+        workspaceId: "workspace_alpha",
+        projectId: "project_alpha",
+        actorContextDigest: "f".repeat(64),
+        entityType: "feedback",
+        entityId: restoreIds.feedbackId,
+        clientVersion: 1,
+        serverVersion: 2,
+        status: "open",
+        summaryEnvelope: "{}",
+        createdAt: fixtureTime,
+      },
+    );
+    await createRow(
+      config.appwriteSchema.intelligenceProvenanceTableId,
+      intelligenceId,
+      {
+        workspaceId: "workspace_alpha",
+        projectId: "project_alpha",
+        themeId: `g4pth_${suffix}`,
+        feedbackId: restoreIds.feedbackId,
+        relationType: "supports",
+        sourceVersion: 1,
+        actorId: principalId,
+        createdAt: fixtureTime,
+      },
+    );
     const denied = await deployedPrivacy(
       siblingAccess,
       restoreIds.feedbackId,
@@ -246,6 +372,63 @@ async function main(): Promise<void> {
     );
     if (!object(attribution) || attribution.kind !== "unidentified")
       throw new Error("APPWRITE_G4_PRIVACY_IDENTITY_SEARCH_FAILED");
+    await requireAbsent(
+      config.appwriteSchema.providerOutboxTableId,
+      providerOutboxId,
+      "APPWRITE_G4_PRIVACY_PROVIDER_OUTBOX_RESURRECTION",
+    );
+    await requireAbsent(
+      config.appwriteSchema.providerSyncOutboxTableId,
+      syncOutboxId,
+      "APPWRITE_G4_PRIVACY_SYNC_OUTBOX_RESURRECTION",
+    );
+    await requireAbsent(
+      config.appwriteSchema.offlineConflictProjectionsTableId,
+      offlineId,
+      "APPWRITE_G4_PRIVACY_OFFLINE_PROJECTION_RESURRECTION",
+    );
+    await requireAbsent(
+      config.appwriteSchema.intelligenceProvenanceTableId,
+      intelligenceId,
+      "APPWRITE_G4_PRIVACY_INTELLIGENCE_RESURRECTION",
+    );
+    const privacyLink = await tables.getRow({
+      databaseId: config.appwriteSchema.databaseId,
+      tableId: config.appwriteSchema.externalIssueLinksTableId,
+      rowId: linkId,
+    });
+    if (
+      !object(privacyLink) ||
+      privacyLink.state !== "privacy_deleted" ||
+      privacyLink.synchronizationState !== "privacy_cleanup_pending"
+    )
+      throw new Error("APPWRITE_G4_PRIVACY_PROVIDER_LINK_FAILED");
+    const lateProviderEvent = await createNodeAppwriteProviderIssueStateStore(tables, {
+      databaseId: config.appwriteSchema.databaseId,
+      externalIssueLinksTableId: config.appwriteSchema.externalIssueLinksTableId,
+    }).apply({
+      provider: "github",
+      deliveryId: `g4pdel_${suffix}`,
+      connectionId: `g4pn_${suffix}`,
+      workspaceId: "workspace_alpha",
+      projectId: "project_alpha",
+      repositoryId: "1329343404",
+      issueId: "424242",
+      state: "open",
+      providerUpdatedAt: new Date(clock.valueOf() + 1_000).toISOString(),
+    });
+    if (lateProviderEvent !== "permanent")
+      throw new Error("APPWRITE_G4_PRIVACY_PROVIDER_REPLAY_FAILED");
+    const consentRows = await tables.listRows({
+      databaseId: config.appwriteSchema.databaseId,
+      tableId: config.appwriteSchema.publicationConsentsTableId,
+      queries: [Query.equal("feedbackId", [restoreIds.feedbackId]), Query.limit(10)],
+      total: false,
+    });
+    for (const row of consentRows.rows)
+      extraRows.push([config.appwriteSchema.publicationConsentsTableId, row.$id]);
+    if (!consentRows.rows.some((row) => row.state === "revoked"))
+      throw new Error("APPWRITE_G4_PRIVACY_CONSENT_REVOCATION_FAILED");
 
     clock = new Date(Date.now() + 60_000);
     const restored = await application.privacy.handle({
@@ -360,6 +543,11 @@ async function main(): Promise<void> {
         purgeAtBoundary: true,
         partialFailureRetried: true,
         repeatedWorkerIdempotent: true,
+        providerReplayDenied: true,
+        pendingProviderWritesRemoved: true,
+        consentRevoked: true,
+        offlineProjectionRemoved: true,
+        intelligenceProjectionRemoved: true,
       }),
     );
   } finally {
