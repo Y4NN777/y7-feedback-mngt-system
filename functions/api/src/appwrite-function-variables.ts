@@ -85,18 +85,21 @@ export function planAppwriteFunctionVariables(
 ): readonly FunctionVariableAction[] {
   const existingByKey = new Map(existing.map((variable) => [variable.key, variable]));
 
-  return appwriteFunctionVariableKeys.map((key) => {
+  return appwriteFunctionVariableKeys.flatMap((key) => {
     const value = environment[key]?.trim();
     if (value === undefined || value.length === 0) {
+      if (existingByKey.has(key)) return [];
       throw new Error(`APPWRITE_FUNCTION_VARIABLE_MISSING:${key}`);
     }
     const current = existingByKey.get(key);
-    return {
-      kind: current === undefined ? "create" : "update",
-      id: current?.id ?? variableId(key),
-      key,
-      value,
-      secret: true,
-    };
+    return [
+      {
+        kind: current === undefined ? "create" : "update",
+        id: current?.id ?? variableId(key),
+        key,
+        value,
+        secret: true,
+      },
+    ];
   });
 }

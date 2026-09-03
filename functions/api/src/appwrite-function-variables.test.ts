@@ -64,4 +64,15 @@ describe("Appwrite Function variable policy", () => {
       "APPWRITE_FUNCTION_VARIABLE_MISSING:RELEASE",
     );
   });
+
+  it("BDD-DEL-APPWRITE-011 preserves an existing remote secret absent locally", () => {
+    const local = { ...environment, PROVIDER_OUTBOX_TRIGGER_SECRET: "" };
+    const actions = planAppwriteFunctionVariables(local, [
+      { id: "existing-trigger", key: "PROVIDER_OUTBOX_TRIGGER_SECRET" },
+    ]);
+
+    expect(actions.map(({ key }) => key)).not.toContain(
+      "PROVIDER_OUTBOX_TRIGGER_SECRET",
+    );
+  });
 });

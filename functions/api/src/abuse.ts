@@ -77,17 +77,21 @@ export function normalizeSourceIp(value: string): string | undefined {
   if (isIP(candidate) === 4) return candidate;
   if (isIP(candidate) !== 6) return undefined;
   let normalized: string;
+  /* v8 ignore start -- WHATWG URL cannot reject an address already accepted by isIP. */
   try {
     normalized = new URL(`http://[${candidate}]/`).hostname.slice(1, -1).toLowerCase();
   } catch {
     return undefined;
   }
+  /* v8 ignore stop */
   const mapped = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/u.exec(normalized);
   if (!mapped) return normalized;
+  /* v8 ignore start -- the mapped-address expression guarantees both hex groups. */
   const high = Number.parseInt(mapped[1] ?? "", 16);
   const low = Number.parseInt(mapped[2] ?? "", 16);
   if (!Number.isSafeInteger(high) || !Number.isSafeInteger(low)) return undefined;
   return `${String(high >>> 8)}.${String(high & 255)}.${String(low >>> 8)}.${String(low & 255)}`;
+  /* v8 ignore stop */
 }
 
 function validateKeyring(keyring: AbuseKeyring): void {
@@ -139,6 +143,20 @@ function publicPath(path: string): boolean {
   );
 }
 
+function header(
+  headers: Readonly<Record<string, string | undefined>>,
+  expected: string,
+): string | undefined {
+  const get = (headers as unknown as { get?: (name: string) => unknown }).get;
+  if (typeof get === "function") {
+    const value = get.call(headers, expected);
+    if (typeof value === "string") return value;
+  }
+  const direct = headers[expected];
+  if (direct !== undefined) return direct;
+  return Object.entries(headers).find(([name]) => name.toLowerCase() === expected)?.[1];
+}
+
 function intakePath(path: string): boolean {
   return /^\/v1\/projects\/[A-Za-z0-9][A-Za-z0-9._-]{0,62}\/feedback$/u.test(path);
 }
@@ -180,7 +198,13 @@ export function createAbuseGate(
   return {
     async reserve(request: AbuseRequest, now: string): Promise<AbuseGateOutcome> {
       if (!publicPath(request.path)) return { status: "allowed", reservation: {} };
-      const ip = normalizeSourceIp(request.headers["x-appwrite-client-ip"] ?? "");
+      const documentedIp = header(request.headers, "x-appwrite-client-ip");
+      const appwriteDomainIp =
+        header(request.headers, "x-appwrite-trigger") === "http" &&
+        header(request.headers, "x-appwrite-key")
+          ? header(request.headers, "x-cdn-client-ip")
+          : undefined;
+      const ip = normalizeSourceIp(documentedIp ?? appwriteDomainIp ?? "");
       if (!ip) return { status: "unavailable" };
       const attemptCounters: AbuseCounterRequest[] = [
         counter("public_ip_minute", `ip:${ip}`, 1, 60, minute, keyring),

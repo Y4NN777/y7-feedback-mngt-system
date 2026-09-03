@@ -14,25 +14,17 @@ export interface AppwriteAbuseCounterSchema {
 }
 
 export interface AppwriteAbuseCounterTables {
-  createTransaction(input: { readonly ttl: number }): Promise<{ readonly $id: string }>;
-  updateTransaction(input: {
-    readonly transactionId: string;
-    readonly commit?: boolean;
-    readonly rollback?: boolean;
-  }): Promise<unknown>;
   listRows(input: {
     readonly databaseId: string;
     readonly tableId: string;
     readonly queries: readonly string[];
     readonly total: boolean;
     readonly ttl: number;
-    readonly transactionId: string;
   }): Promise<{ readonly rows: readonly unknown[] }>;
   getRow(input: {
     readonly databaseId: string;
     readonly tableId: string;
     readonly rowId: string;
-    readonly transactionId: string;
   }): Promise<unknown>;
   createRow(input: {
     readonly databaseId: string;
@@ -40,14 +32,22 @@ export interface AppwriteAbuseCounterTables {
     readonly rowId: string;
     readonly data: Readonly<Record<string, unknown>>;
     readonly permissions: readonly [];
-    readonly transactionId: string;
   }): Promise<unknown>;
-  updateRow(input: {
+  incrementRowColumn(input: {
     readonly databaseId: string;
     readonly tableId: string;
     readonly rowId: string;
-    readonly data: Readonly<Record<string, unknown>>;
-    readonly transactionId: string;
+    readonly column: string;
+    readonly value: number;
+    readonly max: number;
+  }): Promise<unknown>;
+  decrementRowColumn(input: {
+    readonly databaseId: string;
+    readonly tableId: string;
+    readonly rowId: string;
+    readonly column: string;
+    readonly value: number;
+    readonly min: number;
   }): Promise<unknown>;
 }
 
@@ -122,140 +122,112 @@ export function createAppwriteAbuseCounterStore(
     readonly now: string;
   }) => {
     const nowMs = instant(input.now);
-    const transaction = await tables.createTransaction({ ttl: 30 });
-    if (!id.test(transaction.$id)) throw new Error("APPWRITE_ABUSE_COUNTER_INVALID");
-    try {
-      const receipts: AbuseCounterReceipt[] = [];
-      let retryAfterSeconds = 0;
-      for (const counter of input.counters) {
-        if (
-          counter.amount < 1 ||
-          counter.limit < 1 ||
-          counter.windowMs < 1 ||
-          counter.subjectDigests.length < 1 ||
-          !counter.subjectDigests.includes(counter.activeDigest)
-        )
-          throw new Error("APPWRITE_ABUSE_COUNTER_INVALID");
-        const startMs = Math.floor(nowMs / counter.windowMs) * counter.windowMs;
-        const windowStartedAt = new Date(startMs).toISOString();
-        const expiresAt = new Date(startMs + counter.windowMs).toISOString();
-        const listed = await tables.listRows({
+    const receipts: AbuseCounterReceipt[] = [];
+    let retryAfterSeconds = 0;
+    for (const counter of input.counters) {
+      if (
+        counter.amount < 1 ||
+        counter.limit < 1 ||
+        counter.windowMs < 1 ||
+        counter.subjectDigests.length < 1 ||
+        !counter.subjectDigests.includes(counter.activeDigest)
+      )
+        throw new Error("APPWRITE_ABUSE_COUNTER_INVALID");
+      const startMs = Math.floor(nowMs / counter.windowMs) * counter.windowMs;
+      const windowStartedAt = new Date(startMs).toISOString();
+      const expiresAt = new Date(startMs + counter.windowMs).toISOString();
+      const listed = await tables.listRows({
+        databaseId: schema.databaseId,
+        tableId: schema.abuseCountersTableId,
+        queries: [
+          queries.equal("dimension", [counter.dimension]),
+          queries.equal("subjectDigest", counter.subjectDigests),
+          queries.equal("windowStartedAt", [windowStartedAt]),
+          queries.limit(counter.subjectDigests.length + 1),
+        ],
+        total: false,
+        ttl: 0,
+      });
+      const rows = listed.rows.map(parsedRow);
+      const current = rows.find(({ digest }) => digest === counter.activeDigest);
+      const total = rows.reduce((sum, row) => sum + row.count, 0);
+      if (total + counter.amount > counter.limit) {
+        retryAfterSeconds = Math.max(
+          retryAfterSeconds,
+          Math.max(1, Math.ceil((startMs + counter.windowMs - nowMs) / 1_000)),
+        );
+        continue;
+      }
+      const targetId = current?.id ?? rowId(counter, windowStartedAt);
+      if (current) {
+        try {
+          await tables.incrementRowColumn({
+            databaseId: schema.databaseId,
+            tableId: schema.abuseCountersTableId,
+            rowId: targetId,
+            column: "count",
+            value: counter.amount,
+            max: counter.limit - (total - current.count),
+          });
+        } catch (error: unknown) {
+          if (object(error) && (error.code === 400 || error.code === 409)) {
+            throw Object.assign(new Error("counter contention"), { code: 409 });
+          }
+          throw error;
+        }
+      } else {
+        await tables.createRow({
           databaseId: schema.databaseId,
           tableId: schema.abuseCountersTableId,
-          queries: [
-            queries.equal("dimension", [counter.dimension]),
-            queries.equal("subjectDigest", counter.subjectDigests),
-            queries.equal("windowStartedAt", [windowStartedAt]),
-            queries.limit(counter.subjectDigests.length + 1),
-          ],
-          total: false,
-          ttl: 0,
-          transactionId: transaction.$id,
-        });
-        const rows = listed.rows.map(parsedRow);
-        const current = rows.find(({ digest }) => digest === counter.activeDigest);
-        const total = rows.reduce((sum, row) => sum + row.count, 0);
-        if (total + counter.amount > counter.limit) {
-          retryAfterSeconds = Math.max(
-            retryAfterSeconds,
-            Math.max(1, Math.ceil((startMs + counter.windowMs - nowMs) / 1_000)),
-          );
-          continue;
-        }
-        const targetId = current?.id ?? rowId(counter, windowStartedAt);
-        if (current) {
-          await tables.updateRow({
-            databaseId: schema.databaseId,
-            tableId: schema.abuseCountersTableId,
-            rowId: targetId,
-            data: { count: current.count + counter.amount, expiresAt },
-            transactionId: transaction.$id,
-          });
-        } else {
-          await tables.createRow({
-            databaseId: schema.databaseId,
-            tableId: schema.abuseCountersTableId,
-            rowId: targetId,
-            permissions: [],
-            transactionId: transaction.$id,
-            data: {
-              dimension: counter.dimension,
-              subjectDigest: counter.activeDigest,
-              keyId: counter.keyId,
-              count: counter.amount,
-              windowStartedAt,
-              expiresAt,
-            },
-          });
-        }
-        receipts.push({
-          dimension: counter.dimension,
           rowId: targetId,
-          amount: counter.amount,
+          permissions: [],
+          data: {
+            dimension: counter.dimension,
+            subjectDigest: counter.activeDigest,
+            keyId: counter.keyId,
+            count: counter.amount,
+            windowStartedAt,
+            expiresAt,
+          },
         });
       }
-      await tables.updateTransaction({ transactionId: transaction.$id, commit: true });
-      return retryAfterSeconds > 0
-        ? ({ status: "limited", retryAfterSeconds } as const)
-        : ({ status: "allowed", receipts } as const);
-    } catch (error: unknown) {
-      try {
-        await tables.updateTransaction({
-          transactionId: transaction.$id,
-          rollback: true,
-        });
-      } catch {
-        // Preserve the authoritative failure.
-      }
-      throw error;
+      receipts.push({
+        dimension: counter.dimension,
+        rowId: targetId,
+        amount: counter.amount,
+      });
     }
+    return retryAfterSeconds > 0
+      ? ({ status: "limited", retryAfterSeconds } as const)
+      : ({ status: "allowed", receipts } as const);
   };
 
   return {
     async consume(input) {
-      for (let attempt = 0; attempt < 4; attempt += 1) {
+      for (let attempt = 0; attempt < 20; attempt += 1) {
         try {
           return await consumeOnce(input);
         } catch (error: unknown) {
-          if (!retryable(error) || attempt === 3) throw error;
+          if (!retryable(error) || attempt === 19) throw error;
         }
       }
+      /* v8 ignore next -- the bounded loop either returns or throws on its final pass. */
       throw new Error("APPWRITE_ABUSE_COUNTER_UNAVAILABLE");
     },
     async release({ receipt }) {
-      const transaction = await tables.createTransaction({ ttl: 30 });
-      if (!id.test(transaction.$id)) throw new Error("APPWRITE_ABUSE_COUNTER_INVALID");
-      try {
-        const value = parsedRow(
-          await tables.getRow({
-            databaseId: schema.databaseId,
-            tableId: schema.abuseCountersTableId,
-            rowId: receipt.rowId,
-            transactionId: transaction.$id,
-          }),
-        );
-        await tables.updateRow({
-          databaseId: schema.databaseId,
-          tableId: schema.abuseCountersTableId,
-          rowId: receipt.rowId,
-          data: { count: Math.max(0, value.count - receipt.amount) },
-          transactionId: transaction.$id,
-        });
-        await tables.updateTransaction({
-          transactionId: transaction.$id,
-          commit: true,
-        });
-      } catch (error: unknown) {
-        try {
-          await tables.updateTransaction({
-            transactionId: transaction.$id,
-            rollback: true,
-          });
-        } catch {
-          // Preserve the authoritative failure.
-        }
-        throw error;
-      }
+      await tables.getRow({
+        databaseId: schema.databaseId,
+        tableId: schema.abuseCountersTableId,
+        rowId: receipt.rowId,
+      });
+      await tables.decrementRowColumn({
+        databaseId: schema.databaseId,
+        tableId: schema.abuseCountersTableId,
+        rowId: receipt.rowId,
+        column: "count",
+        value: receipt.amount,
+        min: 0,
+      });
     },
   };
 }
@@ -267,15 +239,14 @@ export function createNodeAppwriteAbuseCounterStore(
 ): AbuseCounterStore {
   return createAppwriteAbuseCounterStore(
     {
-      createTransaction: (input) => tables.createTransaction(input),
-      updateTransaction: (input) => tables.updateTransaction(input),
       listRows: async (input) => ({
         rows: (await tables.listRows({ ...input, queries: [...input.queries] })).rows,
       }),
       getRow: (input) => tables.getRow(input),
       createRow: (input) =>
         tables.createRow({ ...input, permissions: [...input.permissions] }),
-      updateRow: (input) => tables.updateRow(input),
+      incrementRowColumn: (input) => tables.incrementRowColumn(input),
+      decrementRowColumn: (input) => tables.decrementRowColumn(input),
     },
     schema,
     nodeQueries,
