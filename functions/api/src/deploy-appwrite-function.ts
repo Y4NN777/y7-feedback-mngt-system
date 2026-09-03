@@ -53,6 +53,8 @@ async function ensureFunction(
       ProjectKeyScopes.RowsRead,
       ProjectKeyScopes.RowsWrite,
       ProjectKeyScopes.FilesRead,
+      ProjectKeyScopes.UsersRead,
+      ProjectKeyScopes.TeamsRead,
     ],
     deploymentRetention: 3,
   };
