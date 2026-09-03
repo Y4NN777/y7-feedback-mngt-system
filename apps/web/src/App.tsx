@@ -18,6 +18,8 @@ import type { OfflineIntakeReplay } from "./OfflineIntakeReplay";
 import type { ProjectGateway } from "./ProjectGateway";
 import type { PublicationConsentGateway } from "./PublicationConsentGateway";
 import type { PrivacyGateway } from "./PrivacyGateway";
+import type { PlatformAccessGateway } from "./PlatformAccessGateway";
+import { PlatformAccessPage } from "./PlatformAccessPage";
 import { RetrieveFeedback, type AccountlessGateway } from "./RetrieveFeedback";
 import type { WorkbenchGateway } from "./WorkbenchGateway";
 import { WorkbenchPage } from "./WorkbenchPage";
@@ -43,6 +45,9 @@ const unavailablePublicationConsentGateway: PublicationConsentGateway = {
 };
 const unavailablePrivacyGateway: PrivacyGateway = {
   requestDeletion: () => Promise.resolve({ status: "retryable" }),
+};
+const unavailablePlatformAccessGateway: PlatformAccessGateway = {
+  execute: () => Promise.resolve({ status: "retryable" }),
 };
 const unavailableAdministrationGateway: AdministrationGateway = {
   execute: () => Promise.resolve({ status: "retryable" }),
@@ -181,6 +186,7 @@ export function App({
   projectGateway = unavailableProjectGateway,
   publicationConsentGateway = unavailablePublicationConsentGateway,
   privacyGateway = unavailablePrivacyGateway,
+  platformAccessGateway = unavailablePlatformAccessGateway,
   redirectProject = (canonicalSlug) => {
     window.location.replace(`/${canonicalSlug}`);
   },
@@ -201,6 +207,7 @@ export function App({
   readonly projectGateway?: ProjectGateway;
   readonly publicationConsentGateway?: PublicationConsentGateway;
   readonly privacyGateway?: PrivacyGateway;
+  readonly platformAccessGateway?: PlatformAccessGateway;
   readonly redirectProject?: (canonicalSlug: string) => void;
   readonly workbenchGateway?: WorkbenchGateway;
   readonly notificationInvalidation?: NotificationInvalidation;
@@ -264,6 +271,16 @@ export function App({
     return (
       <SourceManagementPage
         gateway={sourceManagementGateway}
+        locale={locale}
+        onLocaleChange={selectLocale}
+        session={administrationSession}
+      />
+    );
+  }
+  if (window.location.pathname === "/platform/access") {
+    return (
+      <PlatformAccessPage
+        gateway={platformAccessGateway}
         locale={locale}
         onLocaleChange={selectLocale}
         session={administrationSession}
