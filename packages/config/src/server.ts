@@ -57,6 +57,8 @@ export interface ServerConfig {
   readonly providerGrantEnvelopeKey: string;
   readonly sensitiveDataActiveKeyId: string;
   readonly sensitiveDataEnvelopeKeys: Readonly<Record<string, string>>;
+  readonly abuseHmacActiveKeyId: string;
+  readonly abuseHmacKeys: Readonly<Record<string, string>>;
   readonly providers?: {
     readonly github: {
       readonly clientId: string;
@@ -347,6 +349,15 @@ export function parseServerConfig(
     input.SENSITIVE_DATA_ACTIVE_KEY_ID,
     [accessProofEnvelopeKey, providerGrantEnvelopeKey],
   );
+  const abuseHmacKeys = parseSensitiveDataKeys(
+    input.ABUSE_HMAC_KEYS,
+    input.ABUSE_HMAC_ACTIVE_KEY_ID,
+    [
+      accessProofEnvelopeKey,
+      providerGrantEnvelopeKey,
+      ...Object.values(sensitiveDataKeys.keys),
+    ],
+  );
   const providers = parseProviders(input);
   const providerOutboxTriggerSecret = parseOptionalTriggerSecret(
     input.PROVIDER_OUTBOX_TRIGGER_SECRET,
@@ -366,6 +377,8 @@ export function parseServerConfig(
     providerGrantEnvelopeKey,
     sensitiveDataActiveKeyId: sensitiveDataKeys.activeKeyId,
     sensitiveDataEnvelopeKeys: sensitiveDataKeys.keys,
+    abuseHmacActiveKeyId: abuseHmacKeys.activeKeyId,
+    abuseHmacKeys: abuseHmacKeys.keys,
     ...(providers === undefined ? {} : { providers }),
     release: requireValue(input.RELEASE),
   };

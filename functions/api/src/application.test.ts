@@ -60,6 +60,10 @@ const config: ServerConfig = {
   sensitiveDataEnvelopeKeys: {
     data_2026_08: "CgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgo",
   },
+  abuseHmacActiveKeyId: "abuse_2026_08",
+  abuseHmacKeys: {
+    abuse_2026_08: "CwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCws",
+  },
   release: "commit-application",
 };
 
@@ -217,7 +221,10 @@ describe("trusted Function composition root", () => {
       req: {
         method: "POST",
         path: "/v1/projects/wisemoney/feedback",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          "x-appwrite-client-ip": "203.0.113.10",
+        },
         bodyJson: {
           clientOperationId: "123e4567-e89b-42d3-a456-426614174000",
           locale: "fr",
@@ -256,7 +263,7 @@ describe("trusted Function composition root", () => {
         "x-correlation-id": "correlation-1",
       }),
     );
-    expect(tables.rows).toHaveLength(7);
+    expect(tables.rows).toHaveLength(9);
     expect(tables.rows.every((row) => JSON.stringify(row.permissions) === "[]")).toBe(
       true,
     );

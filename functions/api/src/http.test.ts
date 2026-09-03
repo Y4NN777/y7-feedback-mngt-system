@@ -31,6 +31,82 @@ function createContext(
 }
 
 describe("trusted API entrypoint", () => {
+  it("BDD-ABUSE-201 returns a non-cacheable 429 before public handling", async () => {
+    const publicHandle = vi.fn();
+    const publicApi = { handle: publicHandle } as unknown as PublicApi;
+    const abuse = {
+      reserve: vi.fn().mockResolvedValue({
+        status: "limited",
+        retryAfterSeconds: 37,
+      }),
+      settle: vi.fn(),
+    };
+    const { context, json } = createContext("GET", "/v1/projects/wisemoney", {
+      headers: { "x-appwrite-client-ip": "203.0.113.10" },
+    });
+
+    await routeRequest(context, { ...dependencies, abuse, publicApi });
+
+    expect(json).toHaveBeenCalledWith(
+      { error: "ERR-ABUSE-LIMITED" },
+      429,
+      expect.objectContaining({
+        "cache-control": "no-store",
+        "retry-after": "37",
+      }),
+    );
+    expect(publicHandle).not.toHaveBeenCalled();
+    expect(abuse.settle).not.toHaveBeenCalled();
+  });
+
+  it("BDD-ABUSE-202 fails closed and releases a rejected identity reservation", async () => {
+    const receipt = {
+      dimension: "external_identity_hour" as const,
+      rowId: "abuse_receipt",
+      amount: 1,
+    };
+    const unavailable = createContext("GET", "/providers/github/connect", {
+      headers: { "x-appwrite-client-ip": "203.0.113.10" },
+    });
+    await routeRequest(unavailable.context, {
+      ...dependencies,
+      abuse: {
+        reserve: vi.fn().mockResolvedValue({ status: "unavailable" }),
+        settle: vi.fn(),
+      },
+    });
+    expect(unavailable.json).toHaveBeenCalledWith(
+      { error: "ERR-ABUSE-UNAVAILABLE" },
+      503,
+      expect.objectContaining({ "cache-control": "no-store" }),
+    );
+
+    const rejected = createContext("POST", "/v1/projects/wisemoney/feedback", {
+      headers: { "x-appwrite-client-ip": "203.0.113.10" },
+      bodyJson: {},
+    });
+    const abuse = {
+      reserve: vi.fn().mockResolvedValue({
+        status: "allowed",
+        reservation: { identity: receipt },
+      }),
+      settle: vi.fn().mockResolvedValue(undefined),
+    };
+    const publicApi = {
+      handle: vi.fn().mockResolvedValue({ statusCode: 400, body: { error: "bad" } }),
+    } as unknown as PublicApi;
+    await routeRequest(rejected.context, {
+      ...dependencies,
+      abuse,
+      publicApi,
+    });
+    expect(abuse.settle).toHaveBeenCalledWith(
+      { identity: receipt },
+      false,
+      expect.any(String),
+    );
+  });
+
   it("BDD-INGRESS-001 accepts exactly 10 MiB plus multipart overhead in Preview", async () => {
     const fileBytes = 10 * 1024 * 1024;
     const bodyBinary = new Uint8Array(fileBytes + 173);
