@@ -20,6 +20,7 @@
     "probe": "node scripts/probe.mjs",
     "probe:ingress": "node scripts/ingress-probe.mjs",
     "probe:vercel:preview": "node scripts/vercel-preview-probe.mjs",
+    "recovery:backup": "pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build && node functions/api/dist/run-recovery-backup.js --apply",
     "provision:appwrite": "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build && node --env-file=.env.appwrite-preview functions/api/dist/provision-appwrite.js --apply",
     "provision:appwrite:production": "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build && node --env-file=.env.appwrite-production functions/api/dist/provision-appwrite.js --apply --production",
     "verify:appwrite:g1": "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build && node --env-file=.env.appwrite-preview functions/api/dist/verify-appwrite-g1.js --apply",

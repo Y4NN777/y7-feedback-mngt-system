@@ -35,7 +35,7 @@ describe("Azure private recovery repository", () => {
     const objects = new Map<string, Buffer>();
     const conditions: unknown[] = [];
     const container = {
-      createIfNotExists: () => Promise.resolve(undefined),
+      getProperties: () => Promise.resolve({}),
       getBlockBlobClient: (key: string) => ({
         uploadData: (value: Buffer, options: { conditions?: unknown }) => {
           conditions.push(options.conditions);
@@ -73,5 +73,20 @@ describe("Azure private recovery repository", () => {
     await repository.delete("generation/a");
     await expect(repository.get("generation/a")).resolves.toBeUndefined();
     expect(conditions).toEqual([{ ifNoneMatch: "*" }, { ifNoneMatch: "*" }]);
+  });
+
+  it("BDD-REC-010A rejects a container with public blob access", async () => {
+    const repository = createAzureRecoveryObjectRepository({
+      getProperties: () => Promise.resolve({ blobPublicAccess: "blob" }),
+      getBlockBlobClient: () => ({
+        uploadData: () => Promise.resolve(),
+        download: () => Promise.resolve({}),
+        deleteIfExists: () => Promise.resolve(),
+        exists: () => Promise.resolve(false),
+      }),
+    });
+    await expect(repository.get("generation/a")).rejects.toThrow(
+      "RECOVERY_DESTINATION_PUBLIC",
+    );
   });
 });
