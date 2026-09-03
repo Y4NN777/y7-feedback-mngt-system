@@ -16,7 +16,10 @@ import { createNodeAppwritePrivacyProviderCleanup } from "./appwrite-privacy-pro
 import { createNodeAppwriteAbuseCounterStore } from "./appwrite-abuse-counter-store.js";
 import { createNodeAppwritePrivateAttachmentStorage } from "./appwrite-private-attachment-storage.js";
 import { createNodeAppwritePrincipalVerifier } from "./appwrite-principal-verifier.js";
-import { createNodeAppwritePlatformAccessStore } from "./appwrite-platform-access-store.js";
+import {
+  createNodeAppwritePlatformAccessExpiryWorker,
+  createNodeAppwritePlatformAccessStore,
+} from "./appwrite-platform-access-store.js";
 import { createNodeAppwritePlatformAuthority } from "./appwrite-platform-authority.js";
 import { createNodeAppwriteConversationLifecycleStore } from "./appwrite-conversation-lifecycle-store.js";
 import { createNodeAppwriteConversationProjectionStore } from "./appwrite-conversation-projection-store.js";
@@ -295,6 +298,27 @@ export function createHttpApplication(
           ),
         );
       })()
+    : undefined;
+  /* v8 ignore stop */
+  /* v8 ignore start -- scheduled expiry is exercised by the real Preview matrix. */
+  const platformExpiry = config.platformAccess
+    ? createNodeAppwritePlatformAccessExpiryWorker(
+        runtime.tables,
+        {
+          databaseId: config.appwriteSchema.databaseId,
+          grantsTableId: config.appwriteSchema.exceptionalAccessGrantsTableId,
+          auditTableId: config.appwriteSchema.exceptionalAccessAuditTableId,
+        },
+        sensitive,
+        {
+          now: runtime.nowIso,
+          createAuditId: (grantId, sequence) =>
+            createHash("sha256")
+              .update(`${grantId}:${String(sequence)}`)
+              .digest("base64url")
+              .slice(0, 36),
+        },
+      )
     : undefined;
   /* v8 ignore stop */
   const workspaceScopeSchema = {
@@ -873,6 +897,7 @@ export function createHttpApplication(
             return { status: "completed", purge, providerCleanup };
           },
         },
+        ...(platformExpiry === undefined ? {} : { platform: platformExpiry }),
         webhooks: createProviderWebhookReconciliation(
           createNodeAppwriteActiveSourceGrantReader(runtime.tables, {
             databaseId: config.appwriteSchema.databaseId,
@@ -884,7 +909,10 @@ export function createHttpApplication(
         ),
       });
     }
-    return createProviderMaintenance({ privacy: privacyPurgeWorker });
+    return createProviderMaintenance({
+      privacy: privacyPurgeWorker,
+      ...(platformExpiry === undefined ? {} : { platform: platformExpiry }),
+    });
   })();
   /* v8 ignore stop */
 

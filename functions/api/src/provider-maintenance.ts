@@ -16,9 +16,13 @@ export function createProviderMaintenance(input: {
   readonly outbox?: ProviderMaintenanceCapability;
   readonly webhooks?: ProviderMaintenanceCapability;
   readonly privacy?: ProviderMaintenanceCapability;
+  readonly platform?: ProviderMaintenanceCapability;
 }): ProviderMaintenance {
   const capabilities = Object.entries(input) as Array<
-    ["inbox" | "outbox" | "webhooks" | "privacy", ProviderMaintenanceCapability]
+    [
+      "inbox" | "outbox" | "webhooks" | "privacy" | "platform",
+      ProviderMaintenanceCapability,
+    ]
   >;
   if (capabilities.length === 0)
     throw new Error("PROVIDER_MAINTENANCE_CONFIGURATION_INVALID");
