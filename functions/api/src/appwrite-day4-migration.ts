@@ -17,6 +17,7 @@ export const day4TableIds = [
   "abuse_counters",
   "exceptional_access_grants",
   "exceptional_access_audit",
+  "exceptional_access_operations",
 ] as const;
 
 export interface Day4SchemaIds {
@@ -28,6 +29,7 @@ export interface Day4SchemaIds {
   readonly abuseCountersTableId: string;
   readonly exceptionalAccessGrantsTableId: string;
   readonly exceptionalAccessAuditTableId: string;
+  readonly exceptionalAccessOperationsTableId: string;
 }
 
 export const canonicalDay4SchemaIds: Day4SchemaIds = {
@@ -39,6 +41,7 @@ export const canonicalDay4SchemaIds: Day4SchemaIds = {
   abuseCountersTableId: day4TableIds[5],
   exceptionalAccessGrantsTableId: day4TableIds[6],
   exceptionalAccessAuditTableId: day4TableIds[7],
+  exceptionalAccessOperationsTableId: day4TableIds[8],
 };
 
 const varchar = (key: string, size: number, required = true): AppwriteColumn => ({
@@ -303,6 +306,24 @@ export function createDay4TableDefinitions(
       [
         index("grant_sequence_unique", ["grantId", "sequence"], "unique"),
         index("actor_time", ["actorId", "occurredAt"]),
+      ],
+    ),
+    table(
+      ids.exceptionalAccessOperationsTableId,
+      "Exceptional access idempotent operations",
+      [
+        varchar("grantId", 36),
+        varchar("operationId", 36),
+        varchar("payloadDigest", 64),
+        varchar("outcome", 16),
+        integer("revision"),
+        text("resultEnvelope", false),
+        datetime("createdAt"),
+        datetime("expiresAt"),
+      ],
+      [
+        index("grant_operation_unique", ["grantId", "operationId"], "unique"),
+        index("expiry", ["expiresAt"]),
       ],
     ),
   ];

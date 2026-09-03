@@ -57,6 +57,7 @@ export interface ServerConfig {
     readonly abuseCountersTableId: string;
     readonly exceptionalAccessGrantsTableId: string;
     readonly exceptionalAccessAuditTableId: string;
+    readonly exceptionalAccessOperationsTableId: string;
   };
   readonly accessProofEnvelopeKey: string;
   readonly providerGrantEnvelopeKey: string;
@@ -170,6 +171,10 @@ function parseAppwriteSchema(input: Readonly<Record<string, string | undefined>>
     ),
     exceptionalAccessAuditTableId: requireAppwriteId(
       input.APPWRITE_EXCEPTIONAL_ACCESS_AUDIT_TABLE_ID ?? "exceptional_access_audit",
+    ),
+    exceptionalAccessOperationsTableId: requireAppwriteId(
+      input.APPWRITE_EXCEPTIONAL_ACCESS_OPERATIONS_TABLE_ID ??
+        "exceptional_access_operations",
     ),
   };
   if (new Set(Object.values(tableIds)).size !== Object.values(tableIds).length) {
