@@ -59,6 +59,37 @@ describe("trusted API entrypoint", () => {
     expect(abuse.settle).not.toHaveBeenCalled();
   });
 
+  it("BDD-ABUSE-203 never reads Appwrite bodyJson on a bodyless GET", async () => {
+    const request = {
+      method: "GET",
+      path: "/v1/projects/wisemoney",
+      headers: { "x-appwrite-client-ip": "203.0.113.10" },
+      get bodyJson(): never {
+        throw new SyntaxError("Unexpected end of JSON input");
+      },
+    };
+    const json = vi.fn();
+    await routeRequest(
+      {
+        req: request,
+        res: { json },
+        log: vi.fn(),
+        error: vi.fn(),
+      },
+      {
+        ...dependencies,
+        abuse: {
+          reserve: vi.fn().mockResolvedValue({
+            status: "allowed",
+            reservation: {},
+          }),
+          settle: vi.fn(),
+        },
+      },
+    );
+    expect(json).toHaveBeenCalledWith({ error: "not_found" }, 404, expect.any(Object));
+  });
+
   it("BDD-ABUSE-202 fails closed and releases a rejected identity reservation", async () => {
     const receipt = {
       dimension: "external_identity_hour" as const,
@@ -104,6 +135,19 @@ describe("trusted API entrypoint", () => {
       { identity: receipt },
       false,
       expect.any(String),
+    );
+
+    const releaseFailure = createContext("POST", "/v1/projects/wisemoney/feedback", {
+      headers: { "x-appwrite-client-ip": "203.0.113.10" },
+      bodyJson: {},
+    });
+    await routeRequest(releaseFailure.context, {
+      ...dependencies,
+      abuse: { ...abuse, settle: vi.fn().mockRejectedValue(new Error("storage")) },
+      publicApi,
+    });
+    expect(releaseFailure.context.log).toHaveBeenCalledWith(
+      expect.stringContaining('"statusCode":503'),
     );
   });
 

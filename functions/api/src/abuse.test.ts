@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createAbuseGate, normalizeSourceIp, type AbuseCounterStore } from "./abuse";
+import {
+  createAbuseGate,
+  normalizeSourceIp,
+  type AbuseCounterStore,
+  type AbuseProjectScopeResolver,
+} from "./abuse";
 
 const keyring = {
   active: { id: "2026_09", material: new Uint8Array(32).fill(1) },
@@ -27,7 +32,7 @@ function setup(
     consume: (input) => consumeSpy(input),
     release: (input) => releaseSpy(input),
   };
-  const resolve = vi.fn(() =>
+  const resolve = vi.fn<AbuseProjectScopeResolver["resolve"]>(() =>
     Promise.resolve({ workspaceId: "workspace_1", projectId: "project_1" }),
   );
   return {
@@ -35,6 +40,7 @@ function setup(
     consumeSpy,
     releaseSpy,
     resolve,
+    store,
   };
 }
 
@@ -125,6 +131,141 @@ describe("anti-abuse gate", () => {
           release: () => Promise.resolve(),
         },
         { active: { id: "bad id", material: new Uint8Array(2) } },
+        { resolve: () => Promise.resolve({ status: "denied" }) },
+      ),
+    ).toThrow("ABUSE_KEYRING_INVALID");
+  });
+
+  it("BDD-ABUSE-006 accepts the Appwrite CDN IP only with injected execution authority", async () => {
+    const trusted = setup();
+    await expect(
+      trusted.gate.reserve(
+        {
+          ...intake,
+          headers: {
+            "x-appwrite-trigger": "http",
+            "x-appwrite-key": "dynamic-authority",
+            "x-cdn-client-ip": "203.0.113.77",
+          },
+        },
+        "2026-09-03T12:00:00.000Z",
+      ),
+    ).resolves.toMatchObject({ status: "allowed" });
+    const untrusted = setup();
+    await expect(
+      untrusted.gate.reserve(
+        {
+          ...intake,
+          headers: {
+            "x-cdn-client-ip": "203.0.113.77",
+            "x-forwarded-for": "203.0.113.77",
+          },
+        },
+        "2026-09-03T12:00:00.000Z",
+      ),
+    ).resolves.toEqual({ status: "unavailable" });
+  });
+
+  it("BDD-ABUSE-007 handles header adapters, denied scopes and retryable resolution", async () => {
+    const adapterHeaders = {
+      get: (name: string) =>
+        name === "x-appwrite-client-ip" ? "203.0.113.88" : undefined,
+    } as unknown as Readonly<Record<string, string | undefined>>;
+    const adapted = setup();
+    await expect(
+      adapted.gate.reserve(
+        { method: "GET", path: "/v1/feedback/reference", headers: adapterHeaders },
+        "2026-09-03T12:00:00.000Z",
+      ),
+    ).resolves.toMatchObject({ status: "allowed" });
+    const upperCase = setup();
+    await expect(
+      upperCase.gate.reserve(
+        {
+          method: "GET",
+          path: "/providers/github/connect",
+          headers: { "X-Appwrite-Client-IP": "203.0.113.89" },
+        },
+        "2026-09-03T12:00:00.000Z",
+      ),
+    ).resolves.toMatchObject({ status: "allowed" });
+
+    const denied = setup();
+    denied.resolve.mockResolvedValueOnce({ status: "denied" });
+    await expect(
+      denied.gate.reserve(intake, "2026-09-03T12:00:00.000Z"),
+    ).resolves.toMatchObject({ status: "allowed", reservation: {} });
+    const retryable = setup();
+    retryable.resolve.mockResolvedValueOnce({ status: "retryable" });
+    await expect(
+      retryable.gate.reserve(intake, "2026-09-03T12:00:00.000Z"),
+    ).resolves.toEqual({ status: "unavailable" });
+    const failed = setup();
+    failed.resolve.mockRejectedValueOnce(new Error("storage"));
+    await expect(
+      failed.gate.reserve(intake, "2026-09-03T12:00:00.000Z"),
+    ).resolves.toEqual({ status: "unavailable" });
+  });
+
+  it("BDD-ABUSE-008 handles non-intake bodies and missing identity receipts", async () => {
+    const noPrevious = setup();
+    const gate = createAbuseGate(
+      noPrevious.store,
+      { active: keyring.active },
+      { resolve: () => Promise.resolve({ status: "denied" }) },
+    );
+    await expect(
+      gate.reserve(
+        {
+          method: "POST",
+          path: "/v1/projects/wisemoney/feedback",
+          headers: { "x-appwrite-client-ip": "203.0.113.90" },
+          body: { feedback: { reporter: { kind: "unidentified" } } },
+        },
+        "2026-09-03T12:00:00.000Z",
+      ),
+    ).resolves.toMatchObject({ status: "allowed" });
+    await expect(
+      gate.reserve(
+        {
+          method: "POST",
+          path: "/v1/projects/wisemoney/feedback",
+          headers: { "x-appwrite-client-ip": "203.0.113.91" },
+          body: null,
+        },
+        "2026-09-03T12:00:00.000Z",
+      ),
+    ).resolves.toMatchObject({ status: "allowed" });
+    let calls = 0;
+    const identityLimited = setup(({ counters }) => {
+      calls += 1;
+      return calls === 2
+        ? Promise.resolve({ status: "limited", retryAfterSeconds: 42 })
+        : Promise.resolve({
+            status: "allowed",
+            receipts: counters.map((candidate, index) => ({
+              dimension: candidate.dimension,
+              rowId: `allowed_${String(index)}`,
+              amount: candidate.amount,
+            })),
+          });
+    });
+    await expect(
+      identityLimited.gate.reserve(intake, "2026-09-03T12:00:00.000Z"),
+    ).resolves.toEqual({ status: "limited", retryAfterSeconds: 42 });
+    const missingReceipt = setup(({ counters }) =>
+      Promise.resolve({ status: "allowed", receipts: counters.length > 1 ? [] : [] }),
+    );
+    await expect(
+      missingReceipt.gate.reserve(intake, "2026-09-03T12:00:00.000Z"),
+    ).resolves.toEqual({ status: "unavailable" });
+    expect(() =>
+      createAbuseGate(
+        noPrevious.store,
+        {
+          active: keyring.active,
+          previous: { id: keyring.active.id, material: new Uint8Array(32).fill(3) },
+        },
         { resolve: () => Promise.resolve({ status: "denied" }) },
       ),
     ).toThrow("ABUSE_KEYRING_INVALID");

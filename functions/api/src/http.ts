@@ -158,7 +158,9 @@ export async function routeRequest(
             method,
             path: req.path,
             headers: requestHeaders,
-            ...(req.bodyJson === undefined ? {} : { body: req.bodyJson }),
+            ...(method !== "POST" || contentType.startsWith("multipart/form-data")
+              ? {}
+              : { body: req.bodyJson }),
           },
           new Date(dependencies.now()).toISOString(),
         );
@@ -408,7 +410,7 @@ export async function routeRequest(
     } catch {
       log(
         serializeOperationalEvent({
-          event: "api.abuse.reservation.release_failed",
+          event: "api.request.completed",
           correlationId,
           environment: dependencies.environment,
           release: dependencies.release,

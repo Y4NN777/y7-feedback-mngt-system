@@ -15,43 +15,9 @@ const queries = {
 
 class FakeTables implements AppwriteAbuseCounterTables {
   readonly rows = new Map<string, Readonly<Record<string, unknown>>>();
-  readonly transactions = new Map<
-    string,
-    Map<string, Readonly<Record<string, unknown>>>
-  >();
-  transactionSequence = 0;
-  commits = 0;
-  rollbacks = 0;
   conflicts = 0;
   failList = false;
-
-  createTransaction = vi.fn(() => {
-    const transactionId = `transaction_${String(++this.transactionSequence)}`;
-    this.transactions.set(transactionId, new Map(this.rows));
-    return Promise.resolve({ $id: transactionId });
-  });
-  updateTransaction = vi.fn(
-    (input: Parameters<AppwriteAbuseCounterTables["updateTransaction"]>[0]) => {
-      if (input.commit && this.conflicts > 0) {
-        this.conflicts -= 1;
-        this.transactions.delete(input.transactionId);
-        return Promise.reject(Object.assign(new Error("conflict"), { code: 409 }));
-      }
-      if (input.commit) {
-        const staged = this.transactions.get(input.transactionId);
-        if (!staged) return Promise.reject(new Error("missing transaction"));
-        this.rows.clear();
-        for (const [rowId, row] of staged) this.rows.set(rowId, row);
-        this.transactions.delete(input.transactionId);
-        this.commits += 1;
-      }
-      if (input.rollback) {
-        this.transactions.delete(input.transactionId);
-        this.rollbacks += 1;
-      }
-      return Promise.resolve({});
-    },
-  );
+  failIncrement = false;
   listRows = vi.fn((input: Parameters<AppwriteAbuseCounterTables["listRows"]>[0]) => {
     if (this.failList) return Promise.reject(new Error("storage"));
     const equals = input.queries.flatMap((query) => {
@@ -59,9 +25,7 @@ class FakeTables implements AppwriteAbuseCounterTables {
       return [JSON.parse(query) as { attribute: string; values: (string | number)[] }];
     });
     return Promise.resolve({
-      rows: [
-        ...(this.transactions.get(input.transactionId) ?? this.rows).values(),
-      ].filter((row) =>
+      rows: [...this.rows.values()].filter((row) =>
         equals.every(({ attribute, values }) =>
           values.map(String).includes(String(row[attribute])),
         ),
@@ -69,27 +33,44 @@ class FakeTables implements AppwriteAbuseCounterTables {
     });
   });
   getRow = vi.fn((input: Parameters<AppwriteAbuseCounterTables["getRow"]>[0]) => {
-    const row = (this.transactions.get(input.transactionId) ?? this.rows).get(
-      input.rowId,
-    );
+    const row = this.rows.get(input.rowId);
     return row
       ? Promise.resolve(row)
       : Promise.reject(Object.assign(new Error("absent"), { code: 404 }));
   });
   createRow = vi.fn((input: Parameters<AppwriteAbuseCounterTables["createRow"]>[0]) => {
-    const rows = this.transactions.get(input.transactionId) ?? this.rows;
+    const rows = this.rows;
     if (rows.has(input.rowId))
       return Promise.reject(Object.assign(new Error("conflict"), { code: 409 }));
     const row = { $id: input.rowId, ...input.data };
     rows.set(input.rowId, row);
     return Promise.resolve(row);
   });
-  updateRow = vi.fn((input: Parameters<AppwriteAbuseCounterTables["updateRow"]>[0]) => {
-    const rows = this.transactions.get(input.transactionId) ?? this.rows;
-    const row = { ...rows.get(input.rowId), ...input.data };
-    rows.set(input.rowId, row);
-    return Promise.resolve(row);
-  });
+  incrementRowColumn = vi.fn(
+    (input: Parameters<AppwriteAbuseCounterTables["incrementRowColumn"]>[0]) => {
+      if (this.failIncrement) return Promise.reject(new Error("increment storage"));
+      if (this.conflicts > 0) {
+        this.conflicts -= 1;
+        return Promise.reject(Object.assign(new Error("conflict"), { code: 409 }));
+      }
+      const row = this.rows.get(input.rowId);
+      const count = Number(row?.count ?? 0) + input.value;
+      if (count > input.max)
+        return Promise.reject(Object.assign(new Error("maximum"), { code: 400 }));
+      const updated = { ...row, count };
+      this.rows.set(input.rowId, updated);
+      return Promise.resolve(updated);
+    },
+  );
+  decrementRowColumn = vi.fn(
+    (input: Parameters<AppwriteAbuseCounterTables["decrementRowColumn"]>[0]) => {
+      const row = this.rows.get(input.rowId);
+      const count = Math.max(input.min, Number(row?.count ?? 0) - input.value);
+      const updated = { ...row, count };
+      this.rows.set(input.rowId, updated);
+      return Promise.resolve(updated);
+    },
+  );
 }
 
 function counter(overrides: Partial<AbuseCounterRequest> = {}): AbuseCounterRequest {
@@ -195,14 +176,43 @@ describe("Appwrite abuse counter store", () => {
 
   it("BDD-ABUSE-105 retries conflicts and rolls back storage failures", async () => {
     const retried = setup();
-    retried.tables.conflicts = 1;
+    await retried.store.consume({
+      counters: [counter()],
+      now: "2026-09-03T12:00:00.000Z",
+    });
+    retried.tables.conflicts = 5;
     await expect(
       retried.store.consume({
         counters: [counter()],
         now: "2026-09-03T12:00:00.000Z",
       }),
     ).resolves.toMatchObject({ status: "allowed" });
-    expect(retried.tables.rollbacks).toBe(1);
+
+    const exhausted = setup();
+    await exhausted.store.consume({
+      counters: [counter()],
+      now: "2026-09-03T12:00:00.000Z",
+    });
+    exhausted.tables.conflicts = 20;
+    await expect(
+      exhausted.store.consume({
+        counters: [counter()],
+        now: "2026-09-03T12:00:00.000Z",
+      }),
+    ).rejects.toThrow("counter contention");
+
+    const incrementFailed = setup();
+    await incrementFailed.store.consume({
+      counters: [counter()],
+      now: "2026-09-03T12:00:00.000Z",
+    });
+    incrementFailed.tables.failIncrement = true;
+    await expect(
+      incrementFailed.store.consume({
+        counters: [counter()],
+        now: "2026-09-03T12:00:00.000Z",
+      }),
+    ).rejects.toThrow("increment storage");
 
     const failed = setup();
     failed.tables.failList = true;
@@ -212,7 +222,6 @@ describe("Appwrite abuse counter store", () => {
         now: "2026-09-03T12:00:00.000Z",
       }),
     ).rejects.toThrow("storage");
-    expect(failed.tables.rollbacks).toBe(1);
   });
 
   it("BDD-ABUSE-106 rejects invalid schema, time, counters and transaction IDs", async () => {
@@ -230,6 +239,23 @@ describe("Appwrite abuse counter store", () => {
     await expect(
       store.consume({
         counters: [counter({ amount: 0 })],
+        now: "2026-09-03T12:00:00.000Z",
+      }),
+    ).rejects.toThrow("APPWRITE_ABUSE_COUNTER_INVALID");
+  });
+
+  it("BDD-ABUSE-107 rejects malformed persisted counters", async () => {
+    const { store, tables } = setup();
+    tables.rows.set("malformed", {
+      $id: "malformed",
+      dimension: "public_ip_minute",
+      subjectDigest: "digest_current",
+      windowStartedAt: "2026-09-03T12:00:00.000Z",
+      count: -1,
+    });
+    await expect(
+      store.consume({
+        counters: [counter()],
         now: "2026-09-03T12:00:00.000Z",
       }),
     ).rejects.toThrow("APPWRITE_ABUSE_COUNTER_INVALID");
