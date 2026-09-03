@@ -93,6 +93,7 @@ export function PlatformAccessPage({
           : action === "use"
             ? {
                 kind: action,
+                operationId: globalThis.crypto.randomUUID(),
                 grantId,
                 expectedRevision: revision,
                 ...scope,
@@ -244,6 +245,7 @@ export function PlatformAccessPage({
                 <label>
                   {copy.projectId}
                   <input
+                    required={action === "use"}
                     value={projectId}
                     onChange={(e) => {
                       setProjectId(e.target.value);
@@ -253,6 +255,7 @@ export function PlatformAccessPage({
                 <label>
                   {copy.feedbackId}
                   <input
+                    required={action === "use"}
                     value={feedbackId}
                     onChange={(e) => {
                       setFeedbackId(e.target.value);
@@ -342,6 +345,12 @@ export function PlatformAccessPage({
         </>
       )}
       {outcomeText && <p role="status">{outcomeText}</p>}
+      {outcome?.status === "ok" && outcome.result.content && (
+        <section aria-labelledby="platform-protected-result">
+          <h2 id="platform-protected-result">{copy.protectedResult}</h2>
+          <pre>{JSON.stringify(outcome.result.content, null, 2)}</pre>
+        </section>
+      )}
     </main>
   );
 }

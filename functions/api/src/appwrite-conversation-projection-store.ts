@@ -121,7 +121,7 @@ function actor(value: unknown): value is "workspace" | "reporter" {
   return value === "workspace" || value === "reporter";
 }
 
-function message(
+export function parseConversationProjectionMessage(
   value: unknown,
   expected: {
     readonly feedbackId: string;
@@ -294,7 +294,7 @@ export function createAppwriteConversationProjectionStore(
         ttl: 0,
       });
       const messages = messageRows.rows.map((row) =>
-        message(
+        parseConversationProjectionMessage(
           row,
           {
             ...scope,
@@ -324,7 +324,7 @@ export function createAppwriteConversationProjectionStore(
       return {
         ...base,
         internalNotes: noteRows.rows.map((row) =>
-          message(
+          parseConversationProjectionMessage(
             row,
             { ...scope, tableId: schema.internalNotesTableId, audience: "workspace" },
             persistence,

@@ -14,13 +14,30 @@ import {
   type ExceptionalAccessGrant,
 } from "@y7-feedback/domain";
 
-import type { PlatformAccessCommand, PlatformAccessStore } from "./platform-access.js";
+import type {
+  PlatformAccessCommand,
+  PlatformAccessContent,
+  PlatformAccessStore,
+} from "./platform-access.js";
 import type { AppwriteSensitivePersistence } from "./sensitive-data-protector.js";
 
 export interface AppwritePlatformAccessSchema {
   readonly databaseId: string;
   readonly grantsTableId: string;
   readonly auditTableId: string;
+  readonly operationsTableId: string;
+}
+
+export interface PlatformAccessContentReader {
+  read(input: {
+    readonly command: Extract<PlatformAccessCommand, { readonly kind: "use" }>;
+    readonly transactionId: string;
+  }): Promise<{
+    readonly workspaceId: string;
+    readonly projectId: string;
+    readonly feedbackId: string;
+    readonly content: PlatformAccessContent;
+  }>;
 }
 
 export interface AppwritePlatformAccessTables {
@@ -76,6 +93,7 @@ export interface PlatformAccessExpiryWorker {
 export interface AppwritePlatformAccessDependencies {
   readonly now: () => string;
   readonly createAuditId: (grantId: string, sequence: number) => string;
+  readonly content?: PlatformAccessContentReader;
 }
 
 const appwriteId = /^[A-Za-z0-9][A-Za-z0-9._-]{0,35}$/u;
@@ -256,6 +274,103 @@ function scopeDigest(event: ExceptionalAccessAuditEvent): string {
   return createHash("sha256").update(JSON.stringify(event.scope)).digest("hex");
 }
 
+function operationRowId(grantId: string, operationId: string): string {
+  return `op_${createHash("sha256")
+    .update(`${grantId}:${operationId}`)
+    .digest("hex")
+    .slice(0, 32)}`;
+}
+
+function operationDigest(
+  actorId: string,
+  command: Extract<PlatformAccessCommand, { readonly kind: "use" }>,
+): string {
+  return createHash("sha256")
+    .update(
+      JSON.stringify({
+        actorId,
+        grantId: command.grantId,
+        workspaceId: command.workspaceId,
+        projectId: command.projectId ?? null,
+        feedbackId: command.feedbackId ?? null,
+        action: command.action,
+      }),
+    )
+    .digest("hex");
+}
+
+function parseOperationReplay(
+  value: unknown,
+  expected: {
+    readonly rowId: string;
+    readonly actorId: string;
+    readonly command: Extract<PlatformAccessCommand, { readonly kind: "use" }>;
+    readonly payloadDigest: string;
+  },
+  schema: AppwritePlatformAccessSchema,
+  sensitive: AppwriteSensitivePersistence,
+):
+  | { readonly status: "conflict" }
+  | {
+      readonly status: "replayed";
+      readonly grantId: string;
+      readonly state: string;
+      readonly revision: number;
+      readonly content: PlatformAccessContent;
+    }
+  | { readonly status: "denied" | "invalid" | "conflict" } {
+  if (
+    !object(value) ||
+    value.$id !== expected.rowId ||
+    value.grantId !== expected.command.grantId ||
+    value.operationId !== expected.command.operationId ||
+    value.actorId !== expected.actorId ||
+    typeof value.payloadDigest !== "string"
+  )
+    throw new Error("invalid operation replay");
+  if (value.payloadDigest !== expected.payloadDigest) return { status: "conflict" };
+  if (
+    value.outcome === "denied" ||
+    value.outcome === "invalid" ||
+    value.outcome === "conflict"
+  )
+    return { status: value.outcome };
+  if (
+    value.outcome !== "applied" ||
+    typeof value.state !== "string" ||
+    !states.has(value.state) ||
+    typeof value.revision !== "number" ||
+    !Number.isSafeInteger(value.revision) ||
+    typeof value.resultEnvelope !== "string"
+  )
+    throw new Error("invalid operation replay");
+  let content: unknown;
+  try {
+    content = JSON.parse(
+      sensitive.protector.open(
+        {
+          environment: sensitive.environment,
+          tableId: schema.operationsTableId,
+          rowId: expected.rowId,
+          field: "resultEnvelope",
+        },
+        value.resultEnvelope,
+      ),
+    );
+  } catch {
+    throw new Error("invalid operation replay");
+  }
+  if (!object(content) || typeof content.kind !== "string")
+    throw new Error("invalid operation replay");
+  return {
+    status: "replayed",
+    grantId: expected.command.grantId,
+    state: value.state,
+    revision: value.revision,
+    content: content as PlatformAccessContent,
+  };
+}
+
 function decide(
   grant: ExceptionalAccessGrant,
   actorId: string,
@@ -313,7 +428,13 @@ export function createAppwritePlatformAccessStore(
     !appwriteId.test(schema.databaseId) ||
     !appwriteId.test(schema.grantsTableId) ||
     !appwriteId.test(schema.auditTableId) ||
-    new Set([schema.databaseId, schema.grantsTableId, schema.auditTableId]).size !== 3
+    !appwriteId.test(schema.operationsTableId) ||
+    new Set([
+      schema.databaseId,
+      schema.grantsTableId,
+      schema.auditTableId,
+      schema.operationsTableId,
+    ]).size !== 4
   )
     throw new Error("PLATFORM_ACCESS_SCHEMA_INVALID");
 
@@ -340,6 +461,18 @@ export function createAppwritePlatformAccessStore(
 
         let decision: ExceptionalAccessDecision;
         let previousAuditSequence = 0;
+        let currentRevision = 0;
+        let content: PlatformAccessContent | undefined;
+        let operation:
+          | {
+              readonly rowId: string;
+              readonly payloadDigest: string;
+              readonly command: Extract<
+                PlatformAccessCommand,
+                { readonly kind: "use" }
+              >;
+            }
+          | undefined;
         if (input.command.kind === "request") {
           if (existing !== undefined) {
             const current = parseGrant(existing, schema, sensitive).grant;
@@ -392,6 +525,42 @@ export function createAppwritePlatformAccessStore(
           }
           const parsed = parseGrant(existing, schema, sensitive);
           previousAuditSequence = parsed.auditSequence;
+          currentRevision = parsed.grant.revision;
+          if (input.command.kind === "use") {
+            const rowId = operationRowId(
+              input.command.grantId,
+              input.command.operationId,
+            );
+            const payloadDigest = operationDigest(input.actorId, input.command);
+            let prior: unknown;
+            try {
+              prior = await tables.getRow({
+                databaseId: schema.databaseId,
+                tableId: schema.operationsTableId,
+                rowId,
+                transactionId,
+              });
+            } catch (error) {
+              if (!absent(error)) throw error;
+            }
+            if (prior !== undefined) {
+              const replay = parseOperationReplay(
+                prior,
+                {
+                  rowId,
+                  actorId: input.actorId,
+                  command: input.command,
+                  payloadDigest,
+                },
+                schema,
+                sensitive,
+              );
+              await tables.updateTransaction({ transactionId, rollback: true });
+              closed = true;
+              return replay;
+            }
+            operation = { rowId, payloadDigest, command: input.command };
+          }
           decision = decide(
             parsed.grant,
             input.actorId,
@@ -399,6 +568,30 @@ export function createAppwritePlatformAccessStore(
             input.command,
             now,
           );
+          if (decision.status === "ok" && input.command.kind === "use") {
+            if (!dependencies.content) throw new Error("content reader unavailable");
+            const resolved = await dependencies.content.read({
+              command: input.command,
+              transactionId,
+            });
+            const authoritativeCommand: Extract<
+              PlatformAccessCommand,
+              { readonly kind: "use" }
+            > = {
+              ...input.command,
+              workspaceId: resolved.workspaceId,
+              projectId: resolved.projectId,
+              feedbackId: resolved.feedbackId,
+            };
+            decision = decide(
+              parsed.grant,
+              input.actorId,
+              input.freshMfa,
+              authoritativeCommand,
+              now,
+            );
+            if (decision.status === "ok") content = resolved.content;
+          }
         }
 
         if (decision.status !== "ok" && decision.audit === undefined) {
@@ -457,6 +650,40 @@ export function createAppwritePlatformAccessStore(
             occurredAt: audit.occurredAt,
           },
         });
+        if (operation) {
+          const expiresAt = new Date(Date.parse(now) + 86_400_000).toISOString();
+          await tables.createRow({
+            databaseId: schema.databaseId,
+            tableId: schema.operationsTableId,
+            rowId: operation.rowId,
+            permissions: [],
+            transactionId,
+            data: {
+              grantId: operation.command.grantId,
+              operationId: operation.command.operationId,
+              actorId: input.actorId,
+              payloadDigest: operation.payloadDigest,
+              outcome: decision.status === "ok" ? "applied" : decision.status,
+              ...(decision.status === "ok"
+                ? {
+                    state: decision.grant.state,
+                    revision: decision.grant.revision,
+                    resultEnvelope: sensitive.protector.seal(
+                      {
+                        environment: sensitive.environment,
+                        tableId: schema.operationsTableId,
+                        rowId: operation.rowId,
+                        field: "resultEnvelope",
+                      },
+                      JSON.stringify(content),
+                    ),
+                  }
+                : { revision: currentRevision }),
+              createdAt: now,
+              expiresAt,
+            },
+          });
+        }
         await tables.updateTransaction({ transactionId, commit: true });
         closed = true;
         return decision.status === "ok"
@@ -465,6 +692,7 @@ export function createAppwritePlatformAccessStore(
               grantId: decision.grant.id,
               state: decision.grant.state,
               revision: decision.grant.revision,
+              ...(content === undefined ? {} : { content }),
             }
           : { status: decision.status };
       } catch {

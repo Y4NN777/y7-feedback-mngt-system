@@ -21,6 +21,7 @@ import {
   createNodeAppwritePlatformAccessStore,
 } from "./appwrite-platform-access-store.js";
 import { createNodeAppwritePlatformAuthority } from "./appwrite-platform-authority.js";
+import { createNodeAppwritePlatformContentReader } from "./appwrite-platform-content-reader.js";
 import { createNodeAppwriteConversationLifecycleStore } from "./appwrite-conversation-lifecycle-store.js";
 import { createNodeAppwriteConversationProjectionStore } from "./appwrite-conversation-projection-store.js";
 import { createNodeAppwriteProjectAdministrationStore } from "./appwrite-project-administration-store.js";
@@ -284,6 +285,8 @@ export function createHttpApplication(
                 databaseId: config.appwriteSchema.databaseId,
                 grantsTableId: config.appwriteSchema.exceptionalAccessGrantsTableId,
                 auditTableId: config.appwriteSchema.exceptionalAccessAuditTableId,
+                operationsTableId:
+                  config.appwriteSchema.exceptionalAccessOperationsTableId,
               },
               sensitive,
               {
@@ -293,6 +296,20 @@ export function createHttpApplication(
                     .update(`${grantId}:${String(sequence)}`)
                     .digest("base64url")
                     .slice(0, 36),
+                content: createNodeAppwritePlatformContentReader(
+                  runtime.tables,
+                  {
+                    databaseId: config.appwriteSchema.databaseId,
+                    feedbackTableId: config.appwriteSchema.feedbackTableId,
+                    messagesTableId: config.appwriteSchema.conversationMessagesTableId,
+                    internalNotesTableId:
+                      config.appwriteSchema.conversationInternalNotesTableId,
+                    attachmentsTableId: config.appwriteSchema.attachmentsTableId,
+                    attachmentStagingTableId:
+                      config.appwriteSchema.attachmentStagingTableId,
+                  },
+                  sensitive,
+                ),
               },
             ),
           ),
@@ -308,6 +325,7 @@ export function createHttpApplication(
           databaseId: config.appwriteSchema.databaseId,
           grantsTableId: config.appwriteSchema.exceptionalAccessGrantsTableId,
           auditTableId: config.appwriteSchema.exceptionalAccessAuditTableId,
+          operationsTableId: config.appwriteSchema.exceptionalAccessOperationsTableId,
         },
         sensitive,
         {

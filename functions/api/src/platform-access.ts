@@ -28,6 +28,7 @@ export type PlatformAccessCommand =
     }
   | {
       readonly kind: "use";
+      readonly operationId: string;
       readonly grantId: string;
       readonly expectedRevision: number;
       readonly workspaceId: string;
@@ -47,6 +48,17 @@ export interface PlatformAuthority {
   >;
 }
 
+export type PlatformAccessContent =
+  | {
+      readonly kind: "feedback";
+      readonly feedback: object;
+    }
+  | {
+      readonly kind: "messages" | "internal_notes" | "attachments";
+      readonly feedbackId: string;
+      readonly items: readonly object[];
+    };
+
 export interface PlatformAccessStore {
   execute(input: {
     readonly actorId: string;
@@ -58,6 +70,7 @@ export interface PlatformAccessStore {
         readonly grantId: string;
         readonly state: string;
         readonly revision: number;
+        readonly content?: PlatformAccessContent;
       }
     | { readonly status: "denied" | "invalid" | "conflict" | "retryable" }
   >;
@@ -71,11 +84,14 @@ export type PlatformAccessOutcome =
         readonly grantId: string;
         readonly state: string;
         readonly revision: number;
+        readonly content?: PlatformAccessContent;
       };
     }
   | { readonly status: "denied" | "invalid" | "conflict" | "retryable" };
 
 const identifier = /^[A-Za-z0-9][A-Za-z0-9._-]{0,35}$/u;
+const operationIdentifier =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const reason = /^[A-Z][A-Z0-9_]{2,63}$/u;
 const actionValues = new Set<unknown>([
   "feedback.read",
@@ -162,17 +178,19 @@ function parseCommand(value: unknown): PlatformAccessCommand | undefined {
     const feedbackId = optionalId(value.feedbackId);
     return typeof value.workspaceId === "string" &&
       identifier.test(value.workspaceId) &&
-      projectId !== null &&
-      feedbackId !== null &&
-      (feedbackId === undefined || projectId !== undefined) &&
-      actionValues.has(value.action)
+      typeof projectId === "string" &&
+      typeof feedbackId === "string" &&
+      actionValues.has(value.action) &&
+      typeof value.operationId === "string" &&
+      operationIdentifier.test(value.operationId)
       ? {
           kind: value.kind,
+          operationId: value.operationId,
           grantId: value.grantId,
           expectedRevision,
           workspaceId: value.workspaceId,
-          ...(projectId === undefined ? {} : { projectId }),
-          ...(feedbackId === undefined ? {} : { feedbackId }),
+          projectId,
+          feedbackId,
           action: value.action as ExceptionalAccessAction,
         }
       : undefined;
@@ -225,6 +243,7 @@ export function createPlatformAccessCoordinator(
                 grantId: outcome.grantId,
                 state: outcome.state,
                 revision: outcome.revision,
+                ...(outcome.content === undefined ? {} : { content: outcome.content }),
               },
             }
           : { status: outcome.status };

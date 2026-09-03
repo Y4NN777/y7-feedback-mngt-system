@@ -6,6 +6,7 @@ export type PlatformAccessOutcome =
         readonly grantId: string;
         readonly state: string;
         readonly revision: number;
+        readonly content?: Readonly<Record<string, unknown>>;
       };
     }
   | { readonly status: "invalid" | "denied" | "conflict" | "retryable" };
@@ -24,6 +25,22 @@ const errors = {
 
 function object(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function content(value: unknown): Readonly<Record<string, unknown>> | undefined | null {
+  if (value === undefined) return undefined;
+  if (!object(value)) return null;
+  if (value.kind === "feedback" && object(value.feedback)) return value;
+  if (
+    (value.kind === "messages" ||
+      value.kind === "internal_notes" ||
+      value.kind === "attachments") &&
+    typeof value.feedbackId === "string" &&
+    Array.isArray(value.items) &&
+    value.items.every(object)
+  )
+    return value;
+  return null;
 }
 
 export function createHttpPlatformAccessGateway(
@@ -53,6 +70,8 @@ export function createHttpPlatformAccessGateway(
           },
         );
         const body: unknown = await response.json();
+        const protectedContent =
+          object(body) && object(body.result) ? content(body.result.content) : null;
         if (
           response.ok &&
           object(body) &&
@@ -62,7 +81,8 @@ export function createHttpPlatformAccessGateway(
             body.result.disposition === "replayed") &&
           typeof body.result.grantId === "string" &&
           typeof body.result.state === "string" &&
-          Number.isSafeInteger(body.result.revision)
+          Number.isSafeInteger(body.result.revision) &&
+          protectedContent !== null
         )
           return {
             status: "ok",
@@ -71,6 +91,7 @@ export function createHttpPlatformAccessGateway(
               grantId: body.result.grantId,
               state: body.result.state,
               revision: Number(body.result.revision),
+              ...(protectedContent === undefined ? {} : { content: protectedContent }),
             },
           };
         if (object(body) && typeof body.error === "string" && body.error in errors)

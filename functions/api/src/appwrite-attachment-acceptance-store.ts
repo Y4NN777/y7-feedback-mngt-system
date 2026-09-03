@@ -105,7 +105,7 @@ function lifecycle(value: unknown): AttachmentLifecycle {
   return value;
 }
 
-function parseMetadata(
+export function parseAttachmentMetadata(
   value: unknown,
   schema: AppwriteAttachmentAcceptanceSchema,
   sensitive: AppwriteSensitivePersistence,
@@ -253,7 +253,7 @@ export function createAppwriteAttachmentAcceptanceStore(
     if (result.rows.length !== 1) {
       throw new Error("APPWRITE_ATTACHMENT_METADATA_INCONSISTENT");
     }
-    const record = parseMetadata(result.rows[0], schema, sensitive);
+    const record = parseAttachmentMetadata(result.rows[0], schema, sensitive);
     if (
       (attribute === "$id" && record.id !== value) ||
       (attribute === "objectId" && record.objectId !== value)

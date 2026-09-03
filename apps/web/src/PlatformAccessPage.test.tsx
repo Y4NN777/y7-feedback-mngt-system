@@ -15,7 +15,10 @@ function setup(
     },
   },
 ) {
-  const execute = vi.fn(() => Promise.resolve(outcome));
+  const execute = vi.fn((command: Readonly<Record<string, unknown>>) => {
+    void command;
+    return Promise.resolve(outcome);
+  });
   const signIn = vi.fn(() => Promise.resolve("authenticated" as const));
   const signOut = vi.fn(() => Promise.resolve());
   const onLocaleChange = vi.fn();
@@ -109,6 +112,10 @@ describe("Platform exceptional access screen", () => {
         grantId: "grant_1",
         state: "active",
         revision: 1,
+        content: {
+          kind: "feedback",
+          feedback: { feedbackId: "feedback_1", state: "received" },
+        },
       },
     });
     await authenticate();
@@ -136,20 +143,32 @@ describe("Platform exceptional access screen", () => {
     expect(screen.getAllByRole("status").at(-1)).toHaveTextContent(
       "Commande déjà appliquée ; résultat rejoué.",
     );
+    expect(screen.getByText("Résultat protégé autorisé")).toBeInTheDocument();
+    expect(screen.getByText(/feedback_1/u)).toBeInTheDocument();
 
     fireEvent.change(action, { target: { value: "use" } });
     fireEvent.change(screen.getByLabelText("Identifiant du workspace"), {
       target: { value: "workspace_1" },
     });
+    fireEvent.change(screen.getByLabelText("Identifiant du projet (facultatif)"), {
+      target: { value: "project_1" },
+    });
+    fireEvent.change(screen.getByLabelText("Identifiant du feedback (facultatif)"), {
+      target: { value: "feedback_1" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Exécuter la commande" }));
     await waitFor(() => {
       expect(candidate.execute).toHaveBeenCalledTimes(2);
     });
-    expect(candidate.execute).toHaveBeenLastCalledWith({
+    const useCommand = candidate.execute.mock.calls.at(-1)?.[0];
+    expect(typeof useCommand?.operationId).toBe("string");
+    expect(useCommand).toMatchObject({
       kind: "use",
       grantId: "grant_1",
       expectedRevision: 0,
       workspaceId: "workspace_1",
+      projectId: "project_1",
+      feedbackId: "feedback_1",
       action: "feedback.read",
     });
 

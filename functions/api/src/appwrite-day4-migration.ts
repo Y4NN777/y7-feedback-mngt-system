@@ -314,8 +314,10 @@ export function createDay4TableDefinitions(
       [
         varchar("grantId", 36),
         varchar("operationId", 36),
+        varchar("actorId", 36),
         varchar("payloadDigest", 64),
         varchar("outcome", 16),
+        varchar("state", 32, false),
         integer("revision"),
         text("resultEnvelope", false),
         datetime("createdAt"),

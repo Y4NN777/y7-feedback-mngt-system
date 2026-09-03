@@ -27,7 +27,7 @@ function setup() {
     void input;
     return Promise.resolve({ status: "authorized" as const, freshMfa: true });
   });
-  const execute = vi.fn((input: Parameters<PlatformAccessStore["execute"]>[0]) => {
+  const execute = vi.fn<PlatformAccessStore["execute"]>((input) => {
     void input;
     return Promise.resolve({
       status: "applied" as const,
@@ -129,13 +129,7 @@ describe("trusted Platform exceptional access coordination", () => {
       { kind: "deny", grantId: "grant_1", expectedRevision: 0 },
       {
         kind: "use",
-        grantId: "grant_1",
-        expectedRevision: 1,
-        workspaceId: "workspace_1",
-        action: "feedback.read",
-      },
-      {
-        kind: "use",
+        operationId: "00000000-0000-4000-8000-000000000001",
         grantId: "grant_1",
         expectedRevision: 1,
         workspaceId: "workspace_1",
@@ -172,6 +166,15 @@ describe("trusted Platform exceptional access coordination", () => {
       { kind: "use", grantId: "grant_1", expectedRevision: 1 },
       {
         kind: "use",
+        operationId: "00000000-0000-4000-8000-000000000001",
+        grantId: "grant_1",
+        expectedRevision: 1,
+        workspaceId: "workspace_1",
+        action: "feedback.read",
+      },
+      {
+        kind: "use",
+        operationId: "00000000-0000-4000-8000-000000000001",
         grantId: "grant_1",
         expectedRevision: 1,
         workspaceId: "bad id",
@@ -179,6 +182,7 @@ describe("trusted Platform exceptional access coordination", () => {
       },
       {
         kind: "use",
+        operationId: "00000000-0000-4000-8000-000000000001",
         grantId: "grant_1",
         expectedRevision: 1,
         workspaceId: "workspace_1",
@@ -187,6 +191,7 @@ describe("trusted Platform exceptional access coordination", () => {
       },
       {
         kind: "use",
+        operationId: "00000000-0000-4000-8000-000000000001",
         grantId: "grant_1",
         expectedRevision: 1,
         workspaceId: "workspace_1",
@@ -195,6 +200,7 @@ describe("trusted Platform exceptional access coordination", () => {
       },
       {
         kind: "use",
+        operationId: "00000000-0000-4000-8000-000000000001",
         grantId: "grant_1",
         expectedRevision: 1,
         workspaceId: "workspace_1",
@@ -213,7 +219,7 @@ describe("trusted Platform exceptional access coordination", () => {
   it("BDD-PLAT-114 fails closed on authority/store outage and preserves outcomes", async () => {
     for (const status of ["retryable", "invalid", "conflict", "denied"] as const) {
       const target = setup();
-      target.execute.mockResolvedValueOnce({ status } as never);
+      target.execute.mockResolvedValueOnce({ status });
       await expect(
         target.coordinator.execute({ jwt: "jwt_1", command: request }),
       ).resolves.toEqual({ status });
@@ -223,5 +229,37 @@ describe("trusted Platform exceptional access coordination", () => {
     await expect(
       failed.coordinator.execute({ jwt: "jwt_1", command: request }),
     ).resolves.toEqual({ status: "retryable" });
+  });
+
+  it("BDD-PLAT-115 returns protected content only after the store succeeds", async () => {
+    const target = setup();
+    target.execute.mockResolvedValueOnce({
+      status: "applied",
+      grantId: "grant_1",
+      state: "active",
+      revision: 2,
+      content: {
+        kind: "feedback",
+        feedback: { feedbackId: "feedback_1" },
+      },
+    });
+    await expect(
+      target.coordinator.execute({
+        jwt: "jwt_1",
+        command: {
+          kind: "use",
+          operationId: "123e4567-e89b-42d3-a456-426614174000",
+          grantId: "grant_1",
+          expectedRevision: 1,
+          workspaceId: "workspace_1",
+          projectId: "project_1",
+          feedbackId: "feedback_1",
+          action: "feedback.read",
+        },
+      }),
+    ).resolves.toMatchObject({
+      status: "ok",
+      result: { content: { kind: "feedback" } },
+    });
   });
 });

@@ -20,6 +20,10 @@ describe("Platform access HTTP gateway", () => {
             grantId: "grant_1",
             state: "requested",
             revision: 0,
+            content: {
+              kind: "feedback",
+              feedback: { feedbackId: "feedback_1" },
+            },
           },
         }),
       ),
@@ -37,6 +41,10 @@ describe("Platform access HTTP gateway", () => {
         grantId: "grant_1",
         state: "requested",
         revision: 0,
+        content: {
+          kind: "feedback",
+          feedback: { feedbackId: "feedback_1" },
+        },
       },
     });
     expect(fetcher).toHaveBeenCalledWith(
@@ -73,6 +81,16 @@ describe("Platform access HTTP gateway", () => {
       {
         status: "ok",
         result: { disposition: "replayed", grantId: 1, state: "active", revision: 1 },
+      },
+      {
+        status: "ok",
+        result: {
+          disposition: "replayed",
+          grantId: "g",
+          state: "active",
+          revision: 1,
+          content: { kind: "messages", feedbackId: "f", items: ["invalid"] },
+        },
       },
       {
         status: "ok",
