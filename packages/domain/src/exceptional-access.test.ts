@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   approveExceptionalAccess,
   denyExceptionalAccess,
+  expireExceptionalAccess,
   requestExceptionalAccess,
   reviewBreakGlass,
   revokeExceptionalAccess,
@@ -203,6 +204,89 @@ describe("exceptional access policy", () => {
         now,
       }),
     ).toMatchObject({ status: "ok", grant: { state: "reviewed" } });
+  });
+
+  it("BDD-PLAT-008 expires grants durably and sends used break-glass to review", () => {
+    const ordinary = active();
+    expect(
+      expireExceptionalAccess(ordinary, {
+        actorId: "expiry_worker_1",
+        expectedRevision: 1,
+        now: ordinary.expiresAt!,
+      }),
+    ).toMatchObject({
+      status: "ok",
+      grant: {
+        state: "expired",
+        revision: 2,
+        expiredAt: ordinary.expiresAt,
+      },
+      audit: { type: "expired", actorId: "expiry_worker_1", sequence: 2 },
+    });
+
+    const emergency = active({ breakGlass: true, incidentSeverity: "critical" });
+    const used = useExceptionalAccess(emergency, {
+      operatorId: "operator_1",
+      expectedRevision: 1,
+      workspaceId: "workspace_1",
+      projectId: "project_1",
+      feedbackId: "feedback_1",
+      action: "feedback.read",
+      now: "2026-09-03T12:02:00.000Z",
+    });
+    if (used.status !== "ok") throw new Error("fixture invalid");
+    expect(
+      expireExceptionalAccess(used.grant, {
+        actorId: "expiry_worker_1",
+        expectedRevision: 2,
+        now: used.grant.expiresAt!,
+      }),
+    ).toMatchObject({
+      status: "ok",
+      grant: { state: "review_required", revision: 3 },
+      audit: { type: "expired", sequence: 3 },
+    });
+  });
+
+  it("BDD-PLAT-009 denies premature, malformed and concurrent expiry", () => {
+    const grant = active();
+    expect(
+      expireExceptionalAccess(grant, {
+        actorId: "expiry_worker_1",
+        expectedRevision: 1,
+        now: "2026-09-03T13:00:59.999Z",
+      }),
+    ).toMatchObject({ status: "denied", code: "EXCEPTIONAL_ACCESS_NOT_EXPIRED" });
+    expect(
+      expireExceptionalAccess(grant, {
+        actorId: "expiry_worker_1",
+        expectedRevision: 9,
+        now: grant.expiresAt!,
+      }),
+    ).toMatchObject({ status: "conflict" });
+    for (const candidate of [
+      {
+        value: grant,
+        input: { actorId: "bad id", expectedRevision: 1, now: grant.expiresAt! },
+      },
+      {
+        value: grant,
+        input: { actorId: "expiry_worker_1", expectedRevision: 1, now: "invalid" },
+      },
+      {
+        value: { ...grant, expiresAt: undefined } as ExceptionalAccessGrant,
+        input: { actorId: "expiry_worker_1", expectedRevision: 1, now },
+      },
+      {
+        value: { ...grant, state: "revoked" as const },
+        input: { actorId: "expiry_worker_1", expectedRevision: 1, now },
+      },
+    ]) {
+      expect(expireExceptionalAccess(candidate.value, candidate.input)).toMatchObject({
+        status: "denied",
+        code: "EXCEPTIONAL_ACCESS_EXPIRY_DENIED",
+      });
+    }
   });
 
   it("BDD-PLAT-006 supports independent denial and rejects malformed requests", () => {

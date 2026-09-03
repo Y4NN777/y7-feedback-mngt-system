@@ -32,6 +32,7 @@ export interface ExceptionalAccessGrant {
   readonly requestedAt: string;
   readonly approvedAt?: string;
   readonly expiresAt?: string;
+  readonly expiredAt?: string;
   readonly revokedAt?: string;
   readonly reviewedAt?: string;
 }
@@ -302,6 +303,42 @@ export function revokeExceptionalAccess(
     status: "ok",
     grant: revoked,
     audit: audit(grant, "revoked", input.actorId, input.now),
+  };
+}
+
+export function expireExceptionalAccess(
+  grant: ExceptionalAccessGrant,
+  input: {
+    readonly actorId: string;
+    readonly expectedRevision: number;
+    readonly now: string;
+  },
+): ExceptionalAccessDecision {
+  if (input.expectedRevision !== grant.revision)
+    return { status: "conflict", code: "EXCEPTIONAL_ACCESS_STATE_CONFLICT" };
+  const occurredAt = time(input.now);
+  const expiresAt = grant.expiresAt === undefined ? undefined : time(grant.expiresAt);
+  if (
+    grant.state !== "active" ||
+    !identifier.test(input.actorId) ||
+    occurredAt === undefined ||
+    expiresAt === undefined
+  )
+    return { status: "denied", code: "EXCEPTIONAL_ACCESS_EXPIRY_DENIED" };
+  if (occurredAt < expiresAt)
+    return { status: "denied", code: "EXCEPTIONAL_ACCESS_NOT_EXPIRED" };
+  const state: ExceptionalAccessState =
+    grant.breakGlass && grant.useCount > 0 ? "review_required" : "expired";
+  const expired = {
+    ...grant,
+    revision: grant.revision + 1,
+    state,
+    expiredAt: input.now,
+  };
+  return {
+    status: "ok",
+    grant: expired,
+    audit: audit(grant, "expired", input.actorId, input.now),
   };
 }
 
