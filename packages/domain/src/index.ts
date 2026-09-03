@@ -3,6 +3,7 @@ export * from "./access.js";
 export * from "./attachment.js";
 export * from "./conversation-lifecycle.js";
 export * from "./authorization.js";
+export * from "./exceptional-access.js";
 export * from "./feedback.js";
 export * from "./external-issue-link.js";
 export * from "./policy.js";
