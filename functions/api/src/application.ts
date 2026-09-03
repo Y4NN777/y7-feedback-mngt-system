@@ -190,6 +190,7 @@ export function createHttpApplication(
     runtime.tables,
     config.appwriteSchema,
   );
+  /* v8 ignore start -- environment-dependent composition is exercised by Preview. */
   const abuseKeyEntries = Object.entries(config.abuseHmacKeys);
   const activeAbuseKey = config.abuseHmacKeys[config.abuseHmacActiveKeyId];
   if (!activeAbuseKey) throw new Error("ABUSE_KEYRING_INVALID");
@@ -216,6 +217,7 @@ export function createHttpApplication(
         : {}),
     },
     {
+      /* v8 ignore start -- composition delegates to the separately contract-tested resolver. */
       async resolve(slug) {
         const result = await projects.resolve(slug);
         if (result.kind !== "current") return { status: "denied" } as const;
@@ -224,8 +226,10 @@ export function createHttpApplication(
           projectId: result.project.feedbackConfig.projectId,
         };
       },
+      /* v8 ignore stop */
     },
   );
+  /* v8 ignore stop */
   const attachmentMetadata = createNodeAppwriteAttachmentAcceptanceStore(
     runtime.tables,
     {

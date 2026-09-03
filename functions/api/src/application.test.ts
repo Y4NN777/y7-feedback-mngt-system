@@ -62,6 +62,7 @@ const config: ServerConfig = {
   },
   abuseHmacActiveKeyId: "abuse_2026_08",
   abuseHmacKeys: {
+    abuse_2026_07: "DAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAw",
     abuse_2026_08: "CwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCws",
   },
   release: "commit-application",
