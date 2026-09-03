@@ -147,18 +147,22 @@ describe("Day 4 additive Appwrite migration", () => {
         .filter(({ key }) =>
           [
             "revision",
+            "auditSequence",
             "justificationEnvelope",
             "incidentSeverity",
             "actionsJson",
+            "expiredAt",
             "reviewedAt",
           ].includes(key),
         )
         .map(({ key, required }) => ({ key, required })),
     ).toEqual([
       { key: "revision", required: false },
+      { key: "auditSequence", required: false },
       { key: "justificationEnvelope", required: false },
       { key: "incidentSeverity", required: false },
       { key: "actionsJson", required: false },
+      { key: "expiredAt", required: false },
       { key: "reviewedAt", required: false },
     ]);
   });
