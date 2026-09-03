@@ -35,6 +35,7 @@ export function createProviderMaintenance(input: {
       };
       for (const [index, outcome] of outcomes.entries()) {
         const capability = capabilities[index];
+        /* v8 ignore next -- allSettled preserves one outcome for every capability. */
         if (outcome.status === "fulfilled" && capability !== undefined)
           result[capability[0]] = capabilityStatus(outcome.value);
       }

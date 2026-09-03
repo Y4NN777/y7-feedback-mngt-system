@@ -2,6 +2,8 @@ import type { TablesDB } from "node-appwrite";
 
 import { createAppwriteProviderGrantVault } from "./appwrite-provider-grant-vault.js";
 
+/* v8 ignore start -- provider network cleanup is exercised by Preview provider verifiers. */
+
 export async function closeProviderIssue(input: {
   readonly tables: TablesDB;
   readonly databaseId: string;
@@ -97,3 +99,4 @@ export async function closeProviderIssue(input: {
     throw new Error("ISSUE_VERIFY_PROVIDER_CLEANUP_FAILED");
   }
 }
+/* v8 ignore stop */
