@@ -311,12 +311,15 @@ describe("Appwrite exceptional access persistence", () => {
 
   it("BDD-PLAT-028 covers workspace grants and rejects malformed persisted fields", async () => {
     const minimalRequest = {
-      ...request,
+      actorId: request.actorId,
+      freshMfa: request.freshMfa,
       command: {
-        ...request.command,
+        kind: "request" as const,
         grantId: "grant_minimal",
-        projectId: undefined,
-        feedbackId: undefined,
+        workspaceId: request.command.workspaceId,
+        actions: request.command.actions,
+        reasonCode: request.command.reasonCode,
+        justification: request.command.justification,
         breakGlass: false,
         incidentSeverity: "ordinary" as const,
       },
@@ -396,12 +399,15 @@ describe("Appwrite exceptional access persistence", () => {
   it("BDD-PLAT-030 applies an exact workspace-only grant", async () => {
     const candidate = setup();
     const workspaceRequest = {
-      ...request,
+      actorId: request.actorId,
+      freshMfa: request.freshMfa,
       command: {
-        ...request.command,
+        kind: "request" as const,
         grantId: "workspace_grant",
-        projectId: undefined,
-        feedbackId: undefined,
+        workspaceId: request.command.workspaceId,
+        actions: request.command.actions,
+        reasonCode: request.command.reasonCode,
+        justification: request.command.justification,
         breakGlass: false,
         incidentSeverity: "ordinary" as const,
       },
