@@ -16,6 +16,8 @@ interface ConversationMessages {
   readonly conflict: string;
   readonly retry: string;
   readonly actor: Readonly<Record<"workspace" | "reporter", string>>;
+  readonly provider: Readonly<Record<"github" | "gitlab", string>>;
+  readonly revision: Readonly<Record<"created" | "revised" | "tombstoned", string>>;
   readonly state: Readonly<Record<FeedbackLifecycleState, string>>;
 }
 
@@ -36,6 +38,12 @@ export const conversationMessages = {
     conflict: "L’état a changé. La conversation a été actualisée.",
     retry: "L’envoi n’a pas abouti. Vous pouvez réessayer sans créer de doublon.",
     actor: { workspace: "Équipe du projet", reporter: "Vous" },
+    provider: { github: "GitHub", gitlab: "GitLab" },
+    revision: {
+      created: "Message importé",
+      revised: "Révision importée",
+      tombstoned: "Message supprimé chez le fournisseur",
+    },
     state: {
       received: "Reçu",
       under_review: "En cours d’examen",
@@ -60,6 +68,12 @@ export const conversationMessages = {
     conflict: "The status changed. The conversation has been refreshed.",
     retry: "Delivery did not complete. You can retry without creating a duplicate.",
     actor: { workspace: "Project team", reporter: "You" },
+    provider: { github: "GitHub", gitlab: "GitLab" },
+    revision: {
+      created: "Imported message",
+      revised: "Imported revision",
+      tombstoned: "Message deleted at provider",
+    },
     state: {
       received: "Received",
       under_review: "Under review",

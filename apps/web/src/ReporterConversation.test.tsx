@@ -16,6 +16,9 @@ const waiting = {
       audience: "reporter" as const,
       occurredAt: "2026-08-28T12:00:00.000Z",
       content: "Quelle version est concernée ?",
+      provider: "github" as const,
+      revisionKind: "revised" as const,
+      supersedesMessageId: "message_0",
     },
   ],
   lifecycle: [
@@ -71,6 +74,7 @@ describe("Reporter Conversation experience", () => {
       await screen.findByRole("heading", { name: "Conversation" }),
     ).toBeInTheDocument();
     expect(screen.getByText("Quelle version est concernée ?")).toBeInTheDocument();
+    expect(screen.getByText("GitHub · Révision importée")).toBeInTheDocument();
     expect(screen.queryByText(/note interne/i)).not.toBeInTheDocument();
     await user.type(screen.getByRole("textbox", { name: "Votre réponse" }), "2.1");
     await user.click(screen.getByRole("button", { name: "Envoyer la réponse" }));

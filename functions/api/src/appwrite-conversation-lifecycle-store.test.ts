@@ -115,6 +115,7 @@ function store(
     notifications: 0,
     emailAttempts: 0,
   }),
+  providerAppend = vi.fn().mockResolvedValue({ queued: 0 }),
 ) {
   return createAppwriteConversationLifecycleStore(
     tables,
@@ -122,6 +123,7 @@ function store(
     queries,
     persistence,
     { append },
+    { append: providerAppend },
   );
 }
 
@@ -175,6 +177,45 @@ describe("Appwrite conversation and lifecycle transaction", () => {
     expect(tables.transactions.at(-1)).toEqual({
       transactionId: "transaction_1",
       commit: true,
+    });
+  });
+
+  it("BDD-SYNC-FANOUT-007 commits the visible Message and provider outbox in one transaction", async () => {
+    const tables = new FakeTables();
+    const providerAppend = vi.fn().mockResolvedValue({ queued: 1 });
+    await store(tables, undefined, providerAppend).execute({
+      ...common,
+      command: messageCommand,
+    });
+    expect(providerAppend).toHaveBeenCalledWith({
+      transactionId: "transaction_1",
+      feedbackId: "feedback_1",
+      workspaceId: "workspace_1",
+      projectId: "project_1",
+      messageId: "message_1",
+      actorKind: "workspace",
+      audience: "reporter",
+      content: "Which version is affected?",
+      occurredAt: "2026-08-28T12:00:00.000Z",
+    });
+    expect(tables.transactions.at(-1)).toEqual({
+      transactionId: "transaction_1",
+      commit: true,
+    });
+  });
+
+  it("BDD-SYNC-FANOUT-008 rolls back both facts if durable provider enqueue fails", async () => {
+    const tables = new FakeTables();
+    const providerAppend = vi.fn().mockRejectedValue(new Error("outbox unavailable"));
+    await expect(
+      store(tables, undefined, providerAppend).execute({
+        ...common,
+        command: messageCommand,
+      }),
+    ).rejects.toEqual(new AppwriteConversationLifecycleError("ERR-CONV-RETRYABLE"));
+    expect(tables.transactions.at(-1)).toEqual({
+      transactionId: "transaction_1",
+      rollback: true,
     });
   });
 

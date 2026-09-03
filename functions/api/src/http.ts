@@ -11,6 +11,7 @@ import type { ProjectAdministrationHttp } from "./project-administration-http.js
 import type { ProviderIssueOutboxHttp } from "./provider-issue-outbox-http.js";
 import type { ProviderEventInboxHttp } from "./provider-event-inbox-http.js";
 import type { ProviderMaintenance } from "./provider-maintenance.js";
+import type { ProviderMaintenanceHttp } from "./provider-maintenance-http.js";
 import type { ProviderWebhookHttpResponse } from "./provider-webhook-http.js";
 import type { SourceConnectionHttp } from "./source-connection-http.js";
 import type { WorkbenchHttp } from "./workbench-http.js";
@@ -67,6 +68,7 @@ export interface HttpDependencies {
   readonly providerIssueOutbox?: ProviderIssueOutboxHttp;
   readonly providerEventInbox?: ProviderEventInboxHttp;
   readonly providerMaintenance?: ProviderMaintenance;
+  readonly providerMaintenanceHttp?: ProviderMaintenanceHttp;
   readonly providerWebhook?: {
     readonly handle: (request: {
       readonly method: string;
@@ -212,8 +214,24 @@ export async function routeRequest(
           headers: requestHeaders,
           ...(req.bodyBinary === undefined ? {} : { body: req.bodyBinary }),
         });
+  const providerMaintenanceHttpResponse =
+    isHealth || isIngressProbe || isProviderMaintenance || providerWebhookResponse
+      ? null
+      : await dependencies.providerMaintenanceHttp?.handle({
+          method,
+          path: req.path,
+          headers: requestHeaders,
+          body:
+            method === "POST" && !contentType.startsWith("multipart/form-data")
+              ? req.bodyJson
+              : undefined,
+        });
   const providerOutboxResponse =
-    isHealth || isIngressProbe || maintenanceResponse || providerWebhookResponse
+    isHealth ||
+    isIngressProbe ||
+    maintenanceResponse ||
+    providerWebhookResponse ||
+    providerMaintenanceHttpResponse
       ? null
       : await dependencies.providerEventInbox?.handle({
           method,
@@ -229,6 +247,7 @@ export async function routeRequest(
     isIngressProbe ||
     maintenanceResponse ||
     providerWebhookResponse ||
+    providerMaintenanceHttpResponse ||
     providerOutboxResponse
       ? null
       : await dependencies.providerIssueOutbox?.handle({
@@ -245,6 +264,7 @@ export async function routeRequest(
     isIngressProbe ||
     maintenanceResponse ||
     providerWebhookResponse ||
+    providerMaintenanceHttpResponse ||
     providerOutboxResponse ||
     providerIssueOutboxResponse
       ? null
@@ -263,6 +283,7 @@ export async function routeRequest(
     isIngressProbe ||
     maintenanceResponse ||
     providerWebhookResponse ||
+    providerMaintenanceHttpResponse ||
     providerOutboxResponse ||
     providerIssueOutboxResponse ||
     sourceResponse
@@ -300,6 +321,7 @@ export async function routeRequest(
     isIngressProbe ||
     maintenanceResponse ||
     providerWebhookResponse ||
+    providerMaintenanceHttpResponse ||
     providerOutboxResponse ||
     sourceResponse ||
     administrationResponse ||
@@ -319,6 +341,7 @@ export async function routeRequest(
     isIngressProbe ||
     maintenanceResponse ||
     providerWebhookResponse ||
+    providerMaintenanceHttpResponse ||
     providerOutboxResponse ||
     sourceResponse ||
     administrationResponse ||
@@ -454,6 +477,7 @@ export async function routeRequest(
     : (probeResponse?.statusCode ??
       maintenanceResponse?.statusCode ??
       providerWebhookResponse?.statusCode ??
+      providerMaintenanceHttpResponse?.statusCode ??
       providerOutboxResponse?.statusCode ??
       providerIssueOutboxResponse?.statusCode ??
       sourceResponse?.statusCode ??
@@ -474,34 +498,37 @@ export async function routeRequest(
         ? "provider_maintenance"
         : providerWebhookResponse
           ? "provider_webhook"
-          : providerOutboxResponse
-            ? "provider_event_inbox"
-            : providerIssueOutboxResponse
-              ? "provider_issue_outbox"
-              : sourceResponse
-                ? "source_connection"
-                : administrationResponse
-                  ? "project_administration"
-                  : platformAccessResponse
-                    ? "platform_access"
-                    : conversationResponse
-                      ? "conversation_lifecycle"
-                      : workbenchResponse
-                        ? "workbench"
-                        : externalIssueResponse
-                          ? "external_issue"
-                          : intelligenceResponse
-                            ? "intelligence"
-                            : privacyResponse
-                              ? "privacy"
-                              : publicResponse
-                                ? "public_api"
-                                : "unknown";
+          : providerMaintenanceHttpResponse
+            ? "provider_maintenance"
+            : providerOutboxResponse
+              ? "provider_event_inbox"
+              : providerIssueOutboxResponse
+                ? "provider_issue_outbox"
+                : sourceResponse
+                  ? "source_connection"
+                  : administrationResponse
+                    ? "project_administration"
+                    : platformAccessResponse
+                      ? "platform_access"
+                      : conversationResponse
+                        ? "conversation_lifecycle"
+                        : workbenchResponse
+                          ? "workbench"
+                          : externalIssueResponse
+                            ? "external_issue"
+                            : intelligenceResponse
+                              ? "intelligence"
+                              : privacyResponse
+                                ? "privacy"
+                                : publicResponse
+                                  ? "public_api"
+                                  : "unknown";
   const outcome = isHealth
     ? "success"
     : (probeResponse ??
         maintenanceResponse ??
         providerWebhookResponse ??
+        providerMaintenanceHttpResponse ??
         providerOutboxResponse ??
         providerIssueOutboxResponse ??
         sourceResponse ??
@@ -546,6 +573,14 @@ export async function routeRequest(
     return res.json(
       providerWebhookResponse.body,
       providerWebhookResponse.statusCode,
+      headers,
+    );
+  }
+
+  if (providerMaintenanceHttpResponse) {
+    return res.json(
+      providerMaintenanceHttpResponse.body,
+      providerMaintenanceHttpResponse.statusCode,
       headers,
     );
   }

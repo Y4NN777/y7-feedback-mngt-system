@@ -54,6 +54,8 @@ function clients() {
       createIntegerColumn: vi.fn(),
       createTextColumn: vi.fn(),
       createVarcharColumn: vi.fn(),
+      createIndex: vi.fn(),
+      getIndex: vi.fn().mockResolvedValue({ status: "available", error: "" }),
     },
     storage: {
       getBucket: vi.fn(),
@@ -191,6 +193,72 @@ describe("Node Appwrite provisioning adapter", () => {
     expect(sdk.tables.createVarcharColumn).toHaveBeenCalledWith(
       expect.objectContaining({ key: "proof", encrypt: true }),
     );
+  });
+
+  it("BDD-INFRA-015 translates additive indexes without changing their order", async () => {
+    const sdk = clients();
+    const port = createNodeAppwriteProvisioningPort(sdk.tables, sdk.storage);
+    await port.createIndex("feedback", "conversation_messages", {
+      key: "provider_comment_time",
+      type: "key",
+      columns: ["provider", "repositoryId", "providerCommentId", "providerUpdatedAt"],
+    });
+    expect(sdk.tables.createIndex).toHaveBeenCalledWith({
+      databaseId: "feedback",
+      tableId: "conversation_messages",
+      key: "provider_comment_time",
+      type: "key",
+      columns: ["provider", "repositoryId", "providerCommentId", "providerUpdatedAt"],
+    });
+    expect(sdk.tables.getIndex).toHaveBeenCalledWith({
+      databaseId: "feedback",
+      tableId: "conversation_messages",
+      key: "provider_comment_time",
+    });
+    sdk.tables.getIndex.mockResolvedValueOnce({ status: "available" });
+    await port.createIndex("feedback", "conversation_messages", {
+      key: "provider_comment_unique",
+      type: "unique",
+      columns: ["providerCommentId"],
+    });
+  });
+
+  it("BDD-INFRA-016 fails closed when an additive index build fails or times out", async () => {
+    const failed = clients();
+    failed.tables.getIndex.mockResolvedValue({ status: "failed", error: "build" });
+    const failedPort = createNodeAppwriteProvisioningPort(
+      failed.tables,
+      failed.storage,
+    );
+    await expect(
+      failedPort.createIndex("feedback", "conversation_messages", {
+        key: "provider_comment_time",
+        type: "unique",
+        columns: ["providerCommentId"],
+      }),
+    ).rejects.toThrow("APPWRITE_INFRASTRUCTURE_INDEX_FAILED");
+
+    vi.useFakeTimers();
+    try {
+      const pending = clients();
+      pending.tables.getIndex.mockResolvedValue(null);
+      const pendingPort = createNodeAppwriteProvisioningPort(
+        pending.tables,
+        pending.storage,
+      );
+      const timeout = expect(
+        pendingPort.createIndex("feedback", "conversation_messages", {
+          key: "provider_comment_time",
+          type: "key",
+          columns: ["providerCommentId"],
+        }),
+      ).rejects.toThrow("APPWRITE_INFRASTRUCTURE_INDEX_TIMEOUT");
+      await vi.runAllTimersAsync();
+      await timeout;
+      expect(pending.tables.getIndex).toHaveBeenCalledTimes(60);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("BDD-INFRA-010 normalizes SDK metadata before drift comparison", async () => {

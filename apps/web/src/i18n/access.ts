@@ -58,11 +58,12 @@ export const accessMessages = {
     publicationAudience: "Destination publique autorisée",
     publicationConsent: "Publication dans une issue publique",
     publicationConsentHint:
-      "Autorisez explicitement une destination précise. Seul le contenu public autorisé pourra être publié.",
+      "Autorisez explicitement une destination précise. Seul le contenu public autorisé pourra être publié. Une révocation bloque les nouvelles publications et demande le retrait du contenu contrôlé par Y7, sans pouvoir garantir l’effacement des copies déjà publiques.",
     grantPublicationConsent: "Autoriser cette publication",
     revokePublicationConsent: "Révoquer l’autorisation",
     consentActive: "Autorisation active, version {version}.",
-    consentRevoked: "Autorisation révoquée, version {version}.",
+    consentRevoked:
+      "Autorisation révoquée, version {version}. Les nouvelles publications sont bloquées ; le retrait externe est tenté sans garantie d’effacement des copies publiques.",
     consentConflict: "Cette demande entre en conflit avec une tentative précédente.",
     deletionAcknowledge:
       "Je comprends que l’accès sera révoqué immédiatement et que la purge définitive aura lieu après 30 jours.",
@@ -109,11 +110,12 @@ export const accessMessages = {
     publicationAudience: "Authorized public destination",
     publicationConsent: "Publication in a public issue",
     publicationConsentHint:
-      "Explicitly authorize one exact destination. Only authorized public content may be published.",
+      "Explicitly authorize one exact destination. Only authorized public content may be published. Revocation blocks new publication and requests removal of Y7-controlled content, but cannot guarantee erasure of copies already made public.",
     grantPublicationConsent: "Authorize this publication",
     revokePublicationConsent: "Revoke authorization",
     consentActive: "Authorization active, version {version}.",
-    consentRevoked: "Authorization revoked, version {version}.",
+    consentRevoked:
+      "Authorization revoked, version {version}. New publication is blocked; external removal is attempted without guaranteeing erasure of public copies.",
     consentConflict: "This request conflicts with an earlier attempt.",
     deletionAcknowledge:
       "I understand that access is revoked immediately and permanent purge occurs after 30 days.",

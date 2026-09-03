@@ -149,6 +149,8 @@ export function createDay4TableDefinitions(
         datetime("nextAttemptAt", false),
         varchar("claimedBy", 64, false),
         varchar("lastErrorCode", 64, false),
+        varchar("providerObjectId", 128, false),
+        boolean("cleanupMissing", false),
       ],
       [
         index("operation_unique", ["operationId"], "unique"),

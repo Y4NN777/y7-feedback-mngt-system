@@ -1,4 +1,5 @@
 import type { ActorAccess } from "@y7-feedback/domain";
+import type { ProviderConsentCleanup } from "./appwrite-provider-consent-cleanup.js";
 
 export type ExternalIssueOutcome =
   | { readonly status: "denied" | "retryable" | "conflict" }
@@ -95,6 +96,7 @@ export interface ExternalIssueCoordinatorDependencies {
     readonly feedbackId: string;
   }) => string;
   readonly now: () => string;
+  readonly consentCleanup?: ProviderConsentCleanup;
 }
 
 const identifier = /^[A-Za-z0-9][A-Za-z0-9._-]{0,35}$/u;
@@ -254,6 +256,7 @@ export function createExternalIssueCoordinator(
         }
         const verified = await reporter(input);
         if (verified.status !== "verified") return { status: verified.status } as const;
+        const occurredAt = dependencies.now();
         const consent = await dependencies.persistence.revokeConsent({
           feedbackId: verified.feedbackId,
           reporterId: verified.reporterId,
@@ -264,8 +267,21 @@ export function createExternalIssueCoordinator(
             kind: "revoke_publication_consent",
             feedbackId: verified.feedbackId,
           }),
-          occurredAt: dependencies.now(),
+          occurredAt,
         });
+        if (dependencies.consentCleanup) {
+          try {
+            await dependencies.consentCleanup.request({
+              feedbackId: verified.feedbackId,
+              workspaceId: verified.workspaceId,
+              projectId: verified.projectId,
+              consentOperationId: input.operationId,
+              occurredAt,
+            });
+          } catch {
+            // Consent revocation is authoritative; cleanup remains explicitly best effort.
+          }
+        }
         return { status: "ok" as const, consent };
       } catch (error) {
         return { status: stableFailure(error) } as const;

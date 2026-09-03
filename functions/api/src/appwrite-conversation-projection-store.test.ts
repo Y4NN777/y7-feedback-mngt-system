@@ -38,6 +38,14 @@ const message = {
   contentEnvelope: "sealed:Which version?",
   occurredAt: "2026-08-28T12:00:00.000Z",
 };
+const providerRevision = {
+  ...message,
+  $id: "message_2",
+  origin: "provider",
+  provider: "github",
+  revisionKind: "revised",
+  supersedesMessageId: "message_1",
+};
 const note = {
   $id: "note_1",
   feedbackId: "feedback_1",
@@ -157,6 +165,44 @@ describe("Appwrite Conversation projections", () => {
     expect(messageCall?.queries).toContain("equal:audience:reporter");
   });
 
+  it("FR-SYNC-010 exposes append-only provider revision provenance", async () => {
+    const tables = new FakeTables();
+    tables.messages = [providerRevision];
+    await expect(
+      store(tables).readReporter({ feedbackId: "feedback_1" }),
+    ).resolves.toMatchObject({
+      messages: [
+        {
+          id: "message_2",
+          provider: "github",
+          revisionKind: "revised",
+          supersedesMessageId: "message_1",
+        },
+      ],
+    });
+  });
+
+  it("FR-SYNC-010 exposes created and tombstoned provider facts distinctly", async () => {
+    const tables = new FakeTables();
+    tables.messages = [
+      {
+        ...providerRevision,
+        $id: "message_3",
+        revisionKind: "created",
+        supersedesMessageId: undefined,
+      },
+      { ...providerRevision, $id: "message_4", revisionKind: "tombstoned" },
+    ];
+    await expect(
+      store(tables).readReporter({ feedbackId: "feedback_1" }),
+    ).resolves.toMatchObject({
+      messages: [
+        { revisionKind: "created", provider: "github" },
+        { revisionKind: "tombstoned", supersedesMessageId: "message_1" },
+      ],
+    });
+  });
+
   it("fails closed on scope mismatch and malformed authoritative rows", async () => {
     const denied = new FakeTables();
     await expect(
@@ -178,6 +224,8 @@ describe("Appwrite Conversation projections", () => {
       null,
       { ...message, audience: "workspace" },
       { ...message, contentEnvelope: 4 },
+      { ...providerRevision, provider: "unknown" },
+      { ...providerRevision, supersedesMessageId: undefined },
     ]) {
       const tables = new FakeTables();
       tables.messages = [malformed];
