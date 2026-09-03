@@ -137,4 +137,29 @@ describe("Day 4 additive Appwrite migration", () => {
       { key: "purgeClaimedAt", required: false },
     ]);
   });
+
+  it("BDD-PLAT-101 evolves exceptional grants additively for lifecycle enforcement", () => {
+    const grant = createDay4AdditiveMigration(g3Tables()).createTables.find(
+      ({ id }) => id === "exceptional_access_grants",
+    );
+    expect(
+      grant?.columns
+        .filter(({ key }) =>
+          [
+            "revision",
+            "justificationEnvelope",
+            "incidentSeverity",
+            "actionsJson",
+            "reviewedAt",
+          ].includes(key),
+        )
+        .map(({ key, required }) => ({ key, required })),
+    ).toEqual([
+      { key: "revision", required: false },
+      { key: "justificationEnvelope", required: false },
+      { key: "incidentSeverity", required: false },
+      { key: "actionsJson", required: false },
+      { key: "reviewedAt", required: false },
+    ]);
+  });
 });
