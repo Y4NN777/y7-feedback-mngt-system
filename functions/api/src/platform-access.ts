@@ -39,6 +39,7 @@ export type PlatformAccessCommand =
 export interface PlatformAuthority {
   authorize(input: {
     readonly principalId: string;
+    readonly jwt: string;
     readonly role: "platform_operator" | "platform_owner";
   }): Promise<
     | { readonly status: "authorized"; readonly freshMfa: boolean }
@@ -207,6 +208,7 @@ export function createPlatformAccessCoordinator(
         if (verified.status !== "verified") return { status: "denied" };
         const authorized = await authority.authorize({
           principalId: verified.principalId,
+          jwt: input.jwt,
           role: requiredRole(parsed),
         });
         if (authorized.status !== "authorized") return { status: authorized.status };

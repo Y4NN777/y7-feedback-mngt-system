@@ -59,6 +59,7 @@ describe("trusted Platform exceptional access coordination", () => {
     expect(target.verify).toHaveBeenCalledWith("jwt_1");
     expect(target.authorize).toHaveBeenCalledWith({
       principalId: "operator_1",
+      jwt: "jwt_1",
       role: "platform_operator",
     });
     expect(target.execute).toHaveBeenCalledWith(
@@ -84,6 +85,7 @@ describe("trusted Platform exceptional access coordination", () => {
     });
     expect(target.authorize).toHaveBeenCalledWith({
       principalId: "operator_1",
+      jwt: "jwt_1",
       role: "platform_owner",
     });
     expect(target.execute).toHaveBeenCalledWith(
