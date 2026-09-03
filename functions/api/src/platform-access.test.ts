@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createPlatformAccessCoordinator } from "./platform-access";
+import {
+  createPlatformAccessCoordinator,
+  type PlatformAccessStore,
+  type PlatformAuthority,
+} from "./platform-access";
 
 const request = {
   kind: "request",
@@ -19,17 +23,19 @@ function setup() {
   const verify = vi.fn(() =>
     Promise.resolve({ status: "verified" as const, principalId: "operator_1" }),
   );
-  const authorize = vi.fn(() =>
-    Promise.resolve({ status: "authorized" as const, freshMfa: true }),
-  );
-  const execute = vi.fn(() =>
-    Promise.resolve({
+  const authorize = vi.fn((input: Parameters<PlatformAuthority["authorize"]>[0]) => {
+    void input;
+    return Promise.resolve({ status: "authorized" as const, freshMfa: true });
+  });
+  const execute = vi.fn((input: Parameters<PlatformAccessStore["execute"]>[0]) => {
+    void input;
+    return Promise.resolve({
       status: "applied" as const,
       grantId: "grant_1",
       state: "requested",
       revision: 0,
-    }),
-  );
+    });
+  });
   return {
     verify,
     authorize,
@@ -62,13 +68,12 @@ describe("trusted Platform exceptional access coordination", () => {
       jwt: "jwt_1",
       role: "platform_operator",
     });
-    expect(target.execute).toHaveBeenCalledWith(
-      expect.objectContaining({
-        actorId: "operator_1",
-        freshMfa: true,
-        command: expect.objectContaining({ kind: "request" }),
-      }),
-    );
+    expect(target.execute).toHaveBeenCalledOnce();
+    expect(target.execute.mock.calls[0]?.[0]).toMatchObject({
+      actorId: "operator_1",
+      freshMfa: true,
+      command: { kind: "request" },
+    });
   });
 
   it("BDD-PLAT-111 requires owner authority and server-derived fresh MFA", async () => {
@@ -88,14 +93,10 @@ describe("trusted Platform exceptional access coordination", () => {
       jwt: "jwt_1",
       role: "platform_owner",
     });
-    expect(target.execute).toHaveBeenCalledWith(
-      expect.objectContaining({ freshMfa: true }),
-    );
-    expect(target.execute).toHaveBeenCalledWith(
-      expect.objectContaining({
-        command: expect.not.objectContaining({ freshMfa: expect.anything() }),
-      }),
-    );
+    expect(target.execute).toHaveBeenCalledOnce();
+    const stored = target.execute.mock.calls[0]?.[0];
+    expect(stored).toMatchObject({ freshMfa: true });
+    expect(stored?.command).not.toHaveProperty("freshMfa");
   });
 
   it("BDD-PLAT-112 denies before grant access when identity or role is absent", async () => {
