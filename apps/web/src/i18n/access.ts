@@ -21,6 +21,12 @@ interface AccessMessages {
   readonly consentActive: string;
   readonly consentRevoked: string;
   readonly consentConflict: string;
+  readonly deletionAcknowledge: string;
+  readonly deletionComplete: string;
+  readonly deletionConflict: string;
+  readonly deletionHint: string;
+  readonly deletionRequest: string;
+  readonly deletionTitle: string;
   readonly messages: string;
   readonly preserve: string;
   readonly reference: string;
@@ -58,6 +64,15 @@ export const accessMessages = {
     consentActive: "Autorisation active, version {version}.",
     consentRevoked: "Autorisation révoquée, version {version}.",
     consentConflict: "Cette demande entre en conflit avec une tentative précédente.",
+    deletionAcknowledge:
+      "Je comprends que l’accès sera révoqué immédiatement et que la purge définitive aura lieu après 30 jours.",
+    deletionComplete:
+      "Le retour est supprimé de l’usage courant. Sa purge définitive est programmée pour le {date}.",
+    deletionConflict: "Cette suppression a déjà été traitée différemment.",
+    deletionHint:
+      "La suppression masque immédiatement le retour, anonymise les données Reporter et révoque cette preuve d’accès.",
+    deletionRequest: "Supprimer définitivement mon retour",
+    deletionTitle: "Suppression du retour",
     messages: "Messages visibles",
     preserve:
       "Conservez la référence et la preuve séparément. La preuve ne doit pas être placée dans une URL ni partagée par e-mail.",
@@ -100,6 +115,15 @@ export const accessMessages = {
     consentActive: "Authorization active, version {version}.",
     consentRevoked: "Authorization revoked, version {version}.",
     consentConflict: "This request conflicts with an earlier attempt.",
+    deletionAcknowledge:
+      "I understand that access is revoked immediately and permanent purge occurs after 30 days.",
+    deletionComplete:
+      "The feedback is removed from ordinary use. Permanent purge is scheduled for {date}.",
+    deletionConflict: "This deletion was already handled differently.",
+    deletionHint:
+      "Deletion immediately hides the feedback, anonymizes Reporter data, and revokes this access proof.",
+    deletionRequest: "Permanently delete my feedback",
+    deletionTitle: "Delete feedback",
     messages: "Visible messages",
     preserve:
       "Keep the reference and proof separately. Do not put the proof in a URL or share it by email.",
