@@ -214,16 +214,13 @@ export function createAppwritePrivacyStore(
     tableId: string,
     feedbackId: string,
     transactionId: string,
+    attribute = "feedbackId",
     extra: readonly string[] = [],
   ) =>
     tables.listRows({
       databaseId: schema.databaseId,
       tableId,
-      queries: [
-        queries.equal("feedbackId", [feedbackId]),
-        ...extra,
-        queries.limit(500),
-      ],
+      queries: [queries.equal(attribute, [feedbackId]), ...extra, queries.limit(500)],
       total: false,
       ttl: 0,
       transactionId,
@@ -417,12 +414,17 @@ export function createAppwritePrivacyStore(
               transactionId,
             });
           }
-          for (const tableId of [
-            schema.notificationsTableId,
-            schema.offlineConflictProjectionsTableId,
-            schema.intelligenceProvenanceTableId,
-          ]) {
-            const rows = await list(tableId, input.command.feedbackId, transactionId);
+          for (const [tableId, attribute] of [
+            [schema.notificationsTableId, "feedbackId"],
+            [schema.offlineConflictProjectionsTableId, "entityId"],
+            [schema.intelligenceProvenanceTableId, "feedbackId"],
+          ] as const) {
+            const rows = await list(
+              tableId,
+              input.command.feedbackId,
+              transactionId,
+              attribute,
+            );
             for (const row of rows.rows) {
               if (!object(row) || typeof row.$id !== "string")
                 throw new Error("unavailable");

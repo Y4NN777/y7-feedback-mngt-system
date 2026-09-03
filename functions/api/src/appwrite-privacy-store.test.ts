@@ -138,11 +138,7 @@ function setup(
       { feedbackId: "feedback_1", lifecycle: "available" },
     ],
     [schema.notificationsTableId, "notification_1", { feedbackId: "feedback_1" }],
-    [
-      schema.offlineConflictProjectionsTableId,
-      "offline_1",
-      { feedbackId: "feedback_1" },
-    ],
+    [schema.offlineConflictProjectionsTableId, "offline_1", { entityId: "feedback_1" }],
     [schema.intelligenceProvenanceTableId, "theme_1", { feedbackId: "feedback_1" }],
     [
       schema.externalIssueLinksTableId,
@@ -230,6 +226,12 @@ describe("Appwrite privacy store", () => {
     expect(tables.table(schema.notificationsTableId)).toHaveLength(0);
     expect(tables.table(schema.offlineConflictProjectionsTableId)).toHaveLength(0);
     expect(tables.table(schema.intelligenceProvenanceTableId)).toHaveLength(0);
+    expect(tables.listRows).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tableId: schema.offlineConflictProjectionsTableId,
+        queries: expect.arrayContaining(["equal:entityId:feedback_1"]),
+      }),
+    );
     expect(
       tables.table(schema.reportersTableId).get("reporter_1")?.attributionJson,
     ).toBe(JSON.stringify({ kind: "unidentified" }));
