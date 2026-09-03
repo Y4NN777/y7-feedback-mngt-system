@@ -11,6 +11,7 @@ const schema = {
   databaseId: "feedback",
   grantsTableId: "exceptional_access_grants",
   auditTableId: "exceptional_access_audit",
+  operationsTableId: "exceptional_access_operations",
 } as const;
 
 const sensitive = {
@@ -27,12 +28,14 @@ const sensitive = {
 class FakeTables implements AppwritePlatformAccessTables {
   readonly grants = new Map<string, Readonly<Record<string, unknown>>>();
   readonly audits = new Map<string, Readonly<Record<string, unknown>>>();
+  readonly operations = new Map<string, Readonly<Record<string, unknown>>>();
   readonly calls: Readonly<Record<string, unknown>>[] = [];
-  fail: "create" | "update" | "commit" | "rollback" | undefined;
+  fail: "create" | "update" | "commit" | "rollback" | "operation-read" | undefined;
   private pending:
     | {
         grants: Map<string, Readonly<Record<string, unknown>>>;
         audits: Map<string, Readonly<Record<string, unknown>>>;
+        operations: Map<string, Readonly<Record<string, unknown>>>;
       }
     | undefined;
 
@@ -40,12 +43,20 @@ class FakeTables implements AppwritePlatformAccessTables {
     this.pending = {
       grants: new Map(this.grants),
       audits: new Map(this.audits),
+      operations: new Map(this.operations),
     };
     return Promise.resolve({ $id: "transaction_1" });
   });
 
   getRow = vi.fn((input: Parameters<AppwritePlatformAccessTables["getRow"]>[0]) => {
-    const row = this.pending?.grants.get(input.rowId);
+    if (this.fail === "operation-read" && input.tableId === schema.operationsTableId)
+      return Promise.reject(new Error("read"));
+    const row =
+      input.tableId === schema.grantsTableId
+        ? this.pending?.grants.get(input.rowId)
+        : input.tableId === schema.operationsTableId
+          ? this.pending?.operations.get(input.rowId)
+          : undefined;
     return row
       ? Promise.resolve(row)
       : Promise.reject(Object.assign(new Error("absent"), { code: 404 }));
@@ -63,7 +74,9 @@ class FakeTables implements AppwritePlatformAccessTables {
       const target =
         input.tableId === schema.grantsTableId
           ? this.pending?.grants
-          : this.pending?.audits;
+          : input.tableId === schema.auditTableId
+            ? this.pending?.audits
+            : this.pending?.operations;
       if (!target || target.has(input.rowId))
         return Promise.reject(new Error("duplicate"));
       target.set(input.rowId, { $id: input.rowId, ...input.data });
@@ -93,8 +106,11 @@ class FakeTables implements AppwritePlatformAccessTables {
       if (input.commit && this.pending) {
         this.grants.clear();
         this.audits.clear();
+        this.operations.clear();
         for (const [key, value] of this.pending.grants) this.grants.set(key, value);
         for (const [key, value] of this.pending.audits) this.audits.set(key, value);
+        for (const [key, value] of this.pending.operations)
+          this.operations.set(key, value);
       }
       this.pending = undefined;
       return Promise.resolve({});
@@ -108,6 +124,18 @@ function setup(now = "2026-09-03T12:00:00.000Z") {
   const store = createAppwritePlatformAccessStore(tables, schema, sensitive, {
     now: () => now,
     createAuditId: () => `audit_${String(++audit)}`,
+    content: {
+      read: () =>
+        Promise.resolve({
+          workspaceId: "workspace_1",
+          projectId: "project_1",
+          feedbackId: "feedback_1",
+          content: {
+            kind: "feedback" as const,
+            feedback: { feedbackId: "feedback_1", state: "received" },
+          },
+        }),
+    },
   });
   return { store, tables };
 }
@@ -190,6 +218,7 @@ describe("Appwrite exceptional access persistence", () => {
         freshMfa: true,
         command: {
           kind: "use",
+          operationId: "00000000-0000-4000-8000-000000000001",
           grantId: "grant_1",
           expectedRevision: 1,
           workspaceId: "workspace_1",
@@ -218,6 +247,145 @@ describe("Appwrite exceptional access persistence", () => {
     ]);
   });
 
+  it("BDD-PLAT-024 replays the exact protected result after response loss", async () => {
+    const candidate = setup();
+    await candidate.store.execute(request);
+    await candidate.store.execute({
+      actorId: "owner_1",
+      freshMfa: true,
+      command: {
+        kind: "approve",
+        grantId: "grant_1",
+        expectedRevision: 0,
+        expiresAt: "2026-09-03T12:30:00.000Z",
+      },
+    });
+    const command = {
+      kind: "use" as const,
+      operationId: "123e4567-e89b-42d3-a456-426614174000",
+      grantId: "grant_1",
+      expectedRevision: 1,
+      workspaceId: "workspace_1",
+      projectId: "project_1",
+      feedbackId: "feedback_1",
+      action: "feedback.read" as const,
+    };
+    const first = await candidate.store.execute({
+      actorId: "operator_1",
+      freshMfa: true,
+      command,
+    });
+    expect(first).toMatchObject({
+      status: "applied",
+      revision: 2,
+      content: { kind: "feedback", feedback: { feedbackId: "feedback_1" } },
+    });
+    expect([...candidate.tables.operations.values()][0]).toMatchObject({
+      operationId: command.operationId,
+      outcome: "applied",
+      revision: 2,
+    });
+    expect(JSON.stringify([...candidate.tables.operations.values()][0])).not.toContain(
+      '"state":"received"',
+    );
+    await expect(
+      candidate.store.execute({
+        actorId: "operator_1",
+        freshMfa: true,
+        command,
+      }),
+    ).resolves.toEqual({ ...first, status: "replayed" });
+    expect(candidate.tables.audits).toHaveLength(3);
+    await expect(
+      candidate.store.execute({
+        actorId: "operator_1",
+        freshMfa: true,
+        command: { ...command, workspaceId: "workspace_2" },
+      }),
+    ).resolves.toEqual({ status: "conflict" });
+    expect(candidate.tables.audits).toHaveLength(3);
+  });
+
+  it("BDD-PLAT-025 deduplicates denied attempts and rejects corrupt replay state", async () => {
+    const denied = setup();
+    await denied.store.execute(request);
+    await denied.store.execute({
+      actorId: "owner_1",
+      freshMfa: true,
+      command: {
+        kind: "approve",
+        grantId: "grant_1",
+        expectedRevision: 0,
+        expiresAt: "2026-09-03T12:30:00.000Z",
+      },
+    });
+    const deniedCommand = {
+      kind: "use" as const,
+      operationId: "123e4567-e89b-42d3-a456-426614174001",
+      grantId: "grant_1",
+      expectedRevision: 1,
+      workspaceId: "workspace_2",
+      projectId: "project_1",
+      feedbackId: "feedback_1",
+      action: "feedback.read" as const,
+    };
+    await expect(
+      denied.store.execute({
+        actorId: "operator_1",
+        freshMfa: true,
+        command: deniedCommand,
+      }),
+    ).resolves.toEqual({ status: "denied" });
+    await expect(
+      denied.store.execute({
+        actorId: "operator_1",
+        freshMfa: true,
+        command: deniedCommand,
+      }),
+    ).resolves.toEqual({ status: "denied" });
+    expect(denied.tables.audits).toHaveLength(3);
+
+    for (const corrupt of [
+      { $id: "wrong_operation" },
+      { grantId: "wrong_grant" },
+      { operationId: "123e4567-e89b-42d3-a456-426614174099" },
+      { actorId: "wrong_actor" },
+      { payloadDigest: 1 },
+      { outcome: "unknown" },
+      { resultEnvelope: "not-an-envelope" },
+      { resultEnvelope: "sealed:null" },
+    ]) {
+      const candidate = setup();
+      await candidate.store.execute(request);
+      await candidate.store.execute({
+        actorId: "owner_1",
+        freshMfa: true,
+        command: {
+          kind: "approve",
+          grantId: "grant_1",
+          expectedRevision: 0,
+          expiresAt: "2026-09-03T12:30:00.000Z",
+        },
+      });
+      const command = { ...deniedCommand, workspaceId: "workspace_1" };
+      await candidate.store.execute({
+        actorId: "operator_1",
+        freshMfa: true,
+        command,
+      });
+      const entry = [...candidate.tables.operations.entries()][0];
+      if (!entry) throw new Error("operation fixture missing");
+      candidate.tables.operations.set(entry[0], { ...entry[1], ...corrupt });
+      await expect(
+        candidate.store.execute({
+          actorId: "operator_1",
+          freshMfa: true,
+          command,
+        }),
+      ).resolves.toEqual({ status: "retryable" });
+    }
+  });
+
   it("BDD-PLAT-024 audits an authorized command denial without advancing revision", async () => {
     const candidate = setup();
     await candidate.store.execute(request);
@@ -227,6 +395,7 @@ describe("Appwrite exceptional access persistence", () => {
         freshMfa: true,
         command: {
           kind: "use",
+          operationId: "00000000-0000-4000-8000-000000000001",
           grantId: "grant_1",
           expectedRevision: 0,
           workspaceId: "workspace_1",
@@ -262,6 +431,83 @@ describe("Appwrite exceptional access persistence", () => {
     });
     expect(commitFailure.tables.grants).toHaveLength(0);
     expect(commitFailure.tables.audits).toHaveLength(0);
+  });
+
+  it("BDD-PLAT-028 fails closed on operation lookup, content, or authoritative scope failure", async () => {
+    const candidate = setup();
+    await candidate.store.execute(request);
+    await candidate.store.execute({
+      actorId: "owner_1",
+      freshMfa: true,
+      command: {
+        kind: "approve",
+        grantId: "grant_1",
+        expectedRevision: 0,
+        expiresAt: "2026-09-03T12:30:00.000Z",
+      },
+    });
+    const command = {
+      kind: "use" as const,
+      operationId: "123e4567-e89b-42d3-a456-426614174010",
+      grantId: "grant_1",
+      expectedRevision: 1,
+      workspaceId: "workspace_1",
+      projectId: "project_1",
+      feedbackId: "feedback_1",
+      action: "feedback.read" as const,
+    };
+    candidate.tables.fail = "operation-read";
+    await expect(
+      candidate.store.execute({
+        actorId: "operator_1",
+        freshMfa: true,
+        command,
+      }),
+    ).resolves.toEqual({ status: "retryable" });
+    candidate.tables.fail = undefined;
+
+    const unavailable = createAppwritePlatformAccessStore(
+      candidate.tables,
+      schema,
+      sensitive,
+      { now: () => "2026-09-03T12:00:00.000Z", createAuditId: () => "audit_x" },
+    );
+    await expect(
+      unavailable.execute({
+        actorId: "operator_1",
+        freshMfa: true,
+        command,
+      }),
+    ).resolves.toEqual({ status: "retryable" });
+
+    const mismatch = createAppwritePlatformAccessStore(
+      candidate.tables,
+      schema,
+      sensitive,
+      {
+        now: () => "2026-09-03T12:00:00.000Z",
+        createAuditId: () => "audit_scope",
+        content: {
+          read: () =>
+            Promise.resolve({
+              workspaceId: "workspace_2",
+              projectId: "project_1",
+              feedbackId: "feedback_1",
+              content: { kind: "feedback", feedback: {} },
+            }),
+        },
+      },
+    );
+    await expect(
+      mismatch.execute({
+        actorId: "operator_1",
+        freshMfa: true,
+        command: {
+          ...command,
+          operationId: "123e4567-e89b-42d3-a456-426614174011",
+        },
+      }),
+    ).resolves.toEqual({ status: "denied" });
   });
 
   it("BDD-PLAT-026 fails closed for absent, corrupt, invalid and conflicting grants", async () => {
@@ -436,6 +682,7 @@ describe("Appwrite exceptional access persistence", () => {
         freshMfa: true,
         command: {
           kind: "use",
+          operationId: "00000000-0000-4000-8000-000000000001",
           grantId: "workspace_grant",
           expectedRevision: 1,
           workspaceId: "workspace_1",

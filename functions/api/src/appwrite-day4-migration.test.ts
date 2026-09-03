@@ -175,8 +175,10 @@ describe("Day 4 additive Appwrite migration", () => {
     expect(operations?.columns.map(({ key }) => key)).toEqual([
       "grantId",
       "operationId",
+      "actorId",
       "payloadDigest",
       "outcome",
+      "state",
       "revision",
       "resultEnvelope",
       "createdAt",

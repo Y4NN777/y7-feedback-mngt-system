@@ -35,6 +35,7 @@ export const platformAccessMessages: Record<
     denied: "Accès refusé.",
     conflict: "Le grant a changé. Rechargez sa révision.",
     retryable: "Service temporairement indisponible. Réessayez.",
+    protectedResult: "Résultat protégé autorisé",
   },
   en: {
     language: "Language",
@@ -66,5 +67,6 @@ export const platformAccessMessages: Record<
     denied: "Access denied.",
     conflict: "The grant changed. Reload its revision.",
     retryable: "Service temporarily unavailable. Try again.",
+    protectedResult: "Authorized protected result",
   },
 };

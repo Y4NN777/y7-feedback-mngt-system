@@ -211,7 +211,7 @@ function openJson(
   }
 }
 
-function detail(
+export function parseWorkbenchDetail(
   value: unknown,
   input: {
     readonly actor: ActorAccess;
@@ -317,7 +317,7 @@ export function createAppwriteWorkbenchStore(
     },
     async read(input) {
       try {
-        return detail(
+        return parseWorkbenchDetail(
           await tables.getRow({
             databaseId: schema.databaseId,
             tableId: schema.feedbackTableId,
