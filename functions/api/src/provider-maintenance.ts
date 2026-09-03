@@ -30,15 +30,14 @@ export function createProviderMaintenance(input: {
       if (outcomes.some(({ status }) => status === "rejected")) {
         throw new Error("PROVIDER_MAINTENANCE_RETRYABLE");
       }
-      const fulfilled = outcomes.filter(
-        (outcome): outcome is PromiseFulfilledResult<object> =>
-          outcome.status === "fulfilled",
-      );
       const result: Record<string, unknown> = {
         status: "completed",
       };
-      for (const [index, outcome] of fulfilled.entries())
-        result[capabilities[index]![0]] = capabilityStatus(outcome.value);
+      for (const [index, outcome] of outcomes.entries()) {
+        const capability = capabilities[index];
+        if (outcome.status === "fulfilled" && capability !== undefined)
+          result[capability[0]] = capabilityStatus(outcome.value);
+      }
       return result;
     },
   };

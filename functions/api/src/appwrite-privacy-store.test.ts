@@ -226,12 +226,10 @@ describe("Appwrite privacy store", () => {
     expect(tables.table(schema.notificationsTableId)).toHaveLength(0);
     expect(tables.table(schema.offlineConflictProjectionsTableId)).toHaveLength(0);
     expect(tables.table(schema.intelligenceProvenanceTableId)).toHaveLength(0);
-    expect(tables.listRows).toHaveBeenCalledWith(
-      expect.objectContaining({
-        tableId: schema.offlineConflictProjectionsTableId,
-        queries: expect.arrayContaining(["equal:entityId:feedback_1"]),
-      }),
-    );
+    const offlineQuery = tables.listRows.mock.calls.find(
+      ([input]) => input.tableId === schema.offlineConflictProjectionsTableId,
+    )?.[0].queries;
+    expect(offlineQuery).toContain("equal:entityId:feedback_1");
     expect(
       tables.table(schema.reportersTableId).get("reporter_1")?.attributionJson,
     ).toBe(JSON.stringify({ kind: "unidentified" }));

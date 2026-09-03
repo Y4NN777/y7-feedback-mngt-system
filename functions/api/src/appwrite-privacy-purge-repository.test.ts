@@ -61,13 +61,15 @@ class FakeTables implements AppwritePrivacyPurgeTables {
   transactionId = "transaction_1";
   fail: "list" | "get" | "update" | "commit" | "rollback" | undefined;
   readonly writes: Array<Readonly<Record<string, unknown>>> = [];
+  readonly listInputs: Parameters<AppwritePrivacyPurgeTables["listRows"]>[0][] = [];
 
   createTransaction = vi.fn(() => Promise.resolve({ $id: this.transactionId }));
-  listRows = vi.fn(() =>
-    this.fail === "list"
+  listRows = vi.fn((input: Parameters<AppwritePrivacyPurgeTables["listRows"]>[0]) => {
+    this.listInputs.push(input);
+    return this.fail === "list"
       ? Promise.reject(new Error("transport"))
-      : Promise.resolve({ rows: this.rows }),
-  );
+      : Promise.resolve({ rows: this.rows });
+  });
   getRow = vi.fn(() =>
     this.fail === "get"
       ? Promise.reject(new Error("transport"))
@@ -136,11 +138,9 @@ describe("Appwrite privacy purge repository", () => {
       }),
     ).resolves.toHaveLength(3);
     expect(tables.writes).toHaveLength(3);
-    expect(tables.listRows).toHaveBeenCalledWith(
-      expect.objectContaining({
-        queries: expect.arrayContaining(["equal:state:soft_deleted", "limit:10"]),
-      }),
-    );
+    const claimQueries = tables.listInputs[0]?.queries;
+    expect(claimQueries).toContain("equal:state:soft_deleted");
+    expect(claimQueries).toContain("limit:10");
     expect(tables.updateTransaction).toHaveBeenLastCalledWith({
       transactionId: "transaction_1",
       commit: true,
