@@ -114,6 +114,22 @@ function audit(
   };
 }
 
+function auditedDenial(
+  grant: ExceptionalAccessGrant,
+  code: string,
+  actorId: string,
+  occurredAt: string,
+  status: "denied" | "invalid" | "conflict" = "denied",
+): ExceptionalAccessDecision {
+  return {
+    status,
+    code,
+    ...(identifier.test(actorId) && time(occurredAt) !== undefined
+      ? { audit: audit(grant, "denied", actorId, occurredAt, code) }
+      : {}),
+  };
+}
+
 export function requestExceptionalAccess(input: {
   readonly id: string;
   readonly requesterId: string;
@@ -174,13 +190,35 @@ export function approveExceptionalAccess(
     expiry <= now ||
     expiry - now > oneHour
   )
-    return { status: "invalid", code: "EXCEPTIONAL_ACCESS_APPROVAL_INVALID" };
+    return auditedDenial(
+      grant,
+      "EXCEPTIONAL_ACCESS_APPROVAL_INVALID",
+      input.approverId,
+      input.now,
+      "invalid",
+    );
   if (!input.freshMfa)
-    return { status: "denied", code: "EXCEPTIONAL_ACCESS_MFA_REQUIRED" };
+    return auditedDenial(
+      grant,
+      "EXCEPTIONAL_ACCESS_MFA_REQUIRED",
+      input.approverId,
+      input.now,
+    );
   if (input.approverId === grant.requesterId)
-    return { status: "denied", code: "EXCEPTIONAL_ACCESS_SELF_APPROVAL" };
+    return auditedDenial(
+      grant,
+      "EXCEPTIONAL_ACCESS_SELF_APPROVAL",
+      input.approverId,
+      input.now,
+    );
   if (grant.state !== "requested" || input.expectedRevision !== grant.revision)
-    return { status: "conflict", code: "EXCEPTIONAL_ACCESS_STATE_CONFLICT" };
+    return auditedDenial(
+      grant,
+      "EXCEPTIONAL_ACCESS_STATE_CONFLICT",
+      input.approverId,
+      input.now,
+      "conflict",
+    );
   const active: ExceptionalAccessGrant = {
     ...grant,
     revision: grant.revision + 1,
@@ -211,7 +249,12 @@ export function denyExceptionalAccess(
     !identifier.test(input.approverId) ||
     time(input.now) === undefined
   )
-    return { status: "denied", code: "EXCEPTIONAL_ACCESS_DENIAL_INVALID" };
+    return auditedDenial(
+      grant,
+      "EXCEPTIONAL_ACCESS_DENIAL_INVALID",
+      input.approverId,
+      input.now,
+    );
   const denied = { ...grant, revision: grant.revision + 1, state: "denied" as const };
   return {
     status: "ok",
@@ -258,7 +301,13 @@ export function useExceptionalAccess(
   if (occurredAt === undefined || !identifier.test(input.operatorId))
     return denial("EXCEPTIONAL_ACCESS_USE_INVALID");
   if (input.expectedRevision !== grant.revision)
-    return { status: "conflict", code: "EXCEPTIONAL_ACCESS_STATE_CONFLICT" };
+    return auditedDenial(
+      grant,
+      "EXCEPTIONAL_ACCESS_STATE_CONFLICT",
+      input.operatorId,
+      input.now,
+      "conflict",
+    );
   if (grant.state !== "active") return denial("EXCEPTIONAL_ACCESS_NOT_ACTIVE");
   if (input.operatorId !== grant.requesterId)
     return denial("EXCEPTIONAL_ACCESS_WRONG_OPERATOR");
@@ -290,7 +339,12 @@ export function revokeExceptionalAccess(
     !identifier.test(input.actorId) ||
     time(input.now) === undefined
   )
-    return { status: "denied", code: "EXCEPTIONAL_ACCESS_REVOKE_DENIED" };
+    return auditedDenial(
+      grant,
+      "EXCEPTIONAL_ACCESS_REVOKE_DENIED",
+      input.actorId,
+      input.now,
+    );
   const state: ExceptionalAccessState =
     grant.breakGlass && grant.useCount > 0 ? "review_required" : "revoked";
   const revoked = {
@@ -357,7 +411,12 @@ export function reviewBreakGlass(
     !identifier.test(input.reviewerId) ||
     time(input.now) === undefined
   )
-    return { status: "denied", code: "EXCEPTIONAL_ACCESS_REVIEW_DENIED" };
+    return auditedDenial(
+      grant,
+      "EXCEPTIONAL_ACCESS_REVIEW_DENIED",
+      input.reviewerId,
+      input.now,
+    );
   const reviewed = {
     ...grant,
     revision: grant.revision + 1,
