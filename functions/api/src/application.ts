@@ -12,6 +12,7 @@ import { createNodeAppwriteIntelligenceProvenanceStore } from "./appwrite-intell
 import { createNodeAppwritePrivacyStore } from "./appwrite-privacy-store.js";
 import { createNodeAppwritePrivacyPurgeRepository } from "./appwrite-privacy-purge-repository.js";
 import { createNodeAppwritePrivacyCleanup } from "./appwrite-privacy-cleanup.js";
+import { createNodeAppwritePrivacyProviderCleanup } from "./appwrite-privacy-provider-cleanup.js";
 import { createNodeAppwritePrivateAttachmentStorage } from "./appwrite-private-attachment-storage.js";
 import { createNodeAppwritePrincipalVerifier } from "./appwrite-principal-verifier.js";
 import { createNodeAppwriteConversationLifecycleStore } from "./appwrite-conversation-lifecycle-store.js";
@@ -49,6 +50,7 @@ import { createIntelligenceHttp } from "./intelligence-http.js";
 import { createPrivacyCoordinator } from "./privacy.js";
 import { createPrivacyHttp } from "./privacy-http.js";
 import { createPrivacyPurgeWorker } from "./privacy-cleanup.js";
+import { createPrivacyProviderCleanup } from "./privacy-provider-cleanup.js";
 import { createConversationLifecycleCoordinator } from "./conversation-lifecycle.js";
 import { createConversationLifecycleHttp } from "./conversation-lifecycle-http.js";
 import { createGitHubSourceProvider } from "./github-source-provider.js";
@@ -264,6 +266,7 @@ export function createHttpApplication(
       ),
     ),
   );
+  /* v8 ignore start -- privacy composition is exercised by verify:appwrite:g4:privacy. */
   const privacy = createPrivacyHttp(
     createPrivacyCoordinator(
       principalVerifier,
@@ -307,6 +310,7 @@ export function createHttpApplication(
       (value) => createHash("sha256").update(value).digest("base64url"),
     ),
   );
+  /* v8 ignore stop */
   const workbench = createWorkbenchHttp(
     createWorkbenchCoordinator(
       principalVerifier,
@@ -758,10 +762,36 @@ export function createHttpApplication(
         providerWebhookAuthority,
         () => randomBytes(32).toString("base64url"),
       );
+      const privacyProviderPorts = createNodeAppwritePrivacyProviderCleanup(
+        runtime.tables,
+        {
+          databaseId: config.appwriteSchema.databaseId,
+          externalIssueLinksTableId: config.appwriteSchema.externalIssueLinksTableId,
+          sourceConnectionsTableId: config.appwriteSchema.sourceConnectionsTableId,
+          providerGrantsTableId: config.appwriteSchema.providerGrantsTableId,
+        },
+        {
+          providerGrantEnvelopeKey: config.providerGrantEnvelopeKey,
+          gitlabOrigin: config.providers.gitlab.origin,
+        },
+      );
+      const privacyProviderCleanup = createPrivacyProviderCleanup(
+        privacyProviderPorts.store,
+        privacyProviderPorts.closer,
+        { limit: 25, now: runtime.nowIso },
+      );
       return createProviderMaintenance({
         inbox: providerEventInboxWorker,
         outbox: providerIssueOutboxWorker,
-        privacy: privacyPurgeWorker,
+        privacy: {
+          async runOnce() {
+            const providerCleanup = await privacyProviderCleanup.runOnce();
+            if (providerCleanup.failed > 0)
+              throw new Error("PRIVACY_PROVIDER_CLEANUP_RETRYABLE");
+            const purge = await privacyPurgeWorker.runOnce();
+            return { status: "completed", purge, providerCleanup };
+          },
+        },
         webhooks: createProviderWebhookReconciliation(
           createNodeAppwriteActiveSourceGrantReader(runtime.tables, {
             databaseId: config.appwriteSchema.databaseId,
