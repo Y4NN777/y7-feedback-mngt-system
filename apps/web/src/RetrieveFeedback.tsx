@@ -5,6 +5,7 @@ import type { FeedbackSource, Locale, ReporterFeedbackView } from "@y7-feedback/
 import type { ConversationGateway } from "./ConversationGateway";
 import { accessMessages } from "./i18n/access";
 import type { PublicationConsentGateway } from "./PublicationConsentGateway";
+import type { PrivacyGateway } from "./PrivacyGateway";
 import { ReporterConversation } from "./ReporterConversation";
 
 export type AccountlessGatewayOutcome =
@@ -85,6 +86,7 @@ export function RetrieveFeedback({
   locale,
   onLocaleChange,
   publicationConsentGateway,
+  privacyGateway,
 }: {
   readonly conversationGateway: ConversationGateway;
   readonly createOperationId: () => string;
@@ -92,6 +94,7 @@ export function RetrieveFeedback({
   readonly locale: Locale;
   readonly onLocaleChange: (locale: Locale) => void;
   readonly publicationConsentGateway: PublicationConsentGateway;
+  readonly privacyGateway: PrivacyGateway;
 }) {
   const copy = accessMessages[locale];
   const [reference, setReference] = useState("");
@@ -106,6 +109,11 @@ export function RetrieveFeedback({
   const [consentOutcome, setConsentOutcome] = useState<
     "denied" | "conflict" | "retryable"
   >();
+  const [deletionAcknowledged, setDeletionAcknowledged] = useState(false);
+  const [deletionOutcome, setDeletionOutcome] = useState<
+    "denied" | "conflict" | "retryable"
+  >();
+  const [purgeEligibleAt, setPurgeEligibleAt] = useState<string>();
 
   async function retrieve(event: SyntheticEvent<HTMLFormElement, SubmitEvent>) {
     event.preventDefault();
@@ -134,6 +142,29 @@ export function RetrieveFeedback({
     setConsentAudience("");
     setConsent(undefined);
     setConsentOutcome(undefined);
+    setDeletionAcknowledged(false);
+    setDeletionOutcome(undefined);
+    setPurgeEligibleAt(undefined);
+  }
+
+  async function requestDeletion() {
+    if (!view || !deletionAcknowledged) return;
+    const result = await privacyGateway.requestDeletion({
+      operationId: createOperationId(),
+      feedbackId: view.feedbackId,
+      reference: reference.trim(),
+      proof,
+      reasonCode: "reporter_request",
+    });
+    if (result.status === "ok") {
+      setPurgeEligibleAt(result.purgeEligibleAt);
+      setView(null);
+      setReference("");
+      setProof("");
+      setDeletionOutcome(undefined);
+      return;
+    }
+    setDeletionOutcome(result.status);
   }
 
   async function updateConsent(action: "grant" | "revoke") {
@@ -190,7 +221,19 @@ export function RetrieveFeedback({
         </fieldset>
       </header>
 
-      {view ? (
+      {purgeEligibleAt ? (
+        <section className="retrieve-shell" aria-labelledby="deletion-complete-title">
+          <h1 id="deletion-complete-title">{copy.deletionTitle}</h1>
+          <p role="status">
+            {copy.deletionComplete.replace(
+              "{date}",
+              new Intl.DateTimeFormat(locale, { dateStyle: "long" }).format(
+                new Date(purgeEligibleAt),
+              ),
+            )}
+          </p>
+        </section>
+      ) : view ? (
         <>
           <ReporterView locale={locale} view={view} />
           <ReporterConversation
@@ -251,6 +294,40 @@ export function RetrieveFeedback({
                   ? copy.denied
                   : consentOutcome === "conflict"
                     ? copy.consentConflict
+                    : copy.retryable}
+              </p>
+            )}
+          </section>
+          <section className="retrieved-view" aria-labelledby="deletion-title">
+            <h2 id="deletion-title">{copy.deletionTitle}</h2>
+            <p>{copy.deletionHint}</p>
+            <label className="consent-confirmation">
+              <input
+                type="checkbox"
+                checked={deletionAcknowledged}
+                onChange={(event) => {
+                  setDeletionAcknowledged(event.currentTarget.checked);
+                  setDeletionOutcome(undefined);
+                }}
+              />
+              <span>{copy.deletionAcknowledge}</span>
+            </label>
+            <button
+              className="primary-action"
+              type="button"
+              disabled={!deletionAcknowledged}
+              onClick={() => {
+                void requestDeletion();
+              }}
+            >
+              {copy.deletionRequest}
+            </button>
+            {deletionOutcome && (
+              <p role="alert">
+                {deletionOutcome === "conflict"
+                  ? copy.deletionConflict
+                  : deletionOutcome === "denied"
+                    ? copy.denied
                     : copy.retryable}
               </p>
             )}

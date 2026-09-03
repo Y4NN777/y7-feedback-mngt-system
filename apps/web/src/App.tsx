@@ -17,6 +17,7 @@ import type { NotificationInvalidation } from "./NotificationInvalidation";
 import type { OfflineIntakeReplay } from "./OfflineIntakeReplay";
 import type { ProjectGateway } from "./ProjectGateway";
 import type { PublicationConsentGateway } from "./PublicationConsentGateway";
+import type { PrivacyGateway } from "./PrivacyGateway";
 import { RetrieveFeedback, type AccountlessGateway } from "./RetrieveFeedback";
 import type { WorkbenchGateway } from "./WorkbenchGateway";
 import { WorkbenchPage } from "./WorkbenchPage";
@@ -39,6 +40,9 @@ const unavailableProjectGateway: ProjectGateway = {
 const unavailablePublicationConsentGateway: PublicationConsentGateway = {
   grant: () => Promise.resolve({ status: "retryable" }),
   revoke: () => Promise.resolve({ status: "retryable" }),
+};
+const unavailablePrivacyGateway: PrivacyGateway = {
+  requestDeletion: () => Promise.resolve({ status: "retryable" }),
 };
 const unavailableAdministrationGateway: AdministrationGateway = {
   execute: () => Promise.resolve({ status: "retryable" }),
@@ -176,6 +180,7 @@ export function App({
   intelligenceGateway = unavailableIntelligenceGateway,
   projectGateway = unavailableProjectGateway,
   publicationConsentGateway = unavailablePublicationConsentGateway,
+  privacyGateway = unavailablePrivacyGateway,
   redirectProject = (canonicalSlug) => {
     window.location.replace(`/${canonicalSlug}`);
   },
@@ -195,6 +200,7 @@ export function App({
   readonly intelligenceGateway?: IntelligenceGateway;
   readonly projectGateway?: ProjectGateway;
   readonly publicationConsentGateway?: PublicationConsentGateway;
+  readonly privacyGateway?: PrivacyGateway;
   readonly redirectProject?: (canonicalSlug: string) => void;
   readonly workbenchGateway?: WorkbenchGateway;
   readonly notificationInvalidation?: NotificationInvalidation;
@@ -217,6 +223,7 @@ export function App({
         locale={locale}
         onLocaleChange={selectLocale}
         publicationConsentGateway={publicationConsentGateway}
+        privacyGateway={privacyGateway}
       />
     );
   }

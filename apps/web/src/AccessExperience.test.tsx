@@ -10,6 +10,7 @@ import { AccessMaterial } from "./AccessMaterial";
 import { App } from "./App";
 import type { AccountlessGateway } from "./RetrieveFeedback";
 import type { PublicationConsentGateway } from "./PublicationConsentGateway";
+import type { PrivacyGateway } from "./PrivacyGateway";
 
 const proof = "proof_A_abcdefghijklmnopqrstuvwxyz_0123456789ABCDEFG";
 
@@ -26,6 +27,110 @@ afterEach(() => {
 });
 
 describe("accountless access experience", () => {
+  it("BDD-PRIV-WEB-002 requires explicit acknowledgement then removes retained authority", async () => {
+    window.history.replaceState({}, "", "/retrieve");
+    const user = userEvent.setup();
+    const view: ReporterFeedbackView = {
+      feedbackId: "feedback-1",
+      reference: "Y7-2026-000001",
+      originalSource: {
+        type: "review",
+        experience: "Rapide",
+        appreciation: "Interface claire",
+      },
+      currentSource: {
+        type: "review",
+        experience: "Rapide",
+        appreciation: "Interface claire",
+      },
+      currentState: "received",
+      history: [],
+      messages: [],
+      attachments: [],
+      sourceRevisions: [],
+      deletionRequests: [],
+    };
+    const requestDeletion = vi.fn<PrivacyGateway["requestDeletion"]>(() =>
+      Promise.resolve({
+        status: "ok",
+        disposition: "applied",
+        revision: 1,
+        purgeEligibleAt: "2026-10-03T00:00:00.000Z",
+      }),
+    );
+    renderApp(
+      <App
+        accountlessGateway={{ retrieve: () => Promise.resolve({ status: "ok", view }) }}
+        createOperationId={() => "operation_1"}
+        privacyGateway={{ requestDeletion }}
+      />,
+    );
+    await user.type(screen.getByRole("textbox", { name: "Référence" }), view.reference);
+    await user.type(screen.getByLabelText("Preuve d’accès"), proof);
+    await user.click(screen.getByRole("button", { name: "Retrouver le retour" }));
+
+    const remove = screen.getByRole("button", {
+      name: "Supprimer définitivement mon retour",
+    });
+    expect(remove).toBeDisabled();
+    await user.click(
+      screen.getByRole("checkbox", {
+        name: /Je comprends que l’accès sera révoqué immédiatement/i,
+      }),
+    );
+    await user.click(remove);
+
+    expect(requestDeletion).toHaveBeenCalledWith({
+      operationId: "operation_1",
+      feedbackId: "feedback-1",
+      reference: view.reference,
+      proof,
+      reasonCode: "reporter_request",
+    });
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      /purge définitive est programmée/i,
+    );
+    expect(screen.queryByText("Interface claire")).not.toBeInTheDocument();
+    expect(window.location.href).not.toContain(proof);
+  });
+
+  it("BDD-PRIV-WEB-003 keeps the authorized view when deletion must be retried", async () => {
+    window.history.replaceState({}, "", "/retrieve");
+    const user = userEvent.setup();
+    const view: ReporterFeedbackView = {
+      feedbackId: "feedback-1",
+      reference: "Y7-2026-000001",
+      originalSource: { type: "review", experience: "Rapide", appreciation: "Clair" },
+      currentSource: { type: "review", experience: "Rapide", appreciation: "Clair" },
+      currentState: "received",
+      history: [],
+      messages: [],
+      attachments: [],
+      sourceRevisions: [],
+      deletionRequests: [],
+    };
+    renderApp(
+      <App
+        accountlessGateway={{ retrieve: () => Promise.resolve({ status: "ok", view }) }}
+        privacyGateway={{
+          requestDeletion: () => Promise.resolve({ status: "retryable" }),
+        }}
+      />,
+    );
+    await user.type(screen.getByRole("textbox", { name: "Référence" }), view.reference);
+    await user.type(screen.getByLabelText("Preuve d’accès"), proof);
+    await user.click(screen.getByRole("button", { name: "Retrouver le retour" }));
+    await user.click(screen.getByRole("checkbox", { name: /Je comprends/i }));
+    await user.click(
+      screen.getByRole("button", { name: "Supprimer définitivement mon retour" }),
+    );
+    expect(
+      await screen.findByText(
+        "Le service est temporairement indisponible. Réessayez sans modifier vos informations.",
+      ),
+    ).toHaveAttribute("role", "alert");
+    expect(screen.getByText("Clair")).toBeInTheDocument();
+  });
   it("explains how to preserve separate accepted reference and proof without a URL", async () => {
     const user = userEvent.setup();
     render(

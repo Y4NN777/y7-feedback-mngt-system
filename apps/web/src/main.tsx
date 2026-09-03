@@ -20,6 +20,7 @@ import { createHttpIntelligenceGateway } from "./IntelligenceGateway";
 import { createAppwriteNotificationInvalidation } from "./NotificationInvalidation";
 import { createHttpProjectGateway } from "./ProjectGateway";
 import { createHttpPublicationConsentGateway } from "./PublicationConsentGateway";
+import { createHttpPrivacyGateway } from "./PrivacyGateway";
 import { createHttpWorkbenchGateway } from "./WorkbenchGateway";
 import { createHttpSourceManagementGateway } from "./SourceManagementGateway";
 import { OperationalTelemetry } from "./observability/OperationalTelemetry";
@@ -51,6 +52,7 @@ const projectGateway = createOfflineProjectGateway(
 const publicationConsentGateway = createHttpPublicationConsentGateway(
   config.apiEndpoint,
 );
+const privacyGateway = createHttpPrivacyGateway(config.apiEndpoint);
 const administrationSession = createAppwriteAdministrationSession(
   config.appwriteEndpoint,
   config.appwriteProjectId,
@@ -96,6 +98,7 @@ createRoot(root).render(
         notificationInvalidation={notificationInvalidation}
         projectGateway={projectGateway}
         publicationConsentGateway={publicationConsentGateway}
+        privacyGateway={privacyGateway}
         workbenchGateway={workbenchGateway}
         sourceManagementGateway={sourceManagementGateway}
       />
