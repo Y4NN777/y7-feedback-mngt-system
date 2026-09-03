@@ -128,8 +128,9 @@ describe("exceptional access policy", () => {
     expect(
       useExceptionalAccess(grant, { ...valid, action: "message.read" }),
     ).toMatchObject({ status: "denied", code: "EXCEPTIONAL_ACCESS_SCOPE_DENIED" });
+    if (!grant.expiresAt) throw new Error("fixture invalid");
     expect(
-      useExceptionalAccess(grant, { ...valid, now: grant.expiresAt! }),
+      useExceptionalAccess(grant, { ...valid, now: grant.expiresAt }),
     ).toMatchObject({ status: "denied", code: "EXCEPTIONAL_ACCESS_EXPIRED" });
     expect(
       useExceptionalAccess(grant, { ...valid, expectedRevision: 9 }),
@@ -208,11 +209,12 @@ describe("exceptional access policy", () => {
 
   it("BDD-PLAT-008 expires grants durably and sends used break-glass to review", () => {
     const ordinary = active();
+    if (!ordinary.expiresAt) throw new Error("fixture invalid");
     expect(
       expireExceptionalAccess(ordinary, {
         actorId: "expiry_worker_1",
         expectedRevision: 1,
-        now: ordinary.expiresAt!,
+        now: ordinary.expiresAt,
       }),
     ).toMatchObject({
       status: "ok",
@@ -235,11 +237,12 @@ describe("exceptional access policy", () => {
       now: "2026-09-03T12:02:00.000Z",
     });
     if (used.status !== "ok") throw new Error("fixture invalid");
+    if (!used.grant.expiresAt) throw new Error("fixture invalid");
     expect(
       expireExceptionalAccess(used.grant, {
         actorId: "expiry_worker_1",
         expectedRevision: 2,
-        now: used.grant.expiresAt!,
+        now: used.grant.expiresAt,
       }),
     ).toMatchObject({
       status: "ok",
@@ -250,6 +253,7 @@ describe("exceptional access policy", () => {
 
   it("BDD-PLAT-009 denies premature, malformed and concurrent expiry", () => {
     const grant = active();
+    if (!grant.expiresAt) throw new Error("fixture invalid");
     expect(
       expireExceptionalAccess(grant, {
         actorId: "expiry_worker_1",
@@ -261,20 +265,22 @@ describe("exceptional access policy", () => {
       expireExceptionalAccess(grant, {
         actorId: "expiry_worker_1",
         expectedRevision: 9,
-        now: grant.expiresAt!,
+        now: grant.expiresAt,
       }),
     ).toMatchObject({ status: "conflict" });
+    const { expiresAt: removedExpiry, ...withoutExpiry } = grant;
+    void removedExpiry;
     for (const candidate of [
       {
         value: grant,
-        input: { actorId: "bad id", expectedRevision: 1, now: grant.expiresAt! },
+        input: { actorId: "bad id", expectedRevision: 1, now: grant.expiresAt },
       },
       {
         value: grant,
         input: { actorId: "expiry_worker_1", expectedRevision: 1, now: "invalid" },
       },
       {
-        value: { ...grant, expiresAt: undefined } as ExceptionalAccessGrant,
+        value: withoutExpiry as ExceptionalAccessGrant,
         input: { actorId: "expiry_worker_1", expectedRevision: 1, now },
       },
       {

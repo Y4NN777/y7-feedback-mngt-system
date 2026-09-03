@@ -10,8 +10,8 @@ vi.mock("node-appwrite", async (original) => {
   return {
     ...sdk,
     Query: {
-      equal: (key: string, values: string[]) => `equal:${key}:${values[0]}`,
-      limit: (limit: number) => `limit:${limit}`,
+      equal: (key: string, values: string[]) => `equal:${key}:${String(values[0])}`,
+      limit: (limit: number) => `limit:${String(limit)}`,
     },
   };
 });
