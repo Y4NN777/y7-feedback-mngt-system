@@ -23,6 +23,13 @@ function absent(error: unknown): boolean {
   return object(error) && error.code === 404;
 }
 
+function rowData(value: unknown): Readonly<Record<string, unknown>> {
+  if (!object(value)) throw new Error("APPWRITE_G4_PRIVACY_BACKUP_ROW_INVALID");
+  return Object.fromEntries(
+    Object.entries(value).filter(([key]) => !key.startsWith("$")),
+  );
+}
+
 function ids(prefix: string, suffix: string): AppwriteG1MatrixIds {
   return {
     feedbackId: `${prefix}f_${suffix}`,
@@ -447,6 +454,29 @@ async function main(): Promise<void> {
     if (restored?.statusCode !== 200)
       throw new Error("APPWRITE_G4_PRIVACY_RESTORE_FAILED");
 
+    const staleBackup = {
+      feedback: rowData(
+        await tables.getRow({
+          databaseId: config.appwriteSchema.databaseId,
+          tableId: config.appwriteSchema.feedbackTableId,
+          rowId: purgeIds.feedbackId,
+        }),
+      ),
+      reporter: rowData(
+        await tables.getRow({
+          databaseId: config.appwriteSchema.databaseId,
+          tableId: config.appwriteSchema.reportersTableId,
+          rowId: purgeIds.reporterId,
+        }),
+      ),
+      grant: rowData(
+        await tables.getRow({
+          databaseId: config.appwriteSchema.databaseId,
+          tableId: config.appwriteSchema.accessGrantsTableId,
+          rowId: purgeIds.feedbackId,
+        }),
+      ),
+    };
     const purging = await deployedPrivacy(
       purgeAccess,
       purgeIds.feedbackId,
@@ -531,6 +561,67 @@ async function main(): Promise<void> {
     } catch (error: unknown) {
       if (!absent(error)) throw error;
     }
+    const purgeRecords = await tables.listRows({
+      databaseId: config.appwriteSchema.databaseId,
+      tableId: config.appwriteSchema.deletionRecordsTableId,
+      queries: [Query.equal("feedbackId", [purgeIds.feedbackId]), Query.limit(2)],
+      total: false,
+    });
+    const purgeRecord = purgeRecords.rows[0];
+    if (
+      purgeRecords.rows.length !== 1 ||
+      !purgeRecord ||
+      purgeRecord.state !== "purged" ||
+      typeof purgeRecord.workspaceId !== "string" ||
+      typeof purgeRecord.projectId !== "string" ||
+      typeof purgeRecord.revision !== "number" ||
+      typeof purgeRecord.purgeEligibleAt !== "string"
+    )
+      throw new Error("APPWRITE_G4_PRIVACY_PURGE_LEDGER_FAILED");
+    await tables.createRow({
+      databaseId: config.appwriteSchema.databaseId,
+      tableId: config.appwriteSchema.feedbackTableId,
+      rowId: purgeIds.feedbackId,
+      permissions: [],
+      data: staleBackup.feedback,
+    });
+    await tables.createRow({
+      databaseId: config.appwriteSchema.databaseId,
+      tableId: config.appwriteSchema.reportersTableId,
+      rowId: purgeIds.reporterId,
+      permissions: [],
+      data: staleBackup.reporter,
+    });
+    await tables.createRow({
+      databaseId: config.appwriteSchema.databaseId,
+      tableId: config.appwriteSchema.accessGrantsTableId,
+      rowId: purgeIds.feedbackId,
+      permissions: [],
+      data: staleBackup.grant,
+    });
+    await cleanup.cleanup({
+      deletionId: purgeRecord.$id,
+      feedbackId: purgeIds.feedbackId,
+      workspaceId: purgeRecord.workspaceId,
+      projectId: purgeRecord.projectId,
+      revision: purgeRecord.revision,
+      purgeEligibleAt: purgeRecord.purgeEligibleAt,
+    });
+    await requireAbsent(
+      config.appwriteSchema.feedbackTableId,
+      purgeIds.feedbackId,
+      "APPWRITE_G4_PRIVACY_BACKUP_FEEDBACK_RESURRECTED",
+    );
+    await requireAbsent(
+      config.appwriteSchema.reportersTableId,
+      purgeIds.reporterId,
+      "APPWRITE_G4_PRIVACY_BACKUP_IDENTITY_RESURRECTED",
+    );
+    await requireAbsent(
+      config.appwriteSchema.accessGrantsTableId,
+      purgeIds.feedbackId,
+      "APPWRITE_G4_PRIVACY_BACKUP_PROOF_RESURRECTED",
+    );
 
     console.log(
       JSON.stringify({
@@ -548,6 +639,7 @@ async function main(): Promise<void> {
         consentRevoked: true,
         offlineProjectionRemoved: true,
         intelligenceProjectionRemoved: true,
+        backupDeletionReplay: true,
       }),
     );
   } finally {
