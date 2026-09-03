@@ -45,16 +45,16 @@ test("BDD-DEL-APPWRITE-005 defines one reproducible Preview Function", async () 
       enabled: true,
       runtime: "node-22",
       execute: ["any"],
-      scopes: ["rows.read", "rows.write", "files.read"],
+      scopes: ["rows.read", "rows.write", "files.read", "users.read", "teams.read"],
       events: [],
-      schedule: "",
+      schedule: "*/5 * * * *",
       path: ".",
       entrypoint: "functions/api/dist/main.js",
       commands: expectedBuildCommand,
     },
   );
   assert.equal(api.logging, true);
-  assert.equal(api.timeout, 15);
+  assert.equal(api.timeout, 60);
   assert.equal(api.deploymentRetention, 3);
 });
 
