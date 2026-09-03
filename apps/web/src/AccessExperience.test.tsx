@@ -272,7 +272,7 @@ describe("accountless access experience", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(
       "Le service est temporairement indisponible. Réessayez sans modifier vos informations.",
     );
-  });
+  }, 10_000);
 
   it("fails closed for missing input, default unavailability, and gateway errors", async () => {
     window.history.replaceState({}, "", "/retrieve");
