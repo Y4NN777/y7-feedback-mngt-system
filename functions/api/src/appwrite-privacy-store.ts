@@ -29,7 +29,7 @@ export interface AppwritePrivacyTables {
     readonly databaseId: string;
     readonly tableId: string;
     readonly rowId: string;
-    readonly transactionId: string;
+    readonly transactionId?: string;
   }): Promise<unknown>;
   listRows(input: {
     readonly databaseId: string;
@@ -89,6 +89,10 @@ const nodeQueries: AppwritePrivacyQueries = {
 
 function object(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function absent(error: unknown): boolean {
+  return object(error) && error.code === 404;
 }
 
 function openAudit(
@@ -225,6 +229,28 @@ export function createAppwritePrivacyStore(
       transactionId,
     });
   return {
+    async resolveScope(feedbackId) {
+      try {
+        const value = await tables.getRow({
+          databaseId: schema.databaseId,
+          tableId: schema.feedbackTableId,
+          rowId: feedbackId,
+        });
+        if (
+          !object(value) ||
+          typeof value.workspaceId !== "string" ||
+          typeof value.projectId !== "string" ||
+          !id.test(value.workspaceId) ||
+          !id.test(value.projectId)
+        )
+          return { status: "retryable" } as const;
+        return { workspaceId: value.workspaceId, projectId: value.projectId };
+      } catch (error: unknown) {
+        return absent(error)
+          ? ({ status: "denied" } as const)
+          : ({ status: "retryable" } as const);
+      }
+    },
     async execute(input) {
       let transactionId: string | undefined;
       let closed = false;

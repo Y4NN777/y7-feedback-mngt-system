@@ -19,6 +19,7 @@ export interface PrivacyHttp {
 type Coordinator = ReturnType<typeof createPrivacyCoordinator>;
 const pathPattern =
   /^\/v1\/workspaces\/([A-Za-z0-9][A-Za-z0-9._-]{0,35})\/projects\/([A-Za-z0-9][A-Za-z0-9._-]{0,35})\/privacy$/u;
+const accountlessPath = "/v1/feedback/privacy";
 
 function object(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -48,11 +49,10 @@ export function createPrivacyHttp(coordinator: Coordinator): PrivacyHttp {
   return {
     async handle(request) {
       const match = pathPattern.exec(request.path);
-      if (!match || request.method !== "POST") return undefined;
-      const [, workspaceId, projectId] = match;
+      const accountless = request.path === accountlessPath;
+      if ((!match && !accountless) || request.method !== "POST") return undefined;
+      const [, workspaceId, projectId] = match ?? [];
       if (
-        !workspaceId ||
-        !projectId ||
         !object(request.body) ||
         header(request.headers, "x-appwrite-user-id") !== undefined
       )
@@ -71,10 +71,12 @@ export function createPrivacyHttp(coordinator: Coordinator): PrivacyHttp {
             } as const)
           : undefined;
       if (!authority) return { statusCode: 404, body: { error: "ERR-PRIVACY-DENIED" } };
+      if (accountless && authority.kind !== "access_proof")
+        return { statusCode: 404, body: { error: "ERR-PRIVACY-DENIED" } };
       return response(
         await coordinator.execute({
-          workspaceId,
-          projectId,
+          ...(workspaceId === undefined ? {} : { workspaceId }),
+          ...(projectId === undefined ? {} : { projectId }),
           authority,
           command: request.body.command,
         }),
