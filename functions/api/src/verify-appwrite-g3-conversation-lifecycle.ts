@@ -129,6 +129,18 @@ async function main(): Promise<void> {
       createdAt: now,
       updatedAt: now,
     });
+    await createRow(config.appwriteSchema.reportersTableId, reporterId, {
+      workspaceId,
+      attributionJson: protector.seal(
+        {
+          environment: config.environment,
+          tableId: config.appwriteSchema.reportersTableId,
+          rowId: reporterId,
+          field: "attributionJson",
+        },
+        JSON.stringify({ kind: "anonymous" }),
+      ),
+    });
     await createRow(config.appwriteSchema.feedbackTableId, feedbackId, {
       projectId,
       workspaceId,
@@ -176,16 +188,22 @@ async function main(): Promise<void> {
       actor: "workspace" | "reporter",
       value: Readonly<Record<string, unknown>>,
       expected = 201,
-    ) =>
-      request(
-        "POST",
-        actor === "workspace"
-          ? `${workspacePath}/conversation/commands`
-          : `${reporterPath}/commands`,
-        actor === "workspace" ? bearer : reporter,
-        actor === "workspace" ? { command: value } : { reference, command: value },
-        expected,
-      );
+    ) => {
+      try {
+        return await request(
+          "POST",
+          actor === "workspace"
+            ? `${workspacePath}/conversation/commands`
+            : `${reporterPath}/commands`,
+          actor === "workspace" ? bearer : reporter,
+          actor === "workspace" ? { command: value } : { reference, command: value },
+          expected,
+        );
+      } catch (error: unknown) {
+        const kind = typeof value.kind === "string" ? value.kind : "invalid";
+        throw new Error(`APPWRITE_G3_CONVERSATION_STEP_${kind}`, { cause: error });
+      }
+    };
 
     const note = {
       kind: "append_internal_note",
@@ -212,7 +230,12 @@ async function main(): Promise<void> {
     });
     const expectedDigest = createHash("sha256")
       .update(
-        JSON.stringify({ parsed: question, actorId: ownerId, actorKind: "workspace" }),
+        JSON.stringify({
+          parsed: question,
+          actorId: ownerId,
+          actorKind: "workspace",
+          locale: "fr",
+        }),
       )
       .digest("base64url");
     if (
