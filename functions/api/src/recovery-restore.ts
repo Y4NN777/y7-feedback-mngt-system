@@ -34,16 +34,24 @@ function deletionEvent(value: unknown): RecoveryDeletionEvent {
   const feedbackId = "feedbackId" in value ? value.feedbackId : undefined;
   const type = "type" in value ? value.type : undefined;
   const occurredAt = "occurredAt" in value ? value.occurredAt : undefined;
+  const occurredAtMs =
+    typeof occurredAt === "string" ? Date.parse(occurredAt) : Number.NaN;
   if (
     typeof eventId !== "string" ||
     typeof feedbackId !== "string" ||
     (type !== "deletion_requested" &&
       type !== "feedback_restored" &&
       type !== "feedback_purged") ||
-    typeof occurredAt !== "string"
+    typeof occurredAt !== "string" ||
+    !Number.isFinite(occurredAtMs)
   )
     throw new Error("RECOVERY_DELETION_EVENT_INVALID");
-  return { eventId, feedbackId, type, occurredAt };
+  return {
+    eventId,
+    feedbackId,
+    type,
+    occurredAt: new Date(occurredAtMs).toISOString(),
+  };
 }
 
 function segments(path: string, prefix: string, suffix = "") {
