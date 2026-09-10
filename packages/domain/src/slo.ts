@@ -267,6 +267,8 @@ export function buildCapacityReport(input: CapacityReportInput) {
     })
   )
     throw new Error("SLO_CAPACITY_OBSERVATION_INVALID");
+  if (input.observations.length > 0 && input.observations.length !== input.iterations)
+    throw new Error("SLO_CAPACITY_SAMPLE_COUNT_INVALID");
   const series = loadDefinitions.map((definition) => ({
     id: definition.id,
     metric: definition.metric,

@@ -221,6 +221,12 @@ describe("SLO measurement policy", () => {
     expect(buildCapacityReport({ ...capacityInput, observations: [] })).toMatchObject({
       status: "failed",
     });
+    expect(() =>
+      buildCapacityReport({
+        ...capacityInput,
+        observations: capacityInput.observations.slice(1),
+      }),
+    ).toThrow("SLO_CAPACITY_SAMPLE_COUNT_INVALID");
     for (const override of [
       { startedAt: "invalid" },
       { completedAt: "invalid" },
