@@ -19,3 +19,4 @@ export * from "./intelligence.js";
 export * from "./intelligence-provenance.js";
 export * from "./privacy.js";
 export * from "./recovery.js";
+export * from "./slo.js";
