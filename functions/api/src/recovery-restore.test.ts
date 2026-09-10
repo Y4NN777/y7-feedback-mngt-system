@@ -152,6 +152,33 @@ describe("isolated recovery restore", () => {
     );
   });
 
+  it("BDD-REC-023 normalizes Appwrite UTC offsets before deletion replay", async () => {
+    const candidate = target();
+    const appwriteEntries = entries.map((entry) =>
+      entry.kind === "deletion_event"
+        ? {
+            ...entry,
+            bytes: encode({
+              ...(JSON.parse(new TextDecoder().decode(entry.bytes)) as Record<
+                string,
+                unknown
+              >),
+              occurredAt: "2026-09-03T09:00:00.000+00:00",
+            }),
+          }
+        : entry,
+    );
+    await expect(
+      restoreRecoveryArtifact({
+        artifact: artifact(appwriteEntries),
+        encryptionKey,
+        signingKey,
+        target: candidate.target,
+        feedbackTableId: "feedback",
+      }),
+    ).resolves.toMatchObject({ hidden: 1, purged: 1 });
+  });
+
   it("BDD-REC-017 rejects non-isolated or already exposed targets", async () => {
     for (const isolation of [
       { isolated: false, exposed: false },
@@ -250,6 +277,12 @@ describe("isolated recovery restore", () => {
       feedbackId: "f",
       type: "feedback_restored",
       occurredAt: 1,
+    },
+    {
+      eventId: "e",
+      feedbackId: "f",
+      type: "feedback_restored",
+      occurredAt: "invalid",
     },
   ] as const)("BDD-REC-020 rejects malformed deletion event %s", async (event) => {
     const candidateEntries = entries.map((entry) =>
