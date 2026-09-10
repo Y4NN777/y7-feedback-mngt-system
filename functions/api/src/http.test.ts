@@ -241,6 +241,28 @@ describe("trusted API entrypoint", () => {
     );
   });
 
+  it("BDD-SLO-307 emits redacted measurements for an accepted intake", async () => {
+    const { context } = createContext("POST", "/v1/projects/wisemoney/feedback", {
+      bodyJson: { title: "must-not-be-logged", contact: "private@example.test" },
+    });
+    await routeRequest(context, {
+      ...dependencies,
+      publicApi: {
+        handle: vi.fn().mockResolvedValue({
+          statusCode: 201,
+          body: { status: "accepted" },
+        }),
+      },
+    });
+
+    const serializedLogs = vi.mocked(context.log).mock.calls.flat().join("\n");
+    expect(serializedLogs).toContain('"metricName":"critical_api_ms"');
+    expect(serializedLogs).toContain('"metricName":"feedback_commit_ms"');
+    expect(serializedLogs).toContain('"metricValue":4');
+    expect(serializedLogs).not.toContain("must-not-be-logged");
+    expect(serializedLogs).not.toContain("private@example.test");
+  });
+
   it("BDD-PROJ-HTTP-001 does not parse an absent JSON body for GET routing", async () => {
     const handle = vi.fn(() =>
       Promise.resolve({ statusCode: 200, body: { status: "current" } }),
