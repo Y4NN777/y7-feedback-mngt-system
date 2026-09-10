@@ -43,6 +43,8 @@ const encryptionKey = Buffer.alloc(32, 1);
 const signingKey = Buffer.alloc(32, 2);
 const recoveryArtifact = () =>
   createRecoveryArtifact({ manifest, entries, encryptionKey, signingKey });
+const replaceFirstCharacter = (value: string) =>
+  `${value[0] === "A" ? "B" : "A"}${value.slice(1)}`;
 
 describe("encrypted recovery artifact", () => {
   it("BDD-REC-005 encrypts the full set with a wrapped random data key", () => {
@@ -73,7 +75,7 @@ describe("encrypted recovery artifact", () => {
       signingKey,
     });
     for (const candidate of [
-      { ...artifact, ciphertext: `${artifact.ciphertext.slice(0, -1)}A` },
+      { ...artifact, ciphertext: replaceFirstCharacter(artifact.ciphertext) },
       { ...artifact, expiresAt: "2027-01-01T00:00:00.000Z" },
     ])
       expect(() =>
