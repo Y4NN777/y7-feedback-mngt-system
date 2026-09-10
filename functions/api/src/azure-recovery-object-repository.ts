@@ -100,15 +100,19 @@ export function createAzureRecoveryObjectRepository(
 
 export function createAzureRecoveryRepositoryFromEnvironment(
   environment: NodeJS.ProcessEnv,
+  dependencies: {
+    readonly service?: (
+      accountUrl: string,
+    ) => Pick<BlobServiceClient, "getContainerClient">;
+  } = {},
 ): RecoveryObjectRepository {
   const destination = parseAzureRecoveryDestination({
     accountUrl: environment.AZURE_RECOVERY_ACCOUNT_URL?.trim() ?? "",
     containerName: environment.AZURE_RECOVERY_CONTAINER?.trim() ?? "",
   });
-  const service = new BlobServiceClient(
-    destination.accountUrl,
-    new DefaultAzureCredential(),
-  );
+  const service = dependencies.service
+    ? dependencies.service(destination.accountUrl)
+    : new BlobServiceClient(destination.accountUrl, new DefaultAzureCredential());
   return createAzureRecoveryObjectRepository(
     service.getContainerClient(destination.containerName),
   );

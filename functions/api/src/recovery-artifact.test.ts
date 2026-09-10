@@ -90,6 +90,83 @@ describe("encrypted recovery artifact", () => {
     ).toThrow("RECOVERY_ARTIFACT_INVALID");
   });
 
+  it("BDD-REC-006A validates keys, randomness, signatures and embedded inventory", () => {
+    expect(() =>
+      createRecoveryArtifact({
+        manifest,
+        entries,
+        encryptionKey: Buffer.alloc(31),
+        signingKey,
+      }),
+    ).toThrow("RECOVERY_KEY_INVALID");
+    expect(() =>
+      createRecoveryArtifact({
+        manifest,
+        entries,
+        encryptionKey,
+        signingKey: Buffer.alloc(31),
+      }),
+    ).toThrow("RECOVERY_KEY_INVALID");
+    for (const invalidCall of [1, 2, 3]) {
+      let call = 0;
+      expect(() =>
+        createRecoveryArtifact({
+          manifest,
+          entries,
+          encryptionKey,
+          signingKey,
+          randomBytes: (length) =>
+            Buffer.alloc(++call === invalidCall ? length - 1 : length),
+        }),
+      ).toThrow("RECOVERY_RANDOM_INVALID");
+    }
+
+    const candidate = recoveryArtifact();
+    expect(() =>
+      openRecoveryArtifact({
+        artifact: { ...candidate, signature: "AA" },
+        encryptionKey,
+        signingKey,
+      }),
+    ).toThrow("RECOVERY_ARTIFACT_INVALID");
+    expect(() =>
+      openRecoveryArtifact({
+        artifact: candidate,
+        encryptionKey,
+        signingKey: Buffer.alloc(31),
+      }),
+    ).toThrow("RECOVERY_ARTIFACT_INVALID");
+
+    const incomplete = createRecoveryArtifact({
+      manifest,
+      entries: entries.slice(1),
+      encryptionKey,
+      signingKey,
+    });
+    expect(() =>
+      openRecoveryArtifact({ artifact: incomplete, encryptionKey, signingKey }),
+    ).toThrow("RECOVERY_ARTIFACT_INVALID");
+
+    let recoverySetIdReads = 0;
+    const inconsistentManifest = new Proxy(manifest, {
+      get(target, property) {
+        if (property !== "recoverySetId")
+          return target[property as keyof typeof target];
+        recoverySetIdReads += 1;
+        return recoverySetIdReads === 2 ? "recovery_other" : target.recoverySetId;
+      },
+    });
+    const inconsistent = createRecoveryArtifact({
+      manifest: inconsistentManifest,
+      entries,
+      encryptionKey,
+      signingKey,
+    });
+    expect(() =>
+      openRecoveryArtifact({ artifact: inconsistent, encryptionKey, signingKey }),
+    ).toThrow("RECOVERY_ARTIFACT_INVALID");
+  });
+
   it("BDD-REC-007 publishes only verified complete generations and is idempotent", async () => {
     const objects = new Map<string, Uint8Array>();
     const repository: RecoveryObjectRepository = {
@@ -148,6 +225,76 @@ describe("encrypted recovery artifact", () => {
     expect(objects.has("generations/recovery_1.recovery")).toBe(false);
   });
 
+  it("BDD-REC-008B rejects conflicting completed or concurrently published sets", async () => {
+    const artifact = recoveryArtifact();
+    const conflictingMarker = new TextEncoder().encode(
+      JSON.stringify({ artifactDigest: "sha256:conflict" }),
+    );
+    const completed: RecoveryObjectRepository = {
+      put: () => Promise.resolve("stored"),
+      get: (key) =>
+        Promise.resolve(key.startsWith("complete/") ? conflictingMarker : undefined),
+      delete: () => Promise.resolve(),
+    };
+    await expect(
+      publishRecoveryArtifact({ repository: completed, artifact, digest }),
+    ).rejects.toThrow("RECOVERY_GENERATION_CONFLICT");
+
+    for (const winner of [undefined, conflictingMarker]) {
+      let reads = 0;
+      const concurrent: RecoveryObjectRepository = {
+        put: (_key, _value, options) =>
+          Promise.resolve(options.ifAbsent && reads > 0 ? "exists" : "stored"),
+        get: (key) => {
+          reads += 1;
+          if (key.startsWith("generations/"))
+            return Promise.resolve(encodeArtifact(artifact));
+          return Promise.resolve(reads > 2 ? winner : undefined);
+        },
+        delete: () => Promise.resolve(),
+      };
+      await expect(
+        publishRecoveryArtifact({ repository: concurrent, artifact, digest }),
+      ).rejects.toThrow("RECOVERY_GENERATION_CONFLICT");
+    }
+  });
+
+  it("BDD-REC-008C rejects a missing staged generation", async () => {
+    const repository: RecoveryObjectRepository = {
+      put: () => Promise.resolve("stored"),
+      get: () => Promise.resolve(undefined),
+      delete: () => Promise.resolve(),
+    };
+    await expect(
+      publishRecoveryArtifact({ repository, artifact: recoveryArtifact(), digest }),
+    ).rejects.toThrow("RECOVERY_STAGING_VERIFICATION_FAILED");
+  });
+
+  it("BDD-REC-008D accepts an identical concurrent completion marker", async () => {
+    const artifact = recoveryArtifact();
+    let staged: Uint8Array | undefined;
+    let attemptedMarker: Uint8Array | undefined;
+    const repository: RecoveryObjectRepository = {
+      put: (key, value) => {
+        if (key.startsWith("generations/")) {
+          staged = value;
+          return Promise.resolve("stored");
+        }
+        attemptedMarker = value;
+        return Promise.resolve("exists");
+      },
+      get: (key) =>
+        Promise.resolve(key.startsWith("generations/") ? staged : attemptedMarker),
+      delete: () => Promise.resolve(),
+    };
+    await expect(
+      publishRecoveryArtifact({ repository, artifact, digest }),
+    ).resolves.toEqual({
+      status: "replayed",
+      recoverySetId: "recovery_1",
+    });
+  });
+
   it("BDD-REC-008A expires at the exact boundary and replays cleanup", async () => {
     const deleted: string[] = [];
     const repository: RecoveryObjectRepository = {
@@ -176,5 +323,20 @@ describe("encrypted recovery artifact", () => {
       "complete/recovery_1.json",
       "generations/recovery_1.recovery",
     ]);
+    for (const candidate of [
+      { now: "invalid", expiresAt: manifest.expiresAt },
+      { now: manifest.expiresAt, expiresAt: "invalid" },
+    ])
+      await expect(
+        expireRecoveryArtifact({
+          repository,
+          artifact: { recoverySetId: "recovery_1", expiresAt: candidate.expiresAt },
+          now: candidate.now,
+        }),
+      ).rejects.toThrow("RECOVERY_EXPIRY_INVALID");
   });
 });
+
+function encodeArtifact(artifact: unknown): Uint8Array {
+  return new TextEncoder().encode(JSON.stringify(artifact));
+}

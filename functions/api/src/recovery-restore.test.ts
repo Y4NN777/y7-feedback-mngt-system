@@ -63,8 +63,10 @@ const entries: readonly RecoveryEntry[] = [
     bytes: new Uint8Array([1, 2, 3]),
   },
 ];
+const configurationEntry = entries[0];
+if (!configurationEntry) throw new Error("configuration fixture");
 
-function artifact() {
+function artifact(candidateEntries: readonly RecoveryEntry[] = entries) {
   const manifest = buildRecoveryManifest({
     recoverySetId: "recovery_1",
     sourceEnvironment: "preview",
@@ -72,10 +74,15 @@ function artifact() {
     snapshotCompletedAt: "2026-09-03T09:02:00.000Z",
     encryptionKeyId: "recovery-kek-1",
     signingKeyId: "recovery-sign-1",
-    entries,
+    entries: candidateEntries,
     digest,
   });
-  return createRecoveryArtifact({ manifest, entries, encryptionKey, signingKey });
+  return createRecoveryArtifact({
+    manifest,
+    entries: candidateEntries,
+    encryptionKey,
+    signingKey,
+  });
 }
 
 function target(overrides: Partial<RecoveryRestoreTarget> = {}): {
@@ -183,5 +190,111 @@ describe("isolated recovery restore", () => {
       ).rejects.toThrow();
       expect(candidate.calls).not.toContain("expose");
     }
+  });
+
+  it.each([
+    [entries.filter(({ kind }) => kind !== "config"), "RECOVERY_CONFIGURATION_INVALID"],
+    [
+      [...entries, { ...configurationEntry, path: "config/duplicate.json" }],
+      "RECOVERY_CONFIGURATION_INVALID",
+    ],
+    [
+      entries.map((entry) =>
+        entry.kind === "config"
+          ? { ...entry, bytes: new TextEncoder().encode("invalid json") }
+          : entry,
+      ),
+      "RECOVERY_ENTRY_INVALID",
+    ],
+    [
+      entries.map((entry, index) =>
+        entry.kind === "table_row" && index === 1
+          ? { ...entry, path: "wrong/path.json" }
+          : entry,
+      ),
+      "RECOVERY_ENTRY_PATH_INVALID",
+    ],
+    [
+      entries.map((entry) =>
+        entry.kind === "private_file" ? { ...entry, path: "storage//file" } : entry,
+      ),
+      "RECOVERY_ENTRY_PATH_INVALID",
+    ],
+  ] as const)(
+    "BDD-REC-019 rejects malformed recovery entries: %s",
+    async (candidate, error) => {
+      await expect(
+        restoreRecoveryArtifact({
+          artifact: artifact(candidate),
+          encryptionKey,
+          signingKey,
+          target: target().target,
+          feedbackTableId: "feedback",
+        }),
+      ).rejects.toThrow(error);
+    },
+  );
+
+  it.each([
+    null,
+    {},
+    { eventId: 1 },
+    { eventId: "e", feedbackId: 1 },
+    {
+      eventId: "e",
+      feedbackId: "f",
+      type: "unknown",
+    },
+    {
+      eventId: "e",
+      feedbackId: "f",
+      type: "feedback_restored",
+      occurredAt: 1,
+    },
+  ] as const)("BDD-REC-020 rejects malformed deletion event %s", async (event) => {
+    const candidateEntries = entries.map((entry) =>
+      entry.kind === "deletion_event" ? { ...entry, bytes: encode(event) } : entry,
+    );
+    await expect(
+      restoreRecoveryArtifact({
+        artifact: artifact(candidateEntries),
+        encryptionKey,
+        signingKey,
+        target: target().target,
+        feedbackTableId: "feedback",
+      }),
+    ).rejects.toThrow("RECOVERY_DELETION_EVENT_INVALID");
+  });
+
+  it("BDD-REC-021 restores a configuration-only recovery set", async () => {
+    const configurationOnly = entries.filter(({ kind }) => kind === "config");
+    await expect(
+      restoreRecoveryArtifact({
+        artifact: artifact(configurationOnly),
+        encryptionKey,
+        signingKey,
+        target: target().target,
+        feedbackTableId: "feedback",
+        now: () => "2026-09-03T10:09:00.000Z",
+      }),
+    ).resolves.toMatchObject({ rows: 0, privateFiles: 0, hidden: 0, purged: 0 });
+
+    const withNonFeedbackRow: readonly RecoveryEntry[] = [
+      ...configurationOnly,
+      {
+        kind: "table_row",
+        path: "tables/projects/project_1.json",
+        bytes: encode({ $id: "project_1" }),
+      },
+    ];
+    await expect(
+      restoreRecoveryArtifact({
+        artifact: artifact(withNonFeedbackRow),
+        encryptionKey,
+        signingKey,
+        target: target().target,
+        feedbackTableId: "feedback",
+      }),
+    ).resolves.toMatchObject({ rows: 1, hidden: 0, purged: 0 });
   });
 });

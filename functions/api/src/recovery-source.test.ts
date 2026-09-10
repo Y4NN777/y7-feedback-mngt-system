@@ -110,4 +110,57 @@ describe("stable Appwrite recovery collection", () => {
       }),
     ).rejects.toThrow("RECOVERY_SOURCE_READ_FAILED");
   });
+
+  it("BDD-REC-013A uses capture time for an empty source", async () => {
+    const emptyInventory: RecoverySourceInventory = {
+      ...inventory,
+      tables: [],
+      files: [],
+    };
+    await expect(
+      collectRecoveryEntries({
+        source: source({ inventory: () => Promise.resolve(emptyInventory) }),
+        deletionTableIds: [],
+      }),
+    ).resolves.toMatchObject({ latestSourceMutationAt: inventory.capturedAt });
+  });
+
+  it("BDD-REC-013B rejects an invalid source timestamp", async () => {
+    const firstFile = inventory.files[0];
+    if (!firstFile) throw new Error("file fixture");
+    const invalidInventory: RecoverySourceInventory = {
+      ...inventory,
+      files: [{ ...firstFile, updatedAt: "invalid" }],
+    };
+    await expect(
+      collectRecoveryEntries({
+        source: source({ inventory: () => Promise.resolve(invalidInventory) }),
+        deletionTableIds: ["privacy_deletions"],
+      }),
+    ).rejects.toThrow("RECOVERY_SOURCE_INVENTORY_INVALID");
+  });
+
+  it("BDD-REC-013C finds the maximum mutation in unsorted inventory", async () => {
+    const firstTable = inventory.tables[0];
+    if (!firstTable) throw new Error("table fixture");
+    const unsortedInventory: RecoverySourceInventory = {
+      ...inventory,
+      tables: [
+        {
+          ...firstTable,
+          rows: [
+            { id: "newer", updatedAt: "2026-09-03T09:00:03.000Z" },
+            { id: "older", updatedAt: "2026-09-03T09:00:00.000Z" },
+          ],
+        },
+      ],
+      files: [],
+    };
+    await expect(
+      collectRecoveryEntries({
+        source: source({ inventory: () => Promise.resolve(unsortedInventory) }),
+        deletionTableIds: [],
+      }),
+    ).resolves.toMatchObject({ latestSourceMutationAt: "2026-09-03T09:00:03.000Z" });
+  });
 });

@@ -85,8 +85,7 @@ async function pages<T extends Readonly<Record<string, unknown>>>(
     const page = await load(pageQueries(cursor));
     result.push(...page);
     if (page.length < 100) return result;
-    const last = page.at(-1);
-    if (!last) return result;
+    const last = page[99] as T;
     const next = text(last, "$id");
     if (next === cursor) throw new Error("RECOVERY_APPWRITE_PAGINATION_INVALID");
     cursor = next;
