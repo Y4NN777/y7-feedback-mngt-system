@@ -50,7 +50,6 @@ async function main(): Promise<void> {
       material: Buffer.from(material, "base64url"),
     })),
   );
-  const criticalApiSamplesMs: number[] = [];
   const dashboardSamplesMs: number[] = [];
   const notificationVisibilitySamplesMs: number[] = [];
   const createRow = async (
@@ -113,7 +112,6 @@ async function main(): Promise<void> {
         `APPWRITE_G3_WORKBENCH_HTTP_${String(expected)}_GOT_${String(response.status)}_${path}_${JSON.stringify(payload)}`,
       );
     if (expected < 400) {
-      criticalApiSamplesMs.push(durationMs);
       if (method === "GET" && path.includes("/workbench"))
         dashboardSamplesMs.push(durationMs);
     }
@@ -631,7 +629,6 @@ async function main(): Promise<void> {
       notificationReadPassed,
       realtimeSignalPassed,
       notificationVisibleP95Ms,
-      criticalApiSamplesMs,
       dashboardSamplesMs,
       notificationVisibilitySamplesMs,
       cleanupPassed: true,
