@@ -49,6 +49,9 @@ async function main(): Promise<void> {
       material: Buffer.from(material, "base64url"),
     })),
   );
+  const criticalApiSamplesMs: number[] = [];
+  const dashboardSamplesMs: number[] = [];
+  const notificationVisibilitySamplesMs: number[] = [];
   const createRow = async (
     tableId: string,
     rowId: string,
@@ -88,6 +91,7 @@ async function main(): Promise<void> {
     body?: unknown,
     extraHeaders: Readonly<Record<string, string>> = {},
   ) => {
+    const startedAt = performance.now();
     const response = await fetch(new URL(path, domain).toString(), {
       method,
       headers: {
@@ -99,11 +103,17 @@ async function main(): Promise<void> {
       redirect: "error",
       signal: AbortSignal.timeout(30_000),
     });
+    const durationMs = Math.round(performance.now() - startedAt);
     const payload: unknown = await response.json();
     if (response.status !== expected)
       throw new Error(
         `APPWRITE_G3_WORKBENCH_HTTP_${String(expected)}_GOT_${String(response.status)}_${path}_${JSON.stringify(payload)}`,
       );
+    if (expected < 400) {
+      criticalApiSamplesMs.push(durationMs);
+      if (method === "GET" && path.includes("/workbench"))
+        dashboardSamplesMs.push(durationMs);
+    }
     return payload;
   };
   const path = `/v1/workspaces/${workspaceId}/projects/${projectId}/workbench`;
@@ -376,7 +386,6 @@ async function main(): Promise<void> {
     removalPassed = true;
 
     const operationsPath = `/v1/workspaces/${workspaceId}/projects/${projectId}/operations`;
-    const visibleDurations: number[] = [];
     let notificationIds: string[] = [];
     for (let index = 0; index < 5; index += 1) {
       const startedAt = Date.now();
@@ -407,7 +416,7 @@ async function main(): Promise<void> {
               throw new Error("APPWRITE_G3_NOTIFICATION_FEED_INVALID");
             return item.id;
           });
-          visibleDurations.push(Date.now() - startedAt);
+          notificationVisibilitySamplesMs.push(Date.now() - startedAt);
           waiting = false;
           continue;
         }
@@ -416,7 +425,9 @@ async function main(): Promise<void> {
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
     }
-    const sortedDurations = [...visibleDurations].sort((left, right) => left - right);
+    const sortedDurations = [...notificationVisibilitySamplesMs].sort(
+      (left, right) => left - right,
+    );
     notificationVisibleP95Ms =
       sortedDurations[Math.ceil(sortedDurations.length * 0.95) - 1] ?? 5_001;
     if (notificationVisibleP95Ms > 5_000 || notificationIds.length !== 5)
@@ -617,6 +628,9 @@ async function main(): Promise<void> {
       notificationReadPassed,
       realtimeSignalPassed,
       notificationVisibleP95Ms,
+      criticalApiSamplesMs,
+      dashboardSamplesMs,
+      notificationVisibilitySamplesMs,
       cleanupPassed: true,
     }),
   );

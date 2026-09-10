@@ -33,6 +33,7 @@ export async function verifyPreviewMailCatcher(): Promise<{
   readonly referenceMatched: true;
   readonly localizedTemplates: 18;
   readonly providerHandoffP95Ms: number;
+  readonly emailHandoffSamplesMs: readonly number[];
   readonly prohibitedDataAbsent: true;
 }> {
   const account = await nodemailer.createTestAccount();
@@ -102,6 +103,7 @@ export async function verifyPreviewMailCatcher(): Promise<{
     referenceMatched: true,
     localizedTemplates: 18,
     providerHandoffP95Ms: Math.round(p95),
+    emailHandoffSamplesMs: handoffDurations.map(Math.round),
     prohibitedDataAbsent: true,
   };
 }
