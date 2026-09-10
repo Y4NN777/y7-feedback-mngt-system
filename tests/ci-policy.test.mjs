@@ -89,3 +89,31 @@ test("BDD-CI-004 loads ignored Appwrite credentials without shell export", async
     "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build && node --env-file=.env.appwrite-preview functions/api/dist/verify-appwrite-g1.js --apply",
   );
 });
+
+test("BDD-REC-301 runs the real recovery drill with isolated OIDC authority", async () => {
+  const workflow = await readFile(
+    new URL("../.github/workflows/recovery-drill.yml", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(workflow, /workflow_dispatch:/u);
+  assert.match(workflow, /permissions:\s+contents: read\s+id-token: write/u);
+  assert.match(workflow, /environment: recovery-restore/u);
+  assert.match(
+    workflow,
+    /client-id: \$\{\{ vars\.AZURE_RECOVERY_RESTORE_CLIENT_ID \}\}/u,
+  );
+  assert.match(
+    workflow,
+    /APPWRITE_API_KEY: \$\{\{ secrets\.Y7_RECOVERY_APPWRITE_API_KEY \}\}/u,
+  );
+  assert.match(workflow, /run: pnpm verify:recovery:g5/u);
+  assert.doesNotMatch(workflow, /AZURE_(?:CLIENT_)?SECRET/u);
+
+  const actionReferences = [...workflow.matchAll(/^\s+(?:- )?uses: ([^\s#]+)/gmu)].map(
+    (match) => match[1],
+  );
+  assert.ok(actionReferences.length >= 4);
+  for (const reference of actionReferences)
+    assert.match(reference, /^[^@\s]+@[0-9a-f]{40}$/u);
+});
