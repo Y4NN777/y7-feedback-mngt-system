@@ -227,18 +227,41 @@ export function createAppwriteWorkbenchMutationStore(
         if (!appwriteId.test(transaction.$id))
           throw new AppwriteWorkbenchError("ERR-WORK-RETRYABLE");
         transactionId = transaction.$id;
-        const priorRows = await tables.listRows({
-          databaseId: schema.databaseId,
-          tableId: schema.idempotencyTableId,
-          queries: [
-            queries.equal("feedbackId", [input.feedbackId]),
-            queries.equal("operationId", [input.command.operationId]),
-            queries.limit(2),
-          ],
-          total: false,
-          ttl: 0,
-          transactionId,
-        });
+        const [priorRows, feedback, assignments] = await Promise.all([
+          tables.listRows({
+            databaseId: schema.databaseId,
+            tableId: schema.idempotencyTableId,
+            queries: [
+              queries.equal("feedbackId", [input.feedbackId]),
+              queries.equal("operationId", [input.command.operationId]),
+              queries.limit(2),
+            ],
+            total: false,
+            ttl: 0,
+            transactionId,
+          }),
+          tables.getRow({
+            databaseId: schema.databaseId,
+            tableId: schema.feedbackTableId,
+            rowId: input.feedbackId,
+            transactionId,
+          }),
+          input.command.kind === "assign_feedback"
+            ? tables.listRows({
+                databaseId: schema.databaseId,
+                tableId: schema.projectAssignmentsTableId,
+                queries: [
+                  queries.equal("userId", [input.command.maintainerId]),
+                  queries.equal("workspaceId", [input.workspaceId]),
+                  queries.equal("projectId", [input.projectId]),
+                  queries.limit(2),
+                ],
+                total: false,
+                ttl: 0,
+                transactionId,
+              })
+            : Promise.resolve(undefined),
+        ]);
         if (priorRows.rows.length > 1)
           throw new AppwriteWorkbenchError("ERR-WORK-RETRYABLE");
         if (priorRows.rows.length === 1) {
@@ -251,30 +274,11 @@ export function createAppwriteWorkbenchMutationStore(
           closed = true;
           return prior;
         }
-        const feedback = await tables.getRow({
-          databaseId: schema.databaseId,
-          tableId: schema.feedbackTableId,
-          rowId: input.feedbackId,
-          transactionId,
-        });
         authorize(feedback, input);
         if (input.command.kind === "assign_feedback") {
-          const assignments = await tables.listRows({
-            databaseId: schema.databaseId,
-            tableId: schema.projectAssignmentsTableId,
-            queries: [
-              queries.equal("userId", [input.command.maintainerId]),
-              queries.equal("workspaceId", [input.workspaceId]),
-              queries.equal("projectId", [input.projectId]),
-              queries.limit(2),
-            ],
-            total: false,
-            ttl: 0,
-            transactionId,
-          });
-          const assignment = assignments.rows[0];
+          const assignment = assignments?.rows[0];
           if (
-            assignments.rows.length !== 1 ||
+            assignments?.rows.length !== 1 ||
             !object(assignment) ||
             assignment.userId !== input.command.maintainerId ||
             assignment.workspaceId !== input.workspaceId ||
@@ -296,48 +300,48 @@ export function createAppwriteWorkbenchMutationStore(
               : input.command.kind === "unassign_feedback"
                 ? { assignedMaintainerId: null }
                 : { deletedAt: input.occurredAt };
-        const updated = await tables.updateRow({
-          databaseId: schema.databaseId,
-          tableId: schema.feedbackTableId,
-          rowId: input.feedbackId,
-          data,
-          transactionId,
-        });
-        if (!object(updated) || updated.$id !== input.feedbackId)
-          throw new AppwriteWorkbenchError("ERR-WORK-RETRYABLE");
-        if (
+        const result = { feedbackId: input.feedbackId, action: input.command.kind };
+        const rowId = stableId(input.feedbackId, input.command.operationId);
+        const [updated, created] = await Promise.all([
+          tables.updateRow({
+            databaseId: schema.databaseId,
+            tableId: schema.feedbackTableId,
+            rowId: input.feedbackId,
+            data,
+            transactionId,
+          }),
+          tables.createRow({
+            databaseId: schema.databaseId,
+            tableId: schema.idempotencyTableId,
+            rowId,
+            data: {
+              feedbackId: input.feedbackId,
+              operationId: input.command.operationId,
+              payloadDigest: input.payloadDigest,
+              action: input.command.kind,
+              resultJson: JSON.stringify(result),
+              createdAt: input.occurredAt,
+            },
+            permissions: [],
+            transactionId,
+          }),
           fanout !== undefined &&
           (input.command.kind === "assign_feedback" ||
             input.command.kind === "unassign_feedback")
-        ) {
-          await fanout.append({
-            transactionId,
-            feedback: { ...feedback, ...data },
-            eventId: input.command.operationId,
-            kind: "assignment_changed",
-            occurredAt: input.occurredAt,
-            locale: "fr",
-            audience: "workspace",
-            actor: { kind: "workspace", id: input.actor.principalId },
-          });
-        }
-        const result = { feedbackId: input.feedbackId, action: input.command.kind };
-        const rowId = stableId(input.feedbackId, input.command.operationId);
-        const created = await tables.createRow({
-          databaseId: schema.databaseId,
-          tableId: schema.idempotencyTableId,
-          rowId,
-          data: {
-            feedbackId: input.feedbackId,
-            operationId: input.command.operationId,
-            payloadDigest: input.payloadDigest,
-            action: input.command.kind,
-            resultJson: JSON.stringify(result),
-            createdAt: input.occurredAt,
-          },
-          permissions: [],
-          transactionId,
-        });
+            ? fanout.append({
+                transactionId,
+                feedback: { ...feedback, ...data },
+                eventId: input.command.operationId,
+                kind: "assignment_changed",
+                occurredAt: input.occurredAt,
+                locale: "fr",
+                audience: "workspace",
+                actor: { kind: "workspace", id: input.actor.principalId },
+              })
+            : Promise.resolve(undefined),
+        ]);
+        if (!object(updated) || updated.$id !== input.feedbackId)
+          throw new AppwriteWorkbenchError("ERR-WORK-RETRYABLE");
         if (!object(created) || created.$id !== rowId)
           throw new AppwriteWorkbenchError("ERR-WORK-RETRYABLE");
         await tables.updateTransaction({ transactionId, commit: true });
