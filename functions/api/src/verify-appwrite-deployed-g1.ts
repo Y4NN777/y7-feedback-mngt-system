@@ -111,6 +111,7 @@ async function main(): Promise<void> {
   let matrixFailure: unknown;
   let cleanedRows = 0;
   let feedbackCommitMs = 0;
+  const criticalApiSamplesMs: number[] = [];
 
   const findOne = async (
     tableId: string,
@@ -229,6 +230,7 @@ async function main(): Promise<void> {
     feedbackCommitMs =
       acceptedResponse?.operationalDurationMs ??
       performance.now() - feedbackCommitStartedAt;
+    criticalApiSamplesMs.push(Math.round(feedbackCommitMs));
     const accepted = expectResponse(acceptedResponse, 201);
     if (
       accepted.status !== "accepted" ||
@@ -286,15 +288,20 @@ async function main(): Promise<void> {
       }
     }
 
-    const retrieved = expectResponse(
-      await api.handle({
-        method: "POST",
-        path: "/v1/feedback/retrieve",
-        headers: { authorization: `FeedbackProof ${accessProof}` },
-        body: { reference },
-      }),
-      200,
+    const retrievalStartedAt = performance.now();
+    const retrievedResponse = await api.handle({
+      method: "POST",
+      path: "/v1/feedback/retrieve",
+      headers: { authorization: `FeedbackProof ${accessProof}` },
+      body: { reference },
+    });
+    criticalApiSamplesMs.push(
+      Math.round(
+        retrievedResponse?.operationalDurationMs ??
+          performance.now() - retrievalStartedAt,
+      ),
     );
+    const retrieved = expectResponse(retrievedResponse, 200);
     if (
       retrieved.status !== "ok" ||
       JSON.stringify(retrieved).includes("internalNotes")
@@ -334,15 +341,20 @@ async function main(): Promise<void> {
     }
 
     const rotatedProof = rotated.accessProof;
-    const rotatedRetrieval = expectResponse(
-      await api.handle({
-        method: "POST",
-        path: "/v1/feedback/retrieve",
-        headers: { authorization: `FeedbackProof ${rotatedProof}` },
-        body: { reference },
-      }),
-      200,
+    const rotatedRetrievalStartedAt = performance.now();
+    const rotatedRetrievalResponse = await api.handle({
+      method: "POST",
+      path: "/v1/feedback/retrieve",
+      headers: { authorization: `FeedbackProof ${rotatedProof}` },
+      body: { reference },
+    });
+    criticalApiSamplesMs.push(
+      Math.round(
+        rotatedRetrievalResponse?.operationalDurationMs ??
+          performance.now() - rotatedRetrievalStartedAt,
+      ),
     );
+    const rotatedRetrieval = expectResponse(rotatedRetrievalResponse, 200);
     if (rotatedRetrieval.status !== "ok") {
       throw new Error("APPWRITE_DEPLOYED_G1_ROTATED_PROOF_INVALID");
     }
@@ -438,6 +450,7 @@ async function main(): Promise<void> {
       revoked: true,
       revokedProofDenied: true,
       sensitiveRowsEncrypted: true,
+      criticalApiSamplesMs,
       feedbackCommitSamplesMs: [Math.round(feedbackCommitMs)],
       cleanedRows,
     })}\n`,

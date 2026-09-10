@@ -17,6 +17,7 @@ const concurrency = 4;
 const commands = [
   "verify-appwrite-deployed-g1.js",
   "verify-appwrite-g2-attachment.js",
+  "verify-appwrite-g3-conversation-lifecycle.js",
   "verify-appwrite-g3-workbench.js",
 ] as const;
 
