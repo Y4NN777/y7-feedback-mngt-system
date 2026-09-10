@@ -55,7 +55,8 @@
     "test:e2e:offline": "pnpm --filter @y7-feedback/web test:e2e:offline",
     "test:runtime-deps": "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build",
     "typecheck": "pnpm -r --if-present typecheck",
-    "verify:pwa:g4": "pnpm --filter @y7-feedback/web build && pnpm test:e2e:offline"
+    "verify:pwa:g4": "pnpm --filter @y7-feedback/web build && pnpm test:e2e:offline",
+    "verify:recovery:g5": "pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build && node --env-file=.env.appwrite-preview functions/api/dist/verify-recovery-g5.js --apply"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

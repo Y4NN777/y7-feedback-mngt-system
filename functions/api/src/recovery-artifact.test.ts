@@ -6,6 +6,7 @@ import { buildRecoveryManifest, type RecoveryEntry } from "@y7-feedback/domain";
 
 import {
   createRecoveryArtifact,
+  expireRecoveryArtifact,
   openRecoveryArtifact,
   publishRecoveryArtifact,
   type RecoveryObjectRepository,
@@ -40,6 +41,8 @@ const manifest = buildRecoveryManifest({
 
 const encryptionKey = Buffer.alloc(32, 1);
 const signingKey = Buffer.alloc(32, 2);
+const recoveryArtifact = () =>
+  createRecoveryArtifact({ manifest, entries, encryptionKey, signingKey });
 
 describe("encrypted recovery artifact", () => {
   it("BDD-REC-005 encrypts the full set with a wrapped random data key", () => {
@@ -141,5 +144,35 @@ describe("encrypted recovery artifact", () => {
     ).rejects.toThrow("RECOVERY_STAGING_VERIFICATION_FAILED");
     expect(objects.has("complete/recovery_1.json")).toBe(false);
     expect(objects.has("generations/recovery_1.recovery")).toBe(false);
+  });
+
+  it("BDD-REC-008A expires at the exact boundary and replays cleanup", async () => {
+    const deleted: string[] = [];
+    const repository: RecoveryObjectRepository = {
+      put: () => Promise.resolve("stored"),
+      get: () => Promise.resolve(undefined),
+      delete: (key) => {
+        deleted.push(key);
+        return Promise.resolve();
+      },
+    };
+    await expect(
+      expireRecoveryArtifact({
+        repository,
+        artifact: recoveryArtifact(),
+        now: "2026-10-03T09:00:59.999Z",
+      }),
+    ).resolves.toEqual({ status: "retained" });
+    await expect(
+      expireRecoveryArtifact({
+        repository,
+        artifact: recoveryArtifact(),
+        now: "2026-10-03T09:01:00.000Z",
+      }),
+    ).resolves.toEqual({ status: "expired" });
+    expect(deleted).toEqual([
+      "complete/recovery_1.json",
+      "generations/recovery_1.recovery",
+    ]);
   });
 });
