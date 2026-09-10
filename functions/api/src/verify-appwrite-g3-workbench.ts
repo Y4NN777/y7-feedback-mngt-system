@@ -5,6 +5,7 @@ import { Client, Query, TablesDB, Users } from "node-appwrite";
 import { parseServerConfig } from "@y7-feedback/config/server";
 
 import { createSensitiveDataProtector } from "./sensitive-data-protector.js";
+import { readOperationalDuration } from "./http-function-public-api.js";
 import { createNodeAppwriteWorkbenchStore } from "./appwrite-workbench-store.js";
 import { createNodeAppwriteWorkspaceCapabilityScopeResolver } from "./appwrite-workspace-capability-scope.js";
 
@@ -103,7 +104,9 @@ async function main(): Promise<void> {
       redirect: "error",
       signal: AbortSignal.timeout(30_000),
     });
-    const durationMs = Math.round(performance.now() - startedAt);
+    const durationMs = Math.round(
+      readOperationalDuration(response) ?? performance.now() - startedAt,
+    );
     const payload: unknown = await response.json();
     if (response.status !== expected)
       throw new Error(

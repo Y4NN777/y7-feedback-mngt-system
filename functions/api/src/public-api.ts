@@ -57,6 +57,7 @@ export type PublicApiResponse =
       readonly statusCode: number;
       readonly body: unknown;
       readonly binary?: never;
+      readonly operationalDurationMs?: number;
     }
   | {
       readonly statusCode: 200;
@@ -66,6 +67,7 @@ export type PublicApiResponse =
         readonly displayName: string;
         readonly mediaType: string;
       };
+      readonly operationalDurationMs?: number;
     };
 
 export interface PublicApi {

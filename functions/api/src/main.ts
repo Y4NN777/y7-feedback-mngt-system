@@ -8,8 +8,6 @@ import { createHttpApplication } from "./application.js";
 import { resolveAppwriteFunctionEnvironment } from "./appwrite-function-runtime.js";
 import { routeRequest, type FunctionContext } from "./http.js";
 
-const functionStartedAt = Date.now();
-
 export default function handler(context: FunctionContext): Promise<unknown> {
   const config = parseServerConfig(
     resolveAppwriteFunctionEnvironment(process.env, context.req.headers ?? {}),
@@ -29,7 +27,7 @@ export default function handler(context: FunctionContext): Promise<unknown> {
     createCorrelationId: randomUUID,
     nowIso: () => new Date().toISOString(),
     nowMs: Date.now,
-    startedAt: () => functionStartedAt,
+    startedAt: Date.now,
     createProviderNonce: () => randomBytes(24).toString("base64url"),
     digestProviderNonce: (nonce) =>
       createHash("sha256").update(nonce).digest("base64url"),

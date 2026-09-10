@@ -242,7 +242,7 @@ describe("trusted API entrypoint", () => {
   });
 
   it("BDD-SLO-307 emits redacted measurements for an accepted intake", async () => {
-    const { context } = createContext("POST", "/v1/projects/wisemoney/feedback", {
+    const { context, json } = createContext("POST", "/v1/projects/wisemoney/feedback", {
       bodyJson: { title: "must-not-be-logged", contact: "private@example.test" },
     });
     await routeRequest(context, {
@@ -261,6 +261,11 @@ describe("trusted API entrypoint", () => {
     expect(serializedLogs).toContain('"metricValue":4');
     expect(serializedLogs).not.toContain("must-not-be-logged");
     expect(serializedLogs).not.toContain("private@example.test");
+    expect(json).toHaveBeenCalledWith(
+      { status: "accepted" },
+      201,
+      expect.objectContaining({ "server-timing": "app;dur=4" }),
+    );
   });
 
   it("BDD-PROJ-HTTP-001 does not parse an absent JSON body for GET routing", async () => {
