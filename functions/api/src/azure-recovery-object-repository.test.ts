@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createAzureRecoveryObjectRepository,
+  createAzureRecoveryRepositoryFromEnvironment,
   parseAzureRecoveryDestination,
 } from "./azure-recovery-object-repository";
 
@@ -21,6 +22,11 @@ describe("Azure private recovery repository", () => {
     for (const candidate of [
       { accountUrl: "http://y7recovery.blob.core.windows.net", containerName: "ok" },
       { accountUrl: "https://example.com/path", containerName: "ok" },
+      { accountUrl: "https://example.com", containerName: "recovery" },
+      {
+        accountUrl: "https://y7recovery.blob.core.windows.net/path",
+        containerName: "recovery",
+      },
       {
         accountUrl: "https://y7recovery.blob.core.windows.net",
         containerName: "Bad_Name",
@@ -88,5 +94,90 @@ describe("Azure private recovery repository", () => {
     await expect(repository.get("generation/a")).rejects.toThrow(
       "RECOVERY_DESTINATION_PUBLIC",
     );
+  });
+
+  it("BDD-REC-010B preserves unconditional errors and rejects missing bodies", async () => {
+    const failure = new Error("azure unavailable");
+    const repository = createAzureRecoveryObjectRepository({
+      getProperties: () => Promise.resolve({}),
+      getBlockBlobClient: () => ({
+        uploadData: () => Promise.reject(failure),
+        download: () => Promise.resolve({}),
+        deleteIfExists: () => Promise.resolve(),
+        exists: () => Promise.resolve(true),
+      }),
+    });
+    await expect(
+      repository.put("generation/a", new Uint8Array(), { ifAbsent: false }),
+    ).rejects.toBe(failure);
+    await expect(repository.get("generation/a")).rejects.toThrow(
+      "RECOVERY_BLOB_BODY_MISSING",
+    );
+  });
+
+  it("BDD-REC-010C reads string and typed-array stream chunks", async () => {
+    const repository = createAzureRecoveryObjectRepository({
+      getProperties: () => Promise.resolve({}),
+      getBlockBlobClient: () => ({
+        uploadData: () => Promise.resolve(),
+        download: () =>
+          Promise.resolve({
+            readableStreamBody: Readable.from(["a", new Uint8Array([98])]),
+          }),
+        deleteIfExists: () => Promise.resolve(),
+        exists: () => Promise.resolve(true),
+      }),
+    });
+    await expect(repository.get("generation/a")).resolves.toEqual(
+      new TextEncoder().encode("ab"),
+    );
+  });
+
+  it("BDD-REC-010D composes the environment adapter without exposing credentials", async () => {
+    const calls: string[] = [];
+    const container = {
+      getProperties: () => Promise.resolve({}),
+      getBlockBlobClient: (key: string) => ({
+        uploadData: () => Promise.resolve(),
+        download: () => Promise.resolve({}),
+        deleteIfExists: () => {
+          calls.push(key);
+          return Promise.resolve();
+        },
+        exists: () => Promise.resolve(false),
+      }),
+    };
+    const repository = createAzureRecoveryRepositoryFromEnvironment(
+      {
+        AZURE_RECOVERY_ACCOUNT_URL: " https://y7recovery.blob.core.windows.net ",
+        AZURE_RECOVERY_CONTAINER: " recovery ",
+      },
+      {
+        service: (accountUrl) => {
+          calls.push(accountUrl);
+          return { getContainerClient: () => container } as never;
+        },
+      },
+    );
+    await repository.delete("generation/a");
+    expect(calls).toEqual(["https://y7recovery.blob.core.windows.net", "generation/a"]);
+  });
+
+  it("BDD-REC-010E constructs the default workload-identity adapter lazily", () => {
+    const repository = createAzureRecoveryRepositoryFromEnvironment({
+      AZURE_RECOVERY_ACCOUNT_URL: "https://y7recovery.blob.core.windows.net",
+      AZURE_RECOVERY_CONTAINER: "recovery",
+    });
+    expect(typeof repository.put).toBe("function");
+    expect(typeof repository.get).toBe("function");
+    expect(typeof repository.delete).toBe("function");
+    for (const environment of [
+      {},
+      { AZURE_RECOVERY_ACCOUNT_URL: "https://y7recovery.blob.core.windows.net" },
+      { AZURE_RECOVERY_CONTAINER: "recovery" },
+    ])
+      expect(() => createAzureRecoveryRepositoryFromEnvironment(environment)).toThrow(
+        "RECOVERY_DESTINATION_INVALID",
+      );
   });
 });

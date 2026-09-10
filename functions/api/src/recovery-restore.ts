@@ -53,10 +53,7 @@ function segments(path: string, prefix: string, suffix = "") {
   const result = path.slice(prefix.length, end).split("/");
   if (result.length !== 2 || result.some((part) => part.length === 0))
     throw new Error("RECOVERY_ENTRY_PATH_INVALID");
-  const first = result[0];
-  const second = result[1];
-  if (!first || !second) throw new Error("RECOVERY_ENTRY_PATH_INVALID");
-  return [first, second] as const;
+  return result as [string, string];
 }
 
 export async function restoreRecoveryArtifact(input: {
@@ -81,9 +78,9 @@ export async function restoreRecoveryArtifact(input: {
     throw new Error("RECOVERY_TARGET_NOT_ISOLATED");
   const opened = openRecoveryArtifact(input);
   const configuration = opened.entries.filter(({ kind }) => kind === "config");
-  if (configuration.length !== 1) throw new Error("RECOVERY_CONFIGURATION_INVALID");
   const configurationEntry = configuration[0];
-  if (!configurationEntry) throw new Error("RECOVERY_CONFIGURATION_INVALID");
+  if (configuration.length !== 1 || !configurationEntry)
+    throw new Error("RECOVERY_CONFIGURATION_INVALID");
   await input.target.restoreConfiguration(parseJson(configurationEntry.bytes));
   const feedbackIds: string[] = [];
   const deletionEvents: RecoveryDeletionEvent[] = [];

@@ -86,4 +86,185 @@ describe("Appwrite recovery source adapter", () => {
     await expect(source.readFile("file_1")).resolves.toEqual(new Uint8Array([1, 2]));
     expect(calls).toEqual(["feedback/feedback_1", "file_1"]);
   });
+
+  it("BDD-REC-014A inventories table rows and filters malformed Function variables", async () => {
+    const source = createAppwriteRecoverySource(
+      {
+        tables: {
+          listTables: () => Promise.resolve({ tables: [{ $id: "feedback" }] }),
+          listRows: () =>
+            Promise.resolve({
+              rows: [
+                {
+                  $id: "feedback_1",
+                  $updatedAt: "2026-09-03T09:00:00.000Z",
+                },
+              ],
+            }),
+          getRow: () => Promise.resolve({}),
+        },
+        storage: {
+          getBucket: () => Promise.resolve({}),
+          listFiles: () => Promise.resolve({}),
+          getFileDownload: () => Promise.resolve(new ArrayBuffer(0)),
+        },
+        functions: {
+          get: () =>
+            Promise.resolve({
+              vars: ["plain", null, {}, { key: 7 }, { key: "VALID" }],
+            }),
+        },
+      },
+      {
+        databaseId: "database_1",
+        bucketId: "bucket_1",
+        functionId: "function_1",
+        now: () => "2026-09-03T09:01:00.000Z",
+      },
+    );
+
+    await expect(source.inventory()).resolves.toMatchObject({
+      tables: [
+        {
+          id: "feedback",
+          rows: [
+            {
+              id: "feedback_1",
+              updatedAt: "2026-09-03T09:00:00.000Z",
+            },
+          ],
+        },
+      ],
+      files: [],
+      configuration: { function: { variableNames: ["VALID"] } },
+    });
+  });
+
+  it("BDD-REC-014B rejects invalid Appwrite identities and sizes", async () => {
+    const invalidFixtures: readonly {
+      readonly tables?: readonly Readonly<Record<string, unknown>>[];
+      readonly rows?: readonly Readonly<Record<string, unknown>>[];
+      readonly files?: readonly Readonly<Record<string, unknown>>[];
+    }[] = [
+      { tables: [{ name: "missing-id" }] },
+      {
+        tables: [{ $id: "feedback" }],
+        rows: [{ $id: "feedback_1", $updatedAt: 1 }],
+      },
+      {
+        files: [
+          {
+            $id: "file_1",
+            $updatedAt: "2026-09-03T09:00:00.000Z",
+            sizeOriginal: -1,
+            signature: "signature",
+          },
+        ],
+      },
+    ];
+    for (const fixture of invalidFixtures) {
+      const source = createAppwriteRecoverySource(
+        {
+          tables: {
+            listTables: () => Promise.resolve({ tables: fixture.tables ?? [] }),
+            listRows: () => Promise.resolve({ rows: fixture.rows ?? [] }),
+            getRow: () => Promise.resolve({}),
+          },
+          storage: {
+            getBucket: () => Promise.resolve({}),
+            listFiles: () => Promise.resolve({ files: fixture.files ?? [] }),
+            getFileDownload: () => Promise.resolve(new ArrayBuffer(0)),
+          },
+          functions: { get: () => Promise.resolve({}) },
+        },
+        {
+          databaseId: "database_1",
+          bucketId: "bucket_1",
+          functionId: "function_1",
+          now: () => "2026-09-03T09:01:00.000Z",
+        },
+      );
+      await expect(source.inventory()).rejects.toThrow(
+        "RECOVERY_APPWRITE_RESPONSE_INVALID",
+      );
+    }
+  });
+
+  it("BDD-REC-014C rejects a repeated full-page cursor", async () => {
+    const repeated = Array.from({ length: 100 }, () => ({ $id: "same" }));
+    const source = createAppwriteRecoverySource(
+      {
+        tables: {
+          listTables: () => Promise.resolve({ tables: repeated }),
+          listRows: () => Promise.resolve({ rows: [] }),
+          getRow: () => Promise.resolve({}),
+        },
+        storage: {
+          getBucket: () => Promise.resolve({}),
+          listFiles: () => Promise.resolve({ files: [] }),
+          getFileDownload: () => Promise.resolve(new ArrayBuffer(0)),
+        },
+        functions: { get: () => Promise.resolve({}) },
+      },
+      {
+        databaseId: "database_1",
+        bucketId: "bucket_1",
+        functionId: "function_1",
+        now: () => "2026-09-03T09:01:00.000Z",
+      },
+    );
+    await expect(source.inventory()).rejects.toThrow(
+      "RECOVERY_APPWRITE_PAGINATION_INVALID",
+    );
+  });
+
+  it("BDD-REC-014D defaults missing Appwrite list members to empty pages", async () => {
+    const source = createAppwriteRecoverySource(
+      {
+        tables: {
+          listTables: () => Promise.resolve({}),
+          listRows: () => Promise.resolve({}),
+          getRow: () => Promise.resolve({}),
+        },
+        storage: {
+          getBucket: () => Promise.resolve({}),
+          listFiles: () => Promise.resolve({}),
+          getFileDownload: () => Promise.resolve(new ArrayBuffer(0)),
+        },
+        functions: { get: () => Promise.resolve({}) },
+      },
+      {
+        databaseId: "database_1",
+        bucketId: "bucket_1",
+        functionId: "function_1",
+        now: () => "2026-09-03T09:01:00.000Z",
+      },
+    );
+    await expect(source.inventory()).resolves.toMatchObject({ tables: [], files: [] });
+
+    const rowsMissing = createAppwriteRecoverySource(
+      {
+        tables: {
+          listTables: () => Promise.resolve({ tables: [{ $id: "feedback" }] }),
+          listRows: () => Promise.resolve({}),
+          getRow: () => Promise.resolve({}),
+        },
+        storage: {
+          getBucket: () => Promise.resolve({}),
+          listFiles: () => Promise.resolve({ files: [] }),
+          getFileDownload: () => Promise.resolve(new ArrayBuffer(0)),
+        },
+        functions: { get: () => Promise.resolve({}) },
+      },
+      {
+        databaseId: "database_1",
+        bucketId: "bucket_1",
+        functionId: "function_1",
+        now: () => "2026-09-03T09:01:00.000Z",
+      },
+    );
+    await expect(rowsMissing.inventory()).resolves.toMatchObject({
+      tables: [{ id: "feedback", rows: [] }],
+    });
+  });
 });
