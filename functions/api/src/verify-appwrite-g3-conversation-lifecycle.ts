@@ -53,6 +53,7 @@ async function main(): Promise<void> {
       material: Buffer.from(material, "base64url"),
     })),
   );
+  const criticalApiSamplesMs: number[] = [];
   const createRow = async (
     tableId: string,
     rowId: string,
@@ -84,10 +85,16 @@ async function main(): Promise<void> {
     body: unknown,
     statusCode: number,
   ) => {
+    const startedAt = performance.now();
     const response = await api.handle({ method, path, headers, body });
     if (response?.statusCode !== statusCode) {
       throw new Error(
         `APPWRITE_G3_CONVERSATION_HTTP_${String(statusCode)}_${String(response?.statusCode)}_${JSON.stringify(response?.body)}`,
+      );
+    }
+    if (statusCode < 400) {
+      criticalApiSamplesMs.push(
+        Math.round(response.operationalDurationMs ?? performance.now() - startedAt),
       );
     }
     return response.body;
@@ -403,6 +410,7 @@ async function main(): Promise<void> {
       result: "APPWRITE_G3_CONVERSATION_LIFECYCLE_PASSED",
       matrixPassed: true,
       directAccessDenied: true,
+      criticalApiSamplesMs,
       cleanupPassed,
     })}\n`,
   );
