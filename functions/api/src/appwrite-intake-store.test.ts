@@ -128,6 +128,7 @@ class FakeTablesDb implements AppwriteTablesDbPort {
   failTableId: string | undefined;
   failCommit = false;
   failRollback = false;
+  operationsResult: unknown;
   useSdkQueries = false;
   transactionId = "transaction-1";
 
@@ -164,11 +165,26 @@ class FakeTablesDb implements AppwriteTablesDbPort {
     return Promise.resolve({ rows: this.listedRows });
   }
 
-  createRow(input: Parameters<AppwriteTablesDbPort["createRow"]>[0]): Promise<unknown> {
-    this.createdRows.push(input);
-    return input.tableId === this.failTableId
+  createOperations(
+    input: Parameters<AppwriteTablesDbPort["createOperations"]>[0],
+  ): Promise<unknown> {
+    this.createdRows.push(
+      ...input.operations.map((operation) => ({
+        ...operation,
+        permissions: [],
+        transactionId: input.transactionId,
+      })),
+    );
+    return input.operations.some(({ tableId }) => tableId === this.failTableId)
       ? Promise.reject(new Error("row failure"))
-      : Promise.resolve({ $id: input.rowId });
+      : Promise.resolve(
+          this.operationsResult === undefined
+            ? {
+                $id: input.transactionId,
+                operations: input.operations.length,
+              }
+            : this.operationsResult,
+        );
   }
 
   updateTransaction(
@@ -273,7 +289,24 @@ describe("Appwrite transactional intake adapter", () => {
     const store = createAppwriteIntakeStore(tables, schema, queries, sensitive);
 
     await expect(store.commit(acceptance())).rejects.toThrow("row failure");
-    expect(tables.createdRows).toHaveLength(3);
+    expect(tables.createdRows).toHaveLength(7);
+    expect(tables.transactionUpdates).toEqual([
+      { transactionId: "transaction-1", rollback: true },
+    ]);
+  });
+
+  it.each([
+    null,
+    { $id: "other-transaction", operations: 7 },
+    { $id: "transaction-1", operations: 6 },
+  ])("rejects malformed grouped transaction staging %#", async (operationsResult) => {
+    const tables = new FakeTablesDb();
+    tables.operationsResult = operationsResult;
+    const store = createAppwriteIntakeStore(tables, schema, queries, sensitive);
+
+    await expect(store.commit(acceptance())).rejects.toThrow(
+      "APPWRITE_TRANSACTION_INVALID",
+    );
     expect(tables.transactionUpdates).toEqual([
       { transactionId: "transaction-1", rollback: true },
     ]);

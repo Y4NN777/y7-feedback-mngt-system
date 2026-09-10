@@ -113,6 +113,23 @@ class FakeTables {
     return Promise.resolve({ $id: input.rowId });
   }
 
+  createOperations(input: {
+    readonly transactionId: string;
+    readonly operations: readonly Readonly<Record<string, unknown>>[];
+  }) {
+    this.rows.push(
+      ...input.operations.map((operation) => ({
+        ...operation,
+        permissions: [],
+        transactionId: input.transactionId,
+      })),
+    );
+    return Promise.resolve({
+      $id: input.transactionId,
+      operations: input.operations.length,
+    });
+  }
+
   updateTransaction() {
     return Promise.resolve({});
   }

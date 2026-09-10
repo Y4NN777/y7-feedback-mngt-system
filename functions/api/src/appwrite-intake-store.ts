@@ -30,13 +30,15 @@ export interface AppwriteTablesDbPort {
   }): Promise<{
     readonly rows: readonly unknown[];
   }>;
-  createRow(input: {
-    readonly databaseId: string;
-    readonly tableId: string;
-    readonly rowId: string;
-    readonly data: Readonly<Record<string, unknown>>;
-    readonly permissions: string[];
+  createOperations(input: {
     readonly transactionId: string;
+    readonly operations: readonly {
+      readonly action: "create";
+      readonly databaseId: string;
+      readonly tableId: string;
+      readonly rowId: string;
+      readonly data: Readonly<Record<string, unknown>>;
+    }[];
   }): Promise<unknown>;
   updateTransaction(input: {
     readonly transactionId: string;
@@ -348,15 +350,23 @@ export function createAppwriteIntakeStore(
       }
       let rowsStaged = false;
       try {
-        for (const row of rowsForCommit(input, schema, sensitive)) {
-          await tables.createRow({
+        const rows = rowsForCommit(input, schema, sensitive);
+        const staged = await tables.createOperations({
+          transactionId: transaction.$id,
+          operations: rows.map((row) => ({
+            action: "create" as const,
             databaseId: schema.databaseId,
             tableId: row.tableId,
             rowId: row.rowId,
             data: row.data,
-            permissions: [],
-            transactionId: transaction.$id,
-          });
+          })),
+        });
+        if (
+          !isObject(staged) ||
+          staged.$id !== transaction.$id ||
+          staged.operations !== rows.length
+        ) {
+          throw new Error("APPWRITE_TRANSACTION_INVALID");
         }
         rowsStaged = true;
         await tables.updateTransaction({
@@ -392,7 +402,11 @@ export function createNodeAppwriteIntakeStore(
         const result = await tables.listRows(input);
         return { rows: result.rows };
       },
-      createRow: (input) => tables.createRow(input),
+      createOperations: (input) =>
+        tables.createOperations({
+          transactionId: input.transactionId,
+          operations: input.operations.map((operation) => ({ ...operation })),
+        }),
       updateTransaction: (input) => tables.updateTransaction(input),
     },
     schema,
