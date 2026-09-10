@@ -368,3 +368,22 @@ const errors: readonly E2eG5Scenario[] = (
 export function buildE2eG5Matrix(): readonly E2eG5Scenario[] {
   return [...useCases, ...errors];
 }
+
+export function buildE2eG5Index() {
+  const matrix = buildE2eG5Matrix();
+  return {
+    result: "E2E_G5_MATRIX_READY" as const,
+    scenarioCount: matrix.length,
+    useCaseCount: matrix.filter(({ id }) => id.startsWith("UC-")).length,
+    errorCount: matrix.filter(({ id }) => id.startsWith("ERR-")).length,
+    environments: [...new Set(matrix.map(({ environment }) => environment))].sort(),
+    evidenceCommands: [
+      ...new Set(matrix.map(({ evidenceCommand }) => evidenceCommand)),
+    ].sort(),
+    scenarios: matrix.map(({ id, requirementIds, environment }) => ({
+      id,
+      requirementIds,
+      environment,
+    })),
+  };
+}

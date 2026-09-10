@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { buildE2eG5Matrix } from "./e2e-g5-matrix";
+import { buildE2eG5Index, buildE2eG5Matrix } from "./e2e-g5-matrix";
 
 const expectedScenarioIds = [
   ...Array.from(
@@ -79,5 +79,29 @@ describe("G5 end-to-end traceability matrix", () => {
       expect(command).toBeDefined();
       expect(scripts[command ?? ""]).toEqual(expect.any(String));
     }
+  });
+
+  it("BDD-E2E-204 emits a complete non-sensitive execution index", () => {
+    const matrix = buildE2eG5Matrix();
+    const index = buildE2eG5Index();
+
+    expect(index).toEqual({
+      result: "E2E_G5_MATRIX_READY",
+      scenarioCount: 31,
+      useCaseCount: 12,
+      errorCount: 19,
+      environments: ["appwrite_preview", "local_browser"],
+      evidenceCommands: [
+        ...new Set(matrix.map(({ evidenceCommand }) => evidenceCommand)),
+      ].sort(),
+      scenarios: matrix.map(({ id, requirementIds, environment }) => ({
+        id,
+        requirementIds,
+        environment,
+      })),
+    });
+    expect(JSON.stringify(index)).not.toMatch(
+      /accessProof|attachmentContent|contact|internalNote|providerToken|workspaceId/iu,
+    );
   });
 });
