@@ -116,4 +116,12 @@ test("BDD-REC-301 runs the real recovery drill with isolated OIDC authority", as
   assert.ok(actionReferences.length >= 4);
   for (const reference of actionReferences)
     assert.match(reference, /^[^@\s]+@[0-9a-f]{40}$/u);
+
+  const rootPackage = JSON.parse(
+    await readFile(new URL("../package.json", import.meta.url), "utf8"),
+  );
+  assert.match(
+    rootPackage.scripts["verify:recovery:g5"],
+    /node --env-file-if-exists=\.env\.appwrite-preview .* --apply$/u,
+  );
 });
