@@ -2,6 +2,8 @@ const allowedEvents = new Set([
   "api.request.completed",
   "probe.completed",
   "rum.web_vital",
+  "slo.alert",
+  "slo.measurement",
 ]);
 
 const allowedFields = [
@@ -17,6 +19,16 @@ const allowedFields = [
   "metricValue",
   "rating",
   "navigationType",
+  "measuredAt",
+  "eligibility",
+  "alertId",
+  "month",
+  "sloId",
+  "severity",
+  "observedValue",
+  "target",
+  "sampleCount",
+  "reportStatus",
 ] as const;
 
 function isSafeValue(value: unknown): value is string | number | boolean {
