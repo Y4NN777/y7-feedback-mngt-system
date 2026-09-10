@@ -144,6 +144,40 @@ const messageCommand = {
 };
 
 describe("Appwrite conversation and lifecycle transaction", () => {
+  it("BDD-SLO-210 overlaps independent conversation reads and validated writes", async () => {
+    const tables = new FakeTables();
+    let releaseIdempotencyRead: (() => void) | undefined;
+    let releaseEntryWrite: (() => void) | undefined;
+    const idempotencyGate = new Promise<void>((resolve) => {
+      releaseIdempotencyRead = resolve;
+    });
+    const entryGate = new Promise<void>((resolve) => {
+      releaseEntryWrite = resolve;
+    });
+    const getRow = vi.spyOn(tables, "getRow");
+    vi.spyOn(tables, "listRows").mockImplementationOnce(async () => {
+      await idempotencyGate;
+      return { rows: [] };
+    });
+    vi.spyOn(tables, "createRow").mockImplementationOnce(async (input) => {
+      tables.created.push(input);
+      await entryGate;
+      return { $id: input.rowId };
+    });
+
+    const execution = store(tables).execute({ ...common, command: messageCommand });
+    await vi.waitFor(() => {
+      expect(getRow).toHaveBeenCalledOnce();
+    });
+    releaseIdempotencyRead?.();
+    await vi.waitFor(() => {
+      expect(tables.created).toHaveLength(2);
+    });
+    releaseEntryWrite?.();
+
+    await expect(execution).resolves.toMatchObject({ status: "applied" });
+  });
+
   it("BDD-CONV-001 appends one encrypted Reporter-visible Message and idempotency fact", async () => {
     const tables = new FakeTables();
     await expect(
@@ -473,8 +507,10 @@ describe("Appwrite conversation and lifecycle transaction", () => {
     await expect(
       store(tables, append).execute({ ...common, command: messageCommand }),
     ).rejects.toEqual(new AppwriteConversationLifecycleError("ERR-CONV-RETRYABLE"));
-    expect(tables.created).toHaveLength(1);
-    expect(tables.created[0]?.tableId).toBe("conversation_messages");
+    expect(tables.created.map((row) => row.tableId)).toEqual([
+      "conversation_messages",
+      "conversation_idempotency",
+    ]);
     expect(tables.transactions.at(-1)).toEqual({
       transactionId: "transaction_1",
       rollback: true,
