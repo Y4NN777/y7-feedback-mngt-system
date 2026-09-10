@@ -65,9 +65,10 @@ function maximumTimestamp(inventory: RecoverySourceInventory): string {
     ...inventory.files.map((file) => file.updatedAt),
   ];
   const timestamps = mutations.length === 0 ? [inventory.capturedAt] : mutations;
-  if (timestamps.some((value) => !Number.isFinite(Date.parse(value))))
+  const parsed = timestamps.map((value) => Date.parse(value));
+  if (parsed.some((value) => !Number.isFinite(value)))
     throw new Error("RECOVERY_SOURCE_INVENTORY_INVALID");
-  return timestamps.reduce((latest, value) => (value > latest ? value : latest));
+  return new Date(Math.max(...parsed)).toISOString();
 }
 
 export async function collectRecoveryEntries(input: {

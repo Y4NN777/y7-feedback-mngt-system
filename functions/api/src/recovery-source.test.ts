@@ -163,4 +163,28 @@ describe("stable Appwrite recovery collection", () => {
       }),
     ).resolves.toMatchObject({ latestSourceMutationAt: "2026-09-03T09:00:03.000Z" });
   });
+
+  it("BDD-REC-024 normalizes Appwrite mutation timestamps to canonical UTC", async () => {
+    const firstTable = inventory.tables[0];
+    if (!firstTable) throw new Error("table fixture");
+    const appwriteInventory: RecoverySourceInventory = {
+      ...inventory,
+      tables: [
+        {
+          ...firstTable,
+          rows: [
+            { id: "earlier", updatedAt: "2026-09-03T10:00:02.000+01:00" },
+            { id: "latest", updatedAt: "2026-09-03T09:00:03.000+00:00" },
+          ],
+        },
+      ],
+      files: [],
+    };
+    await expect(
+      collectRecoveryEntries({
+        source: source({ inventory: () => Promise.resolve(appwriteInventory) }),
+        deletionTableIds: [],
+      }),
+    ).resolves.toMatchObject({ latestSourceMutationAt: "2026-09-03T09:00:03.000Z" });
+  });
 });
