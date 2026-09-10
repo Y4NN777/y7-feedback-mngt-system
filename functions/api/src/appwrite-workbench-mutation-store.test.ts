@@ -92,6 +92,44 @@ function input(overrides: Readonly<Record<string, unknown>> = {}) {
 }
 
 describe("Appwrite Workbench mutation store", () => {
+  it("BDD-SLO-208 overlaps independent transactional reads and validated writes", async () => {
+    const tables = new Tables();
+    let releaseIdempotencyRead: (() => void) | undefined;
+    let releaseFeedbackWrite: (() => void) | undefined;
+    const idempotencyRead = new Promise<void>((resolve) => {
+      releaseIdempotencyRead = resolve;
+    });
+    const feedbackWrite = new Promise<void>((resolve) => {
+      releaseFeedbackWrite = resolve;
+    });
+    const getRow = vi.spyOn(tables, "getRow");
+    const createRow = vi.spyOn(tables, "createRow");
+    vi.spyOn(tables, "listRows").mockImplementationOnce(async () => {
+      await idempotencyRead;
+      return { rows: [] };
+    });
+    vi.spyOn(tables, "updateRow").mockImplementationOnce(async (write) => {
+      await feedbackWrite;
+      return { $id: write.rowId };
+    });
+
+    const execution = createAppwriteWorkbenchMutationStore(
+      tables,
+      schema,
+      queries,
+    ).execute(input());
+    await vi.waitFor(() => {
+      expect(getRow).toHaveBeenCalledOnce();
+    });
+    releaseIdempotencyRead?.();
+    await vi.waitFor(() => {
+      expect(createRow).toHaveBeenCalledOnce();
+    });
+    releaseFeedbackWrite?.();
+
+    await expect(execution).resolves.toMatchObject({ status: "applied" });
+  });
+
   it("BDD-WORK-011 commits a classification and its idempotency fact atomically", async () => {
     const tables = new Tables();
     await expect(
