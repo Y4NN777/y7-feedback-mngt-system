@@ -288,3 +288,18 @@ export async function publishRecoveryArtifact(input: {
   }
   return { status: "published", recoverySetId: input.artifact.recoverySetId };
 }
+
+export async function expireRecoveryArtifact(input: {
+  readonly repository: RecoveryObjectRepository;
+  readonly artifact: Pick<RecoveryArtifact, "expiresAt" | "recoverySetId">;
+  readonly now: string;
+}): Promise<{ readonly status: "expired" | "retained" }> {
+  const now = Date.parse(input.now);
+  const expiresAt = Date.parse(input.artifact.expiresAt);
+  if (!Number.isFinite(now) || !Number.isFinite(expiresAt))
+    throw new Error("RECOVERY_EXPIRY_INVALID");
+  if (now < expiresAt) return { status: "retained" };
+  await input.repository.delete(`complete/${input.artifact.recoverySetId}.json`);
+  await input.repository.delete(`generations/${input.artifact.recoverySetId}.recovery`);
+  return { status: "expired" };
+}
