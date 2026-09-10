@@ -16,7 +16,7 @@ jobs:
     name: Restore, verify and destroy isolated Preview fixtures
     runs-on: ubuntu-latest
     timeout-minutes: 90
-    environment: recovery-restore
+    environment: recovery-drill
     env:
       Y7_ENVIRONMENT: preview
       APPWRITE_ENDPOINT: ${{ vars.Y7_RECOVERY_APPWRITE_ENDPOINT }}
@@ -39,10 +39,10 @@ jobs:
           node-version: 24
           cache: pnpm
           package-manager-cache: false
-      - name: Authenticate restore reader with Azure workload identity
+      - name: Authenticate isolated drill with Azure workload identity
         uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
         with:
-          client-id: ${{ vars.AZURE_RECOVERY_RESTORE_CLIENT_ID }}
+          client-id: ${{ vars.AZURE_RECOVERY_DRILL_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       - name: Install dependencies
