@@ -127,6 +127,44 @@ function execute(
 }
 
 describe("Appwrite notification fanout", () => {
+  it("BDD-SLO-209 overlaps independent authority reads and recipient writes", async () => {
+    const target = setup();
+    let releaseGrant: (() => void) | undefined;
+    let releaseFirstWrite: (() => void) | undefined;
+    const grantGate = new Promise<void>((resolve) => {
+      releaseGrant = resolve;
+    });
+    const writeGate = new Promise<void>((resolve) => {
+      releaseFirstWrite = resolve;
+    });
+    target.getRow.mockImplementationOnce(async () => {
+      await grantGate;
+      return {
+        $id: "feedback_1",
+        feedbackId: "feedback_1",
+        reference: "Y7-NOTIFY-12345678",
+        status: "active",
+      };
+    });
+    target.createRow.mockImplementationOnce(async (input) => {
+      await writeGate;
+      return { $id: input.rowId };
+    });
+
+    const execution = execute(target);
+    await vi.waitFor(() => {
+      expect(target.getRow).toHaveBeenCalledTimes(2);
+      expect(target.listRows).toHaveBeenCalledTimes(2);
+    });
+    releaseGrant?.();
+    await vi.waitFor(() => {
+      expect(target.createRow.mock.calls.length).toBeGreaterThan(1);
+    });
+    releaseFirstWrite?.();
+
+    await expect(execution).resolves.toEqual({ notifications: 3, emailAttempts: 3 });
+  });
+
   it.each([
     { ...schema, databaseId: "bad id" },
     { ...schema, notificationsTableId: "bad id" },

@@ -250,50 +250,54 @@ export async function appendAppwriteNotificationFanout(
     throw new Error("APPWRITE_NOTIFICATION_FANOUT_UNAVAILABLE");
   }
   const feedback = feedbackAuthority(input.feedback);
-  const accessGrant = await tables.getRow({
-    databaseId: schema.databaseId,
-    tableId: schema.accessGrantsTableId,
-    rowId: feedback.id,
-    transactionId: input.transactionId,
-  });
-  const reporter = await tables.getRow({
-    databaseId: schema.databaseId,
-    tableId: schema.reportersTableId,
-    rowId: feedback.reporterId,
-    transactionId: input.transactionId,
-  });
-  const membershipRows = await tables.listRows({
-    databaseId: schema.databaseId,
-    tableId: schema.workspaceMembershipsTableId,
-    queries: [
-      queries.equal("workspaceId", [feedback.workspaceId]),
-      queries.equal("role", ["workspace_owner"]),
-      queries.equal("status", ["active"]),
-      queries.limit(100),
-    ],
-    total: false,
-    ttl: 0,
-    transactionId: input.transactionId,
-  });
-  const ownerIds = owners(listedRows(membershipRows), feedback.workspaceId);
-  let assigned: readonly string[] = [];
-  let removed: readonly string[] = [];
-  if (feedback.assignedMaintainerId !== undefined) {
-    const assignments = await tables.listRows({
+  const [accessGrant, reporter, membershipRows, assignmentRows] = await Promise.all([
+    tables.getRow({
       databaseId: schema.databaseId,
-      tableId: schema.projectAssignmentsTableId,
+      tableId: schema.accessGrantsTableId,
+      rowId: feedback.id,
+      transactionId: input.transactionId,
+    }),
+    tables.getRow({
+      databaseId: schema.databaseId,
+      tableId: schema.reportersTableId,
+      rowId: feedback.reporterId,
+      transactionId: input.transactionId,
+    }),
+    tables.listRows({
+      databaseId: schema.databaseId,
+      tableId: schema.workspaceMembershipsTableId,
       queries: [
         queries.equal("workspaceId", [feedback.workspaceId]),
-        queries.equal("projectId", [feedback.projectId]),
-        queries.equal("userId", [feedback.assignedMaintainerId]),
-        queries.limit(2),
+        queries.equal("role", ["workspace_owner"]),
+        queries.equal("status", ["active"]),
+        queries.limit(100),
       ],
       total: false,
       ttl: 0,
       transactionId: input.transactionId,
-    });
+    }),
+    feedback.assignedMaintainerId === undefined
+      ? Promise.resolve(undefined)
+      : tables.listRows({
+          databaseId: schema.databaseId,
+          tableId: schema.projectAssignmentsTableId,
+          queries: [
+            queries.equal("workspaceId", [feedback.workspaceId]),
+            queries.equal("projectId", [feedback.projectId]),
+            queries.equal("userId", [feedback.assignedMaintainerId]),
+            queries.limit(2),
+          ],
+          total: false,
+          ttl: 0,
+          transactionId: input.transactionId,
+        }),
+  ]);
+  const ownerIds = owners(listedRows(membershipRows), feedback.workspaceId);
+  let assigned: readonly string[] = [];
+  let removed: readonly string[] = [];
+  if (feedback.assignedMaintainerId !== undefined) {
     if (
-      activeAssignment(listedRows(assignments), {
+      activeAssignment(listedRows(assignmentRows), {
         workspaceId: feedback.workspaceId,
         projectId: feedback.projectId,
         maintainerId: feedback.assignedMaintainerId,
@@ -337,85 +341,94 @@ export async function appendAppwriteNotificationFanout(
     },
   });
 
-  let emailAttempts = 0;
-  for (const item of planned) {
-    const notificationId = stableId("not_", item.notificationKey);
-    const notification = await tables.createRow({
-      databaseId: schema.databaseId,
-      tableId: schema.notificationsTableId,
-      rowId: notificationId,
-      data: {
-        eventId: item.fact.eventId,
-        feedbackId: item.fact.feedbackId,
-        workspaceId: feedback.workspaceId,
-        projectId: feedback.projectId,
-        reporterId: feedback.reporterId,
-        recipientKind: item.recipient.kind,
-        recipientId: item.recipient.id,
-        kind: item.fact.kind,
-        reference: item.fact.reference,
-        locale: item.fact.locale,
-        createdAt: item.fact.occurredAt,
-        readAt: null,
-      },
-      permissions: [],
-      transactionId: input.transactionId,
-    });
-    if (!validCreated(notification, notificationId)) {
-      throw new Error("APPWRITE_NOTIFICATION_FANOUT_UNAVAILABLE");
-    }
-    if (item.recipient.kind === "workspace") {
-      const signalId = stableId("nsig_", item.notificationKey);
-      const signal = await tables.createRow({
+  await Promise.all(
+    planned.map(async (item) => {
+      const notificationId = stableId("not_", item.notificationKey);
+      const notification = await tables.createRow({
         databaseId: schema.databaseId,
-        tableId: schema.notificationSignalsTableId,
-        rowId: signalId,
+        tableId: schema.notificationsTableId,
+        rowId: notificationId,
         data: {
+          eventId: item.fact.eventId,
+          feedbackId: item.fact.feedbackId,
+          workspaceId: feedback.workspaceId,
+          projectId: feedback.projectId,
+          reporterId: feedback.reporterId,
+          recipientKind: item.recipient.kind,
           recipientId: item.recipient.id,
-          createdAt: item.fact.occurredAt,
-        },
-        permissions: [permissions.readUser(item.recipient.id)],
-        transactionId: input.transactionId,
-      });
-      if (!validCreated(signal, signalId)) {
-        throw new Error("APPWRITE_NOTIFICATION_FANOUT_UNAVAILABLE");
-      }
-    }
-    if (item.channels.includes("email")) {
-      const outboxId = stableId("nout_", `${item.notificationKey}:email`);
-      const payloadJson = persistence.protector.seal(
-        {
-          environment: persistence.environment,
-          tableId: schema.outboxTableId,
-          rowId: outboxId,
-          field: "payloadJson",
-        },
-        JSON.stringify({
           kind: item.fact.kind,
           reference: item.fact.reference,
           locale: item.fact.locale,
-          recipient: item.recipient,
-        }),
-      );
-      const outbox = await tables.createRow({
-        databaseId: schema.databaseId,
-        tableId: schema.outboxTableId,
-        rowId: outboxId,
-        data: {
-          notificationId,
-          channel: "email",
-          status: "pending",
           createdAt: item.fact.occurredAt,
-          payloadJson,
+          readAt: null,
         },
         permissions: [],
         transactionId: input.transactionId,
       });
-      if (!validCreated(outbox, outboxId)) {
+      if (!validCreated(notification, notificationId)) {
         throw new Error("APPWRITE_NOTIFICATION_FANOUT_UNAVAILABLE");
       }
-      emailAttempts += 1;
-    }
-  }
-  return { notifications: planned.length, emailAttempts };
+      await Promise.all([
+        item.recipient.kind === "workspace"
+          ? (async () => {
+              const signalId = stableId("nsig_", item.notificationKey);
+              const signal = await tables.createRow({
+                databaseId: schema.databaseId,
+                tableId: schema.notificationSignalsTableId,
+                rowId: signalId,
+                data: {
+                  recipientId: item.recipient.id,
+                  createdAt: item.fact.occurredAt,
+                },
+                permissions: [permissions.readUser(item.recipient.id)],
+                transactionId: input.transactionId,
+              });
+              if (!validCreated(signal, signalId)) {
+                throw new Error("APPWRITE_NOTIFICATION_FANOUT_UNAVAILABLE");
+              }
+            })()
+          : Promise.resolve(),
+        item.channels.includes("email")
+          ? (async () => {
+              const outboxId = stableId("nout_", `${item.notificationKey}:email`);
+              const payloadJson = persistence.protector.seal(
+                {
+                  environment: persistence.environment,
+                  tableId: schema.outboxTableId,
+                  rowId: outboxId,
+                  field: "payloadJson",
+                },
+                JSON.stringify({
+                  kind: item.fact.kind,
+                  reference: item.fact.reference,
+                  locale: item.fact.locale,
+                  recipient: item.recipient,
+                }),
+              );
+              const outbox = await tables.createRow({
+                databaseId: schema.databaseId,
+                tableId: schema.outboxTableId,
+                rowId: outboxId,
+                data: {
+                  notificationId,
+                  channel: "email",
+                  status: "pending",
+                  createdAt: item.fact.occurredAt,
+                  payloadJson,
+                },
+                permissions: [],
+                transactionId: input.transactionId,
+              });
+              if (!validCreated(outbox, outboxId)) {
+                throw new Error("APPWRITE_NOTIFICATION_FANOUT_UNAVAILABLE");
+              }
+            })()
+          : Promise.resolve(),
+      ]);
+    }),
+  );
+  return {
+    notifications: planned.length,
+    emailAttempts: planned.filter((item) => item.channels.includes("email")).length,
+  };
 }
