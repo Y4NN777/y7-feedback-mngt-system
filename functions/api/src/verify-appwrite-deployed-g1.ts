@@ -226,7 +226,9 @@ async function main(): Promise<void> {
       headers: { "content-type": "application/json" },
       body: intakeBody(operationId, marker),
     });
-    feedbackCommitMs = performance.now() - feedbackCommitStartedAt;
+    feedbackCommitMs =
+      acceptedResponse?.operationalDurationMs ??
+      performance.now() - feedbackCommitStartedAt;
     const accepted = expectResponse(acceptedResponse, 201);
     if (
       accepted.status !== "accepted" ||

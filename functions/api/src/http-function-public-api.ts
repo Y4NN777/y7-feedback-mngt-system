@@ -130,7 +130,23 @@ async function binaryResponse(response: Response) {
   return {
     statusCode: 200 as const,
     binary: { bytes, displayName, mediaType },
+    ...operationalTiming(response),
   };
+}
+
+export function readOperationalDuration(response: Response): number | undefined {
+  const value = response.headers.get("server-timing");
+  const match = /(?:^|,)\s*app;dur=(\d+(?:\.\d+)?)\s*(?:,|$)/u.exec(value ?? "");
+  if (!match?.[1]) return undefined;
+  const operationalDurationMs = Number(match[1]);
+  return Number.isFinite(operationalDurationMs) ? operationalDurationMs : undefined;
+}
+
+function operationalTiming(response: Response): {
+  readonly operationalDurationMs?: number;
+} {
+  const operationalDurationMs = readOperationalDuration(response);
+  return operationalDurationMs === undefined ? {} : { operationalDurationMs };
 }
 
 export function createHttpFunctionPublicApi({
@@ -163,6 +179,7 @@ export function createHttpFunctionPublicApi({
       return {
         statusCode: response.status,
         body: await responseBody(response),
+        ...operationalTiming(response),
       };
     },
   };
