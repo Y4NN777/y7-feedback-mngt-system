@@ -8,9 +8,10 @@ LOCATION="${AZURE_LOCATION:-centralus}"
 RESOURCE_GROUP="${AZURE_RECOVERY_RESOURCE_GROUP:-rg-y7-feedback-recovery-cus}"
 STORAGE_ACCOUNT="${AZURE_RECOVERY_STORAGE_ACCOUNT:-y7feedbackrec60489914}"
 CONTAINER="${AZURE_RECOVERY_CONTAINER:-recovery}"
-REPOSITORY="${GITHUB_REPOSITORY:-Y4NN777/y7-feedback-mngt-system}"
+OIDC_REPOSITORY_SUBJECT="${GITHUB_OIDC_REPOSITORY_SUBJECT:-Y4NN777@171065166/y7-feedback-mngt-system@1329343404}"
 BACKUP_IDENTITY="id-y7-feedback-recovery-backup"
 RESTORE_IDENTITY="id-y7-feedback-recovery-restore"
+DRILL_IDENTITY="id-y7-feedback-recovery-drill"
 
 ensure_identity() {
   local identity_name="$1"
@@ -116,23 +117,31 @@ az storage account management-policy create \
 
 ensure_identity "$BACKUP_IDENTITY"
 ensure_identity "$RESTORE_IDENTITY"
+ensure_identity "$DRILL_IDENTITY"
 
 BACKUP_CLIENT_ID="$(az identity show --name "$BACKUP_IDENTITY" --resource-group "$RESOURCE_GROUP" --query clientId --output tsv)"
 BACKUP_PRINCIPAL_ID="$(az identity show --name "$BACKUP_IDENTITY" --resource-group "$RESOURCE_GROUP" --query principalId --output tsv)"
 RESTORE_CLIENT_ID="$(az identity show --name "$RESTORE_IDENTITY" --resource-group "$RESOURCE_GROUP" --query clientId --output tsv)"
 RESTORE_PRINCIPAL_ID="$(az identity show --name "$RESTORE_IDENTITY" --resource-group "$RESOURCE_GROUP" --query principalId --output tsv)"
+DRILL_CLIENT_ID="$(az identity show --name "$DRILL_IDENTITY" --resource-group "$RESOURCE_GROUP" --query clientId --output tsv)"
+DRILL_PRINCIPAL_ID="$(az identity show --name "$DRILL_IDENTITY" --resource-group "$RESOURCE_GROUP" --query principalId --output tsv)"
 
 upsert_federated_credential \
   github-main-backup \
   "$BACKUP_IDENTITY" \
-  "repo:${REPOSITORY}:environment:recovery-backup"
+  "repo:${OIDC_REPOSITORY_SUBJECT}:environment:recovery-backup"
 upsert_federated_credential \
   github-isolated-restore \
   "$RESTORE_IDENTITY" \
-  "repo:${REPOSITORY}:environment:recovery-restore"
+  "repo:${OIDC_REPOSITORY_SUBJECT}:environment:recovery-restore"
+upsert_federated_credential \
+  github-isolated-drill \
+  "$DRILL_IDENTITY" \
+  "repo:${OIDC_REPOSITORY_SUBJECT}:environment:recovery-drill"
 
 ensure_role_assignment "$BACKUP_PRINCIPAL_ID" "Storage Blob Data Contributor"
 ensure_role_assignment "$RESTORE_PRINCIPAL_ID" "Storage Blob Data Reader"
+ensure_role_assignment "$DRILL_PRINCIPAL_ID" "Storage Blob Data Contributor"
 
-printf '{"result":"AZURE_RECOVERY_DESTINATION_PROVISIONED","accountUrl":"https://%s.blob.core.windows.net","container":"%s","backupClientId":"%s","restoreClientId":"%s","location":"%s"}\n' \
-  "$STORAGE_ACCOUNT" "$CONTAINER" "$BACKUP_CLIENT_ID" "$RESTORE_CLIENT_ID" "$LOCATION"
+printf '{"result":"AZURE_RECOVERY_DESTINATION_PROVISIONED","accountUrl":"https://%s.blob.core.windows.net","container":"%s","backupClientId":"%s","restoreClientId":"%s","drillClientId":"%s","location":"%s"}\n' \
+  "$STORAGE_ACCOUNT" "$CONTAINER" "$BACKUP_CLIENT_ID" "$RESTORE_CLIENT_ID" "$DRILL_CLIENT_ID" "$LOCATION"

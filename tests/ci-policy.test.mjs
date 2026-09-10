@@ -98,10 +98,10 @@ test("BDD-REC-301 runs the real recovery drill with isolated OIDC authority", as
 
   assert.match(workflow, /workflow_dispatch:/u);
   assert.match(workflow, /permissions:\s+contents: read\s+id-token: write/u);
-  assert.match(workflow, /environment: recovery-restore/u);
+  assert.match(workflow, /environment: recovery-drill/u);
   assert.match(
     workflow,
-    /client-id: \$\{\{ vars\.AZURE_RECOVERY_RESTORE_CLIENT_ID \}\}/u,
+    /client-id: \$\{\{ vars\.AZURE_RECOVERY_DRILL_CLIENT_ID \}\}/u,
   );
   assert.match(
     workflow,
@@ -124,4 +124,14 @@ test("BDD-REC-301 runs the real recovery drill with isolated OIDC authority", as
     rootPackage.scripts["verify:recovery:g5"],
     /node --env-file-if-exists=\.env\.appwrite-preview .* --apply$/u,
   );
+
+  const provision = await readFile(
+    new URL("../scripts/provision-recovery-azure.sh", import.meta.url),
+    "utf8",
+  );
+  assert.match(provision, /id-y7-feedback-recovery-drill/u);
+  assert.match(provision, /github-isolated-drill/u);
+  assert.match(provision, /environment:recovery-drill/u);
+  assert.match(provision, /Storage Blob Data Contributor/u);
+  assert.match(provision, /GITHUB_OIDC_REPOSITORY_SUBJECT/u);
 });
