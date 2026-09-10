@@ -39,4 +39,29 @@ describe("safe operational telemetry", () => {
       }),
     ).toThrow("TELEMETRY_EVENT_INVALID");
   });
+
+  it("BDD-SLO-105 serializes only the safe SLO measurement projection", () => {
+    expect(
+      JSON.parse(
+        serializeOperationalEvent({
+          event: "slo.measurement",
+          metricName: "email_handoff_ms",
+          metricValue: 250,
+          measuredAt: "2026-08-15T12:00:00.000Z",
+          environment: "production",
+          release: "sha-1234567",
+          eligibility: "eligible",
+          recipient: "must-not-survive@example.invalid",
+        }),
+      ),
+    ).toEqual({
+      event: "slo.measurement",
+      environment: "production",
+      release: "sha-1234567",
+      metricName: "email_handoff_ms",
+      metricValue: 250,
+      measuredAt: "2026-08-15T12:00:00.000Z",
+      eligibility: "eligible",
+    });
+  });
 });
