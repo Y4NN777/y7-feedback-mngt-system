@@ -15,6 +15,7 @@ import {
 } from "./recovery-artifact.js";
 import { restoreRecoveryArtifact } from "./recovery-restore.js";
 import { collectRecoveryEntries } from "./recovery-source.js";
+import { recoveryDeletionFixtures } from "./recovery-g5-fixtures.js";
 
 function required(name: string): string {
   const value = process.env[name]?.trim();
@@ -101,10 +102,10 @@ async function main() {
       rowSecurity: false,
       enabled: true,
       columns: [
+        { key: "eventId", type: "string", size: 64, required: true },
         { key: "feedbackId", type: "string", size: 64, required: true },
-        { key: "state", type: "string", size: 32, required: true },
-        { key: "requestedAt", type: "datetime", required: false },
-        { key: "purgedAt", type: "datetime", required: false },
+        { key: "type", type: "string", size: 32, required: true },
+        { key: "occurredAt", type: "datetime", required: true },
       ],
     });
     for (const row of [
@@ -120,28 +121,14 @@ async function main() {
         permissions: [],
       });
     const fixtureAt = new Date().toISOString();
-    await tables.createRow({
-      databaseId: sourceDatabaseId,
-      tableId: deletionTableId,
-      rowId: "event_deleted",
-      data: {
-        feedbackId: "feedback_deleted",
-        state: "soft_deleted",
-        requestedAt: fixtureAt,
-      },
-      permissions: [],
-    });
-    await tables.createRow({
-      databaseId: sourceDatabaseId,
-      tableId: deletionTableId,
-      rowId: "event_purged",
-      data: {
-        feedbackId: "feedback_purged",
-        state: "purged",
-        purgedAt: fixtureAt,
-      },
-      permissions: [],
-    });
+    for (const deletion of recoveryDeletionFixtures(fixtureAt))
+      await tables.createRow({
+        databaseId: sourceDatabaseId,
+        tableId: deletionTableId,
+        rowId: deletion.rowId,
+        data: deletion.data,
+        permissions: [],
+      });
     await storage.createBucket({
       bucketId: sourceBucketId,
       name: `Recovery source ${suffix}`,
