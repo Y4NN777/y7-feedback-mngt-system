@@ -8,7 +8,10 @@ describe("direct Function-domain public API", () => {
       Promise.resolve(
         new Response(JSON.stringify({ status: "accepted" }), {
           status: 201,
-          headers: { "content-type": "application/json" },
+          headers: {
+            "content-type": "application/json",
+            "server-timing": "edge;dur=7, app;dur=12.5",
+          },
         }),
       ),
     );
@@ -24,7 +27,11 @@ describe("direct Function-domain public API", () => {
       body: { clientOperationId: "operation-1" },
     });
 
-    expect(response).toEqual({ statusCode: 201, body: { status: "accepted" } });
+    expect(response).toEqual({
+      statusCode: 201,
+      body: { status: "accepted" },
+      operationalDurationMs: 12.5,
+    });
     expect(fetch).toHaveBeenCalledWith(
       "https://preview.example.test/v1/projects/wisemoney/feedback",
       expect.objectContaining({
@@ -45,7 +52,10 @@ describe("direct Function-domain public API", () => {
       Promise.resolve(
         new Response(JSON.stringify({ status: "ok" }), {
           status: 200,
-          headers: { "content-type": "application/json; charset=utf-8" },
+          headers: {
+            "content-type": "application/json; charset=utf-8",
+            "server-timing": `app;dur=${"9".repeat(1_000)}`,
+          },
         }),
       ),
     );
@@ -54,7 +64,9 @@ describe("direct Function-domain public API", () => {
       fetch,
     });
 
-    await api.handle({ method: "GET", path: "/health", headers: {}, body: undefined });
+    await expect(
+      api.handle({ method: "GET", path: "/health", headers: {}, body: undefined }),
+    ).resolves.toEqual({ statusCode: 200, body: { status: "ok" } });
 
     expect(fetch).toHaveBeenCalledWith(
       "https://preview.example.test/health",

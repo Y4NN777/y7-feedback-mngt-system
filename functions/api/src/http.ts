@@ -543,24 +543,32 @@ export async function routeRequest(
     release: dependencies.release,
   }))
     log(serializeOperationalEvent({ ...measurement }));
+  const responseHeaders = {
+    ...headers,
+    "server-timing": `app;dur=${String(durationMs)}`,
+  } as const;
 
   if (isHealth) {
-    return res.json({ status: "ok" }, statusCode, headers);
+    return res.json({ status: "ok" }, statusCode, responseHeaders);
   }
 
   if (probeResponse) {
-    return res.json(probeResponse.body, probeResponse.statusCode, headers);
+    return res.json(probeResponse.body, probeResponse.statusCode, responseHeaders);
   }
 
   if (maintenanceResponse) {
-    return res.json(maintenanceResponse.body, maintenanceResponse.statusCode, headers);
+    return res.json(
+      maintenanceResponse.body,
+      maintenanceResponse.statusCode,
+      responseHeaders,
+    );
   }
 
   if (providerWebhookResponse) {
     return res.json(
       providerWebhookResponse.body,
       providerWebhookResponse.statusCode,
-      headers,
+      responseHeaders,
     );
   }
 
@@ -568,7 +576,7 @@ export async function routeRequest(
     return res.json(
       providerOutboxResponse.body,
       providerOutboxResponse.statusCode,
-      headers,
+      responseHeaders,
     );
   }
 
@@ -576,19 +584,19 @@ export async function routeRequest(
     return res.json(
       providerIssueOutboxResponse.body,
       providerIssueOutboxResponse.statusCode,
-      headers,
+      responseHeaders,
     );
   }
 
   if (sourceResponse) {
-    return res.json(sourceResponse.body, sourceResponse.statusCode, headers);
+    return res.json(sourceResponse.body, sourceResponse.statusCode, responseHeaders);
   }
 
   if (administrationResponse) {
     return res.json(
       administrationResponse.body,
       administrationResponse.statusCode,
-      headers,
+      responseHeaders,
     );
   }
 
@@ -596,7 +604,7 @@ export async function routeRequest(
     return res.json(
       platformAccessResponse.body,
       platformAccessResponse.statusCode,
-      headers,
+      responseHeaders,
     );
   }
 
@@ -604,19 +612,23 @@ export async function routeRequest(
     return res.json(
       conversationResponse.body,
       conversationResponse.statusCode,
-      headers,
+      responseHeaders,
     );
   }
 
   if (workbenchResponse) {
-    return res.json(workbenchResponse.body, workbenchResponse.statusCode, headers);
+    return res.json(
+      workbenchResponse.body,
+      workbenchResponse.statusCode,
+      responseHeaders,
+    );
   }
 
   if (externalIssueResponse) {
     return res.json(
       externalIssueResponse.body,
       externalIssueResponse.statusCode,
-      headers,
+      responseHeaders,
     );
   }
 
@@ -624,32 +636,32 @@ export async function routeRequest(
     return res.json(
       intelligenceResponse.body,
       intelligenceResponse.statusCode,
-      headers,
+      responseHeaders,
     );
   }
 
   if (privacyResponse) {
-    return res.json(privacyResponse.body, privacyResponse.statusCode, headers);
+    return res.json(privacyResponse.body, privacyResponse.statusCode, responseHeaders);
   }
 
   if (publicResponse) {
     if (publicResponse.binary) {
       if (!res.binary) {
-        return res.json({ error: "ERR-ATTACHMENT-UNAVAILABLE" }, 503, headers);
+        return res.json({ error: "ERR-ATTACHMENT-UNAVAILABLE" }, 503, responseHeaders);
       }
       return res.binary(
         Buffer.from(publicResponse.binary.bytes),
         publicResponse.statusCode,
         {
-          ...headers,
+          ...responseHeaders,
           "content-disposition": `attachment; filename*=UTF-8''${encodeURIComponent(publicResponse.binary.displayName)}`,
           "content-length": String(publicResponse.binary.bytes.byteLength),
           "content-type": publicResponse.binary.mediaType,
         },
       );
     }
-    return res.json(publicResponse.body, publicResponse.statusCode, headers);
+    return res.json(publicResponse.body, publicResponse.statusCode, responseHeaders);
   }
 
-  return res.json({ error: "not_found" }, statusCode, headers);
+  return res.json({ error: "not_found" }, statusCode, responseHeaders);
 }
