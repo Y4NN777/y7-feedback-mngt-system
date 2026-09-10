@@ -110,6 +110,7 @@ async function main(): Promise<void> {
   let accessProof: string | undefined;
   let matrixFailure: unknown;
   let cleanedRows = 0;
+  let feedbackCommitMs = 0;
 
   const findOne = async (
     tableId: string,
@@ -218,15 +219,15 @@ async function main(): Promise<void> {
       throw new Error("APPWRITE_DEPLOYED_G1_VALIDATION_INVALID");
     }
 
-    const accepted = expectResponse(
-      await api.handle({
-        method: "POST",
-        path: "/v1/projects/wisemoney/feedback",
-        headers: { "content-type": "application/json" },
-        body: intakeBody(operationId, marker),
-      }),
-      201,
-    );
+    const feedbackCommitStartedAt = performance.now();
+    const acceptedResponse = await api.handle({
+      method: "POST",
+      path: "/v1/projects/wisemoney/feedback",
+      headers: { "content-type": "application/json" },
+      body: intakeBody(operationId, marker),
+    });
+    feedbackCommitMs = performance.now() - feedbackCommitStartedAt;
+    const accepted = expectResponse(acceptedResponse, 201);
     if (
       accepted.status !== "accepted" ||
       accepted.replayed !== false ||
@@ -435,6 +436,7 @@ async function main(): Promise<void> {
       revoked: true,
       revokedProofDenied: true,
       sensitiveRowsEncrypted: true,
+      feedbackCommitSamplesMs: [Math.round(feedbackCommitMs)],
       cleanedRows,
     })}\n`,
   );

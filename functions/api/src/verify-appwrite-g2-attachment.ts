@@ -163,11 +163,20 @@ async function main(): Promise<void> {
   const attachmentId = `g2a_${suffix}`;
   const objectId = `private/g2_${suffix}`;
   const stagedAt = new Date().toISOString();
+  const attachmentProcessingSamplesMs: number[] = [];
+  const measuredValidation = async (
+    candidate: Parameters<typeof validateAttachment>[0],
+  ) => {
+    const startedAt = performance.now();
+    const result = await validateAttachment(candidate, { malwareScanner });
+    attachmentProcessingSamplesMs.push(Math.round(performance.now() - startedAt));
+    return result;
+  };
   const saga = createAttachmentSaga(privateStorage, metadata, {
     now: () => stagedAt,
     createAttachmentId: () => attachmentId,
     createObjectId: () => objectId,
-    validate: (candidate) => validateAttachment(candidate, { malwareScanner }),
+    validate: measuredValidation,
   });
   const internalAttachmentId = `g2i_${suffix}`;
   const internalObjectId = `private/g2_internal_${suffix}`;
@@ -175,7 +184,7 @@ async function main(): Promise<void> {
     now: () => stagedAt,
     createAttachmentId: () => internalAttachmentId,
     createObjectId: () => internalObjectId,
-    validate: (candidate) => validateAttachment(candidate, { malwareScanner }),
+    validate: measuredValidation,
   });
   const lifecycleState = createNodeAppwriteAttachmentLifecycleStore(tables, {
     databaseId: config.appwriteSchema.databaseId,
@@ -723,7 +732,7 @@ async function main(): Promise<void> {
     },
   );
   process.stdout.write(
-    `${JSON.stringify({ status: "ok", environment: config.environment, ...result, workspaceAuth, sweeper })}\n`,
+    `${JSON.stringify({ status: "ok", environment: config.environment, ...result, workspaceAuth, sweeper, attachmentProcessingSamplesMs })}\n`,
   );
 }
 
