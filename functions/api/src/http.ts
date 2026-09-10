@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { classifyHttpSloMeasurements } from "./http-slo.js";
 import { serializeOperationalEvent } from "./observability.js";
 import type { ConversationLifecycleHttp } from "./conversation-lifecycle-http.js";
 import type { ExternalIssueHttp } from "./external-issue-http.js";
@@ -519,6 +520,8 @@ export async function routeRequest(
         ? "success"
         : "rejected"
       : "not_found";
+  const completedAt = dependencies.now();
+  const durationMs = Math.max(0, completedAt - startedAt);
   log(
     serializeOperationalEvent({
       event: "api.request.completed",
@@ -528,9 +531,20 @@ export async function routeRequest(
       operation,
       outcome,
       statusCode,
-      durationMs: Math.max(0, dependencies.now() - startedAt),
+      durationMs,
     }),
   );
+  for (const measurement of classifyHttpSloMeasurements({
+    method,
+    path: req.path,
+    operation,
+    statusCode,
+    durationMs,
+    measuredAt: new Date(completedAt).toISOString(),
+    environment: dependencies.environment,
+    release: dependencies.release,
+  }))
+    log(serializeOperationalEvent({ ...measurement }));
 
   if (isHealth) {
     return res.json({ status: "ok" }, statusCode, headers);
