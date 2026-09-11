@@ -360,7 +360,9 @@ test("BDD-REL-406 stages, promotes, rolls back and restores Production", async (
   assert.match(workflow, /pnpm provision:appwrite:production/u);
   assert.match(workflow, /pnpm configure:appwrite:function:production/u);
   assert.match(workflow, /pnpm deploy:appwrite:function:production/u);
+  assert.match(workflow, /printf '\\nRELEASE=%s\\n' "\$GITHUB_SHA"/u);
   assert.match(workflow, /vercel@50\.35\.0 deploy --prod --skip-domain/u);
+  assert.match(workflow, /--build-env VITE_RELEASE="\$GITHUB_SHA"/u);
   assert.match(workflow, /vercel@50\.35\.0 promote/u);
   assert.match(workflow, /vercel@50\.35\.0 rollback/u);
   assert.match(workflow, /vercel@50\.35\.0 rollback status/u);
@@ -387,6 +389,13 @@ test("BDD-REL-406 stages, promotes, rolls back and restores Production", async (
   assert.match(workflow, /production-function-rollback\.js restore/u);
   assert.doesNotMatch(workflow, /ROLLBACK_ACTIVE/u);
   assert.doesNotMatch(workflow, /upload-artifact/u);
+
+  const webBuild = await readFile(
+    new URL("../apps/web/vite.config.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(webBuild, /parseWebReleaseIdentity\(process\.env\.VITE_RELEASE\)/u);
+  assert.match(webBuild, /attrs: \{ name: "y7-release", content: release \}/u);
 
   const rootPackage = JSON.parse(
     await readFile(new URL("../package.json", import.meta.url), "utf8"),

@@ -578,7 +578,15 @@ export async function routeRequest(
   } as const;
 
   if (isHealth) {
-    return res.json({ status: "ok" }, statusCode, responseHeaders);
+    return res.json(
+      {
+        status: "ok",
+        environment: dependencies.environment,
+        release: dependencies.release,
+      },
+      statusCode,
+      responseHeaders,
+    );
   }
 
   if (probeResponse) {

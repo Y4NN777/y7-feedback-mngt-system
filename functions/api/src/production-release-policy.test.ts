@@ -38,6 +38,9 @@ function ready(
     functionHealthReady: true,
     scannerHealthReady: true,
     scannerMatrixPassed: true,
+    scannerReleaseMatchesCandidate: true,
+    functionReleaseMatchesCandidate: true,
+    webReleaseMatchesCandidate: true,
     providerBoundariesDenyUnsafeRequests: true,
     webHealthReady: true,
     webHeaders: {
@@ -57,7 +60,7 @@ describe("Production release policy", () => {
   it("BDD-REL-401 accepts only an isolated healthy reversible release", () => {
     expect(assertProductionReleaseReady(ready())).toEqual({
       status: "ready",
-      checks: 24,
+      checks: 27,
     });
   });
 
@@ -117,6 +120,9 @@ describe("Production release policy", () => {
     { functionHealthReady: false },
     { scannerHealthReady: false },
     { scannerMatrixPassed: false },
+    { scannerReleaseMatchesCandidate: false },
+    { functionReleaseMatchesCandidate: false },
+    { webReleaseMatchesCandidate: false },
     { providerBoundariesDenyUnsafeRequests: false },
     { webHealthReady: false },
     { activeDeploymentReady: false },

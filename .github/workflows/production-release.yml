@@ -132,6 +132,7 @@ jobs:
           install -m 600 /dev/null .env.appwrite-production
           printf '%s\n' "$Y7_PRODUCTION_RELEASE_ENV" > .env.appwrite-production
           unset Y7_PRODUCTION_RELEASE_ENV
+          printf '\nRELEASE=%s\n' "$GITHUB_SHA" >> .env.appwrite-production
 
           PRODUCTION_WEB_ORIGIN="$(node --env-file=.env.appwrite-production \
             --print 'process.env.Y7_WEB_ORIGIN || ""')"
@@ -170,6 +171,7 @@ jobs:
           pnpm deploy:appwrite:function:production
 
           pnpm dlx vercel@50.35.0 deploy --prod --skip-domain --yes \
+            --build-env VITE_RELEASE="$GITHUB_SHA" \
             --token "$VERCEL_TOKEN" >.production-web-url
           NEW_WEB_URL="$(tr -d '\r\n' <.production-web-url)"
           case "$NEW_WEB_URL" in
