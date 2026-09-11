@@ -8,6 +8,7 @@
       "enabled": true,
       "logging": true,
       "runtime": "node-22",
+      "runtimeSpecification": "s-1vcpu-1gb",
       "deploymentRetention": 3,
       "execute": ["any"],
       "scopes": [
