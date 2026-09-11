@@ -52,22 +52,33 @@ The current candidate contains these independently revertible outcomes:
 - `83cd969` — mandatory Azure Action Group routing for permanent antivirus
   alerts;
 - `d5f37e8` — scheduled encrypted Production backup with dedicated OIDC
-  environment and corrected repository subject.
+  environment and corrected repository subject;
 - `0f01896` — Production callback/webhook fail-closed smoke;
 - `83a1b59` — exhaustive SMTP/recipient authority tests restoring the API
-  authorization boundary to 100% branch coverage.
+  authorization boundary to 100% branch coverage;
+- `809c42f` — Production authority rotation and rollback runbook;
+- `081c789` — reproducible Azure Production bootstrap with environment-bound
+  OIDC, resource-group-scoped deployment authority and alert routing;
+- `f34788f` — exact Vercel candidate/previous deployment identity checks across
+  promotion, rollback and roll-forward.
 
 Local evidence currently passing:
 
 ```text
-node --test tests/ci-policy.test.mjs
+pnpm install --frozen-lockfile --offline
 pnpm format:check
 pnpm lint
 pnpm typecheck
-pnpm --filter @y7-feedback/config test
-pnpm --filter @y7-feedback/api test   # 1,455 tests
-pnpm --filter @y7-feedback/api test:coverage # 100% statements/branches/functions/lines
+pnpm test
+pnpm test:coverage
+pnpm build
+pnpm security:scan # 267 files, 0 findings
+pnpm --filter @y7-feedback/web exec playwright test --list # 38 scenarios, 2 projects
 ```
+
+The API coverage run contains 1,455 tests and reports 100% statements,
+branches, functions and lines. The Playwright listing proves discovery and
+traceability only; execution remains part of the hosted G5 browser gate.
 
 These results prove code and policy behavior only. They do not prove deployed
 G5 or Production behavior.
