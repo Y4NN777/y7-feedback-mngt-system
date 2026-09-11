@@ -118,13 +118,24 @@ describe("G5 end-to-end traceability matrix", () => {
     expect(commands).toContain("verify:providers:g4:message-sync:github");
     expect(commands).toContain("verify:providers:g4:message-sync:gitlab");
     expect(commands).toContain("verify:slo:g5");
-    expect(commands.every((command) => /^verify:[a-z0-9:-]+$/u.test(command))).toBe(
-      true,
-    );
+    expect(commands).toContain("security:scan");
+    expect(
+      commands.every(
+        (command) =>
+          command === "security:scan" || /^verify:[a-z0-9:-]+$/u.test(command),
+      ),
+    ).toBe(true);
   });
 
   it("rejects an evidence command outside the root verify surface", () => {
     expect(() => parseE2eG5Command("pnpm test && echo unsafe")).toThrow(
+      "E2E_G5_COMMAND_INVALID",
+    );
+  });
+
+  it("accepts only the exact non-verifier security gate", () => {
+    expect(parseE2eG5Command("pnpm security:scan")).toBe("security:scan");
+    expect(() => parseE2eG5Command("pnpm security:scan:unsafe")).toThrow(
       "E2E_G5_COMMAND_INVALID",
     );
   });

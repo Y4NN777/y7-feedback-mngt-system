@@ -370,12 +370,13 @@ export function buildE2eG5Matrix(): readonly E2eG5Scenario[] {
 }
 
 export function parseE2eG5Command(command: string): string {
-  const match = /^pnpm (verify:[a-z0-9:-]+)$/u.exec(command);
+  const match = /^pnpm (verify:[a-z0-9:-]+|security:scan)$/u.exec(command);
   if (!match?.[1]) throw new Error("E2E_G5_COMMAND_INVALID");
   return match[1];
 }
 
 const crossScenarioEvidenceCommands = [
+  "pnpm security:scan",
   "pnpm verify:providers:g4:message-sync:github",
   "pnpm verify:providers:g4:message-sync:gitlab",
   "pnpm verify:slo:g5",
