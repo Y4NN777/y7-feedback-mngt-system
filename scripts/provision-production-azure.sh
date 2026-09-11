@@ -9,12 +9,12 @@ RESOURCE_GROUP="${AZURE_PRODUCTION_RESOURCE_GROUP:-rg-y7-feedback-production-cus
 IDENTITY_NAME="${AZURE_PRODUCTION_IDENTITY_NAME:-id-y7-feedback-production-deploy}"
 ACTION_GROUP_NAME="${AZURE_PRODUCTION_ACTION_GROUP_NAME:-ag-y7-feedback-production}"
 ACTION_GROUP_SHORT_NAME="${AZURE_PRODUCTION_ACTION_GROUP_SHORT_NAME:-y7prod}"
-OIDC_REPOSITORY_SUBJECT="${GITHUB_OIDC_REPOSITORY_SUBJECT:-Y4NN777/y7-feedback-mngt-system}"
+OIDC_REPOSITORY_SUBJECT="${GITHUB_OIDC_REPOSITORY_SUBJECT:-Y4NN777@171065166/y7-feedback-mngt-system@1329343404}"
 ALERT_EMAIL="${AZURE_PRODUCTION_ALERT_EMAIL:-}"
 
 if [[ ! "$SUBSCRIPTION_ID" =~ ^[0-9a-fA-F-]{36}$ ]] ||
   [[ ! "$RESOURCE_GROUP" =~ ^[A-Za-z0-9._()-]{1,90}$ ]] ||
-  [[ ! "$OIDC_REPOSITORY_SUBJECT" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] ||
+  [[ ! "$OIDC_REPOSITORY_SUBJECT" =~ ^[A-Za-z0-9_.-]+@[0-9]+/[A-Za-z0-9_.-]+@[0-9]+$ ]] ||
   [[ ! "$ALERT_EMAIL" =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]]; then
   printf '{"error":"PRODUCTION_AZURE_BOOTSTRAP_CONFIG_INVALID"}\n' >&2
   exit 1
