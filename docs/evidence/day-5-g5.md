@@ -67,6 +67,9 @@ The current candidate contains these independently revertible outcomes:
   scanner readiness without retaining or printing the receiver.
 - `c4558a6` — dedicated protected Preview SLO workflow reusing the existing
   ephemeral G5 evidence authority with only `contents: read` permission.
+- `50b3566`, `dd55b50` — fail-closed release cleanup restores the exact
+  previous Vercel deployment and ready Appwrite Function deployment whenever
+  promotion or any subsequent Production verifier fails.
 
 Local evidence currently passing:
 
@@ -82,7 +85,7 @@ pnpm security:scan # 267 files, 0 findings
 pnpm --filter @y7-feedback/web exec playwright test --list # 38 scenarios, 2 projects
 ```
 
-The API suite contains 1,458 tests; its coverage run reports 100% statements,
+The API suite contains 1,466 tests; its coverage run reports 100% statements,
 branches, functions and lines. The Playwright listing proves discovery and
 traceability only; execution remains part of the hosted G5 browser gate.
 
