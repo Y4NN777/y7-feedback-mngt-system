@@ -30,7 +30,7 @@ the reviewable candidate is merged.
 | `TASK-PLAT-001` | D4.6, FR-OPS-008..014 | `pnpm verify:appwrite:g4:platform-access`; commit chain through `3df866f` in `main` | `DONE` |
 | `G4` | all D4 slices | Both real provider message commands plus retained D4 evidence | `IN_PROGRESS` |
 | `TASK-REC-001` | D5.1, recovery/RPO/RTO/deletion replay | `pnpm verify:recovery:g5`; [`day-5-recovery.md`](day-5-recovery.md) | `DONE` |
-| `TASK-SLO-001` | D5.2, SLO-005..010 | `pnpm verify:slo:g5` in `.github/workflows/g5-evidence.yml` | `IN_PROGRESS` |
+| `TASK-SLO-001` | D5.2, SLO-005..010 | `pnpm verify:slo:g5` in the least-privilege `.github/workflows/slo-g5.yml`, retained by `.github/workflows/g5-evidence.yml` | `IN_PROGRESS` |
 | `TASK-E2E-001` | D5.3, UC-01..12, ERR-001..019 | `pnpm verify:e2e:g5:matrix`, then `pnpm verify:e2e:g5` | `IN_PROGRESS` |
 | `TASK-SEC-001` | D5.4 security/isolation regression | `pnpm security:scan` plus every denial and environment-isolation command in G5 | `IN_PROGRESS` |
 | `TASK-UX-001` | D5.4 accessibility/320 px regression | `pnpm verify:e2e:g5:browser` on desktop and `mobile-320` | `IN_PROGRESS` |
@@ -65,6 +65,8 @@ The current candidate contains these independently revertible outcomes:
   exact protected workflow commit before Azure deployment;
 - `2af346c` — real Azure Monitor Action Group test notification submitted after
   scanner readiness without retaining or printing the receiver.
+- `c4558a6` — dedicated protected Preview SLO workflow reusing the existing
+  ephemeral G5 evidence authority with only `contents: read` permission.
 
 Local evidence currently passing:
 
@@ -80,7 +82,7 @@ pnpm security:scan # 267 files, 0 findings
 pnpm --filter @y7-feedback/web exec playwright test --list # 38 scenarios, 2 projects
 ```
 
-The API coverage run contains 1,455 tests and reports 100% statements,
+The API suite contains 1,458 tests; its coverage run reports 100% statements,
 branches, functions and lines. The Playwright listing proves discovery and
 traceability only; execution remains part of the hosted G5 browser gate.
 
