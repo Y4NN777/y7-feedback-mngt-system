@@ -104,4 +104,30 @@ describe("G5 end-to-end traceability matrix", () => {
       /accessProof|attachmentContent|contact|internalNote|providerToken|workspaceId/iu,
     );
   });
+
+  it("BDD-E2E-205 names every currently automated browser journey and denial oracle", () => {
+    const repositoryRoot = resolve(import.meta.dirname, "../../..");
+    const browserSpecifications = [
+      "apps/web/e2e/root.spec.ts",
+      "apps/web/e2e/offline.spec.ts",
+    ]
+      .map((path) => readFileSync(resolve(repositoryRoot, path), "utf8"))
+      .join("\n");
+
+    for (const id of [
+      "UC-01",
+      "UC-02",
+      "UC-04",
+      "UC-05",
+      "UC-07",
+      "UC-08",
+      "UC-10",
+      "UC-12",
+      "ERR-001",
+      "ERR-007",
+      "ERR-014",
+    ]) {
+      expect(browserSpecifications).toContain(id);
+    }
+  });
 });

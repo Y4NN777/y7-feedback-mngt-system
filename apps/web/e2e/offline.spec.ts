@@ -21,7 +21,7 @@ async function routeProject(page: Page) {
   });
 }
 
-test("BDD-OFF-E2E-001 survives reload and navigation offline without protected caches", async ({
+test("UC-02/ERR-014/BDD-OFF-E2E-001 survives reload and navigation offline without protected caches", async ({
   context,
   page,
 }) => {
@@ -74,7 +74,7 @@ test("BDD-OFF-E2E-001 survives reload and navigation offline without protected c
   await context.setOffline(false);
 });
 
-test("BDD-OFF-E2E-002 reports quota failure without losing in-memory input", async ({
+test("UC-02/ERR-014/BDD-OFF-E2E-002 reports quota failure without losing in-memory input", async ({
   page,
 }) => {
   await page.addInitScript(() => {

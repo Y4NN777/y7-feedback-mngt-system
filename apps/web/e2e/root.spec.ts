@@ -128,7 +128,7 @@ test("BDD-PWA-001 emits a manifest and a public-only service worker", async ({
   expect(serviceWorker).toContain("clientsClaim");
 });
 
-test("BDD-UX-INTAKE-001 reviews a bilingual WiseMoney draft without losing input", async ({
+test("UC-02/BDD-UX-INTAKE-001 reviews a bilingual WiseMoney draft without losing input", async ({
   page,
 }) => {
   await page.goto("/wisemoney");
@@ -171,7 +171,7 @@ test("BDD-UX-INTAKE-001 reviews a bilingual WiseMoney draft without losing input
   await expect(page.getByText(/optional.*follow up/i)).toBeVisible();
 });
 
-test("BDD-PROJ-002 redirects a historical Project slug canonically", async ({
+test("UC-01/BDD-PROJ-002 redirects a historical Project slug canonically", async ({
   page,
 }) => {
   await page.goto("/wisemoney-legacy");
@@ -182,7 +182,7 @@ test("BDD-PROJ-002 redirects a historical Project slug canonically", async ({
   ).toBeVisible();
 });
 
-test("BDD-PROJ-003 keeps unavailable Project routes neutral in FR/EN", async ({
+test("UC-01/ERR-001/BDD-PROJ-003 keeps unavailable Project routes neutral in FR/EN", async ({
   page,
 }) => {
   await page.goto("/unknown-project");
@@ -215,7 +215,7 @@ test("BDD-UX-INTAKE-001 is accessible without overflow at 320 px", async ({ page
   expect(hasHorizontalOverflow).toBe(false);
 });
 
-test("BDD-INT-218 keeps the Intelligence entry screen accessible at 320 px", async ({
+test("UC-10/BDD-INT-218 keeps the Intelligence entry screen accessible at 320 px", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 320, height: 800 });
@@ -238,7 +238,7 @@ test("BDD-INT-218 keeps the Intelligence entry screen accessible at 320 px", asy
   expect(hasHorizontalOverflow).toBe(false);
 });
 
-test("BDD-ACC-UX-001 preserves private retrieval input and fails honestly without an API", async ({
+test("UC-04/BDD-ACC-UX-001 preserves private retrieval input and fails honestly without an API", async ({
   page,
 }) => {
   await page.goto("/retrieve");
@@ -285,7 +285,7 @@ test("BDD-ACC-UX-001 retrieval is accessible without overflow at 320 px", async 
   expect(hasHorizontalOverflow).toBe(false);
 });
 
-test("BDD-SRC-219 source management entry is bilingual and accessible at 320 px", async ({
+test("UC-12/BDD-SRC-219 source management entry is bilingual and accessible at 320 px", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 320, height: 800 });
@@ -312,7 +312,7 @@ test("BDD-SRC-219 source management entry is bilingual and accessible at 320 px"
   ).toBe(false);
 });
 
-test("BDD-CONV-001 Reporter answers without Internal Notes in FR/EN at 320 px", async ({
+test("UC-05/ERR-007/BDD-CONV-001 Reporter answers without Internal Notes in FR/EN at 320 px", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 320, height: 800 });
@@ -433,7 +433,7 @@ test("BDD-CONV-001 Reporter answers without Internal Notes in FR/EN at 320 px", 
   ).toBe(false);
 });
 
-test("BDD-ADMIN-001 administration sign-in preserves input and is accessible at 320 px", async ({
+test("UC-07/BDD-ADMIN-001 administration sign-in preserves input and is accessible at 320 px", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 320, height: 800 });
@@ -462,7 +462,7 @@ test("BDD-ADMIN-001 administration sign-in preserves input and is accessible at 
   ).toBe(false);
 });
 
-test("BDD-WORK-001 Workbench detail is keyboard-complete and accessible at 320 px", async ({
+test("UC-08/BDD-WORK-001 Workbench detail is keyboard-complete and accessible at 320 px", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 320, height: 800 });
