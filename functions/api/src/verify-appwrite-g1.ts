@@ -8,6 +8,7 @@ import { createAccountlessAccessCoordinator } from "./accountless-access.js";
 import { createHttpApplication } from "./application.js";
 import { createNodeAppwriteAccountlessRepository } from "./appwrite-accountless-repository.js";
 import { runAppwriteG1OutboxMatrix } from "./appwrite-g1-outbox-matrix.js";
+import { failCreateForTable } from "./appwrite-operation-failure-injection.js";
 import {
   runAppwriteG1Matrix,
   runAppwriteG1RollbackMatrix,
@@ -87,26 +88,6 @@ function instrument(tables: TablesDB): TablesDB {
             throw error;
           },
         );
-      };
-    },
-  });
-}
-
-function failCreateForTable(tables: TablesDB, tableId: string): TablesDB {
-  return new Proxy(tables, {
-    get(target, property, receiver) {
-      const value: unknown = Reflect.get(target, property, receiver);
-      if (typeof value !== "function") return value;
-      if (property !== "createRow") {
-        return (...args: readonly unknown[]) =>
-          Reflect.apply(value, target, args) as unknown;
-      }
-      return (...args: readonly unknown[]) => {
-        const input = args[0];
-        if (isObject(input) && input.tableId === tableId) {
-          return Promise.reject(new Error("APPWRITE_G1_FORCED_ROW_FAILURE"));
-        }
-        return Reflect.apply(value, target, args) as unknown;
       };
     },
   });

@@ -232,6 +232,7 @@ export function createAppwriteOutboxStore(
   queries: AppwriteOutboxQueryPort,
   sensitive: AppwriteSensitivePersistence,
   candidateGuard: (outboxId: string) => boolean = () => true,
+  candidateQueries: readonly string[] = [],
 ): OutboxDeliveryStore {
   if (!appwriteId.test(schema.databaseId) || !appwriteId.test(schema.outboxTableId)) {
     throw new Error("APPWRITE_OUTBOX_SCHEMA_INVALID");
@@ -285,6 +286,7 @@ export function createAppwriteOutboxStore(
         tableId: schema.outboxTableId,
         queries: [
           queries.equal("status", ["pending", "retryable", "processing"]),
+          ...candidateQueries,
           queries.orderAsc("createdAt"),
           queries.limit(25),
         ],
@@ -400,5 +402,6 @@ export function createNodeAppwriteOutboxStore(
     defaultQueries,
     sensitive,
     allowedOutboxIds === undefined ? () => true : (id) => allowedOutboxIds.has(id),
+    allowedOutboxIds === undefined ? [] : [Query.equal("$id", [...allowedOutboxIds])],
   );
 }
