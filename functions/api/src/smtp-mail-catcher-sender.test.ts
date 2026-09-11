@@ -402,4 +402,76 @@ describe("Production SMTP notification sender", () => {
     ).resolves.toBe("retryable");
     expect(sendMail).not.toHaveBeenCalled();
   });
+
+  it("BDD-MAIL-016 validates Production transport, resolver and payload boundaries", async () => {
+    expect(() =>
+      createSmtpNotificationSender(
+        { sendMail: undefined as never },
+        { from: "no-reply@y7labs.com" },
+        { resolve: vi.fn() },
+      ),
+    ).toThrow("SMTP_NOTIFICATION_CONFIG_INVALID");
+    expect(() =>
+      createSmtpNotificationSender(
+        { sendMail: vi.fn() },
+        { from: "invalid" },
+        { resolve: vi.fn() },
+      ),
+    ).toThrow("SMTP_NOTIFICATION_CONFIG_INVALID");
+    expect(() =>
+      createSmtpNotificationSender(
+        { sendMail: vi.fn() },
+        { from: "no-reply@y7labs.com" },
+        { resolve: undefined as never },
+      ),
+    ).toThrow("SMTP_NOTIFICATION_CONFIG_INVALID");
+
+    const resolve = vi.fn(() => Promise.resolve("person@example.com"));
+    const sender = createSmtpNotificationSender(
+      { sendMail: vi.fn() },
+      { from: "no-reply@y7labs.com" },
+      { resolve },
+    );
+    await expect(
+      sender.deliver({
+        deliveryId: "notification_10",
+        channel: "in_product",
+        payload: null,
+      }),
+    ).resolves.toBe("delivered");
+    await expect(
+      sender.deliver({
+        deliveryId: "bad delivery",
+        channel: "email",
+        payload: null,
+      }),
+    ).resolves.toBe("permanent");
+    expect(resolve).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [Object.assign(new Error("smtp"), { responseCode: 421 }), "retryable"],
+    [Object.assign(new Error("smtp"), { responseCode: 550 }), "permanent"],
+    [Object.assign(new Error("smtp"), { responseCode: "bad" }), "retryable"],
+  ] as const)(
+    "BDD-MAIL-017 maps Production SMTP failure %#",
+    async (failure, result) => {
+      const sender = createSmtpNotificationSender(
+        { sendMail: vi.fn(() => Promise.reject(failure)) },
+        { from: "no-reply@y7labs.com" },
+        { resolve: () => Promise.resolve("person@example.com") },
+      );
+      await expect(
+        sender.deliver({
+          deliveryId: "notification_11",
+          channel: "email",
+          payload: {
+            kind: "feedback_accepted",
+            locale: "fr",
+            reference: "Y7-REF-12345678",
+          },
+        }),
+      ).resolves.toBe(result);
+    },
+  );
 });
