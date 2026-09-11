@@ -1,4 +1,5 @@
 /* v8 ignore file -- this adapter is exercised only against live Production authorities. */
+import { gzipSync } from "node:zlib";
 import { Client, DeploymentStatus, Functions, Query } from "node-appwrite";
 
 import { parseServerConfig } from "@y7-feedback/config/server";
@@ -7,6 +8,8 @@ import {
   appwriteFunctionVariableKeys,
   productionFunctionId,
 } from "./appwrite-function-variables.js";
+import { createClamAvHttpScanner } from "./clamav-http-scanner.js";
+import { parseClamAvHttpScannerConfig } from "./clamav-http-scanner-config.js";
 import { assertProductionReleaseReady } from "./production-release-policy.js";
 
 function required(name: string): string {
@@ -132,6 +135,13 @@ async function main(): Promise<void> {
     healthy(new URL("/", webOrigin)),
     healthy(new URL("/index.html", webOrigin)),
   ]);
+  const scanner = createClamAvHttpScanner(parseClamAvHttpScannerConfig(process.env));
+  const [cleanVerdict, infectedVerdict] = await Promise.all([
+    scanner.scan(new TextEncoder().encode("Y7 production scanner clean probe")),
+    scanner.scan(
+      gzipSync("X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"),
+    ),
+  ]);
   const cacheControl = webHeaders?.headers.get("cache-control") ?? "";
   const result = assertProductionReleaseReady({
     productionProjectId: config.appwriteProjectId,
@@ -151,6 +161,7 @@ async function main(): Promise<void> {
     nonSecretFunctionVariables,
     functionHealthReady: functionHealth !== undefined,
     scannerHealthReady: scannerHealth !== undefined,
+    scannerMatrixPassed: cleanVerdict === "clean" && infectedVerdict === "infected",
     webHealthReady: webHealth !== undefined,
     webHeaders: {
       contentSecurityPolicy: Boolean(
