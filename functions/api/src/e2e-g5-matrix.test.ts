@@ -119,13 +119,17 @@ describe("G5 end-to-end traceability matrix", () => {
       "UC-02",
       "UC-04",
       "UC-05",
+      "UC-06",
       "UC-07",
       "UC-08",
+      "UC-09",
       "UC-10",
+      "UC-11",
       "UC-12",
       "ERR-001",
       "ERR-007",
       "ERR-014",
+      "ERR-019",
     ]) {
       expect(browserSpecifications).toContain(id);
     }
