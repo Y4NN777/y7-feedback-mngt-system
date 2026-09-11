@@ -3,7 +3,12 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { buildE2eG5Index, buildE2eG5Matrix } from "./e2e-g5-matrix";
+import {
+  buildE2eG5Commands,
+  buildE2eG5Index,
+  buildE2eG5Matrix,
+  parseE2eG5Command,
+} from "./e2e-g5-matrix";
 
 const expectedScenarioIds = [
   ...Array.from(
@@ -102,6 +107,24 @@ describe("G5 end-to-end traceability matrix", () => {
     });
     expect(JSON.stringify(index)).not.toMatch(
       /accessProof|attachmentContent|contact|internalNote|providerToken|workspaceId/iu,
+    );
+  });
+
+  it("BDD-E2E-206 produces one safe executable command for every evidence family", () => {
+    const commands = buildE2eG5Commands();
+    expect(commands.length).toBeGreaterThan(10);
+    expect(new Set(commands).size).toBe(commands.length);
+    expect(commands).toContain("verify:e2e:g5:browser");
+    expect(commands).toContain("verify:recovery:g5");
+    expect(commands).toContain("verify:providers:g4:reconciliation");
+    expect(commands.every((command) => /^verify:[a-z0-9:-]+$/u.test(command))).toBe(
+      true,
+    );
+  });
+
+  it("rejects an evidence command outside the root verify surface", () => {
+    expect(() => parseE2eG5Command("pnpm test && echo unsafe")).toThrow(
+      "E2E_G5_COMMAND_INVALID",
     );
   });
 

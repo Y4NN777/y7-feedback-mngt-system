@@ -171,7 +171,7 @@ test("UC-02/BDD-UX-INTAKE-001 reviews a bilingual WiseMoney draft without losing
   await expect(page.getByText(/optional.*follow up/i)).toBeVisible();
 });
 
-test("UC-03/ERR-005/BDD-ATT-UC03-011 stages validated evidence and finalizes one acceptance", async ({
+test("UC-03/ERR-009/BDD-ATT-UC03-011 stages validated evidence and finalizes one acceptance", async ({
   page,
 }) => {
   const stagedBodies: Buffer[] = [];

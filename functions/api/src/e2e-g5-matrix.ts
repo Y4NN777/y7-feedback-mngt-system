@@ -369,6 +369,18 @@ export function buildE2eG5Matrix(): readonly E2eG5Scenario[] {
   return [...useCases, ...errors];
 }
 
+export function parseE2eG5Command(command: string): string {
+  const match = /^pnpm (verify:[a-z0-9:-]+)$/u.exec(command);
+  if (!match?.[1]) throw new Error("E2E_G5_COMMAND_INVALID");
+  return match[1];
+}
+
+export function buildE2eG5Commands(): readonly string[] {
+  return [...new Set(buildE2eG5Matrix().map(({ evidenceCommand }) => evidenceCommand))]
+    .map(parseE2eG5Command)
+    .sort();
+}
+
 export function buildE2eG5Index() {
   const matrix = buildE2eG5Matrix();
   return {
@@ -377,9 +389,7 @@ export function buildE2eG5Index() {
     useCaseCount: matrix.filter(({ id }) => id.startsWith("UC-")).length,
     errorCount: matrix.filter(({ id }) => id.startsWith("ERR-")).length,
     environments: [...new Set(matrix.map(({ environment }) => environment))].sort(),
-    evidenceCommands: [
-      ...new Set(matrix.map(({ evidenceCommand }) => evidenceCommand)),
-    ].sort(),
+    evidenceCommands: buildE2eG5Commands().map((command) => `pnpm ${command}`),
     scenarios: matrix.map(({ id, requirementIds, environment }) => ({
       id,
       requirementIds,
