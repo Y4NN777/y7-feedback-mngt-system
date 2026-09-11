@@ -482,13 +482,12 @@ describe("trusted public Function boundary", () => {
     ).resolves.toMatchObject({ statusCode: 201 });
 
     expect(verify).toHaveBeenCalledWith("attachment-1", "encrypted-token");
-    expect(accept).toHaveBeenCalledWith(
-      expect.objectContaining({
-        clientOperationId: body.clientOperationId,
-        attachmentGrants: [expect.objectContaining({ attachmentId: "attachment-1" })],
-        draft: expect.objectContaining({ attachmentNames: ["evidence.txt"] }),
-      }),
+    expect(accept).toHaveBeenCalledOnce();
+    expect(accept.mock.calls[0]?.[0].clientOperationId).toBe(body.clientOperationId);
+    expect(accept.mock.calls[0]?.[0].attachmentGrants?.[0]?.attachmentId).toBe(
+      "attachment-1",
     );
+    expect(accept.mock.calls[0]?.[0].draft.attachmentNames).toEqual(["evidence.txt"]);
   });
 
   it("BDD-ATT-UC03-010 rejects invalid or cross-scope staging tokens before intake", async () => {
