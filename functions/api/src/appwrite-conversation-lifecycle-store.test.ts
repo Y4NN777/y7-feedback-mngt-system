@@ -599,6 +599,26 @@ describe("Appwrite conversation and lifecycle transaction", () => {
     });
   });
 
+  it("BDD-CONV-FAIL-002 rolls back when Appwrite rejects the batched write set", async () => {
+    const tables = new FakeTables() as FakeTables & {
+      createOperations: NonNullable<
+        AppwriteConversationLifecycleTablesPort["createOperations"]
+      >;
+    };
+    tables.createOperations = vi.fn().mockResolvedValue({
+      $id: "transaction_1",
+      operations: 1,
+    });
+
+    await expect(
+      store(tables).execute({ ...common, command: messageCommand }),
+    ).rejects.toEqual(new AppwriteConversationLifecycleError("ERR-CONV-RETRYABLE"));
+    expect(tables.transactions.at(-1)).toEqual({
+      transactionId: "transaction_1",
+      rollback: true,
+    });
+  });
+
   it("rolls back the source transaction when durable notification fanout cannot be staged", async () => {
     const tables = new FakeTables();
     const append = vi.fn().mockRejectedValue(new Error("forced fanout failure"));
@@ -845,6 +865,13 @@ describe("Appwrite conversation and lifecycle transaction", () => {
   });
 
   it("adapts every Node Appwrite operation and the official query encoder", async () => {
+    const createOperations = vi.fn(
+      (input: { readonly operations: readonly Readonly<Record<string, unknown>>[] }) =>
+        Promise.resolve({
+          $id: "transaction_1",
+          operations: input.operations.length,
+        }),
+    );
     const tables = {
       createTransaction: vi.fn().mockResolvedValue({ $id: "transaction_1" }),
       getRow: vi.fn().mockResolvedValue(project),
@@ -855,6 +882,7 @@ describe("Appwrite conversation and lifecycle transaction", () => {
       updateRow: vi.fn((input: { readonly rowId: string }) =>
         Promise.resolve({ $id: input.rowId }),
       ),
+      createOperations,
       updateTransaction: vi.fn().mockResolvedValue({ $id: "transaction_1" }),
     };
     const nodeStore = createNodeAppwriteConversationLifecycleStore(
@@ -869,7 +897,18 @@ describe("Appwrite conversation and lifecycle transaction", () => {
     expect(tables.createTransaction).toHaveBeenCalledWith({ ttl: 60 });
     expect(tables.getRow).toHaveBeenCalledTimes(1);
     expect(tables.listRows).toHaveBeenCalledTimes(1);
-    expect(tables.createRow).toHaveBeenCalledTimes(2);
+    expect(tables.createRow).not.toHaveBeenCalled();
+    expect(createOperations.mock.calls[0]?.[0].operations).toEqual([
+      expect.objectContaining({
+        action: "create",
+        tableId: "conversation_messages",
+        rowId: "message_1",
+      }),
+      expect.objectContaining({
+        action: "create",
+        tableId: "conversation_idempotency",
+      }),
+    ]);
     expect(tables.updateTransaction).toHaveBeenCalledWith({
       transactionId: "transaction_1",
       commit: true,
@@ -891,7 +930,23 @@ describe("Appwrite conversation and lifecycle transaction", () => {
         },
       }),
     ).resolves.toMatchObject({ state: "under_review", version: 2 });
-    expect(tables.updateRow).toHaveBeenCalledTimes(1);
+    expect(tables.updateRow).not.toHaveBeenCalled();
+    expect(createOperations.mock.calls[1]?.[0].operations).toEqual([
+      expect.objectContaining({
+        action: "update",
+        tableId: "feedback_items",
+        rowId: "feedback_1",
+      }),
+      expect.objectContaining({
+        action: "create",
+        tableId: "conversation_lifecycle",
+        rowId: "event_2",
+      }),
+      expect.objectContaining({
+        action: "create",
+        tableId: "conversation_idempotency",
+      }),
+    ]);
     expect(tables.listRows).toHaveBeenCalledTimes(3);
   });
 });
