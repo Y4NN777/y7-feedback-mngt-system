@@ -325,6 +325,10 @@ test("BDD-REL-426 exposes and verifies the immutable scanner release identity", 
   assert.match(gateway, /JSON\.stringify\(\{ status: "ok", release \}\)/u);
   assert.match(verifier, /assertProductionScannerRelease/u);
   assert.match(verifier, /required\("GITHUB_SHA"\)/u);
+  assert.match(
+    verifier,
+    /webHeaders === undefined \? "" : await webHeaders\.text\(\)/u,
+  );
 });
 
 test("BDD-REL-304 bootstraps Production Azure with environment OIDC", async () => {

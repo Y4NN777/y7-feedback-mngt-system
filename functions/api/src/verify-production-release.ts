@@ -203,7 +203,7 @@ async function main(): Promise<void> {
     candidateRelease,
   );
   const webReleaseMatchesCandidate = assertProductionWebRelease(
-    webHealth === undefined ? "" : await webHealth.text(),
+    webHeaders === undefined ? "" : await webHeaders.text(),
     candidateRelease,
   );
   const providerBoundariesDenyUnsafeRequests = (
