@@ -171,6 +171,83 @@ test("UC-02/BDD-UX-INTAKE-001 reviews a bilingual WiseMoney draft without losing
   await expect(page.getByText(/optional.*follow up/i)).toBeVisible();
 });
 
+test("UC-03/ERR-005/BDD-ATT-UC03-011 stages validated evidence and finalizes one acceptance", async ({
+  page,
+}) => {
+  const stagedBodies: Buffer[] = [];
+  const finalBodies: unknown[] = [];
+  await page.route(
+    "http://127.0.0.1:8787/v1/projects/wisemoney/feedback/attachments/stage",
+    async (route) => {
+      stagedBodies.push(route.request().postDataBuffer() ?? Buffer.alloc(0));
+      expect(route.request().headers()["content-type"]).toContain("text/plain");
+      expect(route.request().headers()["x-y7-file-name"]).toBe("cHJldXZlLcOpLnR4dA");
+      await route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: JSON.stringify({
+          status: "staged",
+          attachmentId: "attachment-1",
+          token: "opaque-staging-token",
+          displayName: "preuve-é.txt",
+        }),
+      });
+    },
+  );
+  await page.route(
+    "http://127.0.0.1:8787/v1/projects/wisemoney/feedback",
+    async (route) => {
+      finalBodies.push(route.request().postDataJSON() as unknown);
+      await route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: JSON.stringify({
+          status: "accepted",
+          reference: "Y7-2026-UC03",
+          accessProof: "proof_attachment_abcdefghijklmnopqrstuvwxyz_0123456789",
+          replayed: false,
+        }),
+      });
+    },
+  );
+
+  await page.goto("/wisemoney");
+  await page
+    .getByRole("textbox", { name: "Quel problème avez-vous rencontré ?" })
+    .fill("Le justificatif démontre le défaut.");
+  await page.getByLabel("Pièces jointes", { exact: true }).setInputFiles({
+    name: "preuve-é.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("evidence"),
+  });
+  await page.getByRole("button", { name: "English" }).click();
+  await page.getByRole("button", { name: "Review feedback" }).click();
+  await expect(page.getByText("preuve-é.txt")).toBeVisible();
+  await page.getByRole("button", { name: "Send feedback" }).click();
+
+  await expect(page.getByRole("heading", { name: "Feedback sent" })).toBeVisible();
+  expect(stagedBodies.map((bytes) => bytes.toString("utf8"))).toEqual(["evidence"]);
+  expect(finalBodies).toHaveLength(1);
+  expect(finalBodies[0]).toMatchObject({
+    attachments: [{ attachmentId: "attachment-1", token: "opaque-staging-token" }],
+    feedback: { attachmentNames: [] },
+  });
+
+  const accessibility = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa"])
+    .analyze();
+  expect(
+    accessibility.violations.filter(
+      ({ impact }) => impact === "serious" || impact === "critical",
+    ),
+  ).toEqual([]);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+    ),
+  ).toBe(false);
+});
+
 test("UC-01/BDD-PROJ-002 redirects a historical Project slug canonically", async ({
   page,
 }) => {
