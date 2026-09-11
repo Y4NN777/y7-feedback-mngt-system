@@ -67,9 +67,12 @@ The current candidate contains these independently revertible outcomes:
   scanner readiness without retaining or printing the receiver.
 - `c4558a6` — dedicated protected Preview SLO workflow reusing the existing
   ephemeral G5 evidence authority with only `contents: read` permission.
+- `e55b93c` — exact Preview candidate deployment before the protected SLO load.
 - `50b3566`, `dd55b50` — fail-closed release cleanup restores the exact
   previous Vercel deployment and ready Appwrite Function deployment whenever
   promotion or any subsequent Production verifier fails.
+- `63e2369` — curated session evidence rejects literal personal email while raw
+  Codex snapshots remain outside the scan and Git history.
 
 Local evidence currently passing:
 
@@ -81,7 +84,7 @@ pnpm typecheck
 pnpm test
 pnpm test:coverage
 pnpm build
-pnpm security:scan # 267 files, 0 findings
+pnpm security:scan # 279 files, 0 findings
 pnpm --filter @y7-feedback/web exec playwright test --list # 38 scenarios, 2 projects
 ```
 
