@@ -8,6 +8,34 @@ export interface AppwriteFunctionTarget {
   readonly name: "Y7 Feedback API Preview" | "Y7 Feedback API Production";
 }
 
+export interface AppwriteFunctionDeploymentAuthority {
+  readonly endpoint: string;
+  readonly projectId: string;
+  readonly apiKey: string;
+  readonly environment: "preview" | "production";
+}
+
+export function resolveAppwriteFunctionDeploymentAuthority(
+  input: Readonly<Record<string, string | undefined>>,
+): AppwriteFunctionDeploymentAuthority {
+  const endpoint = input.APPWRITE_ENDPOINT?.trim();
+  const projectId = input.APPWRITE_PROJECT_ID?.trim();
+  const apiKey = input.APPWRITE_API_KEY?.trim();
+  const environment = input.Y7_ENVIRONMENT?.trim();
+  if (
+    endpoint === undefined ||
+    endpoint === "" ||
+    projectId === undefined ||
+    projectId === "" ||
+    apiKey === undefined ||
+    apiKey === "" ||
+    (environment !== "preview" && environment !== "production")
+  ) {
+    throw new Error("APPWRITE_FUNCTION_DEPLOYMENT_AUTHORITY_MISSING");
+  }
+  return { endpoint, projectId, apiKey, environment };
+}
+
 export function resolveAppwriteFunctionTarget(
   environment: string | undefined,
 ): AppwriteFunctionTarget {
