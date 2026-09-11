@@ -70,10 +70,15 @@ export type OutboxRunResult =
       readonly attempt: number;
     };
 
-function validToken(value: string, error = "OUTBOX_WORKER_CONFIG_INVALID"): string {
+function validWorkerId(value: string): string {
   if (!/^[A-Za-z0-9][A-Za-z0-9_-]{7,63}$/u.test(value)) {
-    throw new Error(error);
+    throw new Error("OUTBOX_WORKER_CONFIG_INVALID");
   }
+  return value;
+}
+
+function validLeaseToken(value: string, error: string): string {
+  if (!/^[A-Za-z0-9_-]{8,64}$/u.test(value)) throw new Error(error);
   return value;
 }
 
@@ -85,7 +90,7 @@ function iso(date: Date): string {
 export function createOutboxWorker(dependencies: OutboxWorkerDependencies): {
   readonly runOnce: () => Promise<OutboxRunResult>;
 } {
-  const workerId = validToken(dependencies.workerId);
+  const workerId = validWorkerId(dependencies.workerId);
   if (
     !Number.isSafeInteger(dependencies.leaseDurationMs) ||
     dependencies.leaseDurationMs < 1_000 ||
@@ -102,7 +107,10 @@ export function createOutboxWorker(dependencies: OutboxWorkerDependencies): {
       const leaseUntil = iso(
         new Date(startedAt.getTime() + dependencies.leaseDurationMs),
       );
-      const leaseToken = validToken(dependencies.createLeaseToken());
+      const leaseToken = validLeaseToken(
+        dependencies.createLeaseToken(),
+        "OUTBOX_WORKER_CONFIG_INVALID",
+      );
       let claim: ClaimedOutboxDelivery | null;
       try {
         claim = await dependencies.store.claim({
@@ -115,7 +123,7 @@ export function createOutboxWorker(dependencies: OutboxWorkerDependencies): {
         throw new Error("OUTBOX_CLAIM_UNAVAILABLE", { cause: error });
       }
       if (!claim) return { status: "idle" };
-      validToken(claim.leaseToken, "OUTBOX_CLAIM_INVALID");
+      validLeaseToken(claim.leaseToken, "OUTBOX_CLAIM_INVALID");
       if (
         !Number.isSafeInteger(claim.attempt) ||
         claim.attempt < 1 ||

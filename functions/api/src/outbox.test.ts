@@ -85,6 +85,22 @@ describe("durable outbox worker", () => {
     expect(context.dependencies.sender.deliver).not.toHaveBeenCalled();
   });
 
+  it("BDD-OUTBOX-007 accepts every valid Base64URL lease-token prefix", async () => {
+    for (const leaseToken of ["-lease_token_123", "_lease_token_123"]) {
+      const context = setup("delivered", null);
+
+      await expect(
+        createOutboxWorker({
+          ...context.dependencies,
+          createLeaseToken: () => leaseToken,
+        }).runOnce(),
+      ).resolves.toEqual({ status: "idle" });
+      expect(context.store.claim).toHaveBeenCalledWith(
+        expect.objectContaining({ leaseToken }),
+      );
+    }
+  });
+
   it("BDD-OUTBOX-003 schedules retryable failure and lost response", async () => {
     for (const lostResponse of [false, true]) {
       const context = setup("retryable");
