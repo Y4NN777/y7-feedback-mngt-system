@@ -77,6 +77,9 @@ The current candidate contains these independently revertible outcomes:
   then proves it remains absent across Function rollback and roll-forward.
 - `98bdfeb` — scheduled Production backup rejects mismatched environment labels,
   missing Preview comparison authority and shared Preview/Production projects.
+- `99826f6` — protected Production release proves one real non-sensitive SMTP
+  handoff plus retryable and terminal transport classification without exposing
+  or installing the verification recipient in the Function.
 
 Local evidence currently passing:
 
