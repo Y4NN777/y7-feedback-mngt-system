@@ -10,6 +10,7 @@ import { createNodeAppwriteProviderConsentCleanup } from "./appwrite-provider-co
 import { createNodeAppwriteProviderMessageFanout } from "./appwrite-provider-message-fanout.js";
 import { createGitHubMessageProvider } from "./github-message-provider.js";
 import { createGitLabMessageProvider } from "./gitlab-message-provider.js";
+import { resolveProviderMessageSyncEvidenceTarget } from "./provider-message-sync-evidence-target.js";
 import { createSensitiveDataProtector } from "./sensitive-data-protector.js";
 import type { ProviderGrantVault } from "./source-provider.js";
 
@@ -201,9 +202,14 @@ async function main(): Promise<void> {
   const providers: readonly Provider[] =
     providerSelection === "all" ? ["github", "gitlab"] : [providerSelection];
   const config = parseServerConfig(process.env);
-  const domain = process.env.Y7_FUNCTION_DOMAIN_URL?.trim();
-  if (config.environment !== "preview" || !domain)
-    throw new Error("MESSAGE_SYNC_VERIFY_CONFIG_INVALID");
+  const evidenceTarget = resolveProviderMessageSyncEvidenceTarget({
+    arguments: process.argv,
+    configuredEnvironment: config.environment,
+    functionDomain: process.env.Y7_FUNCTION_DOMAIN_URL,
+    functionId: process.env.APPWRITE_FUNCTION_ID,
+  });
+  const evidenceEnvironment = evidenceTarget.environment;
+  const domain = evidenceTarget.functionDomain;
   const suffix = randomBytes(5).toString("hex");
   const client = new Client()
     .setEndpoint(config.appwriteEndpoint)
@@ -300,9 +306,10 @@ async function main(): Promise<void> {
       }
     }
   }
-  const functionId =
-    process.env.APPWRITE_FUNCTION_ID?.trim() || "y7-feedback-api-preview";
+  const functionId = evidenceTarget.functionId;
   let triggerSecret = config.providerOutboxTriggerSecret;
+  if (!triggerSecret && evidenceEnvironment === "production")
+    throw new Error("MESSAGE_SYNC_VERIFY_CONFIG_INVALID");
   if (!triggerSecret) {
     triggerSecret = randomBytes(32).toString("base64url");
     const definition = await functions.get({ functionId });
@@ -350,7 +357,7 @@ async function main(): Promise<void> {
       material: Buffer.from(material, "base64url"),
     })),
   );
-  const persistence = { environment: "preview" as const, protector };
+  const persistence = { environment: evidenceEnvironment, protector };
   const created: Array<readonly [string, string]> = [];
   const create = async (
     tableId: string,
@@ -445,7 +452,7 @@ async function main(): Promise<void> {
       created.push([config.appwriteSchema.providerGrantsTableId, current.grantId]);
       const webhookCredentialEnvelope = protector.seal(
         {
-          environment: "preview",
+          environment: evidenceEnvironment,
           tableId: config.appwriteSchema.providerGrantsTableId,
           rowId: current.grantId,
           field: "webhookCredentialEnvelope",
@@ -500,7 +507,7 @@ async function main(): Promise<void> {
             headers: { "content-type": "application/json" },
             body: JSON.stringify({
               title: `Y7 message sync proof ${suffix}`,
-              body: "Temporary Preview verification issue.",
+              body: `Temporary ${evidenceEnvironment} verification issue.`,
             }),
           },
         ).then((response) => json(response, "MESSAGE_SYNC_ISSUE_CREATE_FAILED"));
@@ -521,7 +528,7 @@ async function main(): Promise<void> {
             headers: { "content-type": "application/json" },
             body: JSON.stringify({
               title: `Y7 message sync proof ${suffix}`,
-              description: "Temporary Preview verification issue.",
+              description: `Temporary ${evidenceEnvironment} verification issue.`,
             }),
           },
         ).then((response) => json(response, "MESSAGE_SYNC_ISSUE_CREATE_FAILED"));
@@ -1026,7 +1033,7 @@ async function main(): Promise<void> {
     }
   }
   process.stdout.write(
-    `${JSON.stringify({ result: "PROVIDER_MESSAGE_SYNC_REAL_MATRIX_PASSED", providers: outcomes })}\n`,
+    `${JSON.stringify({ result: "PROVIDER_MESSAGE_SYNC_REAL_MATRIX_PASSED", environment: evidenceEnvironment, providers: outcomes })}\n`,
   );
 }
 
