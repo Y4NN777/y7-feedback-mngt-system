@@ -13,6 +13,7 @@ describe("scheduled provider maintenance", () => {
       inbox: { runOnce: inbox },
       outbox: { runOnce: outbox },
       messages: { runOnce: () => Promise.resolve({ status: "delivered" }) },
+      notifications: { runOnce: () => Promise.resolve({ status: "delivered" }) },
       messageReconciliation: {
         runOnce: () => Promise.resolve({ status: "reconciled" }),
       },
@@ -25,6 +26,7 @@ describe("scheduled provider maintenance", () => {
       inbox: "processed",
       outbox: "delivered",
       messages: "delivered",
+      notifications: "delivered",
       messageReconciliation: "reconciled",
       webhooks: "reconciled",
       privacy: "idle",

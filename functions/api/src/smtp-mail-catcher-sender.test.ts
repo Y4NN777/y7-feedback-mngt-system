@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import nodemailer from "nodemailer";
 
-import { createSmtpMailCatcherSender } from "./smtp-mail-catcher-sender";
+import {
+  createSmtpMailCatcherSender,
+  createSmtpNotificationSender,
+} from "./smtp-mail-catcher-sender";
 import {
   createNodeSmtpMailCatcherSender,
   mailCatcherConfigFromEnvironment,
@@ -315,5 +318,88 @@ describe("Preview SMTP mail catcher environment", () => {
     });
     expect(sender).toBeDefined();
     createTransport.mockRestore();
+  });
+});
+
+describe("Production SMTP notification sender", () => {
+  it("BDD-MAIL-006 resolves the authoritative recipient only at delivery time", async () => {
+    const sendMail = vi.fn(() => Promise.resolve());
+    const resolve = vi.fn(() => Promise.resolve("reporter@example.com"));
+    const sender = createSmtpNotificationSender(
+      { sendMail },
+      { from: "Y7 Feedback <no-reply@y7labs.com>" },
+      { resolve },
+    );
+
+    await expect(
+      sender.deliver({
+        deliveryId: "notification_7",
+        channel: "email",
+        payload: {
+          kind: "feedback_accepted",
+          locale: "en",
+          reference: "Y7-REF-12345678",
+        },
+      }),
+    ).resolves.toBe("delivered");
+
+    expect(resolve).toHaveBeenCalledWith("notification_7");
+    expect(sendMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        envelope: {
+          from: "no-reply@y7labs.com",
+          to: "reporter@example.com",
+        },
+        to: "reporter@example.com",
+      }),
+    );
+  });
+
+  it.each([
+    [null, "permanent"],
+    ["not-an-email", "permanent"],
+  ] as const)(
+    "BDD-MAIL-007 denies an unusable recipient %#",
+    async (recipient, outcome) => {
+      const sendMail = vi.fn();
+      const sender = createSmtpNotificationSender(
+        { sendMail },
+        { from: "no-reply@y7labs.com" },
+        { resolve: () => Promise.resolve(recipient) },
+      );
+      await expect(
+        sender.deliver({
+          deliveryId: "notification_8",
+          channel: "email",
+          payload: {
+            kind: "feedback_accepted",
+            locale: "fr",
+            reference: "Y7-REF-12345678",
+          },
+        }),
+      ).resolves.toBe(outcome);
+      expect(sendMail).not.toHaveBeenCalled();
+    },
+  );
+
+  it("BDD-MAIL-008 retries recipient authority failures without leaking it", async () => {
+    const sendMail = vi.fn();
+    const sender = createSmtpNotificationSender(
+      { sendMail },
+      { from: "no-reply@y7labs.com" },
+      { resolve: () => Promise.reject(new Error("private@example.com")) },
+    );
+    await expect(
+      sender.deliver({
+        deliveryId: "notification_9",
+        channel: "email",
+        payload: {
+          kind: "feedback_accepted",
+          locale: "fr",
+          reference: "Y7-REF-12345678",
+        },
+      }),
+    ).resolves.toBe("retryable");
+    expect(sendMail).not.toHaveBeenCalled();
   });
 });

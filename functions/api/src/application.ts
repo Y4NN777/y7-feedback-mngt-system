@@ -11,6 +11,8 @@ import { createAttachmentStagingTokenCodec } from "./attachment-staging-token.js
 import { validateAttachment } from "./attachment-validation.js";
 import { createClamAvHttpScanner } from "./clamav-http-scanner.js";
 import { createNodeAppwriteIntakeStore } from "./appwrite-intake-store.js";
+import { createNodeAppwriteOutboxStore } from "./appwrite-outbox-store.js";
+import { createNodeAppwriteNotificationRecipientResolver } from "./appwrite-notification-recipient-resolver.js";
 import { createNodeAppwriteIntelligenceStore } from "./appwrite-intelligence-store.js";
 import { createNodeAppwriteIntelligenceProvenanceStore } from "./appwrite-intelligence-provenance-store.js";
 import { createNodeAppwritePrivacyStore } from "./appwrite-privacy-store.js";
@@ -121,6 +123,8 @@ import { createGitHubMessageProvider } from "./github-message-provider.js";
 import { createGitLabMessageProvider } from "./gitlab-message-provider.js";
 import { createNodeAppwriteProviderMessageReconciliationReader } from "./appwrite-provider-message-reconciliation-reader.js";
 import { createProviderMessageReconciliation } from "./provider-message-reconciliation.js";
+import { createOutboxWorker, type OutboxSafeEvent } from "./outbox.js";
+import { createNodeSmtpNotificationSender } from "./smtp-notification-node.js";
 
 export function digestExternalIssueCommand(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(value)).digest("base64url");
@@ -157,6 +161,7 @@ export interface ApplicationRuntime {
     readonly status: number;
   }) => void;
   readonly principalVerifier?: AppwritePrincipalVerifier;
+  readonly notificationDiagnostic?: (event: OutboxSafeEvent) => void;
 }
 
 export function deriveReporterActorId(reference: string): string {
@@ -1005,6 +1010,40 @@ export function createHttpApplication(
         `privacy_purge_${createHash("sha256").update(deletionId).digest("hex").slice(0, 24)}`,
     },
   );
+  const notificationOutboxWorker =
+    config.notificationEmail && runtime.users
+      ? createOutboxWorker({
+          store: createNodeAppwriteOutboxStore(
+            runtime.tables,
+            {
+              databaseId: config.appwriteSchema.databaseId,
+              outboxTableId: config.appwriteSchema.outboxTableId,
+            },
+            sensitive,
+          ),
+          sender: createNodeSmtpNotificationSender(
+            config.notificationEmail,
+            createNodeAppwriteNotificationRecipientResolver(
+              runtime.tables,
+              runtime.users,
+              {
+                databaseId: config.appwriteSchema.databaseId,
+                notificationsTableId: config.appwriteSchema.notificationsTableId,
+                reportersTableId: config.appwriteSchema.reportersTableId,
+                feedbackTableId: config.appwriteSchema.feedbackTableId,
+              },
+              sensitive,
+            ),
+          ),
+          workerId: `${config.environment}-notification-worker`,
+          createLeaseToken: () => randomBytes(24).toString("base64url"),
+          now: () => new Date(runtime.nowIso()),
+          leaseDurationMs: 60_000,
+          retryDelayMs: (attempt) => 2 ** attempt * 1_000,
+          maximumAttempts: 5,
+          log: (event) => runtime.notificationDiagnostic?.(event),
+        })
+      : undefined;
   const providerMaintenance = (() => {
     if (
       config.providers &&
@@ -1074,6 +1113,9 @@ export function createHttpApplication(
         inbox: providerEventInboxWorker,
         outbox: providerIssueOutboxWorker,
         messages: providerMessageOutboxWorker,
+        ...(notificationOutboxWorker === undefined
+          ? {}
+          : { notifications: notificationOutboxWorker }),
         messageReconciliation: createProviderMessageReconciliation({
           reader: createNodeAppwriteProviderMessageReconciliationReader(
             runtime.tables,
@@ -1118,6 +1160,9 @@ export function createHttpApplication(
     }
     return createProviderMaintenance({
       privacy: privacyPurgeWorker,
+      ...(notificationOutboxWorker === undefined
+        ? {}
+        : { notifications: notificationOutboxWorker }),
       ...(platformExpiry === undefined ? {} : { platform: platformExpiry }),
     });
   })();

@@ -49,6 +49,53 @@ const validServer = {
 };
 
 describe("trusted environment contract", () => {
+  it("BDD-MAIL-013 parses an all-or-nothing SMTP delivery authority", () => {
+    const mail = {
+      Y7_EMAIL_SMTP_HOST: "smtp.example.com",
+      Y7_EMAIL_SMTP_PORT: "465",
+      Y7_EMAIL_SMTP_SECURE: "true",
+      Y7_EMAIL_SMTP_USER: "production-user",
+      Y7_EMAIL_SMTP_PASSWORD: "production-password",
+      Y7_EMAIL_FROM: "Y7 Feedback <no-reply@y7labs.com>",
+    } as const;
+    expect(parseServerConfig({ ...validServer, ...mail }).notificationEmail).toEqual({
+      host: "smtp.example.com",
+      port: 465,
+      secure: true,
+      user: "production-user",
+      password: "production-password",
+      from: "Y7 Feedback <no-reply@y7labs.com>",
+    });
+    expect(() =>
+      parseServerConfig({
+        ...validServer,
+        ...mail,
+        Y7_EMAIL_SMTP_PASSWORD: "",
+      }),
+    ).toThrow(new ConfigError("NOTIFICATION_EMAIL_CONFIG_INVALID"));
+  });
+
+  it.each([
+    { Y7_EMAIL_SMTP_HOST: "bad host" },
+    { Y7_EMAIL_SMTP_PORT: "0" },
+    { Y7_EMAIL_SMTP_PORT: "65536" },
+    { Y7_EMAIL_SMTP_SECURE: "maybe" },
+    { Y7_EMAIL_FROM: "not-an-address" },
+  ])("BDD-MAIL-014 rejects malformed SMTP authority %#", (override) => {
+    expect(() =>
+      parseServerConfig({
+        ...validServer,
+        Y7_EMAIL_SMTP_HOST: "smtp.example.com",
+        Y7_EMAIL_SMTP_PORT: "587",
+        Y7_EMAIL_SMTP_SECURE: "false",
+        Y7_EMAIL_SMTP_USER: "user",
+        Y7_EMAIL_SMTP_PASSWORD: "password",
+        Y7_EMAIL_FROM: "no-reply@y7labs.com",
+        ...override,
+      }),
+    ).toThrow(new ConfigError("NOTIFICATION_EMAIL_CONFIG_INVALID"));
+  });
+
   it("BDD-ATT-UC03-009 parses an all-or-nothing server-only antivirus authority", () => {
     expect(
       parseServerConfig({

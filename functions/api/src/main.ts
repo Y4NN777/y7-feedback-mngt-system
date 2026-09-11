@@ -34,6 +34,9 @@ export default function handler(context: FunctionContext): Promise<unknown> {
     providerDiagnostic: (event) => {
       context.log(JSON.stringify({ event: "source_provider", ...event }));
     },
+    notificationDiagnostic: (event) => {
+      context.log(JSON.stringify(event));
+    },
   });
   return routeRequest(context, dependencies);
 }

@@ -17,9 +17,19 @@ export interface SmtpMailCatcherConfig {
   readonly to: string;
 }
 
+export interface SmtpNotificationConfig {
+  readonly from: string;
+}
+
+export interface NotificationRecipientResolver {
+  readonly resolve: (deliveryId: string) => Promise<string | null>;
+}
+
 const deliveryId = /^[A-Za-z0-9][A-Za-z0-9._-]{0,35}$/u;
 const reference = /^Y7-[A-Z0-9][A-Z0-9-]{6,78}[A-Z0-9]$/u;
 const testAddress = /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9.-]+[.]test$/u;
+const emailAddress =
+  /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?[.][A-Za-z]{2,63}$/u;
 const recipientKinds = new Set(["reporter", "workspace"]);
 
 type MailKind = NotificationEventKind | "feedback_accepted";
@@ -88,6 +98,14 @@ function address(value: string): string {
   const match = /(?:^|<)([^<>\s]+@[^<>\s]+)(?:>|$)/u.exec(value);
   if (!match?.[1] || !testAddress.test(match[1])) {
     throw new Error("MAIL_CATCHER_CONFIG_INVALID");
+  }
+  return match[1];
+}
+
+function productionAddress(value: string): string {
+  const match = /(?:^|<)([^<>\s]+@[^<>\s]+)(?:>|$)/u.exec(value);
+  if (!match?.[1] || !emailAddress.test(match[1])) {
+    throw new Error("SMTP_NOTIFICATION_CONFIG_INVALID");
   }
   return match[1];
 }
@@ -177,6 +195,60 @@ export function createSmtpMailCatcherSender(
             ? `${template.text} Référence : ${parsed.reference}`
             : `${template.text} Reference: ${parsed.reference}`,
           to: config.to,
+        });
+        return "delivered";
+      } catch (error: unknown) {
+        const code = responseCode(error);
+        return code !== undefined && code >= 500 ? "permanent" : "retryable";
+      }
+    },
+  };
+}
+
+export function createSmtpNotificationSender(
+  transport: SmtpMailCatcherTransport,
+  config: SmtpNotificationConfig,
+  recipients: NotificationRecipientResolver,
+): OutboxDeliverySender {
+  const envelopeFrom = productionAddress(config.from);
+  if (
+    typeof transport.sendMail !== "function" ||
+    typeof recipients.resolve !== "function"
+  ) {
+    throw new Error("SMTP_NOTIFICATION_CONFIG_INVALID");
+  }
+
+  return {
+    async deliver(input) {
+      if (input.channel === "in_product") return "delivered";
+      const parsed = message(input.payload);
+      if (!deliveryId.test(input.deliveryId) || !parsed) return "permanent";
+
+      let to: string | null;
+      try {
+        to = await recipients.resolve(input.deliveryId);
+      } catch {
+        return "retryable";
+      }
+      if (to === null) return "permanent";
+      try {
+        productionAddress(to);
+      } catch {
+        return "permanent";
+      }
+
+      const template = templates[parsed.kind][parsed.locale];
+      try {
+        await transport.sendMail({
+          envelope: { from: envelopeFrom, to },
+          from: config.from,
+          headers: { "X-Y7-Delivery-ID": input.deliveryId },
+          subject: template.subject,
+          text:
+            parsed.locale === "fr"
+              ? `${template.text} Référence : ${parsed.reference}`
+              : `${template.text} Reference: ${parsed.reference}`,
+          to,
         });
         return "delivered";
       } catch (error: unknown) {

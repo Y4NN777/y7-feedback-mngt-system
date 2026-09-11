@@ -650,6 +650,35 @@ describe("Appwrite notification fanout", () => {
     });
   });
 
+  it("BDD-MAIL-015 does not enqueue email for a contact that is not an address", async () => {
+    const target = setup();
+    target.getRow.mockImplementation((input) =>
+      input.tableId === "reporters"
+        ? Promise.resolve({
+            $id: "reporter_1",
+            workspaceId: "workspace_1",
+            attributionJson: protector.seal(
+              {
+                environment: "preview",
+                tableId: "reporters",
+                rowId: "reporter_1",
+                field: "attributionJson",
+              },
+              JSON.stringify({
+                kind: "contact",
+                value: "telephone-only",
+                purpose: "reply",
+              }),
+            ),
+          })
+        : setup().getRow(input),
+    );
+    await expect(execute(target, { audience: "reporter" })).resolves.toEqual({
+      notifications: 1,
+      emailAttempts: 0,
+    });
+  });
+
   it("fails when an email outbox row is not persisted", async () => {
     const target = setup();
     target.createRow

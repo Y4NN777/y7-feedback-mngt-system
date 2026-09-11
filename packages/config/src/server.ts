@@ -21,6 +21,14 @@ export interface ServerConfig {
     readonly timeoutMs: number;
   };
   readonly providerOutboxTriggerSecret?: string;
+  readonly notificationEmail?: {
+    readonly host: string;
+    readonly port: number;
+    readonly secure: boolean;
+    readonly user: string;
+    readonly password: string;
+    readonly from: string;
+  };
   readonly platformAccess?: {
     readonly operatorTeamId: string;
     readonly ownerTeamId: string;
@@ -412,6 +420,47 @@ function parseProviders(
   };
 }
 
+function parseNotificationEmail(
+  input: Readonly<Record<string, string | undefined>>,
+): ServerConfig["notificationEmail"] {
+  const keys = [
+    "Y7_EMAIL_SMTP_HOST",
+    "Y7_EMAIL_SMTP_PORT",
+    "Y7_EMAIL_SMTP_SECURE",
+    "Y7_EMAIL_SMTP_USER",
+    "Y7_EMAIL_SMTP_PASSWORD",
+    "Y7_EMAIL_FROM",
+  ] as const;
+  const values = keys.map((key) => input[key]?.trim() ?? "");
+  if (values.every((value) => value === "")) return undefined;
+  if (values.some((value) => value === "")) {
+    throw new ConfigError("NOTIFICATION_EMAIL_CONFIG_INVALID");
+  }
+  const [host, portValue, secureValue, user, password, from] = values as [
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+  ];
+  const port = Number(portValue);
+  if (
+    !/^[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$/u.test(host) ||
+    !Number.isSafeInteger(port) ||
+    port < 1 ||
+    port > 65_535 ||
+    (secureValue !== "true" && secureValue !== "false") ||
+    user.length > 1_024 ||
+    password.length > 1_024 ||
+    from.length > 320 ||
+    !/(?:^|<)[^<>\s]+@[^<>\s]+(?:>|$)/u.test(from)
+  ) {
+    throw new ConfigError("NOTIFICATION_EMAIL_CONFIG_INVALID");
+  }
+  return { host, port, secure: secureValue === "true", user, password, from };
+}
+
 export function parseServerConfig(
   input: Readonly<Record<string, string | undefined>>,
 ): ServerConfig {
@@ -439,6 +488,7 @@ export function parseServerConfig(
     ],
   );
   const providers = parseProviders(input);
+  const notificationEmail = parseNotificationEmail(input);
   const providerOutboxTriggerSecret = parseOptionalTriggerSecret(
     input.PROVIDER_OUTBOX_TRIGGER_SECRET,
   );
@@ -455,6 +505,7 @@ export function parseServerConfig(
     ...(providerOutboxTriggerSecret === undefined
       ? {}
       : { providerOutboxTriggerSecret }),
+    ...(notificationEmail === undefined ? {} : { notificationEmail }),
     ...(platformAccess === undefined ? {} : { platformAccess }),
     appwriteSchema: parseAppwriteSchema(input),
     accessProofEnvelopeKey,

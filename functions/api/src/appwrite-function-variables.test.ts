@@ -95,6 +95,12 @@ describe("Appwrite Function variable policy", () => {
         "GITLAB_OAUTH_CLIENT_SECRET",
         "GITLAB_OAUTH_CALLBACK_URL",
         "GITLAB_OAUTH_ORIGIN",
+        "Y7_EMAIL_SMTP_HOST",
+        "Y7_EMAIL_SMTP_PORT",
+        "Y7_EMAIL_SMTP_SECURE",
+        "Y7_EMAIL_SMTP_USER",
+        "Y7_EMAIL_SMTP_PASSWORD",
+        "Y7_EMAIL_FROM",
       ]),
     );
   });
