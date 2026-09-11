@@ -6,6 +6,7 @@ on:
 permissions:
   contents: read
   id-token: write
+  packages: write
 
 concurrency:
   group: production-antivirus
@@ -32,6 +33,19 @@ jobs:
           client-id: ${{ vars.AZURE_PRODUCTION_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Publish the immutable scanner gateway
+        shell: bash
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+        run: |
+          set -Eeuo pipefail
+          set +x
+          IMAGE="ghcr.io/y4nn777/y7-feedback-antivirus:sha-$GITHUB_SHA"
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io \
+            --username "$GITHUB_ACTOR" --password-stdin >/dev/null
+          unset GHCR_TOKEN
+          docker build --file services/antivirus/Dockerfile --tag "$IMAGE" .
+          docker push "$IMAGE"
       - name: Deploy immutable monitored scanner
         shell: bash
         run: |

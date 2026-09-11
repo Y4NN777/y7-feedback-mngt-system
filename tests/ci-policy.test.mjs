@@ -242,6 +242,7 @@ test("BDD-REL-302 deploys the Production scanner only through protected OIDC", a
 
   assert.match(workflow, /workflow_dispatch:/u);
   assert.match(workflow, /permissions:\s+contents: read\s+id-token: write/u);
+  assert.match(workflow, /packages: write/u);
   assert.match(workflow, /environment: production/u);
   assert.match(workflow, /cancel-in-progress: false/u);
   assert.match(workflow, /AZURE_PRODUCTION_CLIENT_ID/u);
@@ -250,6 +251,8 @@ test("BDD-REL-302 deploys the Production scanner only through protected OIDC", a
   assert.match(workflow, /az resource show --ids "\$AZURE_ACTION_GROUP_ID"/u);
   assert.match(workflow, /infra\/azure\/production-antivirus\.bicep/u);
   assert.match(workflow, /ghcr\.io\/y4nn777\/y7-feedback-antivirus:sha-\$GITHUB_SHA/u);
+  assert.match(workflow, /docker build --file services\/antivirus\/Dockerfile/u);
+  assert.match(workflow, /docker push "\$IMAGE"/u);
   assert.match(workflow, /az deployment group create/u);
   assert.match(workflow, /curl --fail --silent --show-error/u);
   assert.doesNotMatch(workflow, /AZURE_(?:CLIENT_)?SECRET/u);
