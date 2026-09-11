@@ -10,7 +10,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: recovery-backup-${{ vars.Y7_RECOVERY_SOURCE_ENVIRONMENT }}
+  group: production-recovery-backup
   cancel-in-progress: false
 
 jobs:
@@ -18,16 +18,16 @@ jobs:
     name: Export and publish complete recovery set
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    environment: recovery-backup
+    environment: production-recovery-backup
     env:
-      Y7_ENVIRONMENT: ${{ vars.Y7_RECOVERY_SOURCE_ENVIRONMENT }}
-      APPWRITE_ENDPOINT: ${{ vars.Y7_RECOVERY_APPWRITE_ENDPOINT }}
-      APPWRITE_PROJECT_ID: ${{ vars.Y7_RECOVERY_APPWRITE_PROJECT_ID }}
-      APPWRITE_DATABASE_ID: ${{ vars.Y7_RECOVERY_APPWRITE_DATABASE_ID }}
-      APPWRITE_ATTACHMENT_BUCKET_ID: ${{ vars.Y7_RECOVERY_APPWRITE_BUCKET_ID }}
-      APPWRITE_FUNCTION_ID: ${{ vars.Y7_RECOVERY_APPWRITE_FUNCTION_ID }}
-      APPWRITE_DELETION_RECORDS_TABLE_ID: ${{ vars.Y7_RECOVERY_DELETION_TABLE_ID }}
-      APPWRITE_API_KEY: ${{ secrets.Y7_RECOVERY_APPWRITE_API_KEY }}
+      Y7_ENVIRONMENT: production
+      APPWRITE_ENDPOINT: ${{ vars.Y7_PRODUCTION_APPWRITE_ENDPOINT }}
+      APPWRITE_PROJECT_ID: ${{ vars.Y7_PRODUCTION_APPWRITE_PROJECT_ID }}
+      APPWRITE_DATABASE_ID: ${{ vars.Y7_PRODUCTION_APPWRITE_DATABASE_ID }}
+      APPWRITE_ATTACHMENT_BUCKET_ID: ${{ vars.Y7_PRODUCTION_APPWRITE_BUCKET_ID }}
+      APPWRITE_FUNCTION_ID: ${{ vars.Y7_PRODUCTION_APPWRITE_FUNCTION_ID }}
+      APPWRITE_DELETION_RECORDS_TABLE_ID: ${{ vars.Y7_PRODUCTION_DELETION_TABLE_ID }}
+      APPWRITE_API_KEY: ${{ secrets.Y7_PRODUCTION_RECOVERY_APPWRITE_API_KEY }}
       RECOVERY_ENCRYPTION_KEY_ID: ${{ vars.Y7_RECOVERY_ENCRYPTION_KEY_ID }}
       RECOVERY_ENCRYPTION_KEY: ${{ secrets.Y7_RECOVERY_ENCRYPTION_KEY }}
       RECOVERY_SIGNING_KEY_ID: ${{ vars.Y7_RECOVERY_SIGNING_KEY_ID }}

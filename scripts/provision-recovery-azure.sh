@@ -8,7 +8,7 @@ LOCATION="${AZURE_LOCATION:-centralus}"
 RESOURCE_GROUP="${AZURE_RECOVERY_RESOURCE_GROUP:-rg-y7-feedback-recovery-cus}"
 STORAGE_ACCOUNT="${AZURE_RECOVERY_STORAGE_ACCOUNT:-y7feedbackrec60489914}"
 CONTAINER="${AZURE_RECOVERY_CONTAINER:-recovery}"
-OIDC_REPOSITORY_SUBJECT="${GITHUB_OIDC_REPOSITORY_SUBJECT:-Y4NN777@171065166/y7-feedback-mngt-system@1329343404}"
+OIDC_REPOSITORY_SUBJECT="${GITHUB_OIDC_REPOSITORY_SUBJECT:-Y4NN777/y7-feedback-mngt-system}"
 BACKUP_IDENTITY="id-y7-feedback-recovery-backup"
 RESTORE_IDENTITY="id-y7-feedback-recovery-restore"
 DRILL_IDENTITY="id-y7-feedback-recovery-drill"
@@ -129,7 +129,7 @@ DRILL_PRINCIPAL_ID="$(az identity show --name "$DRILL_IDENTITY" --resource-group
 upsert_federated_credential \
   github-main-backup \
   "$BACKUP_IDENTITY" \
-  "repo:${OIDC_REPOSITORY_SUBJECT}:environment:recovery-backup"
+  "repo:${OIDC_REPOSITORY_SUBJECT}:environment:production-recovery-backup"
 upsert_federated_credential \
   github-isolated-restore \
   "$RESTORE_IDENTITY" \
