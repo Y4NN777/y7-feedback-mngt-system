@@ -52,6 +52,7 @@
     "verify:antivirus:local": "pnpm --filter @y7-feedback/antivirus build && node scripts/antivirus-smoke.mjs",
     "verify:mail-catcher": "pnpm --filter @y7-feedback/api build && pnpm --filter @y7-feedback/api verify:mail-catcher",
     "verify:mail:g3": "pnpm --filter @y7-feedback/api build && pnpm --filter @y7-feedback/api verify:mail-catcher",
+    "verify:mail:production": "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build && node --env-file=.env.appwrite-production functions/api/dist/verify-production-smtp.js --apply --production",
     "verify:slo:g5": "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build && node --env-file-if-exists=.env.appwrite-preview functions/api/dist/verify-slo-g5.js --apply",
     "verify:release:production": "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build && node --env-file-if-exists=.env.appwrite-production functions/api/dist/verify-production-release.js --apply --rehearse-rollback",
     "security:scan": "node scripts/security-scan.mjs",

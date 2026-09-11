@@ -205,6 +205,7 @@ jobs:
             "$PRODUCTION_WEB_ORIGIN/" >/dev/null
 
           pnpm verify:release:production
+          pnpm verify:mail:production
           pnpm verify:providers:production:github
           RESTORE_PREVIOUS_ON_FAILURE=0
           echo '{"result":"PRODUCTION_RELEASE_AND_ROLLBACK_PASSED"}'

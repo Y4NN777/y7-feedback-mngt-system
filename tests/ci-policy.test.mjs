@@ -347,6 +347,7 @@ test("BDD-REL-406 stages, promotes, rolls back and restores Production", async (
   assert.match(workflow, /NEW_WEB_DEPLOYMENT_ID/u);
   assert.match(workflow, /PRODUCTION_WEB_ROUTING_MISMATCH/u);
   assert.match(workflow, /pnpm verify:release:production/u);
+  assert.match(workflow, /pnpm verify:mail:production/u);
   assert.match(workflow, /pnpm verify:providers:production:github/u);
   assert.match(workflow, /PRODUCTION_GITHUB_EVIDENCE_AUTHORITY_MISSING/u);
   assert.match(workflow, /trap cleanup EXIT/u);
@@ -362,6 +363,14 @@ test("BDD-REL-406 stages, promotes, rolls back and restores Production", async (
   assert.match(workflow, /production-function-rollback\.js restore/u);
   assert.doesNotMatch(workflow, /ROLLBACK_ACTIVE/u);
   assert.doesNotMatch(workflow, /upload-artifact/u);
+
+  const rootPackage = JSON.parse(
+    await readFile(new URL("../package.json", import.meta.url), "utf8"),
+  );
+  assert.match(
+    rootPackage.scripts["verify:mail:production"],
+    /verify-production-smtp\.js --apply --production$/u,
+  );
 
   const actionReferences = [...workflow.matchAll(/^\s+(?:- )?uses: ([^\s#]+)/gmu)].map(
     (match) => match[1],

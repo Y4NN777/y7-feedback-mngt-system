@@ -17,7 +17,7 @@ the reviewable candidate is merged.
 | `TASK-ADMIN-001` | D3.1, FR-OPS-001..010 | `pnpm verify:appwrite:g3:admin`; Day 3 G3 index | `DONE` |
 | `TASK-CONV-001`, `TASK-LIFE-001` | D3.2, FR-CONV-*, FR-LIFE-* | `pnpm verify:appwrite:g3:conversation-lifecycle`; Day 3 G3 index | `DONE` |
 | `TASK-WORK-001` | D3.3, FR-OPS-003..007 | `pnpm verify:appwrite:g3:workbench`; Day 3 G3 index | `DONE` |
-| `TASK-NOT-001`, `TASK-NOT-002` | D3.4, FR-NOT-* | `pnpm verify:appwrite:g3:notifications`, `pnpm verify:mail:g3`; Day 3 G3 index | `DONE` for G3; Production SMTP is a `TASK-REL-001` dependency |
+| `TASK-NOT-001`, `TASK-NOT-002` | D3.4, FR-NOT-* | `pnpm verify:appwrite:g3:notifications`, `pnpm verify:mail:g3`; Day 3 G3 index | `DONE` for G3; `pnpm verify:mail:production` remains a `TASK-REL-001` execution dependency |
 | `TASK-SRC-002`, `TASK-ISSUE-001` | D3.5–D3.6, FR-SRC-*, FR-SYNC-* | `pnpm verify:providers:g3:sources`, `pnpm verify:providers:g3:issue-link`; Day 3 G3 index | `DONE` |
 | `G3` | all D3 slices | `pnpm verify:appwrite:g3:composed`; [`day-3-g3.md`](day-3-g3.md) | `DONE` |
 | `TASK-D4-000` | D4.0 additive migration | `pnpm verify:appwrite:d4:migration`; Day 4 index | `DONE` |
@@ -88,11 +88,11 @@ pnpm typecheck
 pnpm test
 pnpm test:coverage
 pnpm build
-pnpm security:scan # 281 files, 0 findings
+pnpm security:scan # 283 files, 0 findings
 pnpm --filter @y7-feedback/web exec playwright test --list # 38 scenarios, 2 projects
 ```
 
-The API suite contains 1,490 tests; its coverage run reports 100% statements,
+The API suite contains 1,495 tests; its coverage run reports 100% statements,
 branches, functions and lines. The Playwright listing proves discovery and
 traceability only; execution remains part of the hosted G5 browser gate.
 
