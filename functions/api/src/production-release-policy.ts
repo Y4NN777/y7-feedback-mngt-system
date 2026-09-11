@@ -19,6 +19,9 @@ export interface ProductionReleaseSnapshot {
   readonly functionHealthReady: boolean;
   readonly scannerHealthReady: boolean;
   readonly scannerMatrixPassed: boolean;
+  readonly scannerReleaseMatchesCandidate: boolean;
+  readonly functionReleaseMatchesCandidate: boolean;
+  readonly webReleaseMatchesCandidate: boolean;
   readonly providerBoundariesDenyUnsafeRequests: boolean;
   readonly webHealthReady: boolean;
   readonly webHeaders: {
@@ -52,7 +55,7 @@ function sameSet(left: readonly string[], right: readonly string[]): boolean {
 
 export function assertProductionReleaseReady(snapshot: ProductionReleaseSnapshot): {
   readonly status: "ready";
-  readonly checks: 24;
+  readonly checks: 27;
 } {
   if (
     snapshot.productionProjectId === snapshot.previewProjectId ||
@@ -86,6 +89,9 @@ export function assertProductionReleaseReady(snapshot: ProductionReleaseSnapshot
     !snapshot.functionHealthReady ||
     !snapshot.scannerHealthReady ||
     !snapshot.scannerMatrixPassed ||
+    !snapshot.scannerReleaseMatchesCandidate ||
+    !snapshot.functionReleaseMatchesCandidate ||
+    !snapshot.webReleaseMatchesCandidate ||
     !snapshot.providerBoundariesDenyUnsafeRequests ||
     !snapshot.webHealthReady ||
     !snapshot.webHeaders.contentSecurityPolicy ||
@@ -98,5 +104,5 @@ export function assertProductionReleaseReady(snapshot: ProductionReleaseSnapshot
   ) {
     throw new Error("PRODUCTION_RELEASE_READINESS_FAILED");
   }
-  return { status: "ready", checks: 24 };
+  return { status: "ready", checks: 27 };
 }

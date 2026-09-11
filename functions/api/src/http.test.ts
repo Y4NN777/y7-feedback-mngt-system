@@ -220,7 +220,7 @@ describe("trusted API entrypoint", () => {
 
     expect(json).toHaveBeenCalledOnce();
     expect(json).toHaveBeenCalledWith(
-      { status: "ok" },
+      { status: "ok", environment: "preview", release: "commit-123" },
       200,
       expect.objectContaining({
         "cache-control": "no-store",

@@ -2,8 +2,25 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 import { VitePWA } from "vite-plugin-pwa";
 
+import { parseWebReleaseIdentity } from "./src/releaseIdentity.ts";
+
+const release = parseWebReleaseIdentity(process.env.VITE_RELEASE);
+
 export default defineConfig({
   plugins: [
+    {
+      name: "y7-release-identity",
+      transformIndexHtml: {
+        order: "pre",
+        handler: () => [
+          {
+            tag: "meta",
+            attrs: { name: "y7-release", content: release },
+            injectTo: "head",
+          },
+        ],
+      },
+    },
     react(),
     VitePWA({
       registerType: "prompt",

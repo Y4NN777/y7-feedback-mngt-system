@@ -13,6 +13,10 @@ import { createClamAvHttpScanner } from "./clamav-http-scanner.js";
 import { parseClamAvHttpScannerConfig } from "./clamav-http-scanner-config.js";
 import { proveProductionDeletionContinuity } from "./production-deletion-continuity.js";
 import { assertProductionReleaseReady } from "./production-release-policy.js";
+import {
+  assertProductionFunctionRelease,
+  assertProductionWebRelease,
+} from "./production-runtime-release.js";
 import { assertProductionScannerRelease } from "./production-scanner-evidence.js";
 
 function required(name: string): string {
@@ -190,8 +194,16 @@ async function main(): Promise<void> {
     healthy(new URL("/", webOrigin)),
     healthy(new URL("/index.html", webOrigin)),
   ]);
-  assertProductionScannerRelease(
+  const scannerReleaseMatchesCandidate = assertProductionScannerRelease(
     scannerHealth === undefined ? undefined : await scannerHealth.json(),
+    candidateRelease,
+  );
+  const functionReleaseMatchesCandidate = assertProductionFunctionRelease(
+    functionHealth === undefined ? undefined : await functionHealth.json(),
+    candidateRelease,
+  );
+  const webReleaseMatchesCandidate = assertProductionWebRelease(
+    webHealth === undefined ? "" : await webHealth.text(),
     candidateRelease,
   );
   const providerBoundariesDenyUnsafeRequests = (
@@ -231,6 +243,9 @@ async function main(): Promise<void> {
     functionHealthReady: functionHealth !== undefined,
     scannerHealthReady: scannerHealth !== undefined,
     scannerMatrixPassed: cleanVerdict === "clean" && infectedVerdict === "infected",
+    scannerReleaseMatchesCandidate,
+    functionReleaseMatchesCandidate,
+    webReleaseMatchesCandidate,
     providerBoundariesDenyUnsafeRequests,
     webHealthReady: webHealth !== undefined,
     webHeaders: {
