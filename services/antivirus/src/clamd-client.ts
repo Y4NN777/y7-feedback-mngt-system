@@ -2,6 +2,21 @@ import type { ClamAvVerdict } from "./gateway.js";
 
 export type ClamdExchange = (frames: readonly Uint8Array[]) => Promise<Uint8Array>;
 
+export function createClamdHealthProbe(
+  exchange: ClamdExchange,
+): () => Promise<boolean> {
+  return async () => {
+    try {
+      const response = new TextDecoder().decode(
+        await exchange([new TextEncoder().encode("zPING\0")]),
+      );
+      return response === "PONG\0";
+    } catch {
+      return false;
+    }
+  };
+}
+
 function frames(bytes: Uint8Array): readonly Uint8Array[] {
   const output: Uint8Array[] = [new TextEncoder().encode("zINSTREAM\0")];
   const chunkSize = 64 * 1024;

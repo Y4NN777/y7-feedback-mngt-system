@@ -1,7 +1,11 @@
 import { createServer, type IncomingHttpHeaders } from "node:http";
 import { createConnection } from "node:net";
 
-import { createClamdScanner, type ClamdExchange } from "./clamd-client.js";
+import {
+  createClamdHealthProbe,
+  createClamdScanner,
+  type ClamdExchange,
+} from "./clamd-client.js";
 import { createScanGateway } from "./gateway.js";
 
 const maximumBytes = 10 * 1024 * 1024;
@@ -64,24 +68,29 @@ if (
 ) {
   throw new Error("ANTIVIRUS_SERVICE_CONFIG_INVALID");
 }
+const exchange = clamdExchange(
+  process.env.CLAMAV_HOST?.trim() || "127.0.0.1",
+  clamdPort,
+);
+const health = createClamdHealthProbe(exchange);
 const gateway = createScanGateway(
   { keyId: required("Y7_SCANNER_KEY_ID"), hmacKey: key, maximumBytes },
   {
     nowMs: Date.now,
-    scan: createClamdScanner(
-      clamdExchange(process.env.CLAMAV_HOST?.trim() || "127.0.0.1", clamdPort),
-    ),
+    scan: createClamdScanner(exchange),
   },
 );
 
 createServer((request, response) => {
   const path = new URL(request.url ?? "/", "http://scanner.invalid").pathname;
   if (request.method === "GET" && path === "/health") {
-    response.writeHead(200, {
-      "content-type": "application/json",
-      "cache-control": "no-store",
+    void health().then((ready) => {
+      response.writeHead(ready ? 200 : 503, {
+        "content-type": "application/json",
+        "cache-control": "no-store",
+      });
+      response.end(ready ? '{"status":"ok"}' : '{"status":"unavailable"}');
     });
-    response.end('{"status":"ok"}');
     return;
   }
   const chunks: Uint8Array[] = [];

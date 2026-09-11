@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createClamdScanner } from "./clamd-client.js";
+import { createClamdHealthProbe, createClamdScanner } from "./clamd-client.js";
 
 const bytes = new TextEncoder().encode("probe");
 
@@ -26,5 +26,22 @@ describe("ClamAV INSTREAM client", () => {
   it("maps daemon transport failure to unavailable", async () => {
     const scan = createClamdScanner(() => Promise.reject(new Error("offline")));
     await expect(scan(bytes)).resolves.toBe("unavailable");
+  });
+
+  it.each([
+    ["PONG\0", true],
+    ["ERROR\0", false],
+  ] as const)("reports daemon readiness for %s", async (response, expected) => {
+    const exchange = vi.fn<(frames: readonly Uint8Array[]) => Promise<Uint8Array>>(() =>
+      Promise.resolve(new TextEncoder().encode(response)),
+    );
+
+    await expect(createClamdHealthProbe(exchange)()).resolves.toBe(expected);
+    expect(exchange).toHaveBeenCalledWith([new TextEncoder().encode("zPING\0")]);
+  });
+
+  it("reports the daemon as unavailable when the readiness exchange fails", async () => {
+    const probe = createClamdHealthProbe(() => Promise.reject(new Error("offline")));
+    await expect(probe()).resolves.toBe(false);
   });
 });
