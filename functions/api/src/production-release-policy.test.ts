@@ -33,6 +33,7 @@ function ready(
     nonSecretFunctionVariables: [],
     functionHealthReady: true,
     scannerHealthReady: true,
+    scannerMatrixPassed: true,
     webHealthReady: true,
     webHeaders: {
       contentSecurityPolicy: true,
@@ -50,7 +51,7 @@ describe("Production release policy", () => {
   it("BDD-REL-401 accepts only an isolated healthy reversible release", () => {
     expect(assertProductionReleaseReady(ready())).toEqual({
       status: "ready",
-      checks: 19,
+      checks: 20,
     });
   });
 
@@ -83,6 +84,7 @@ describe("Production release policy", () => {
   it.each([
     { functionHealthReady: false },
     { scannerHealthReady: false },
+    { scannerMatrixPassed: false },
     { webHealthReady: false },
     { activeDeploymentReady: false },
     { rollbackDeploymentReady: false },
