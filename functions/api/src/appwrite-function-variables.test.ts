@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   appwriteFunctionVariableKeys,
   planAppwriteFunctionVariables,
+  resolveAppwriteFunctionDeploymentAuthority,
   resolveAppwriteFunctionTarget,
 } from "./appwrite-function-variables";
 
@@ -11,6 +12,28 @@ const environment = Object.fromEntries(
 );
 
 describe("Appwrite Function variable policy", () => {
+  it("BDD-DEL-DEPLOY-001 requires only deployment authority", () => {
+    expect(
+      resolveAppwriteFunctionDeploymentAuthority({
+        APPWRITE_ENDPOINT: " https://fra.cloud.appwrite.io/v1 ",
+        APPWRITE_PROJECT_ID: "project_preview",
+        APPWRITE_API_KEY: "server-key",
+        Y7_ENVIRONMENT: "preview",
+      }),
+    ).toEqual({
+      endpoint: "https://fra.cloud.appwrite.io/v1",
+      projectId: "project_preview",
+      apiKey: "server-key",
+      environment: "preview",
+    });
+  });
+
+  it("BDD-DEL-DEPLOY-002 denies incomplete deployment authority", () => {
+    expect(() =>
+      resolveAppwriteFunctionDeploymentAuthority({ Y7_ENVIRONMENT: "preview" }),
+    ).toThrow("APPWRITE_FUNCTION_DEPLOYMENT_AUTHORITY_MISSING");
+  });
+
   it.each([
     ["preview", "y7-feedback-api-preview", "Y7 Feedback API Preview"],
     ["production", "y7-feedback-api-production", "Y7 Feedback API Production"],

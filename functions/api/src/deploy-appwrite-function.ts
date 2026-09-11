@@ -13,10 +13,12 @@ import {
 } from "node-appwrite";
 import { InputFile } from "node-appwrite/file";
 
-import { parseServerConfig } from "@y7-feedback/config/server";
 import type { ApplicationEnvironment } from "@y7-feedback/config/public";
 
-import { resolveAppwriteFunctionTarget } from "./appwrite-function-variables.js";
+import {
+  resolveAppwriteFunctionDeploymentAuthority,
+  resolveAppwriteFunctionTarget,
+} from "./appwrite-function-variables.js";
 
 const buildCommands =
   "corepack enable && corepack prepare pnpm@10.32.1 --activate && pnpm install --frozen-lockfile && pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build";
@@ -91,16 +93,16 @@ async function main(): Promise<void> {
   if (!process.argv.includes("--apply")) {
     throw new Error("APPWRITE_FUNCTION_DEPLOYMENT_REQUIRES_APPLY");
   }
-  const config = parseServerConfig(process.env);
-  const target = resolveAppwriteFunctionTarget(config.environment);
+  const authority = resolveAppwriteFunctionDeploymentAuthority(process.env);
+  const target = resolveAppwriteFunctionTarget(authority.environment);
   const functions = new Functions(
     new Client()
-      .setEndpoint(config.appwriteEndpoint)
-      .setProject(config.appwriteProjectId)
-      .setKey(config.appwriteApiKey),
+      .setEndpoint(authority.endpoint)
+      .setProject(authority.projectId)
+      .setKey(authority.apiKey),
   );
   const temporaryDirectory = await mkdtemp(
-    join(tmpdir(), `y7-appwrite-${config.environment}-`),
+    join(tmpdir(), `y7-appwrite-${authority.environment}-`),
   );
   const archivePath = join(temporaryDirectory, "function.tar.gz");
   try {
@@ -120,7 +122,7 @@ async function main(): Promise<void> {
       archivePath,
       ".",
     ]);
-    const functionChange = await ensureFunction(functions, config.environment);
+    const functionChange = await ensureFunction(functions, authority.environment);
     const deployment = await functions.createDeployment({
       functionId: target.id,
       code: InputFile.fromPath(archivePath),
