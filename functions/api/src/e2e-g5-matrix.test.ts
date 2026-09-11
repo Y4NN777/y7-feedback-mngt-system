@@ -117,6 +117,7 @@ describe("G5 end-to-end traceability matrix", () => {
     for (const id of [
       "UC-01",
       "UC-02",
+      "UC-03",
       "UC-04",
       "UC-05",
       "UC-06",
