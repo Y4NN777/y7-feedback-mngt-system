@@ -101,6 +101,10 @@ the release runner; it is never installed as a Function variable, printed or
 retained as evidence.
 
 GitHub and GitLab client secrets and callback URLs are Production-specific.
+The release gate requires the callbacks to equal the exact provider routes on
+`Y7_FUNCTION_DOMAIN_URL`; HTTPS URLs on Preview, another host, the wrong
+provider path, or carrying a query are rejected before release evidence can
+pass.
 Rotate one provider at a time: create the new secret, update the protected
 bundle, deploy, complete a real authorization and repository action, then revoke
 the old secret. The release verifier separately confirms that unauthenticated
@@ -120,8 +124,9 @@ Run `Production release` for the candidate commit. The workflow:
 7. switches Appwrite to the previous Ready Function deployment, health-checks
    it, proves a deleted non-sensitive Appwrite marker remains absent, restores
    the candidate in a `finally` path, and proves the marker is still absent;
-8. runs the signed antivirus matrix, web security/cache headers, environment
-   isolation and provider callback/webhook denial probes;
+8. proves both configured OAuth callbacks use their exact Production Function
+   routes, then runs the signed antivirus matrix, web security/cache headers,
+   environment isolation and provider callback/webhook denial probes;
 9. sends one non-sensitive SMTP verification message and proves retryable and
    terminal transport classification without printing the recipient;
 10. creates a non-sensitive temporary GitHub issue through the Production

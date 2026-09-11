@@ -80,6 +80,8 @@ The current candidate contains these independently revertible outcomes:
 - `99826f6` — protected Production release proves one real non-sensitive SMTP
   handoff plus retryable and terminal transport classification without exposing
   or installing the verification recipient in the Function.
+- `84eb5d6` — Production release rejects GitHub or GitLab callbacks that do not
+  equal their exact route on the configured Production Function origin.
 
 Local evidence currently passing:
 
@@ -95,7 +97,7 @@ pnpm security:scan # 283 files, 0 findings
 pnpm --filter @y7-feedback/web exec playwright test --list # 38 scenarios, 2 projects
 ```
 
-The API suite contains 1,495 tests; its coverage run reports 100% statements,
+The API suite contains 1,499 tests; its coverage run reports 100% statements,
 branches, functions and lines. The Playwright listing proves discovery and
 traceability only; execution remains part of the hosted G5 browser gate.
 
