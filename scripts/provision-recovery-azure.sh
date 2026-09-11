@@ -8,10 +8,16 @@ LOCATION="${AZURE_LOCATION:-centralus}"
 RESOURCE_GROUP="${AZURE_RECOVERY_RESOURCE_GROUP:-rg-y7-feedback-recovery-cus}"
 STORAGE_ACCOUNT="${AZURE_RECOVERY_STORAGE_ACCOUNT:-y7feedbackrec60489914}"
 CONTAINER="${AZURE_RECOVERY_CONTAINER:-recovery}"
-OIDC_REPOSITORY_SUBJECT="${GITHUB_OIDC_REPOSITORY_SUBJECT:-Y4NN777/y7-feedback-mngt-system}"
+OIDC_REPOSITORY_SUBJECT="${GITHUB_OIDC_REPOSITORY_SUBJECT:-Y4NN777@171065166/y7-feedback-mngt-system@1329343404}"
 BACKUP_IDENTITY="id-y7-feedback-recovery-backup"
 RESTORE_IDENTITY="id-y7-feedback-recovery-restore"
 DRILL_IDENTITY="id-y7-feedback-recovery-drill"
+
+if [[ ! "$SUBSCRIPTION_ID" =~ ^[0-9a-fA-F-]{36}$ ]] ||
+  [[ ! "$OIDC_REPOSITORY_SUBJECT" =~ ^[A-Za-z0-9_.-]+@[0-9]+/[A-Za-z0-9_.-]+@[0-9]+$ ]]; then
+  printf '{"error":"RECOVERY_AZURE_BOOTSTRAP_CONFIG_INVALID"}\n' >&2
+  exit 1
+fi
 
 ensure_identity() {
   local identity_name="$1"
@@ -138,6 +144,10 @@ upsert_federated_credential \
   github-isolated-drill \
   "$DRILL_IDENTITY" \
   "repo:${OIDC_REPOSITORY_SUBJECT}:environment:recovery-drill"
+upsert_federated_credential \
+  github-g5-preview \
+  "$DRILL_IDENTITY" \
+  "repo:${OIDC_REPOSITORY_SUBJECT}:environment:g5-preview"
 
 ensure_role_assignment "$BACKUP_PRINCIPAL_ID" "Storage Blob Data Contributor"
 ensure_role_assignment "$RESTORE_PRINCIPAL_ID" "Storage Blob Data Reader"

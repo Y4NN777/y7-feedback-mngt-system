@@ -132,6 +132,8 @@ test("BDD-REC-301 runs the real recovery drill with isolated OIDC authority", as
   assert.match(provision, /id-y7-feedback-recovery-drill/u);
   assert.match(provision, /github-isolated-drill/u);
   assert.match(provision, /environment:recovery-drill/u);
+  assert.match(provision, /github-g5-preview/u);
+  assert.match(provision, /environment:g5-preview/u);
   assert.match(provision, /Storage Blob Data Contributor/u);
   assert.match(provision, /GITHUB_OIDC_REPOSITORY_SUBJECT/u);
 });
@@ -161,9 +163,8 @@ test("BDD-REL-303 schedules encrypted Production backup with dedicated authority
   );
   assert.match(
     provision,
-    /GITHUB_OIDC_REPOSITORY_SUBJECT:-Y4NN777\/y7-feedback-mngt-system/u,
+    /GITHUB_OIDC_REPOSITORY_SUBJECT:-Y4NN777@171065166\/y7-feedback-mngt-system@1329343404/u,
   );
-  assert.doesNotMatch(provision, /Y4NN777@171065166/u);
 });
 
 test("BDD-E2E-301 runs the complete G5 evidence pack with ephemeral secret material", async () => {
@@ -340,7 +341,7 @@ test("BDD-REL-304 bootstraps Production Azure with environment OIDC", async () =
     "utf8",
   );
   assert.match(bootstrap, /repo:\$\{OIDC_REPOSITORY_SUBJECT\}:environment:production/u);
-  assert.match(bootstrap, /Y4NN777\/y7-feedback-mngt-system/u);
+  assert.match(bootstrap, /Y4NN777@171065166\/y7-feedback-mngt-system@1329343404/u);
   assert.match(bootstrap, /identity federated-credential/u);
   assert.match(bootstrap, /monitor action-group create/u);
   assert.match(bootstrap, /--role Contributor/u);
