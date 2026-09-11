@@ -19,7 +19,7 @@ const accepted: AttachmentValidationOutcome = {
     format: "txt",
     mediaType: "text/plain; charset=utf-8",
     size: 8,
-    sha256: "a".repeat(64),
+    sha256: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
     displayName: "evidence.txt",
   },
 };
@@ -90,5 +90,51 @@ describe("public Attachment staging", () => {
       code: "ATTACHMENT_UNAVAILABLE",
     });
     expect(candidate.remove).toHaveBeenCalledWith("private/object_1");
+  });
+
+  it("fails closed for invalid scope, scanner outage and invalid generated identity", async () => {
+    const invalid = setup();
+    await expect(
+      invalid.target.stage({ ...command, workspaceId: "bad/id" }),
+    ).resolves.toEqual({ status: "rejected", code: "ATTACHMENT_REJECTED" });
+
+    const unavailable = setup({
+      status: "retryable",
+      code: "VALIDATION_UNAVAILABLE",
+    });
+    await expect(unavailable.target.stage(command)).resolves.toEqual({
+      status: "retryable",
+      code: "ATTACHMENT_UNAVAILABLE",
+    });
+
+    const scannerFailure = createAttachmentStaging(
+      { stage: vi.fn(), remove: vi.fn(), listStagedBefore: vi.fn() },
+      { issue: vi.fn(), verify: vi.fn() },
+      {
+        validate: () => Promise.reject(new Error("scanner outage")),
+        createAttachmentId: () => "attachment_1",
+        createObjectId: () => "private/object_1",
+        now: () => "2026-09-11T00:00:00.000Z",
+      },
+    );
+    await expect(scannerFailure.stage(command)).resolves.toEqual({
+      status: "retryable",
+      code: "ATTACHMENT_UNAVAILABLE",
+    });
+
+    const invalidIdentity = createAttachmentStaging(
+      { stage: vi.fn(), remove: vi.fn(), listStagedBefore: vi.fn() },
+      { issue: vi.fn(), verify: vi.fn() },
+      {
+        validate: () => Promise.resolve(accepted),
+        createAttachmentId: () => "bad/id",
+        createObjectId: () => "public/object_1",
+        now: () => "2026-09-11T00:00:00.000Z",
+      },
+    );
+    await expect(invalidIdentity.stage(command)).resolves.toEqual({
+      status: "retryable",
+      code: "ATTACHMENT_UNAVAILABLE",
+    });
   });
 });

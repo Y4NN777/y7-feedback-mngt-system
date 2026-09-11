@@ -49,6 +49,51 @@ const validServer = {
 };
 
 describe("trusted environment contract", () => {
+  it("BDD-ATT-UC03-009 parses an all-or-nothing server-only antivirus authority", () => {
+    expect(
+      parseServerConfig({
+        ...validServer,
+        ANTIVIRUS_SCANNER_ENDPOINT: "https://scanner.preview.example",
+        ANTIVIRUS_SCANNER_KEY_ID: "preview_2026_09",
+        ANTIVIRUS_SCANNER_HMAC_KEY: Buffer.alloc(32, 12).toString("base64url"),
+        ANTIVIRUS_SCANNER_TIMEOUT_MS: "8000",
+      }).antivirusScanner,
+    ).toEqual({
+      endpoint: "https://scanner.preview.example",
+      keyId: "preview_2026_09",
+      hmacKey: Buffer.alloc(32, 12).toString("base64url"),
+      timeoutMs: 8000,
+    });
+    expect(() =>
+      parseServerConfig({
+        ...validServer,
+        ANTIVIRUS_SCANNER_ENDPOINT: "https://scanner.preview.example",
+      }),
+    ).toThrow(new ConfigError("ANTIVIRUS_SCANNER_CONFIG_INVALID"));
+  });
+
+  it.each([
+    { ANTIVIRUS_SCANNER_KEY_ID: "bad/key" },
+    { ANTIVIRUS_SCANNER_HMAC_KEY: "short" },
+    { ANTIVIRUS_SCANNER_TIMEOUT_MS: "1.5" },
+    { ANTIVIRUS_SCANNER_TIMEOUT_MS: "0" },
+    { ANTIVIRUS_SCANNER_TIMEOUT_MS: "10001" },
+    { ANTIVIRUS_SCANNER_ENDPOINT: "https://scanner.preview.example/path" },
+    { ANTIVIRUS_SCANNER_ENDPOINT: "https://scanner.preview.example/?query=yes" },
+    { ANTIVIRUS_SCANNER_ENDPOINT: "https://scanner.preview.example/#fragment" },
+  ])("BDD-ATT-UC03-010 rejects malformed antivirus authority %#", (override) => {
+    expect(() =>
+      parseServerConfig({
+        ...validServer,
+        ANTIVIRUS_SCANNER_ENDPOINT: "https://scanner.preview.example",
+        ANTIVIRUS_SCANNER_KEY_ID: "preview_2026_09",
+        ANTIVIRUS_SCANNER_HMAC_KEY: Buffer.alloc(32, 12).toString("base64url"),
+        ANTIVIRUS_SCANNER_TIMEOUT_MS: "8000",
+        ...override,
+      }),
+    ).toThrow();
+  });
+
   it("BDD-ENV-003 requires and returns server-only authority", () => {
     expect(parseServerConfig(validServer)).toEqual({
       environment: "preview",

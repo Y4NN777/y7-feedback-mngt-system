@@ -122,7 +122,8 @@ export async function routeRequest(
   const startedAt = dependencies.startedAt();
   const correlationId = dependencies.createCorrelationId();
   const headers = {
-    "access-control-allow-headers": "authorization, content-type, x-appwrite-user-id",
+    "access-control-allow-headers":
+      "authorization, content-type, x-appwrite-user-id, x-y7-file-name, x-y7-operation-id",
     "access-control-allow-methods": "GET, POST, OPTIONS",
     "access-control-allow-origin": "*",
     "access-control-max-age": "600",
@@ -426,6 +427,7 @@ export async function routeRequest(
               method === "POST" && !contentType.startsWith("multipart/form-data")
                 ? req.bodyJson
                 : undefined,
+            ...(req.bodyBinary === undefined ? {} : { bodyBinary: req.bodyBinary }),
           });
   if (abuseOutcome?.status === "allowed") {
     try {

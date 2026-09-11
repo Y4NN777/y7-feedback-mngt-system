@@ -7,6 +7,7 @@ import type {
 } from "@y7-feedback/domain";
 
 import type { AccountlessAccessCoordinator } from "./accountless-access";
+import type { AttachmentStaging } from "./attachment-staging";
 import type { IntakeCommand, IntakeCoordinator } from "./intake";
 import type { ReporterAttachmentDownload } from "./reporter-attachment-download";
 import type { WorkspaceAttachmentDownload } from "./workspace-attachment-download";
@@ -103,6 +104,7 @@ function setup(
     readonly workspaceAttachmentOutcome?: Awaited<
       ReturnType<WorkspaceAttachmentDownload>
     >;
+    readonly stagingOutcome?: Awaited<ReturnType<AttachmentStaging["stage"]>>;
     readonly projectResolutions?: readonly Awaited<
       ReturnType<PublicProjectReader["resolve"]>
     >[];
@@ -158,6 +160,16 @@ function setup(
       },
     ),
   );
+  const stage = vi.fn<AttachmentStaging["stage"]>(() =>
+    Promise.resolve(
+      options.stagingOutcome ?? {
+        status: "staged",
+        attachmentId: "attachment_1",
+        token: "encrypted-token",
+        displayName: "evidence.txt",
+      },
+    ),
+  );
   const findBySlug = vi.fn(() =>
     Promise.resolve(
       options.resolvedProject === undefined ? project : options.resolvedProject,
@@ -185,9 +197,12 @@ function setup(
       access,
       reporterAttachmentDownload,
       workspaceAttachmentDownload,
+      undefined,
+      { stage },
     ),
     findBySlug,
     projects,
+    stage,
     retrieve,
     rotate,
     revoke,
@@ -198,6 +213,107 @@ function setup(
 }
 
 describe("trusted public Function boundary", () => {
+  it("BDD-ATT-UC03-007 derives scope and stages one bounded binary without trusting client scope", async () => {
+    const { api, stage } = setup();
+    const bytes = new TextEncoder().encode("evidence");
+
+    await expect(
+      api.handle({
+        method: "POST",
+        path: "/v1/projects/wisemoney/feedback/attachments/stage",
+        headers: {
+          "content-type": "text/plain",
+          "x-y7-file-name": Buffer.from("preuve.txt").toString("base64url"),
+          "x-y7-operation-id": "123e4567-e89b-42d3-a456-426614174000",
+          "x-y7-workspace-id": "forged-workspace",
+        },
+        body: undefined,
+        bodyBinary: bytes,
+      }),
+    ).resolves.toEqual({
+      statusCode: 201,
+      body: {
+        status: "staged",
+        attachmentId: "attachment_1",
+        token: "encrypted-token",
+        displayName: "evidence.txt",
+      },
+    });
+    expect(stage).toHaveBeenCalledWith({
+      operationId: "123e4567-e89b-42d3-a456-426614174000",
+      workspaceId: "workspace-authoritative",
+      projectId: "project-authoritative",
+      file: {
+        bytes,
+        clientName: "preuve.txt",
+        clientMediaType: "text/plain",
+      },
+    });
+  });
+
+  it.each([
+    [{ resolvedProject: null }, {}, 404, "ERR-PROJECT-UNAVAILABLE"],
+    [{}, { "x-y7-file-name": "not base64!" }, 400, "ERR-ATTACHMENT-REJECTED"],
+    [
+      { stagingOutcome: { status: "rejected", code: "ATTACHMENT_REJECTED" } },
+      {},
+      400,
+      "ERR-ATTACHMENT-REJECTED",
+    ],
+    [
+      { stagingOutcome: { status: "retryable", code: "ATTACHMENT_UNAVAILABLE" } },
+      {},
+      503,
+      "ERR-ATTACHMENT-UNAVAILABLE",
+    ],
+  ] as const)(
+    "BDD-ATT-UC03-008 fails closed for staging boundary case %#",
+    async (options, headerOverrides, statusCode, error) => {
+      const { api } = setup(options);
+      await expect(
+        api.handle({
+          method: "POST",
+          path: "/v1/projects/wisemoney/feedback/attachments/stage",
+          headers: {
+            "content-type": "text/plain",
+            "x-y7-file-name": Buffer.from("evidence.txt").toString("base64url"),
+            "x-y7-operation-id": "123e4567-e89b-42d3-a456-426614174000",
+            ...headerOverrides,
+          },
+          body: undefined,
+          bodyBinary: new TextEncoder().encode("evidence"),
+        }),
+      ).resolves.toEqual({ statusCode, body: { error } });
+    },
+  );
+
+  it("returns a retryable staging outcome when antivirus composition is absent", async () => {
+    const target = setup();
+    const api = createPublicApi(
+      target.projects,
+      { accept: target.accept },
+      target.access,
+    );
+    const request = {
+      method: "POST",
+      path: "/v1/projects/wisemoney/feedback/attachments/stage",
+      headers: {
+        "content-type": "text/plain",
+        "x-y7-file-name": Buffer.from("evidence.txt").toString("base64url"),
+        "x-y7-operation-id": "123e4567-e89b-42d3-a456-426614174000",
+      },
+      body: undefined,
+    } as const;
+    await expect(api.handle(request)).resolves.toEqual({
+      statusCode: 503,
+      body: { error: "ERR-ATTACHMENT-UNAVAILABLE" },
+    });
+    await expect(target.api.handle(request)).resolves.toEqual({
+      statusCode: 400,
+      body: { error: "ERR-ATTACHMENT-REJECTED" },
+    });
+  });
+
   it("BDD-PROJ-002 resolves current, historical, and unavailable routes", async () => {
     const { api } = setup({
       projectResolutions: [

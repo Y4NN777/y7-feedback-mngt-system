@@ -278,13 +278,32 @@ describe("trusted API entrypoint", () => {
 
     expect(handle).not.toHaveBeenCalled();
     expect(json).toHaveBeenCalledWith(null, 204, {
-      "access-control-allow-headers": "authorization, content-type, x-appwrite-user-id",
+      "access-control-allow-headers":
+        "authorization, content-type, x-appwrite-user-id, x-y7-file-name, x-y7-operation-id",
       "access-control-allow-methods": "GET, POST, OPTIONS",
       "access-control-allow-origin": "*",
       "access-control-max-age": "600",
       "cache-control": "no-store",
       "x-correlation-id": correlationId,
     });
+  });
+
+  it("BDD-ATT-UC03-011 forwards exact binary upload bytes only to the public boundary", async () => {
+    const bytes = new TextEncoder().encode("evidence");
+    const handle = vi.fn<PublicApi["handle"]>(() =>
+      Promise.resolve({ statusCode: 201, body: { status: "staged" } }),
+    );
+    const { context } = createContext(
+      "POST",
+      "/v1/projects/wisemoney/feedback/attachments/stage",
+      { headers: { "content-type": "text/plain" }, bodyBinary: bytes },
+    );
+
+    await routeRequest(context, { ...dependencies, publicApi: { handle } });
+
+    expect(handle).toHaveBeenCalledWith(
+      expect.objectContaining({ bodyBinary: bytes, body: undefined }),
+    );
   });
 
   it("BDD-ADMIN-001 routes trusted administration before the public API", async () => {

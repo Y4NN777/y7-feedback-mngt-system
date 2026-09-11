@@ -6,6 +6,10 @@ import type { ServerConfig } from "@y7-feedback/config/server";
 import { createAccountlessAccessCoordinator } from "./accountless-access.js";
 import { createNodeAppwriteAccountlessRepository } from "./appwrite-accountless-repository.js";
 import { createNodeAppwriteAttachmentAcceptanceStore } from "./appwrite-attachment-acceptance-store.js";
+import { createAttachmentStaging } from "./attachment-staging.js";
+import { createAttachmentStagingTokenCodec } from "./attachment-staging-token.js";
+import { validateAttachment } from "./attachment-validation.js";
+import { createClamAvHttpScanner } from "./clamav-http-scanner.js";
 import { createNodeAppwriteIntakeStore } from "./appwrite-intake-store.js";
 import { createNodeAppwriteIntelligenceStore } from "./appwrite-intelligence-store.js";
 import { createNodeAppwriteIntelligenceProvenanceStore } from "./appwrite-intelligence-provenance-store.js";
@@ -257,6 +261,33 @@ export function createHttpApplication(
       stagingTableId: config.appwriteSchema.attachmentStagingTableId,
     },
   );
+  const malwareScanner = config.antivirusScanner
+    ? createClamAvHttpScanner({
+        endpoint: config.antivirusScanner.endpoint,
+        keyId: config.antivirusScanner.keyId,
+        hmacKey: Buffer.from(config.antivirusScanner.hmacKey, "base64url"),
+        timeoutMs: config.antivirusScanner.timeoutMs,
+      })
+    : undefined;
+  const attachmentStaging = malwareScanner
+    ? createAttachmentStaging(
+        attachmentStorage,
+        createAttachmentStagingTokenCodec(sensitive, {
+          tableId: config.appwriteSchema.attachmentsTableId,
+          now: runtime.nowIso,
+          ttlMs: 15 * 60 * 1_000,
+        }),
+        {
+          validate: (candidate) =>
+            validateAttachment(candidate, {
+              malwareScanner,
+            }),
+          createAttachmentId: runtime.createId,
+          createObjectId: () => `private/${runtime.createId()}`,
+          now: runtime.nowIso,
+        },
+      )
+    : undefined;
   const reporterAttachmentDownload = createReporterAttachmentDownload(
     accountless,
     createAttachmentDownload(attachmentMetadata, attachmentStorage),
@@ -957,6 +988,7 @@ export function createHttpApplication(
       reporterAttachmentDownload,
       workspaceAttachmentDownload,
       workspaceOperations,
+      attachmentStaging,
     ),
     /* v8 ignore next -- both compositions are exercised by deployed environments */
     ...(sourceConnections === undefined ? {} : { sourceConnections }),

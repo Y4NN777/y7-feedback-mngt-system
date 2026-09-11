@@ -14,6 +14,12 @@ export interface ServerConfig {
   readonly appwriteProjectId: string;
   readonly appwriteApiKey: string;
   readonly webOrigin: string;
+  readonly antivirusScanner?: {
+    readonly endpoint: string;
+    readonly keyId: string;
+    readonly hmacKey: string;
+    readonly timeoutMs: number;
+  };
   readonly providerOutboxTriggerSecret?: string;
   readonly platformAccess?: {
     readonly operatorTeamId: string;
@@ -216,6 +222,45 @@ function parseOptionalTriggerSecret(value: string | undefined): string | undefin
   return normalized;
 }
 
+function parseAntivirusScanner(
+  input: Readonly<Record<string, string | undefined>>,
+  environment: ApplicationEnvironment,
+): ServerConfig["antivirusScanner"] {
+  const keys = [
+    "ANTIVIRUS_SCANNER_ENDPOINT",
+    "ANTIVIRUS_SCANNER_KEY_ID",
+    "ANTIVIRUS_SCANNER_HMAC_KEY",
+    "ANTIVIRUS_SCANNER_TIMEOUT_MS",
+  ] as const;
+  const values = keys.map((key) => input[key]?.trim() ?? "");
+  if (values.every((value) => value === "")) return undefined;
+  if (values.some((value) => value === "")) {
+    throw new ConfigError("ANTIVIRUS_SCANNER_CONFIG_INVALID");
+  }
+  const [rawEndpoint, scannerKeyId, hmacKey, rawTimeout] = values as [
+    string,
+    string,
+    string,
+    string,
+  ];
+  const timeoutMs = Number(rawTimeout);
+  if (
+    !keyId.test(scannerKeyId) ||
+    !proofKey.test(hmacKey) ||
+    !Number.isSafeInteger(timeoutMs) ||
+    timeoutMs < 1 ||
+    timeoutMs > 10_000
+  ) {
+    throw new ConfigError("ANTIVIRUS_SCANNER_CONFIG_INVALID");
+  }
+  const endpoint = parseEndpoint(rawEndpoint, environment);
+  const url = new URL(endpoint);
+  if (url.pathname !== "/" || url.search || url.hash) {
+    throw new ConfigError("ANTIVIRUS_SCANNER_CONFIG_INVALID");
+  }
+  return { endpoint: url.origin, keyId: scannerKeyId, hmacKey, timeoutMs };
+}
+
 function parsePlatformAccess(
   input: Readonly<Record<string, string | undefined>>,
 ): ServerConfig["platformAccess"] {
@@ -398,6 +443,7 @@ export function parseServerConfig(
     input.PROVIDER_OUTBOX_TRIGGER_SECRET,
   );
   const platformAccess = parsePlatformAccess(input);
+  const antivirusScanner = parseAntivirusScanner(input, environment);
   return {
     environment,
     backendEnvironment,
@@ -405,6 +451,7 @@ export function parseServerConfig(
     appwriteProjectId: requireValue(input.APPWRITE_PROJECT_ID),
     appwriteApiKey: requireValue(input.APPWRITE_API_KEY),
     webOrigin: parseWebOrigin(input.Y7_WEB_ORIGIN, environment),
+    ...(antivirusScanner === undefined ? {} : { antivirusScanner }),
     ...(providerOutboxTriggerSecret === undefined
       ? {}
       : { providerOutboxTriggerSecret }),
