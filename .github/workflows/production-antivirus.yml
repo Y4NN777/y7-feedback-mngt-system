@@ -105,10 +105,15 @@ jobs:
         run: |
           set -Eeuo pipefail
           set +x
+          ACTION_GROUP_NAME="${AZURE_ACTION_GROUP_ID##*/}"
           RECEIVER_NAME=""
           RECEIVER_EMAIL=""
+          if [[ ! "$ACTION_GROUP_NAME" =~ ^[A-Za-z0-9._()-]{1,260}$ ]]; then
+            echo '{"error":"PRODUCTION_ACTION_GROUP_ID_INVALID"}' >&2
+            exit 1
+          fi
           read -r RECEIVER_NAME RECEIVER_EMAIL < <(az monitor action-group show \
-            --name ag-y7-feedback-production \
+            --name "$ACTION_GROUP_NAME" \
             --resource-group "$AZURE_RESOURCE_GROUP" \
             --query 'emailReceivers[0].[name,emailAddress]' \
             --output tsv)
@@ -117,11 +122,11 @@ jobs:
             exit 1
           fi
           az monitor action-group test-notifications create \
-            --action-group ag-y7-feedback-production \
+            --action-group "$ACTION_GROUP_NAME" \
             --resource-group "$AZURE_RESOURCE_GROUP" \
             --alert-type metricstaticthreshold \
             --add-action email "$RECEIVER_NAME" "$RECEIVER_EMAIL" \
               usecommonalertschema \
             --output none
-          unset RECEIVER_NAME RECEIVER_EMAIL
+          unset ACTION_GROUP_NAME RECEIVER_NAME RECEIVER_EMAIL
           echo '{"result":"PRODUCTION_ALERT_TEST_SUBMITTED"}'
