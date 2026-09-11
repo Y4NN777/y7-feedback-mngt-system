@@ -199,3 +199,30 @@ test("BDD-REL-301 defines a monitored permanent Production antivirus service", a
   assert.match(template, /retentionInDays: 30/u);
   assert.doesNotMatch(template, /customDomains|certificateId/u);
 });
+
+test("BDD-REL-302 deploys the Production scanner only through protected OIDC", async () => {
+  const workflow = await readFile(
+    new URL("../.github/workflows/production-antivirus.yml", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(workflow, /workflow_dispatch:/u);
+  assert.match(workflow, /permissions:\s+contents: read\s+id-token: write/u);
+  assert.match(workflow, /environment: production/u);
+  assert.match(workflow, /cancel-in-progress: false/u);
+  assert.match(workflow, /AZURE_PRODUCTION_CLIENT_ID/u);
+  assert.match(workflow, /secrets\.Y7_PRODUCTION_SCANNER_HMAC_KEY/u);
+  assert.match(workflow, /infra\/azure\/production-antivirus\.bicep/u);
+  assert.match(workflow, /ghcr\.io\/y4nn777\/y7-feedback-antivirus:sha-\$GITHUB_SHA/u);
+  assert.match(workflow, /az deployment group create/u);
+  assert.match(workflow, /curl --fail --silent --show-error/u);
+  assert.doesNotMatch(workflow, /AZURE_(?:CLIENT_)?SECRET/u);
+  assert.doesNotMatch(workflow, /delete|rm -rf/u);
+
+  const actionReferences = [...workflow.matchAll(/^\s+(?:- )?uses: ([^\s#]+)/gmu)].map(
+    (match) => match[1],
+  );
+  assert.ok(actionReferences.length >= 2);
+  for (const reference of actionReferences)
+    assert.match(reference, /^[^@\s]+@[0-9a-f]{40}$/u);
+});
