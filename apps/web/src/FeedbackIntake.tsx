@@ -308,7 +308,15 @@ function Review({
         <h2>{copy.context}</h2>
         <p>{data.context[0]?.value ?? copy.contextNone}</p>
         <h3>{copy.attachments}</h3>
-        <p>{copy.attachmentsNone}</p>
+        {data.attachmentNames.length === 0 ? (
+          <p>{copy.attachmentsNone}</p>
+        ) : (
+          <ul>
+            {data.attachmentNames.map((name) => (
+              <li key={name}>{name}</li>
+            ))}
+          </ul>
+        )}
       </div>
 
       {queued ? (
@@ -395,6 +403,7 @@ export function FeedbackIntake({
   const [operationId, setOperationId] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<IntakeGatewayOutcome | null>(null);
   const [pending, setPending] = useState(false);
+  const [attachments, setAttachments] = useState<readonly File[]>([]);
   const [offlineState, setOfflineState] = useState<
     "none" | "restored" | "saved" | "queued" | "unavailable"
   >("none");
@@ -515,7 +524,7 @@ export function FeedbackIntake({
                 },
               ]
             : [],
-          attachmentNames: [],
+          attachmentNames: attachments.map(({ name }) => name),
         },
       );
       setReview(validated);
@@ -536,18 +545,27 @@ export function FeedbackIntake({
         clientOperationId: operationId,
         locale,
         draft: review,
+        attachments: attachments.map((file) => ({
+          bytes: file,
+          displayName: file.name,
+        })),
       } satisfies IntakeGatewayCommand;
       const result = await gateway.accept(command);
       setOutcome(result);
       if (result.status === "accepted") {
+        setAttachments([]);
         setOfflineState("none");
         await offlinePersistence?.clear(projectSlug).catch(() => undefined);
-      } else if (result.status === "retryable" && offlinePersistence) {
+      } else if (
+        result.status === "retryable" &&
+        offlinePersistence &&
+        attachments.length === 0
+      ) {
         await offlinePersistence.queue(command);
         setOfflineState("queued");
       }
     } catch {
-      if (offlinePersistence) {
+      if (offlinePersistence && attachments.length === 0) {
         try {
           await offlinePersistence.queue({
             projectSlug,
@@ -682,6 +700,44 @@ export function FeedbackIntake({
                   }}
                 />
                 <small id="version-purpose">{copy.contextPurpose}</small>
+              </div>
+            </section>
+
+            <section className="form-card" aria-label={copy.attachments}>
+              <div className="field">
+                <label htmlFor="feedback-attachments">{copy.attachments}</label>
+                <input
+                  id="feedback-attachments"
+                  type="file"
+                  multiple
+                  accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,text/plain,text/csv"
+                  onChange={(event) => {
+                    const selected = [...(event.currentTarget.files ?? [])];
+                    if (
+                      selected.length > 5 ||
+                      selected.some(
+                        (file) => file.size < 1 || file.size > 10 * 1024 * 1024,
+                      )
+                    ) {
+                      setAttachments([]);
+                      event.currentTarget.value = "";
+                      setError(copy.attachmentError);
+                      return;
+                    }
+                    setAttachments(selected);
+                    setError(null);
+                  }}
+                />
+                <small>{copy.attachmentHint}</small>
+                {attachments.length > 0 ? (
+                  <ul>
+                    {attachments.map((file, index) => (
+                      <li key={`${file.name}:${String(file.size)}:${String(index)}`}>
+                        {file.name}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
               </div>
             </section>
 

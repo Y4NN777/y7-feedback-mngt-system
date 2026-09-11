@@ -9,6 +9,10 @@ export interface IntakeGatewayCommand {
   readonly clientOperationId: string;
   readonly locale: Locale;
   readonly draft: ValidatedFeedbackDraft;
+  readonly attachments?: readonly {
+    readonly bytes: Blob;
+    readonly displayName: string;
+  }[];
 }
 
 export type IntakeGatewayOutcome =
@@ -85,6 +89,11 @@ function accepted(value: unknown): IntakeGatewayOutcome | null {
   };
 }
 
+function encodeFileName(value: string): string {
+  const encoded = btoa(String.fromCharCode(...new TextEncoder().encode(value)));
+  return encoded.replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, "");
+}
+
 export function createHttpIntakeGateway(
   rawEndpoint: string,
   fetcher: Fetcher = globalThis.fetch,
@@ -93,6 +102,37 @@ export function createHttpIntakeGateway(
   return {
     async accept(command) {
       try {
+        const staged = await Promise.all(
+          (command.attachments ?? []).map(async ({ bytes, displayName }) => {
+            const response = await fetcher(
+              new URL(
+                `v1/projects/${encodeURIComponent(command.projectSlug)}/feedback/attachments/stage`,
+                base,
+              ).toString(),
+              {
+                method: "POST",
+                cache: "no-store",
+                credentials: "omit",
+                headers: {
+                  "content-type": bytes.type || "application/octet-stream",
+                  "x-y7-file-name": encodeFileName(displayName),
+                  "x-y7-operation-id": command.clientOperationId,
+                },
+                body: bytes,
+              },
+            );
+            const payload = (await response.json()) as unknown;
+            if (
+              response.status !== 201 ||
+              !isObject(payload) ||
+              typeof payload.attachmentId !== "string" ||
+              typeof payload.token !== "string"
+            ) {
+              throw new Error("ATTACHMENT_STAGING_FAILED");
+            }
+            return { attachmentId: payload.attachmentId, token: payload.token };
+          }),
+        );
         const response = await fetcher(
           new URL(
             `v1/projects/${encodeURIComponent(command.projectSlug)}/feedback`,
@@ -106,6 +146,7 @@ export function createHttpIntakeGateway(
             body: JSON.stringify({
               clientOperationId: command.clientOperationId,
               locale: command.locale,
+              attachments: staged,
               feedback: {
                 type: command.draft.type,
                 source: command.draft.originalSource,
@@ -114,7 +155,7 @@ export function createHttpIntakeGateway(
                   name,
                   value,
                 })),
-                attachmentNames: [...command.draft.attachmentNames],
+                attachmentNames: [],
               },
             }),
           },
