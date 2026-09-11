@@ -20,11 +20,11 @@ param scannerKeyId string
 @description('Unpadded base64url-encoded 32-byte scanner signing key.')
 param scannerHmacKey string
 
-@description('Optional Azure Monitor action group resource ID.')
-param actionGroupId string = ''
+@description('Required Azure Monitor action group resource ID for Production alerts.')
+param actionGroupId string
 
 var workspaceName = 'log-y7-feedback-production-cus'
-var alertActions = empty(actionGroupId) ? [] : [
+var alertActions = [
   {
     actionGroupId: actionGroupId
   }
