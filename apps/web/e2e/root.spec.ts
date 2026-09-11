@@ -215,7 +215,7 @@ test("UC-03/ERR-009/BDD-ATT-UC03-011 stages validated evidence and finalizes one
   await page
     .getByRole("textbox", { name: "Quel problème avez-vous rencontré ?" })
     .fill("Le justificatif démontre le défaut.");
-  await page.getByLabel("Pièces jointes", { exact: true }).setInputFiles({
+  await page.locator("#feedback-attachments").setInputFiles({
     name: "preuve-é.txt",
     mimeType: "text/plain",
     buffer: Buffer.from("evidence"),
@@ -527,8 +527,16 @@ test("UC-06/BDD-PRIV-214 revokes Reporter access immediately after an acknowledg
           feedback: {
             feedbackId: "feedback_privacy_1",
             reference: "Y7-2026-000006",
-            originalSource: { type: "review", experience: "Useful workflow" },
-            currentSource: { type: "review", experience: "Useful workflow" },
+            originalSource: {
+              type: "review",
+              experience: "Useful workflow",
+              appreciation: "positive",
+            },
+            currentSource: {
+              type: "review",
+              experience: "Useful workflow",
+              appreciation: "positive",
+            },
             currentState: "received",
             history: [],
             messages: [],
@@ -640,14 +648,14 @@ test("UC-08/UC-09/BDD-WORK-001/BDD-NOT-WEB-001 Workbench detail and notification
         contentType: "application/json",
         body: JSON.stringify({
           status: "ok",
-          result: {
+          data: {
             unreadCount: notificationRead ? 0 : 1,
             items: [
               {
                 id: "notification_1",
                 eventId: "event_1",
                 feedbackId: "feedback_1",
-                kind: "feedback.accepted",
+                kind: "feedback_received",
                 reference: "Y7-2026-000008",
                 locale: "fr",
                 createdAt: "2026-08-28T10:02:00.000Z",
@@ -664,7 +672,7 @@ test("UC-08/UC-09/BDD-WORK-001/BDD-NOT-WEB-001 Workbench detail and notification
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ status: "ok", result: { status: "read" } }),
+        body: JSON.stringify({ status: "ok", data: { status: "read" } }),
       });
       return;
     }
@@ -674,7 +682,7 @@ test("UC-08/UC-09/BDD-WORK-001/BDD-NOT-WEB-001 Workbench detail and notification
         contentType: "application/json",
         body: JSON.stringify({
           status: "ok",
-          result: { databaseId: "feedback", tableId: "notification_signals" },
+          data: { databaseId: "feedback", tableId: "notification_signals" },
         }),
       });
       return;
@@ -737,15 +745,15 @@ test("UC-08/UC-09/BDD-WORK-001/BDD-NOT-WEB-001 Workbench detail and notification
   await page.getByLabel("Identifiant du Workspace").fill("workspace_1");
   await page.getByLabel("Identifiant du projet").fill("project_1");
   await page.getByRole("button", { name: "Ouvrir la boîte" }).click();
+  await expect(page.getByText("Y7-2026-000008")).toBeVisible();
+  await page.getByRole("button", { name: "Marquer comme lue" }).click();
+  await expect(page.getByText("Lue", { exact: true })).toBeVisible();
   const feedback = page.getByRole("button", { name: /feedback_1/u });
   await expect(feedback).toBeVisible();
   await feedback.focus();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("heading", { name: "Upload fails" })).toBeVisible();
   await expect(page.getByText("Internal evidence")).toBeVisible();
-  await expect(page.getByText("Y7-2026-000008")).toBeVisible();
-  await page.getByRole("button", { name: "Marquer comme lue" }).click();
-  await expect(page.getByText("Lue")).toBeVisible();
   const accessibility = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa"])
     .analyze();
@@ -802,7 +810,9 @@ test("UC-11/ERR-019/BDD-PLAT-230 Platform break-glass requires a scoped command 
   await page.getByLabel("Accès break-glass critique").check();
   await page.getByRole("button", { name: "Exécuter la commande" }).click();
 
-  await expect(page.getByRole("status")).toContainText("Accès refusé");
+  await expect(
+    page.getByRole("status").filter({ hasText: "Accès refusé" }),
+  ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Résultat protégé autorisé" }),
   ).toHaveCount(0);
