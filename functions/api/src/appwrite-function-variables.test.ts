@@ -113,6 +113,35 @@ describe("Appwrite Function variable policy", () => {
     );
   });
 
+  it("BDD-DEL-APPWRITE-012 permits runtime-default and disabled optional capabilities", () => {
+    const optional = {
+      ...environment,
+      PROVIDER_OUTBOX_TRIGGER_SECRET: "",
+      APPWRITE_PROVIDER_EVENT_INBOX_TABLE_ID: "",
+      ANTIVIRUS_SCANNER_ENDPOINT: "",
+      ANTIVIRUS_SCANNER_KEY_ID: "",
+      ANTIVIRUS_SCANNER_HMAC_KEY: "",
+      ANTIVIRUS_SCANNER_TIMEOUT_MS: "",
+      Y7_EMAIL_SMTP_HOST: "",
+      Y7_EMAIL_SMTP_PORT: "",
+      Y7_EMAIL_SMTP_SECURE: "",
+      Y7_EMAIL_SMTP_USER: "",
+      Y7_EMAIL_SMTP_PASSWORD: "",
+      Y7_EMAIL_FROM: "",
+    };
+
+    const actions = planAppwriteFunctionVariables(optional, []);
+
+    expect(actions.map(({ key }) => key)).not.toEqual(
+      expect.arrayContaining([
+        "PROVIDER_OUTBOX_TRIGGER_SECRET",
+        "APPWRITE_PROVIDER_EVENT_INBOX_TABLE_ID",
+        "ANTIVIRUS_SCANNER_ENDPOINT",
+        "Y7_EMAIL_SMTP_HOST",
+      ]),
+    );
+  });
+
   it("BDD-REL-405 manages every Day 4 and provider Production authority", () => {
     expect(appwriteFunctionVariableKeys).toEqual(
       expect.arrayContaining([

@@ -119,6 +119,34 @@ export const appwriteFunctionVariableKeys = [
   "RELEASE",
 ] as const;
 
+const optionalFunctionVariableKeys = new Set<
+  (typeof appwriteFunctionVariableKeys)[number]
+>([
+  "PROVIDER_OUTBOX_TRIGGER_SECRET",
+  "APPWRITE_PROVIDER_EVENT_INBOX_TABLE_ID",
+  "APPWRITE_PROVIDER_SYNC_OUTBOX_TABLE_ID",
+  "APPWRITE_OFFLINE_CONFLICT_PROJECTIONS_TABLE_ID",
+  "APPWRITE_INTELLIGENCE_PROVENANCE_TABLE_ID",
+  "APPWRITE_DELETION_RECORDS_TABLE_ID",
+  "APPWRITE_ABUSE_COUNTERS_TABLE_ID",
+  "APPWRITE_EXCEPTIONAL_ACCESS_GRANTS_TABLE_ID",
+  "APPWRITE_EXCEPTIONAL_ACCESS_AUDIT_TABLE_ID",
+  "APPWRITE_EXCEPTIONAL_ACCESS_OPERATIONS_TABLE_ID",
+  "APPWRITE_PLATFORM_OPERATOR_TEAM_ID",
+  "APPWRITE_PLATFORM_OWNER_TEAM_ID",
+  "PLATFORM_MFA_MAX_AGE_SECONDS",
+  "ANTIVIRUS_SCANNER_ENDPOINT",
+  "ANTIVIRUS_SCANNER_KEY_ID",
+  "ANTIVIRUS_SCANNER_HMAC_KEY",
+  "ANTIVIRUS_SCANNER_TIMEOUT_MS",
+  "Y7_EMAIL_SMTP_HOST",
+  "Y7_EMAIL_SMTP_PORT",
+  "Y7_EMAIL_SMTP_SECURE",
+  "Y7_EMAIL_SMTP_USER",
+  "Y7_EMAIL_SMTP_PASSWORD",
+  "Y7_EMAIL_FROM",
+]);
+
 export interface ExistingFunctionVariable {
   readonly id: string;
   readonly key: string;
@@ -146,6 +174,7 @@ export function planAppwriteFunctionVariables(
     const value = environment[key]?.trim();
     if (value === undefined || value.length === 0) {
       if (existingByKey.has(key)) return [];
+      if (optionalFunctionVariableKeys.has(key)) return [];
       throw new Error(`APPWRITE_FUNCTION_VARIABLE_MISSING:${key}`);
     }
     const current = existingByKey.get(key);
