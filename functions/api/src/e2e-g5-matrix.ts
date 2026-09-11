@@ -375,8 +375,19 @@ export function parseE2eG5Command(command: string): string {
   return match[1];
 }
 
+const crossScenarioEvidenceCommands = [
+  "pnpm verify:providers:g4:message-sync:github",
+  "pnpm verify:providers:g4:message-sync:gitlab",
+  "pnpm verify:slo:g5",
+] as const;
+
 export function buildE2eG5Commands(): readonly string[] {
-  return [...new Set(buildE2eG5Matrix().map(({ evidenceCommand }) => evidenceCommand))]
+  return [
+    ...new Set([
+      ...buildE2eG5Matrix().map(({ evidenceCommand }) => evidenceCommand),
+      ...crossScenarioEvidenceCommands,
+    ]),
+  ]
     .map(parseE2eG5Command)
     .sort();
 }
