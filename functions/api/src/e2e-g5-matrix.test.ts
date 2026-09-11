@@ -96,9 +96,7 @@ describe("G5 end-to-end traceability matrix", () => {
       useCaseCount: 12,
       errorCount: 19,
       environments: ["appwrite_preview", "local_browser"],
-      evidenceCommands: [
-        ...new Set(matrix.map(({ evidenceCommand }) => evidenceCommand)),
-      ].sort(),
+      evidenceCommands: buildE2eG5Commands().map((command) => `pnpm ${command}`),
       scenarios: matrix.map(({ id, requirementIds, environment }) => ({
         id,
         requirementIds,
@@ -117,6 +115,9 @@ describe("G5 end-to-end traceability matrix", () => {
     expect(commands).toContain("verify:e2e:g5:browser");
     expect(commands).toContain("verify:recovery:g5");
     expect(commands).toContain("verify:providers:g4:reconciliation");
+    expect(commands).toContain("verify:providers:g4:message-sync:github");
+    expect(commands).toContain("verify:providers:g4:message-sync:gitlab");
+    expect(commands).toContain("verify:slo:g5");
     expect(commands.every((command) => /^verify:[a-z0-9:-]+$/u.test(command))).toBe(
       true,
     );
