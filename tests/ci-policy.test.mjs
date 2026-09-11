@@ -255,6 +255,8 @@ test("BDD-REL-302 deploys the Production scanner only through protected OIDC", a
   assert.match(workflow, /docker push "\$IMAGE"/u);
   assert.match(workflow, /az deployment group create/u);
   assert.match(workflow, /monitor action-group test-notifications create/u);
+  assert.match(workflow, /ACTION_GROUP_NAME="\$\{AZURE_ACTION_GROUP_ID##\*\/\}"/u);
+  assert.match(workflow, /--action-group "\$ACTION_GROUP_NAME"/u);
   assert.match(workflow, /--alert-type metricstaticthreshold/u);
   assert.match(workflow, /PRODUCTION_ALERT_TEST_SUBMITTED/u);
   assert.match(workflow, /curl --fail --silent --show-error/u);
