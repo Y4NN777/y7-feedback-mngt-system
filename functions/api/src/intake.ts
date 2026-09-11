@@ -1,5 +1,7 @@
 import {
+  createAttachmentRecord,
   issueAccessGrant,
+  type AttachmentRecord,
   type AccessGrant,
   type ReporterAttribution,
   type ValidatedContext,
@@ -7,6 +9,8 @@ import {
   type FeedbackSource,
   type FeedbackType,
 } from "@y7-feedback/domain";
+
+import type { AttachmentStagingGrant } from "./attachment-staging-token.js";
 
 export interface AcceptedFeedbackRecord {
   readonly id: string;
@@ -78,6 +82,7 @@ export interface AcceptanceCommit {
   readonly notification: AcceptanceNotification;
   readonly outbox: AcceptanceOutboxRecord;
   readonly idempotency: IdempotencyRecord;
+  readonly attachments: readonly AttachmentRecord[];
 }
 
 export interface IntakeStore {
@@ -99,7 +104,10 @@ export interface IntakeDependencies {
   readonly hashProof: (proof: string) => string;
   readonly sealProof: (proof: string) => string;
   readonly openProof: (protectedProof: string) => string;
-  readonly digestPayload: (draft: ValidatedFeedbackDraft) => string;
+  readonly digestPayload: (
+    draft: ValidatedFeedbackDraft,
+    attachmentGrants: readonly AttachmentStagingGrant[],
+  ) => string;
   readonly now: () => string;
 }
 
@@ -107,6 +115,7 @@ export interface IntakeCommand {
   readonly clientOperationId: string;
   readonly draft: ValidatedFeedbackDraft;
   readonly locale?: "fr" | "en";
+  readonly attachmentGrants?: readonly AttachmentStagingGrant[];
 }
 
 export type IntakeOutcome =
@@ -154,13 +163,33 @@ function required(value: string): string {
   return normalized;
 }
 
+function validAttachmentGrants(command: IntakeCommand): boolean {
+  const grants = command.attachmentGrants ?? [];
+  return (
+    grants.length === command.draft.attachmentNames.length &&
+    grants.length <= 5 &&
+    new Set(grants.map(({ attachmentId }) => attachmentId)).size === grants.length &&
+    new Set(grants.map(({ objectId }) => objectId)).size === grants.length &&
+    grants.every(
+      (grant, index) =>
+        grant.operationId === command.clientOperationId &&
+        grant.workspaceId === command.draft.workspaceId &&
+        grant.projectId === command.draft.projectId &&
+        grant.displayName === command.draft.attachmentNames[index],
+    )
+  );
+}
+
 export function createIntakeCoordinator(
   store: IntakeStore,
   dependencies: IntakeDependencies,
 ): IntakeCoordinator {
   return {
     async accept(command) {
-      if (!operationIdPattern.test(command.clientOperationId)) {
+      if (
+        !operationIdPattern.test(command.clientOperationId) ||
+        !validAttachmentGrants(command)
+      ) {
         return { status: "rejected", code: "INTAKE_INVALID" };
       }
 
@@ -168,7 +197,9 @@ export function createIntakeCoordinator(
       let payloadDigest: string;
       let existing: IdempotencyRecord | null;
       try {
-        payloadDigest = required(dependencies.digestPayload(command.draft));
+        payloadDigest = required(
+          dependencies.digestPayload(command.draft, command.attachmentGrants ?? []),
+        );
         existing = await store.findIdempotency(scopeKey, command.clientOperationId);
       } catch {
         return retryable();
@@ -265,6 +296,25 @@ export function createIntakeCoordinator(
             proofVerifier: issued.grant.verifier,
             createdAt: acceptedAt,
           },
+          attachments: (command.attachmentGrants ?? []).map((grant) =>
+            createAttachmentRecord({
+              id: grant.attachmentId,
+              objectId: grant.objectId,
+              feedbackId,
+              workspaceId: grant.workspaceId,
+              projectId: grant.projectId,
+              audience: "reporter",
+              sourceEntry: {
+                kind: "source_submission",
+                id: command.clientOperationId,
+              },
+              displayName: grant.displayName,
+              mediaType: grant.mediaType,
+              size: grant.size,
+              sha256: grant.sha256,
+              createdAt: grant.stagedAt,
+            }),
+          ),
         };
         await store.commit(commit);
         return accepted(commit.idempotency, issued.proof, false);

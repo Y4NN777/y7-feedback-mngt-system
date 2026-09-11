@@ -195,7 +195,7 @@ function validateCommit(input: {
   }
 }
 
-function metadataData(
+export function attachmentMetadataData(
   record: AttachmentRecord,
   operationId: string,
   schema: AppwriteAttachmentAcceptanceSchema,
@@ -301,7 +301,12 @@ export function createAppwriteAttachmentAcceptanceStore(
             databaseId: schema.databaseId,
             tableId: schema.attachmentsTableId,
             rowId: attachment.id,
-            data: metadataData(attachment, input.operationId, schema, sensitive),
+            data: attachmentMetadataData(
+              attachment,
+              input.operationId,
+              schema,
+              sensitive,
+            ),
             permissions: [],
             transactionId: transaction.$id,
           });
