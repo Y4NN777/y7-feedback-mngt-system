@@ -82,6 +82,9 @@ The current candidate contains these independently revertible outcomes:
   or installing the verification recipient in the Function.
 - `84eb5d6` — Production release rejects GitHub or GitLab callbacks that do not
   equal their exact route on the configured Production Function origin.
+- `499cc12` — the scanner health contract exposes its immutable source commit,
+  and both deployment and release gates reject a healthy scanner from any
+  other candidate.
 
 Local evidence currently passing:
 
@@ -93,11 +96,11 @@ pnpm typecheck
 pnpm test
 pnpm test:coverage
 pnpm build
-pnpm security:scan # 283 files, 0 findings
+pnpm security:scan # 285 files, 0 findings
 pnpm --filter @y7-feedback/web exec playwright test --list # 38 scenarios, 2 projects
 ```
 
-The API suite contains 1,499 tests; its coverage run reports 100% statements,
+The API suite contains 1,506 tests; its coverage run reports 100% statements,
 branches, functions and lines. The Playwright listing proves discovery and
 traceability only; execution remains part of the hosted G5 browser gate.
 

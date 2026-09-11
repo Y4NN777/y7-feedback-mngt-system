@@ -43,6 +43,11 @@ fails before deployment unless all of these exist:
 - a new 32-byte scanner HMAC secret and non-secret key identifier;
 - an Azure Monitor Action Group resource ID.
 
+The gateway publishes the exact lowercase commit SHA in its non-sensitive
+health response. Both the scanner deployment workflow and the reversible
+release require it to equal their `GITHUB_SHA`; a healthy scanner from an older
+or unrelated candidate is not acceptable release evidence.
+
 Copy only the emitted non-sensitive scanner origin into the Production release
 configuration. Do not create a custom domain; use the Azure-provided HTTPS
 origin.
@@ -114,7 +119,8 @@ callbacks and webhooks fail closed.
 
 Run `Production release` for the candidate commit. The workflow:
 
-1. proves the permanent scanner is ready;
+1. proves the permanent scanner is ready and built from the exact candidate
+   commit;
 2. provisions/migrates Production and deploys a new Appwrite Function revision;
 3. creates a staged Vercel Production deployment with no domain assignment;
 4. smokes the staged deployment through `vercel curl`;
