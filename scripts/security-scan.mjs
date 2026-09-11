@@ -14,6 +14,7 @@ const scanRoots = [
   "services/antivirus/src",
   "services/antivirus/compose.yaml",
   "services/antivirus/Dockerfile",
+  "docs/sessions",
   "scripts/antivirus-smoke.mjs",
   "vercel.json",
 ];
@@ -23,6 +24,7 @@ const textExtensions = new Set([
   ".html",
   ".js",
   ".json",
+  ".md",
   ".mjs",
   ".svg",
   ".ts",
@@ -42,6 +44,8 @@ const prohibitedPatterns = [
 
 const prohibitedPublicVariable =
   /^\s*VITE_[A-Z0-9_]*(?:SECRET|TOKEN|PRIVATE_KEY|API_KEY|ACCESS_PROOF|PASSWORD)[A-Z0-9_]*\s*=/mu;
+const curatedSessionPath = /^docs\/sessions\/(?!raw(?:\/|$))/u;
+const literalEmail = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/iu;
 
 export function findProhibitedContent(path, content) {
   const findings = [];
@@ -54,6 +58,10 @@ export function findProhibitedContent(path, content) {
 
   if (prohibitedPublicVariable.test(content)) {
     findings.push(`${path}: secret-bearing VITE_ variable`);
+  }
+
+  if (curatedSessionPath.test(path) && literalEmail.test(content)) {
+    findings.push(`${path}: literal email in curated session evidence`);
   }
 
   return findings;
@@ -89,6 +97,7 @@ async function collectFiles(path) {
   for (const entry of entries) {
     const child = join(absolutePath, entry.name);
     if (entry.isDirectory()) {
+      if (relative(repositoryRoot, child) === "docs/sessions/raw") continue;
       files.push(...(await collectFiles(relative(repositoryRoot, child))));
     } else if (
       entry.isFile() &&
