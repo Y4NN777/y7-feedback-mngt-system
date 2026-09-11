@@ -74,6 +74,10 @@ export interface AppwriteConversationLifecycleTablesPort {
     readonly permissions: readonly string[];
     readonly transactionId: string;
   }): Promise<unknown>;
+  createOperations?(input: {
+    readonly transactionId: string;
+    readonly operations: readonly Readonly<Record<string, unknown>>[];
+  }): Promise<unknown>;
   updateRow(input: {
     readonly databaseId: string;
     readonly tableId: string;
@@ -577,6 +581,11 @@ export function createNodeAppwriteConversationLifecycleStore(
     },
     createRow: (input) =>
       tables.createRow({ ...input, permissions: [...input.permissions] }),
+    createOperations: (input) =>
+      tables.createOperations({
+        transactionId: input.transactionId,
+        operations: [...input.operations],
+      }),
     updateRow: (input) => tables.updateRow(input),
     updateTransaction: (input) => tables.updateTransaction(input),
   };

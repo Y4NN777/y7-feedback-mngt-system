@@ -102,7 +102,7 @@ const queries = {
 };
 
 function execute(
-  target: ReturnType<typeof setup>,
+  target: AppwriteNotificationFanoutTablesPort,
   overrides: Readonly<Record<string, unknown>> = {},
   schemaOverride = schema,
 ) {
@@ -127,6 +127,22 @@ function execute(
 }
 
 describe("Appwrite notification fanout", () => {
+  it("BDD-SLO-210 batches independent recipient writes into one transaction request", async () => {
+    const target = setup();
+    const createOperations = vi.fn<
+      NonNullable<AppwriteNotificationFanoutTablesPort["createOperations"]>
+    >((input) => Promise.resolve({ $id: input.transactionId }));
+
+    await expect(execute({ ...target, createOperations })).resolves.toEqual({
+      notifications: 3,
+      emailAttempts: 3,
+    });
+
+    expect(target.createRow).not.toHaveBeenCalled();
+    expect(createOperations).toHaveBeenCalledTimes(1);
+    expect(createOperations.mock.calls[0]?.[0].operations).toHaveLength(8);
+  });
+
   it("BDD-SLO-209 overlaps independent authority reads and recipient writes", async () => {
     const target = setup();
     let releaseGrant: (() => void) | undefined;
@@ -158,7 +174,7 @@ describe("Appwrite notification fanout", () => {
     });
     releaseGrant?.();
     await vi.waitFor(() => {
-      expect(target.createRow.mock.calls.length).toBeGreaterThan(1);
+      expect(target.createRow).toHaveBeenCalledTimes(8);
     });
     releaseFirstWrite?.();
 

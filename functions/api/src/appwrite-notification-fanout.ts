@@ -42,6 +42,10 @@ export interface AppwriteNotificationFanoutTablesPort {
     readonly permissions: readonly string[];
     readonly transactionId: string;
   }): Promise<unknown>;
+  createOperations?(input: {
+    readonly transactionId: string;
+    readonly operations: readonly Readonly<Record<string, unknown>>[];
+  }): Promise<unknown>;
 }
 
 export interface AppwriteNotificationFanoutQueryPort {
@@ -348,34 +352,123 @@ export async function appendAppwriteNotificationFanout(
     },
   });
 
-  await Promise.all(
-    planned.map(async (item) => {
+  if (tables.createOperations) {
+    const operations = planned.flatMap((item) => {
       const notificationId = stableId("not_", item.notificationKey);
-      const notification = await tables.createRow({
-        databaseId: schema.databaseId,
-        tableId: schema.notificationsTableId,
-        rowId: notificationId,
-        data: {
-          eventId: item.fact.eventId,
-          feedbackId: item.fact.feedbackId,
-          workspaceId: feedback.workspaceId,
-          projectId: feedback.projectId,
-          reporterId: feedback.reporterId,
-          recipientKind: item.recipient.kind,
-          recipientId: item.recipient.id,
-          kind: item.fact.kind,
-          reference: item.fact.reference,
-          locale: item.fact.locale,
-          createdAt: item.fact.occurredAt,
-          readAt: null,
+      const rows: Readonly<Record<string, unknown>>[] = [
+        {
+          action: "create",
+          databaseId: schema.databaseId,
+          tableId: schema.notificationsTableId,
+          rowId: notificationId,
+          data: {
+            eventId: item.fact.eventId,
+            feedbackId: item.fact.feedbackId,
+            workspaceId: feedback.workspaceId,
+            projectId: feedback.projectId,
+            reporterId: feedback.reporterId,
+            recipientKind: item.recipient.kind,
+            recipientId: item.recipient.id,
+            kind: item.fact.kind,
+            reference: item.fact.reference,
+            locale: item.fact.locale,
+            createdAt: item.fact.occurredAt,
+            readAt: null,
+            $permissions: [],
+          },
         },
-        permissions: [],
-        transactionId: input.transactionId,
-      });
-      if (!validCreated(notification, notificationId)) {
-        throw new Error("APPWRITE_NOTIFICATION_FANOUT_UNAVAILABLE");
+      ];
+      if (item.recipient.kind === "workspace") {
+        rows.push({
+          action: "create",
+          databaseId: schema.databaseId,
+          tableId: schema.notificationSignalsTableId,
+          rowId: stableId("nsig_", item.notificationKey),
+          data: {
+            recipientId: item.recipient.id,
+            createdAt: item.fact.occurredAt,
+            $permissions: [permissions.readUser(item.recipient.id)],
+          },
+        });
       }
-      await Promise.all([
+      if (item.channels.includes("email")) {
+        const outboxId = stableId("nout_", `${item.notificationKey}:email`);
+        rows.push({
+          action: "create",
+          databaseId: schema.databaseId,
+          tableId: schema.outboxTableId,
+          rowId: outboxId,
+          data: {
+            notificationId,
+            channel: "email",
+            status: "pending",
+            createdAt: item.fact.occurredAt,
+            payloadJson: persistence.protector.seal(
+              {
+                environment: persistence.environment,
+                tableId: schema.outboxTableId,
+                rowId: outboxId,
+                field: "payloadJson",
+              },
+              JSON.stringify({
+                kind: item.fact.kind,
+                reference: item.fact.reference,
+                locale: item.fact.locale,
+                recipient: item.recipient,
+              }),
+            ),
+            $permissions: [],
+          },
+        });
+      }
+      return rows;
+    });
+    const staged = await tables.createOperations({
+      transactionId: input.transactionId,
+      operations,
+    });
+    if (!object(staged) || staged.$id !== input.transactionId) {
+      throw new Error("APPWRITE_NOTIFICATION_FANOUT_UNAVAILABLE");
+    }
+    return {
+      notifications: planned.length,
+      emailAttempts: planned.filter((item) => item.channels.includes("email")).length,
+    };
+  }
+
+  await Promise.all(
+    planned.flatMap((item) => {
+      const notificationId = stableId("not_", item.notificationKey);
+      const writes: Promise<void>[] = [
+        tables
+          .createRow({
+            databaseId: schema.databaseId,
+            tableId: schema.notificationsTableId,
+            rowId: notificationId,
+            data: {
+              eventId: item.fact.eventId,
+              feedbackId: item.fact.feedbackId,
+              workspaceId: feedback.workspaceId,
+              projectId: feedback.projectId,
+              reporterId: feedback.reporterId,
+              recipientKind: item.recipient.kind,
+              recipientId: item.recipient.id,
+              kind: item.fact.kind,
+              reference: item.fact.reference,
+              locale: item.fact.locale,
+              createdAt: item.fact.occurredAt,
+              readAt: null,
+            },
+            permissions: [],
+            transactionId: input.transactionId,
+          })
+          .then((notification) => {
+            if (!validCreated(notification, notificationId)) {
+              throw new Error("APPWRITE_NOTIFICATION_FANOUT_UNAVAILABLE");
+            }
+          }),
+      ];
+      writes.push(
         item.recipient.kind === "workspace"
           ? (async () => {
               const signalId = stableId("nsig_", item.notificationKey);
@@ -395,6 +488,8 @@ export async function appendAppwriteNotificationFanout(
               }
             })()
           : Promise.resolve(),
+      );
+      writes.push(
         item.channels.includes("email")
           ? (async () => {
               const outboxId = stableId("nout_", `${item.notificationKey}:email`);
@@ -431,7 +526,8 @@ export async function appendAppwriteNotificationFanout(
               }
             })()
           : Promise.resolve(),
-      ]);
+      );
+      return writes;
     }),
   );
   return {
