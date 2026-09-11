@@ -433,6 +433,86 @@ test("UC-05/ERR-007/BDD-CONV-001 Reporter answers without Internal Notes in FR/E
   ).toBe(false);
 });
 
+test("UC-06/BDD-PRIV-214 revokes Reporter access immediately after an acknowledged deletion request", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  const privacyCommands: unknown[] = [];
+  await page.route("http://127.0.0.1:8787/v1/feedback/**", async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (path === "/v1/feedback/retrieve") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          status: "ok",
+          feedback: {
+            feedbackId: "feedback_privacy_1",
+            reference: "Y7-2026-000006",
+            originalSource: { type: "review", experience: "Useful workflow" },
+            currentSource: { type: "review", experience: "Useful workflow" },
+            currentState: "received",
+            history: [],
+            messages: [],
+            attachments: [],
+            sourceRevisions: [],
+            deletionRequests: [],
+          },
+        }),
+      });
+      return;
+    }
+    if (path === "/v1/feedback/privacy") {
+      privacyCommands.push(request.postDataJSON());
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          status: "ok",
+          result: {
+            disposition: "applied",
+            revision: 1,
+            purgeEligibleAt: "2026-10-10T00:00:00.000Z",
+          },
+        }),
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "ERR-CONVERSATION-RETRYABLE" }),
+    });
+  });
+
+  await page.goto("/retrieve");
+  await page.getByRole("textbox", { name: "Référence" }).fill("Y7-2026-000006");
+  await page.getByLabel("Preuve d’accès").fill("private-proof");
+  await page.getByRole("button", { name: "Retrouver le retour" }).click();
+  const deletion = page.getByRole("button", {
+    name: "Supprimer définitivement mon retour",
+  });
+  await expect(deletion).toBeDisabled();
+  await page.getByLabel(/Je comprends que l’accès sera révoqué immédiatement/u).check();
+  await deletion.click();
+
+  await expect(page.getByRole("status")).toContainText(
+    "Le retour est supprimé de l’usage courant",
+  );
+  expect(privacyCommands).toHaveLength(1);
+  expect(privacyCommands[0]).toMatchObject({
+    reference: "Y7-2026-000006",
+    proof: "private-proof",
+    command: {
+      kind: "request_deletion",
+      feedbackId: "feedback_privacy_1",
+      reasonCode: "reporter_request",
+    },
+  });
+  await expect(page).not.toHaveURL(/private-proof/u);
+});
+
 test("UC-07/BDD-ADMIN-001 administration sign-in preserves input and is accessible at 320 px", async ({
   page,
 }) => {
@@ -462,10 +542,11 @@ test("UC-07/BDD-ADMIN-001 administration sign-in preserves input and is accessib
   ).toBe(false);
 });
 
-test("UC-08/BDD-WORK-001 Workbench detail is keyboard-complete and accessible at 320 px", async ({
+test("UC-08/UC-09/BDD-WORK-001/BDD-NOT-WEB-001 Workbench detail and notifications are keyboard-complete at 320 px", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 320, height: 800 });
+  let notificationRead = false;
   await page.route("http://127.0.0.1/v1/account/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
     await route.fulfill({
@@ -476,6 +557,51 @@ test("UC-08/BDD-WORK-001 Workbench detail is keyboard-complete and accessible at
   });
   await page.route("http://127.0.0.1:8787/v1/workspaces/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/operations/notifications/list")) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          status: "ok",
+          result: {
+            unreadCount: notificationRead ? 0 : 1,
+            items: [
+              {
+                id: "notification_1",
+                eventId: "event_1",
+                feedbackId: "feedback_1",
+                kind: "feedback.accepted",
+                reference: "Y7-2026-000008",
+                locale: "fr",
+                createdAt: "2026-08-28T10:02:00.000Z",
+                readAt: notificationRead ? "2026-08-28T10:03:00.000Z" : null,
+              },
+            ],
+          },
+        }),
+      });
+      return;
+    }
+    if (path.endsWith("/operations/notifications/read")) {
+      notificationRead = true;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ status: "ok", result: { status: "read" } }),
+      });
+      return;
+    }
+    if (path.endsWith("/operations/realtime/authorize")) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          status: "ok",
+          result: { databaseId: "feedback", tableId: "notification_signals" },
+        }),
+      });
+      return;
+    }
     const conversation = path.endsWith("/conversation");
     const detail = path.endsWith("/workbench/feedback_1");
     const result = detail
@@ -540,6 +666,9 @@ test("UC-08/BDD-WORK-001 Workbench detail is keyboard-complete and accessible at
   await page.keyboard.press("Enter");
   await expect(page.getByRole("heading", { name: "Upload fails" })).toBeVisible();
   await expect(page.getByText("Internal evidence")).toBeVisible();
+  await expect(page.getByText("Y7-2026-000008")).toBeVisible();
+  await page.getByRole("button", { name: "Marquer comme lue" }).click();
+  await expect(page.getByText("Lue")).toBeVisible();
   const accessibility = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa"])
     .analyze();
@@ -553,4 +682,72 @@ test("UC-08/BDD-WORK-001 Workbench detail is keyboard-complete and accessible at
       () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
     ),
   ).toBe(false);
+});
+
+test("UC-11/ERR-019/BDD-PLAT-230 Platform break-glass requires a scoped command and exposes no protected result on denial", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  const commands: unknown[] = [];
+  await page.route("http://127.0.0.1/v1/account/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    await route.fulfill({
+      status: 201,
+      contentType: "application/json",
+      body: JSON.stringify(path.endsWith("/jwts") ? { jwt: "jwt_platform_1" } : {}),
+    });
+  });
+  await page.route(
+    "http://127.0.0.1:8787/v1/platform/exceptional-access/commands",
+    async (route) => {
+      commands.push(route.request().postDataJSON());
+      await route.fulfill({
+        status: 403,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "ERR-PLATFORM-ACCESS-DENIED" }),
+      });
+    },
+  );
+
+  await page.goto("/platform/access");
+  await page.getByLabel("Adresse e-mail").fill("operator@example.test");
+  await page.getByLabel("Mot de passe").fill("password");
+  await page.getByRole("button", { name: "Se connecter" }).click();
+  await page.getByLabel("Identifiant du grant").fill("grant_11");
+  await page.getByLabel("Identifiant du workspace").fill("workspace_1");
+  await page.getByLabel("Identifiant du projet (facultatif)").fill("project_1");
+  await page.getByLabel("Identifiant du feedback (facultatif)").fill("feedback_1");
+  await page.getByLabel("Capacité autorisée").selectOption("internal_note.read");
+  await page
+    .getByLabel("Justification")
+    .fill("Critical customer incident investigation");
+  await page.getByLabel("Sévérité de l’incident").selectOption("critical");
+  await page.getByLabel("Accès break-glass critique").check();
+  await page.getByRole("button", { name: "Exécuter la commande" }).click();
+
+  await expect(page.getByRole("status")).toContainText("Accès refusé");
+  await expect(
+    page.getByRole("heading", { name: "Résultat protégé autorisé" }),
+  ).toHaveCount(0);
+  expect(commands).toHaveLength(1);
+  expect(commands[0]).toMatchObject({
+    kind: "request",
+    grantId: "grant_11",
+    workspaceId: "workspace_1",
+    projectId: "project_1",
+    feedbackId: "feedback_1",
+    actions: ["internal_note.read"],
+    incidentSeverity: "critical",
+    breakGlass: true,
+  });
+  await page.getByRole("button", { name: "English" }).click();
+  await expect(page.getByLabel("Grant identifier")).toHaveValue("grant_11");
+  const accessibility = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa"])
+    .analyze();
+  expect(
+    accessibility.violations.filter(
+      (violation) => violation.impact === "serious" || violation.impact === "critical",
+    ),
+  ).toEqual([]);
 });
