@@ -75,4 +75,27 @@ describe("Appwrite Function variable policy", () => {
       "PROVIDER_OUTBOX_TRIGGER_SECRET",
     );
   });
+
+  it("BDD-REL-405 manages every Day 4 and provider Production authority", () => {
+    expect(appwriteFunctionVariableKeys).toEqual(
+      expect.arrayContaining([
+        "APPWRITE_PROVIDER_EVENT_INBOX_TABLE_ID",
+        "APPWRITE_PROVIDER_SYNC_OUTBOX_TABLE_ID",
+        "APPWRITE_OFFLINE_CONFLICT_PROJECTIONS_TABLE_ID",
+        "APPWRITE_INTELLIGENCE_PROVENANCE_TABLE_ID",
+        "APPWRITE_DELETION_RECORDS_TABLE_ID",
+        "APPWRITE_ABUSE_COUNTERS_TABLE_ID",
+        "APPWRITE_EXCEPTIONAL_ACCESS_GRANTS_TABLE_ID",
+        "APPWRITE_EXCEPTIONAL_ACCESS_AUDIT_TABLE_ID",
+        "APPWRITE_EXCEPTIONAL_ACCESS_OPERATIONS_TABLE_ID",
+        "GITHUB_APP_CLIENT_ID",
+        "GITHUB_APP_CLIENT_SECRET",
+        "GITHUB_APP_CALLBACK_URL",
+        "GITLAB_OAUTH_CLIENT_ID",
+        "GITLAB_OAUTH_CLIENT_SECRET",
+        "GITLAB_OAUTH_CALLBACK_URL",
+        "GITLAB_OAUTH_ORIGIN",
+      ]),
+    );
+  });
 });
