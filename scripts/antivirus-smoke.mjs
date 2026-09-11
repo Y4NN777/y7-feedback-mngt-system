@@ -46,6 +46,7 @@ async function waitFor(url, attempts, delayMs) {
 }
 
 async function send(bytes, nonce) {
+  const startedAt = performance.now();
   const timestamp = String(Date.now());
   const digest = createHash("sha256").update(bytes).digest("base64url");
   const canonical = `v1\nPOST\n/v1/scan\n${timestamp}\n${nonce}\n${digest}`;
@@ -65,7 +66,11 @@ async function send(bytes, nonce) {
     },
     body: bytes,
   });
-  return { http: response.status, body: await response.json() };
+  return {
+    http: response.status,
+    body: await response.json(),
+    elapsedMs: Math.round(performance.now() - startedAt),
+  };
 }
 
 async function waitForClean(bytes) {
@@ -94,6 +99,14 @@ try {
   });
   await waitFor(`http://127.0.0.1:${port}/health`, 180, 1_000);
   const clean = await waitForClean(new TextEncoder().encode("Y7 clean probe"));
+  const loadSamples = await Promise.all(
+    Array.from({ length: 12 }, (_, index) =>
+      send(
+        new TextEncoder().encode(`Y7 clean load probe ${String(index + 1)}`),
+        `smoke_load_nonce_${String(index + 1).padStart(2, "0")}`,
+      ),
+    ),
+  );
   const infectedBytes = new TextEncoder().encode(
     "X5O!P%@AP[4\\PZX54(P^)7CC)7}$" + "EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*",
   );
@@ -101,13 +114,20 @@ try {
   if (
     clean.http !== 200 ||
     clean.body?.status !== "clean" ||
+    loadSamples.some(
+      (sample) => sample.http !== 200 || sample.body?.status !== "clean",
+    ) ||
     infected.http !== 200 ||
     infected.body?.status !== "infected"
   ) {
     throw new Error("ANTIVIRUS_SMOKE_VERDICT_INVALID");
   }
   process.stdout.write(
-    `${JSON.stringify({ clean: clean.body.status, infected: infected.body.status })}\n`,
+    `${JSON.stringify({
+      clean: clean.body.status,
+      infected: infected.body.status,
+      attachmentProcessingSamplesMs: loadSamples.map(({ elapsedMs }) => elapsedMs),
+    })}\n`,
   );
 } finally {
   gateway?.kill("SIGTERM");
