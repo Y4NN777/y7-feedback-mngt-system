@@ -74,6 +74,8 @@ only its non-sensitive result. The same workflow then runs daily at `02:17 UTC`.
 It uses:
 
 - Production Appwrite read authority dedicated to recovery export;
+- explicit Production environment marker and the Preview project ID used only
+  to reject a shared or mislabeled Appwrite authority;
 - Azure OIDC identity `id-y7-feedback-recovery-backup`;
 - container-scoped `Storage Blob Data Contributor`;
 - separate encryption and signing keys;

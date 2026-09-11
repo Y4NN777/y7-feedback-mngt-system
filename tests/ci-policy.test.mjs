@@ -144,7 +144,9 @@ test("BDD-REL-303 schedules encrypted Production backup with dedicated authority
   assert.match(workflow, /cron: "17 2 \* \* \*"/u);
   assert.match(workflow, /environment: production-recovery-backup/u);
   assert.match(workflow, /Y7_ENVIRONMENT: production/u);
+  assert.match(workflow, /APPWRITE_ENVIRONMENT: production/u);
   assert.match(workflow, /Y7_PRODUCTION_APPWRITE_PROJECT_ID/u);
+  assert.match(workflow, /Y7_PREVIEW_APPWRITE_PROJECT_ID/u);
   assert.match(workflow, /secrets\.Y7_PRODUCTION_RECOVERY_APPWRITE_API_KEY/u);
   assert.match(workflow, /run: pnpm recovery:backup/u);
   assert.doesNotMatch(workflow, /Y7_RECOVERY_SOURCE_ENVIRONMENT/u);

@@ -10,6 +10,7 @@ import {
   createRecoveryArtifact,
   publishRecoveryArtifact,
 } from "./recovery-artifact.js";
+import { assertRecoveryBackupAuthority } from "./recovery-backup-authority.js";
 import { collectRecoveryEntries } from "./recovery-source.js";
 
 function required(name: string): string {
@@ -30,11 +31,15 @@ const digest = (value: Uint8Array) =>
 async function main() {
   if (!process.argv.includes("--apply"))
     throw new Error("RECOVERY_BACKUP_APPLY_REQUIRED");
-  const sourceEnvironment = required("Y7_ENVIRONMENT");
-  if (sourceEnvironment !== "preview" && sourceEnvironment !== "production")
-    throw new Error("RECOVERY_CONFIGURATION_INVALID");
   const endpoint = required("APPWRITE_ENDPOINT");
-  const projectId = required("APPWRITE_PROJECT_ID");
+  const authority = assertRecoveryBackupAuthority({
+    sourceEnvironment: required("Y7_ENVIRONMENT"),
+    backendEnvironment: required("APPWRITE_ENVIRONMENT"),
+    projectId: required("APPWRITE_PROJECT_ID"),
+    previewProjectId: process.env.Y7_PREVIEW_APPWRITE_PROJECT_ID?.trim(),
+  });
+  const sourceEnvironment = authority.environment;
+  const projectId = authority.projectId;
   const databaseId = required("APPWRITE_DATABASE_ID");
   const bucketId = required("APPWRITE_ATTACHMENT_BUCKET_ID");
   const functionId = required("APPWRITE_FUNCTION_ID");

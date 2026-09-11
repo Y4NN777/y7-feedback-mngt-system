@@ -86,11 +86,11 @@ pnpm typecheck
 pnpm test
 pnpm test:coverage
 pnpm build
-pnpm security:scan # 280 files, 0 findings
+pnpm security:scan # 281 files, 0 findings
 pnpm --filter @y7-feedback/web exec playwright test --list # 38 scenarios, 2 projects
 ```
 
-The API suite contains 1,479 tests; its coverage run reports 100% statements,
+The API suite contains 1,490 tests; its coverage run reports 100% statements,
 branches, functions and lines. The Playwright listing proves discovery and
 traceability only; execution remains part of the hosted G5 browser gate.
 
