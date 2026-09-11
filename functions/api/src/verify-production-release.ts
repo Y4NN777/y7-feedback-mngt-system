@@ -1,6 +1,7 @@
 /* v8 ignore file -- this adapter is exercised only against live Production authorities. */
+import { randomBytes } from "node:crypto";
 import { gzipSync } from "node:zlib";
-import { Client, DeploymentStatus, Functions, Query } from "node-appwrite";
+import { Client, DeploymentStatus, Functions, Query, TablesDB } from "node-appwrite";
 
 import { parseServerConfig } from "@y7-feedback/config/server";
 
@@ -10,6 +11,7 @@ import {
 } from "./appwrite-function-variables.js";
 import { createClamAvHttpScanner } from "./clamav-http-scanner.js";
 import { parseClamAvHttpScannerConfig } from "./clamav-http-scanner-config.js";
+import { proveProductionDeletionContinuity } from "./production-deletion-continuity.js";
 import { assertProductionReleaseReady } from "./production-release-policy.js";
 
 function required(name: string): string {
@@ -103,12 +105,12 @@ async function main(): Promise<void> {
   const scannerOrigin = origin(config.antivirusScanner.endpoint);
   const webOrigin = origin(config.webOrigin);
 
-  const functions = new Functions(
-    new Client()
-      .setEndpoint(config.appwriteEndpoint)
-      .setProject(config.appwriteProjectId)
-      .setKey(config.appwriteApiKey),
-  );
+  const client = new Client()
+    .setEndpoint(config.appwriteEndpoint)
+    .setProject(config.appwriteProjectId)
+    .setKey(config.appwriteApiKey);
+  const functions = new Functions(client);
+  const tables = new TablesDB(client);
   const definition = await functions.get({ functionId: productionFunctionId });
   const deployments = await functions.listDeployments({
     functionId: productionFunctionId,
@@ -136,23 +138,45 @@ async function main(): Promise<void> {
 
   let functionRollbackPassed = false;
   let functionRollForwardPassed = false;
-  try {
-    await functions.updateFunctionDeployment({
-      functionId: productionFunctionId,
-      deploymentId: rollback.$id,
-    });
-    functionRollbackPassed =
-      (await waitForDeployment(functions, productionFunctionId, rollback.$id)) &&
-      (await healthy(new URL("/health", functionOrigin))) !== undefined;
-  } finally {
-    await functions.updateFunctionDeployment({
-      functionId: productionFunctionId,
-      deploymentId: active.$id,
-    });
-    functionRollForwardPassed =
-      (await waitForDeployment(functions, productionFunctionId, active.$id)) &&
-      (await healthy(new URL("/health", functionOrigin))) !== undefined;
-  }
+  const probeSuffix = randomBytes(10).toString("hex");
+  await proveProductionDeletionContinuity(
+    {
+      createTable: (input) =>
+        tables.createTable({ ...input, permissions: [...input.permissions] }),
+      deleteTable: (input) => tables.deleteTable(input),
+      createRow: (input) =>
+        tables.createRow({ ...input, permissions: [...input.permissions] }),
+      deleteRow: (input) => tables.deleteRow(input),
+      getRow: (input) => tables.getRow(input),
+    },
+    {
+      databaseId: config.appwriteSchema.databaseId,
+      tableId: `rel_${probeSuffix}`,
+      markerId: `marker_${probeSuffix}`,
+      rollback: async () => {
+        await functions.updateFunctionDeployment({
+          functionId: productionFunctionId,
+          deploymentId: rollback.$id,
+        });
+        functionRollbackPassed =
+          (await waitForDeployment(functions, productionFunctionId, rollback.$id)) &&
+          (await healthy(new URL("/health", functionOrigin))) !== undefined;
+        if (!functionRollbackPassed)
+          throw new Error("PRODUCTION_FUNCTION_ROLLBACK_FAILED");
+      },
+      rollForward: async () => {
+        await functions.updateFunctionDeployment({
+          functionId: productionFunctionId,
+          deploymentId: active.$id,
+        });
+        functionRollForwardPassed =
+          (await waitForDeployment(functions, productionFunctionId, active.$id)) &&
+          (await healthy(new URL("/health", functionOrigin))) !== undefined;
+        if (!functionRollForwardPassed)
+          throw new Error("PRODUCTION_FUNCTION_ROLL_FORWARD_FAILED");
+      },
+    },
+  );
 
   const [functionHealth, scannerHealth, webHealth, webHeaders] = await Promise.all([
     healthy(new URL("/health", functionOrigin)),
@@ -209,6 +233,7 @@ async function main(): Promise<void> {
     },
     functionRollbackPassed,
     functionRollForwardPassed,
+    authoritativeDeletionPreserved: true,
   });
   process.stdout.write(
     `${JSON.stringify({ result: "PRODUCTION_RELEASE_READY", checks: result.checks })}\n`,
