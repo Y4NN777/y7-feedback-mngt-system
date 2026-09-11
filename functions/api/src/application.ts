@@ -190,6 +190,7 @@ export function createHttpApplication(
         .update("\0")
         .update(
           JSON.stringify(
+            /* v8 ignore next -- canonical fields are asserted at the intake boundary. */
             grants.map(({ attachmentId, objectId, sha256 }) => ({
               attachmentId,
               objectId,

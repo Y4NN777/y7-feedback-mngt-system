@@ -503,6 +503,14 @@ describe("trusted public Function boundary", () => {
         },
       }),
     ).resolves.toEqual({ statusCode: 400, body: { error: "ERR-INTAKE-INVALID" } });
+    await expect(
+      invalid.api.handle({
+        method: "POST",
+        path: "/v1/projects/wisemoney/feedback",
+        headers: {},
+        body: { ...bugBody(), attachments: [null] },
+      }),
+    ).resolves.toEqual({ statusCode: 400, body: { error: "ERR-INTAKE-INVALID" } });
     expect(invalid.accept).not.toHaveBeenCalled();
 
     const forged = setup({
@@ -531,6 +539,43 @@ describe("trusted public Function boundary", () => {
       }),
     ).resolves.toEqual({ statusCode: 400, body: { error: "ERR-INTAKE-INVALID" } });
     expect(forged.accept).not.toHaveBeenCalled();
+
+    await expect(
+      invalid.api.handle({
+        method: "POST",
+        path: "/v1/projects/wisemoney/feedback",
+        headers: {},
+        body: { ...bugBody(), attachments: "invalid" },
+      }),
+    ).resolves.toEqual({ statusCode: 400, body: { error: "ERR-INTAKE-INVALID" } });
+
+    const withoutTokens = createPublicApi(
+      invalid.projects,
+      { accept: invalid.accept },
+      invalid.access,
+    );
+    await expect(
+      withoutTokens.handle({
+        method: "POST",
+        path: "/v1/projects/wisemoney/feedback",
+        headers: {},
+        body: { ...bugBody(), attachments: [] },
+      }),
+    ).resolves.toMatchObject({ statusCode: 201 });
+    await expect(
+      withoutTokens.handle({
+        method: "POST",
+        path: "/v1/projects/wisemoney/feedback",
+        headers: {},
+        body: {
+          ...bugBody(),
+          attachments: [{ attachmentId: "attachment-1", token: "encrypted-token" }],
+        },
+      }),
+    ).resolves.toEqual({
+      statusCode: 503,
+      body: { error: "ERR-INTAKE-UNAVAILABLE" },
+    });
   });
 
   it("maps replay, conflict, and dependency failure without exposing prior success", async () => {
