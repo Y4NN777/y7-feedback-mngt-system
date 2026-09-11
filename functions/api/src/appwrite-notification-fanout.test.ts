@@ -143,6 +143,17 @@ describe("Appwrite notification fanout", () => {
     expect(createOperations.mock.calls[0]?.[0].operations).toHaveLength(8);
   });
 
+  it("fails closed when Appwrite does not acknowledge the batched transaction", async () => {
+    const target = setup();
+    const createOperations = vi.fn<
+      NonNullable<AppwriteNotificationFanoutTablesPort["createOperations"]>
+    >(() => Promise.resolve({ $id: "another_transaction" }));
+
+    await expect(execute({ ...target, createOperations })).rejects.toThrow(
+      "APPWRITE_NOTIFICATION_FANOUT_UNAVAILABLE",
+    );
+  });
+
   it("BDD-SLO-209 overlaps independent authority reads and recipient writes", async () => {
     const target = setup();
     let releaseGrant: (() => void) | undefined;
