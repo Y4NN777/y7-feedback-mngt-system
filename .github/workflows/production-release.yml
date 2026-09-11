@@ -46,7 +46,8 @@ jobs:
           NEW_WEB_URL=""
           NEW_WEB_DEPLOYMENT_ID=""
           PREVIOUS_WEB_DEPLOYMENT_ID=""
-          ROLLBACK_ACTIVE=0
+          PREVIOUS_WEB_DEPLOYMENT_TARGET=""
+          RESTORE_PREVIOUS_ON_FAILURE=0
           resolve_vercel_deployment_id() {
             local target="${1#https://}"
             curl --fail --silent --show-error --max-time 30 \
@@ -61,6 +62,24 @@ jobs:
                   if (typeof value.id !== "string" || !/^dpl_[A-Za-z0-9]+$/.test(value.id))
                     process.exit(1);
                   process.stdout.write(value.id);
+                });
+              '
+          }
+          resolve_vercel_deployment_target() {
+            local target="${1#https://}"
+            curl --fail --silent --show-error --max-time 30 \
+              --header "Authorization: Bearer $VERCEL_TOKEN" \
+              "https://api.vercel.com/v13/deployments/$target?teamId=$VERCEL_ORG_ID" |
+              node -e '
+                let body = "";
+                process.stdin.setEncoding("utf8");
+                process.stdin.on("data", (chunk) => { body += chunk; });
+                process.stdin.on("end", () => {
+                  const value = JSON.parse(body);
+                  if (typeof value.url !== "string" ||
+                      !/^[A-Za-z0-9.-]+\.vercel\.app$/.test(value.url))
+                    process.exit(1);
+                  process.stdout.write(`https://${value.url}`);
                 });
               '
           }
@@ -82,8 +101,10 @@ jobs:
             local status=$?
             trap - EXIT
             rm -f .env.appwrite-production .production-web-url
-            if [ "$ROLLBACK_ACTIVE" = "1" ] && [ -n "$NEW_WEB_URL" ]; then
-              if ! pnpm dlx vercel@50.35.0 promote "$NEW_WEB_URL" \
+            if [ "$status" -ne 0 ] && \
+               [ "$RESTORE_PREVIOUS_ON_FAILURE" = "1" ] && \
+               [ -n "$PREVIOUS_WEB_DEPLOYMENT_TARGET" ]; then
+              if ! pnpm dlx vercel@50.35.0 promote "$PREVIOUS_WEB_DEPLOYMENT_TARGET" \
                 --yes --token "$VERCEL_TOKEN" >/dev/null; then
                 status=1
               fi
@@ -117,6 +138,9 @@ jobs:
           PREVIOUS_WEB_DEPLOYMENT_ID="$(
             resolve_vercel_deployment_id "$PRODUCTION_WEB_ORIGIN"
           )"
+          PREVIOUS_WEB_DEPLOYMENT_TARGET="$(
+            resolve_vercel_deployment_target "$PRODUCTION_WEB_ORIGIN"
+          )"
           curl --fail --silent --show-error --max-time 30 \
             "$PRODUCTION_SCANNER_ORIGIN/health" >/dev/null
 
@@ -139,6 +163,7 @@ jobs:
           pnpm dlx vercel@50.35.0 curl / --deployment "$NEW_WEB_URL" \
             --token "$VERCEL_TOKEN" --fail --silent --show-error >/dev/null
 
+          RESTORE_PREVIOUS_ON_FAILURE=1
           pnpm dlx vercel@50.35.0 promote "$NEW_WEB_URL" \
             --yes --token "$VERCEL_TOKEN" >/dev/null
           await_vercel_deployment "$PRODUCTION_WEB_ORIGIN" "$NEW_WEB_DEPLOYMENT_ID"
@@ -147,7 +172,6 @@ jobs:
 
           pnpm dlx vercel@50.35.0 rollback --yes \
             --token "$VERCEL_TOKEN" >/dev/null
-          ROLLBACK_ACTIVE=1
           pnpm dlx vercel@50.35.0 rollback status \
             --token "$VERCEL_TOKEN" >/dev/null
           await_vercel_deployment "$PRODUCTION_WEB_ORIGIN" "$PREVIOUS_WEB_DEPLOYMENT_ID"
@@ -157,10 +181,10 @@ jobs:
           pnpm dlx vercel@50.35.0 promote "$NEW_WEB_URL" \
             --yes --token "$VERCEL_TOKEN" >/dev/null
           await_vercel_deployment "$PRODUCTION_WEB_ORIGIN" "$NEW_WEB_DEPLOYMENT_ID"
-          ROLLBACK_ACTIVE=0
           curl --fail --silent --show-error --max-time 30 \
             "$PRODUCTION_WEB_ORIGIN/" >/dev/null
 
           pnpm verify:release:production
           pnpm verify:providers:production:github
+          RESTORE_PREVIOUS_ON_FAILURE=0
           echo '{"result":"PRODUCTION_RELEASE_AND_ROLLBACK_PASSED"}'
