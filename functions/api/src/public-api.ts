@@ -12,6 +12,10 @@ import {
 
 import type { AccountlessAccessCoordinator } from "./accountless-access.js";
 import type { AttachmentStaging } from "./attachment-staging.js";
+import type {
+  AttachmentStagingGrant,
+  AttachmentStagingTokenCodec,
+} from "./attachment-staging-token.js";
 import type { IntakeCoordinator, IntakeOutcome } from "./intake.js";
 import type { ReporterAttachmentDownload } from "./reporter-attachment-download.js";
 import type { WorkspaceAttachmentDownload } from "./workspace-attachment-download.js";
@@ -195,11 +199,15 @@ function intakeDraft(
   body: Readonly<Record<string, unknown>>,
   project: PublicProject,
   locale: "fr" | "en",
+  attachmentNames: readonly string[],
 ): FeedbackDraft {
   if (!isObject(body.feedback)) throw new Error("PUBLIC_INPUT_INVALID");
   const raw = body.feedback;
   const type = feedbackType(raw.type);
-  if (!Array.isArray(raw.attachmentNames) || raw.attachmentNames.length !== 0) {
+  if (
+    raw.attachmentNames !== undefined &&
+    (!Array.isArray(raw.attachmentNames) || raw.attachmentNames.length !== 0)
+  ) {
     throw new Error("PUBLIC_INPUT_INVALID");
   }
   return {
@@ -207,8 +215,34 @@ function intakeDraft(
     source: sourceFrom(raw.source, type),
     reporter: reporterFrom(raw.reporter, project.reporterPurpose[locale]),
     context: contextFrom(raw.context),
-    attachmentNames: [],
+    attachmentNames,
   };
+}
+
+function attachmentGrantsFrom(
+  value: unknown,
+  tokens: AttachmentStagingTokenCodec | undefined,
+): readonly AttachmentStagingGrant[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > 5) {
+    throw new Error("PUBLIC_INPUT_INVALID");
+  }
+  if (value.length > 0 && !tokens) throw new Error("ATTACHMENT_FINALIZE_UNAVAILABLE");
+  return value.map((item) => {
+    if (!isObject(item)) throw new Error("PUBLIC_INPUT_INVALID");
+    const attachmentId = requiredString(item.attachmentId, 200);
+    const token = requiredString(item.token, 10_000);
+    try {
+      return (
+        tokens?.verify(attachmentId, token) ??
+        (() => {
+          throw new Error();
+        })()
+      );
+    } catch {
+      throw new Error("PUBLIC_INPUT_INVALID");
+    }
+  });
 }
 
 function intakeResponse(outcome: IntakeOutcome): PublicApiResponse {
@@ -266,6 +300,7 @@ export function createPublicApi(
   workspaceAttachmentDownload?: WorkspaceAttachmentDownload,
   workspaceOperations?: WorkspaceProjectOperations,
   attachmentStaging?: AttachmentStaging,
+  attachmentStagingTokens?: AttachmentStagingTokenCodec,
 ): PublicApi {
   return {
     async handle(request) {
@@ -690,15 +725,35 @@ export function createPublicApi(
         if (rawLocale !== "fr" && rawLocale !== "en") {
           throw new Error("PUBLIC_INPUT_INVALID");
         }
+        const attachmentGrants = attachmentGrantsFrom(
+          request.body.attachments,
+          attachmentStagingTokens,
+        );
+        if (
+          attachmentGrants.some(
+            (grant) =>
+              grant.operationId !== operationId ||
+              grant.workspaceId !== project.feedbackConfig.workspaceId ||
+              grant.projectId !== project.feedbackConfig.projectId,
+          )
+        ) {
+          throw new Error("PUBLIC_INPUT_INVALID");
+        }
         const draft = validateFeedbackDraft(
           project.feedbackConfig,
-          intakeDraft(request.body, { ...project, reporterPurpose }, rawLocale),
+          intakeDraft(
+            request.body,
+            { ...project, reporterPurpose },
+            rawLocale,
+            attachmentGrants.map(({ displayName }) => displayName),
+          ),
         );
         return intakeResponse(
           await intake.accept({
             clientOperationId: operationId,
             draft,
             locale: rawLocale,
+            attachmentGrants,
           }),
         );
       } catch (error: unknown) {
