@@ -88,6 +88,9 @@ The current candidate contains these independently revertible outcomes:
 - `110da77` — the release workflow injects `GITHUB_SHA` into the Appwrite
   Function and Vercel PWA builds, whose public health/metadata must both prove
   that exact candidate before release readiness can pass.
+- `67f9cf5` — the PWA identity proof reads the explicitly revalidated
+  `/index.html` response so a cached route projection cannot satisfy or
+  destabilize candidate verification.
 
 Local evidence currently passing:
 
