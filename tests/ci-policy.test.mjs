@@ -368,3 +368,21 @@ test("BDD-REL-406 stages, promotes, rolls back and restores Production", async (
   for (const reference of actionReferences)
     assert.match(reference, /^[^@\s]+@[0-9a-f]{40}$/u);
 });
+
+test("BDD-REL-407 proves deleted Appwrite state stays absent across Function rollback", async () => {
+  const verifier = await readFile(
+    new URL("../functions/api/src/verify-production-release.ts", import.meta.url),
+    "utf8",
+  );
+  const continuity = await readFile(
+    new URL("../functions/api/src/production-deletion-continuity.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(verifier, /proveProductionDeletionContinuity/u);
+  assert.match(verifier, /authoritativeDeletionPreserved/u);
+  assert.match(continuity, /await input\.rollback\(\)/u);
+  assert.match(continuity, /finally \{\s+await input\.rollForward\(\)/u);
+  assert.match(continuity, /PRODUCTION_DELETION_RESURRECTED/u);
+  assert.match(continuity, /await tables\.deleteTable/u);
+});

@@ -113,7 +113,8 @@ Run `Production release` for the candidate commit. The workflow:
 6. rolls Vercel back, verifies the prior deployment, and promotes the candidate
    again;
 7. switches Appwrite to the previous Ready Function deployment, health-checks
-   it, and restores the candidate in a `finally` path;
+   it, proves a deleted non-sensitive Appwrite marker remains absent, restores
+   the candidate in a `finally` path, and proves the marker is still absent;
 8. runs the signed antivirus matrix, web security/cache headers, environment
    isolation and provider callback/webhook denial probes;
 9. creates a non-sensitive temporary GitHub issue through the Production
@@ -123,10 +124,11 @@ Run `Production release` for the candidate commit. The workflow:
    as a Function variable or retained in evidence.
 
 The release is successful only after
-`PRODUCTION_RELEASE_AND_ROLLBACK_PASSED`. If a smoke fails, leave the last known
-good web and Function deployments active, investigate with redacted logs, and
-create a new atomic fix. Do not roll schema backwards destructively: additive
-schema remains compatible, and deletion-ledger semantics prevent restore from
+`PRODUCTION_RELEASE_AND_ROLLBACK_PASSED`. The temporary marker table is removed
+whether the proof passes or fails. If a smoke fails, leave the last known good
+web and Function deployments active, investigate with redacted logs, and create
+a new atomic fix. Do not roll schema backwards destructively: additive schema
+remains compatible, and deletion-ledger semantics prevent restore from
 resurrecting erased data.
 
 ## Finalization

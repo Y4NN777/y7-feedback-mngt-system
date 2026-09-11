@@ -44,6 +44,7 @@ function ready(
     },
     functionRollbackPassed: true,
     functionRollForwardPassed: true,
+    authoritativeDeletionPreserved: true,
     ...overrides,
   };
 }
@@ -52,7 +53,7 @@ describe("Production release policy", () => {
   it("BDD-REL-401 accepts only an isolated healthy reversible release", () => {
     expect(assertProductionReleaseReady(ready())).toEqual({
       status: "ready",
-      checks: 21,
+      checks: 22,
     });
   });
 
@@ -92,6 +93,7 @@ describe("Production release policy", () => {
     { rollbackDeploymentReady: false },
     { functionRollbackPassed: false },
     { functionRollForwardPassed: false },
+    { authoritativeDeletionPreserved: false },
     { webHeaders: { ...ready().webHeaders, cacheRevalidation: false } },
   ])("BDD-REL-404 rejects an unhealthy or irreversible boundary %#", (override) => {
     expect(() => assertProductionReleaseReady(ready(override))).toThrow(

@@ -27,6 +27,7 @@ export interface ProductionReleaseSnapshot {
   };
   readonly functionRollbackPassed: boolean;
   readonly functionRollForwardPassed: boolean;
+  readonly authoritativeDeletionPreserved: boolean;
 }
 
 const requiredFunctionScopes = [
@@ -49,7 +50,7 @@ function sameSet(left: readonly string[], right: readonly string[]): boolean {
 
 export function assertProductionReleaseReady(snapshot: ProductionReleaseSnapshot): {
   readonly status: "ready";
-  readonly checks: 21;
+  readonly checks: 22;
 } {
   if (
     snapshot.productionProjectId === snapshot.previewProjectId ||
@@ -82,9 +83,10 @@ export function assertProductionReleaseReady(snapshot: ProductionReleaseSnapshot
     !snapshot.webHeaders.contentTypeOptions ||
     !snapshot.webHeaders.cacheRevalidation ||
     !snapshot.functionRollbackPassed ||
-    !snapshot.functionRollForwardPassed
+    !snapshot.functionRollForwardPassed ||
+    !snapshot.authoritativeDeletionPreserved
   ) {
     throw new Error("PRODUCTION_RELEASE_READINESS_FAILED");
   }
-  return { status: "ready", checks: 21 };
+  return { status: "ready", checks: 22 };
 }
