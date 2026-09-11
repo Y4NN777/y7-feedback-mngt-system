@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveAppwriteFunctionEnvironment } from "./appwrite-function-runtime";
+import {
+  resolveAppwriteFunctionEnvironment,
+  resolveAppwriteFunctionPrincipal,
+} from "./appwrite-function-runtime";
 
 const local = {
   Y7_ENVIRONMENT: "development",
@@ -84,5 +87,31 @@ describe("Appwrite Function runtime authority", () => {
         authorization: "FeedbackProof private",
       }),
     ).toMatchObject(local);
+  });
+
+  it("BDD-SLO-211 consumes only the complete Appwrite-injected caller identity", () => {
+    expect(
+      resolveAppwriteFunctionPrincipal({
+        "x-appwrite-user-id": "user_1",
+        "x-appwrite-user-jwt": "trusted.jwt.value",
+      }),
+    ).toEqual({ principalId: "user_1", jwt: "trusted.jwt.value" });
+
+    for (const headers of [
+      {},
+      { "x-appwrite-user-id": "user_1" },
+      { "x-appwrite-user-jwt": "trusted.jwt.value" },
+      {
+        "x-appwrite-user-id": "bad/id",
+        "x-appwrite-user-jwt": "trusted.jwt.value",
+      },
+      {
+        "x-appwrite-user-id": "user_1",
+        "X-Appwrite-User-Id": "user_2",
+        "x-appwrite-user-jwt": "trusted.jwt.value",
+      },
+    ]) {
+      expect(resolveAppwriteFunctionPrincipal(headers)).toBeUndefined();
+    }
   });
 });
