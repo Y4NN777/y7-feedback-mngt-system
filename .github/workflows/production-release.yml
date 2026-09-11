@@ -1,0 +1,112 @@
+name: Production release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Stage, smoke, promote and rehearse rollback
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment: production
+    env:
+      Y7_PRODUCTION_RELEASE_ENV: ${{ secrets.Y7_PRODUCTION_RELEASE_ENV }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: 10.32.1
+          run_install: false
+      - name: Install Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 24
+          cache: pnpm
+          package-manager-cache: false
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Deploy and prove reversible Production release
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          set +x
+          umask 077
+          NEW_WEB_URL=""
+          ROLLBACK_ACTIVE=0
+          cleanup() {
+            local status=$?
+            trap - EXIT
+            rm -f .env.appwrite-production .production-web-url
+            if [ "$ROLLBACK_ACTIVE" = "1" ] && [ -n "$NEW_WEB_URL" ]; then
+              if ! pnpm dlx vercel@50.35.0 promote "$NEW_WEB_URL" \
+                --yes --token "$VERCEL_TOKEN" >/dev/null; then
+                status=1
+              fi
+            fi
+            exit "$status"
+          }
+          trap cleanup EXIT
+          if [ -z "$Y7_PRODUCTION_RELEASE_ENV" ] || [ -z "$VERCEL_TOKEN" ]; then
+            echo '{"error":"PRODUCTION_RELEASE_AUTHORITY_MISSING"}' >&2
+            exit 1
+          fi
+          install -m 600 /dev/null .env.appwrite-production
+          printf '%s\n' "$Y7_PRODUCTION_RELEASE_ENV" > .env.appwrite-production
+          unset Y7_PRODUCTION_RELEASE_ENV
+
+          PRODUCTION_WEB_ORIGIN="$(node --env-file=.env.appwrite-production \
+            --print 'process.env.Y7_WEB_ORIGIN || ""')"
+          PRODUCTION_SCANNER_ORIGIN="$(node --env-file=.env.appwrite-production \
+            --print 'process.env.ANTIVIRUS_SCANNER_ENDPOINT || ""')"
+          case "$PRODUCTION_WEB_ORIGIN $PRODUCTION_SCANNER_ORIGIN" in
+            https://*\ https://*) ;;
+            *) echo '{"error":"PRODUCTION_RELEASE_ORIGIN_INVALID"}' >&2; exit 1 ;;
+          esac
+          curl --fail --silent --show-error --max-time 30 \
+            "$PRODUCTION_SCANNER_ORIGIN/health" >/dev/null
+
+          pnpm provision:appwrite:production
+          pnpm configure:appwrite:function:production
+          pnpm deploy:appwrite:function:production
+
+          pnpm dlx vercel@50.35.0 deploy --prod --skip-domain --yes \
+            --token "$VERCEL_TOKEN" >.production-web-url
+          NEW_WEB_URL="$(tr -d '\r\n' <.production-web-url)"
+          case "$NEW_WEB_URL" in
+            https://*.vercel.app) ;;
+            *) echo '{"error":"PRODUCTION_STAGED_WEB_URL_INVALID"}' >&2; exit 1 ;;
+          esac
+          pnpm dlx vercel@50.35.0 curl / --deployment "$NEW_WEB_URL" \
+            --token "$VERCEL_TOKEN" --fail --silent --show-error >/dev/null
+
+          pnpm dlx vercel@50.35.0 promote "$NEW_WEB_URL" \
+            --yes --token "$VERCEL_TOKEN" >/dev/null
+          curl --fail --silent --show-error --max-time 30 \
+            "$PRODUCTION_WEB_ORIGIN/" >/dev/null
+
+          pnpm dlx vercel@50.35.0 rollback --yes \
+            --token "$VERCEL_TOKEN" >/dev/null
+          ROLLBACK_ACTIVE=1
+          curl --fail --silent --show-error --max-time 30 \
+            "$PRODUCTION_WEB_ORIGIN/" >/dev/null
+
+          pnpm dlx vercel@50.35.0 promote "$NEW_WEB_URL" \
+            --yes --token "$VERCEL_TOKEN" >/dev/null
+          ROLLBACK_ACTIVE=0
+          curl --fail --silent --show-error --max-time 30 \
+            "$PRODUCTION_WEB_ORIGIN/" >/dev/null
+
+          pnpm verify:release:production
+          echo '{"result":"PRODUCTION_RELEASE_AND_ROLLBACK_PASSED"}'

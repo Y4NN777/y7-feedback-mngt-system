@@ -229,3 +229,36 @@ test("BDD-REL-302 deploys the Production scanner only through protected OIDC", a
   for (const reference of actionReferences)
     assert.match(reference, /^[^@\s]+@[0-9a-f]{40}$/u);
 });
+
+test("BDD-REL-406 stages, promotes, rolls back and restores Production", async () => {
+  const workflow = await readFile(
+    new URL("../.github/workflows/production-release.yml", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(workflow, /workflow_dispatch:/u);
+  assert.match(workflow, /permissions:\s+contents: read/u);
+  assert.match(workflow, /environment: production/u);
+  assert.match(workflow, /cancel-in-progress: false/u);
+  assert.match(
+    workflow,
+    /Y7_PRODUCTION_RELEASE_ENV: \$\{\{ secrets\.Y7_PRODUCTION_RELEASE_ENV \}\}/u,
+  );
+  assert.match(workflow, /VERCEL_TOKEN: \$\{\{ secrets\.VERCEL_TOKEN \}\}/u);
+  assert.match(workflow, /pnpm provision:appwrite:production/u);
+  assert.match(workflow, /pnpm configure:appwrite:function:production/u);
+  assert.match(workflow, /pnpm deploy:appwrite:function:production/u);
+  assert.match(workflow, /vercel@50\.35\.0 deploy --prod --skip-domain/u);
+  assert.match(workflow, /vercel@50\.35\.0 promote/u);
+  assert.match(workflow, /vercel@50\.35\.0 rollback/u);
+  assert.match(workflow, /pnpm verify:release:production/u);
+  assert.match(workflow, /trap cleanup EXIT/u);
+  assert.doesNotMatch(workflow, /upload-artifact/u);
+
+  const actionReferences = [...workflow.matchAll(/^\s+(?:- )?uses: ([^\s#]+)/gmu)].map(
+    (match) => match[1],
+  );
+  assert.ok(actionReferences.length >= 3);
+  for (const reference of actionReferences)
+    assert.match(reference, /^[^@\s]+@[0-9a-f]{40}$/u);
+});
