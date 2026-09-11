@@ -62,6 +62,7 @@ jobs:
           fi
           printf '%s\n' "$Y7_PREVIEW_EVIDENCE_ENV" > .env.appwrite-preview
           unset Y7_PREVIEW_EVIDENCE_ENV
+          printf '\nRELEASE=%s\n' "$GITHUB_SHA" >> .env.appwrite-preview
           pnpm provision:appwrite
           pnpm configure:appwrite:function:preview
           pnpm deploy:appwrite:function:preview
