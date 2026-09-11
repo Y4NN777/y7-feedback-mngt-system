@@ -28,9 +28,23 @@ describe("Appwrite Function variable policy", () => {
     });
   });
 
-  it("BDD-DEL-DEPLOY-002 denies incomplete deployment authority", () => {
+  it.each([
+    { APPWRITE_ENDPOINT: undefined },
+    { APPWRITE_ENDPOINT: " " },
+    { APPWRITE_PROJECT_ID: undefined },
+    { APPWRITE_PROJECT_ID: " " },
+    { APPWRITE_API_KEY: undefined },
+    { APPWRITE_API_KEY: " " },
+    { Y7_ENVIRONMENT: "development" },
+  ])("BDD-DEL-DEPLOY-002 denies incomplete deployment authority", (override) => {
     expect(() =>
-      resolveAppwriteFunctionDeploymentAuthority({ Y7_ENVIRONMENT: "preview" }),
+      resolveAppwriteFunctionDeploymentAuthority({
+        APPWRITE_ENDPOINT: "https://fra.cloud.appwrite.io/v1",
+        APPWRITE_PROJECT_ID: "project_preview",
+        APPWRITE_API_KEY: "server-key",
+        Y7_ENVIRONMENT: "preview",
+        ...override,
+      }),
     ).toThrow("APPWRITE_FUNCTION_DEPLOYMENT_AUTHORITY_MISSING");
   });
 

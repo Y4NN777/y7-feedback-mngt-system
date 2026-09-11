@@ -177,6 +177,32 @@ describe("Appwrite conversation and lifecycle transaction", () => {
     ]);
   });
 
+  it("BDD-SLO-212 reports a bounded failed phase without changing the stable error", async () => {
+    const tables = new FakeTables();
+    vi.spyOn(tables, "createTransaction").mockRejectedValueOnce(
+      new Error("private infrastructure detail"),
+    );
+    const observe = vi.fn<(event: ConversationLifecycleDiagnostic) => void>();
+    const instrumented = createAppwriteConversationLifecycleStore(
+      tables,
+      schema,
+      queries,
+      persistence,
+      { append: vi.fn().mockResolvedValue({ notifications: 0, emailAttempts: 0 }) },
+      { append: vi.fn().mockResolvedValue({ queued: 0 }) },
+      { nowMs: vi.fn().mockReturnValueOnce(10).mockReturnValueOnce(8), observe },
+    );
+
+    await expect(
+      instrumented.execute({ ...common, command: messageCommand }),
+    ).rejects.toMatchObject({ code: "ERR-CONV-RETRYABLE" });
+    expect(observe).toHaveBeenCalledWith({
+      phase: "transaction_create",
+      outcome: "failed",
+      durationMs: 0,
+    });
+  });
+
   it("BDD-SLO-210 overlaps independent conversation reads and validated writes", async () => {
     const tables = new FakeTables();
     let releaseIdempotencyRead: (() => void) | undefined;
