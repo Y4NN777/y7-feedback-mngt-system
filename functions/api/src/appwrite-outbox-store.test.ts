@@ -369,7 +369,10 @@ describe("Appwrite durable outbox adapter", () => {
 
     const activeTables = {
       createTransaction: vi.fn(() => Promise.resolve({ $id: "transaction_1" })),
-      listRows: vi.fn(() => Promise.resolve({ rows: [row()] })),
+      listRows: vi.fn((input: Parameters<AppwriteOutboxTablesPort["listRows"]>[0]) => {
+        void input;
+        return Promise.resolve({ rows: [row()] });
+      }),
       getRow: vi.fn(() => Promise.resolve(row())),
       updateRow: vi.fn(() => Promise.resolve(row("processing"))),
       updateTransaction: vi.fn(() => Promise.resolve({})),
@@ -383,6 +386,10 @@ describe("Appwrite durable outbox adapter", () => {
     await expect(active.claim(request)).resolves.toEqual(
       expect.objectContaining({ attempt: 1 }),
     );
+    const candidateQuery = vi.mocked(activeTables.listRows).mock.calls[0]?.[0];
+    expect(
+      candidateQuery?.queries.some((query) => query.includes('"attribute":"$id"')),
+    ).toBe(true);
     expect(activeTables.getRow).toHaveBeenCalledOnce();
     expect(activeTables.updateRow).toHaveBeenCalledOnce();
     expect(activeTables.updateTransaction).toHaveBeenCalledWith({
