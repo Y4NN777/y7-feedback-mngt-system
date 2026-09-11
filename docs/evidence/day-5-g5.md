@@ -73,6 +73,8 @@ The current candidate contains these independently revertible outcomes:
   promotion or any subsequent Production verifier fails.
 - `63e2369` — curated session evidence rejects literal personal email while raw
   Codex snapshots remain outside the scan and Git history.
+- `7f1faa7` — Production creates and deletes a non-sensitive Appwrite marker,
+  then proves it remains absent across Function rollback and roll-forward.
 
 Local evidence currently passing:
 
