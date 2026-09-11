@@ -15,6 +15,7 @@ export function createProviderMaintenance(input: {
   readonly inbox?: ProviderMaintenanceCapability;
   readonly outbox?: ProviderMaintenanceCapability;
   readonly messages?: ProviderMaintenanceCapability;
+  readonly notifications?: ProviderMaintenanceCapability;
   readonly messageReconciliation?: ProviderMaintenanceCapability;
   readonly webhooks?: ProviderMaintenanceCapability;
   readonly privacy?: ProviderMaintenanceCapability;
@@ -26,6 +27,7 @@ export function createProviderMaintenance(input: {
         | "inbox"
         | "outbox"
         | "messages"
+        | "notifications"
         | "messageReconciliation"
         | "webhooks"
         | "privacy"

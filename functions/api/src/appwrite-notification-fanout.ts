@@ -65,6 +65,8 @@ export type NotificationFanoutInput = {
 };
 
 const appwriteId = /^[A-Za-z0-9][A-Za-z0-9._-]{0,35}$/u;
+const emailAddress =
+  /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?[.][A-Za-z]{2,63}$/u;
 
 function object(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -228,7 +230,12 @@ function reporterHasEmail(
         value.attributionJson,
       ),
     ) as unknown;
-    return object(attribution) && attribution.kind === "contact";
+    return (
+      object(attribution) &&
+      attribution.kind === "contact" &&
+      typeof attribution.value === "string" &&
+      emailAddress.test(attribution.value.trim())
+    );
   } catch {
     throw new Error("APPWRITE_NOTIFICATION_FANOUT_UNAVAILABLE");
   }
