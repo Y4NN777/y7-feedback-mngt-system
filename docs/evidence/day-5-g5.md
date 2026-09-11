@@ -1,7 +1,7 @@
 # Day 5 — G5 release evidence index
 
-Status: `IN_PROGRESS`  
-Candidate branch: `task/TASK-E2E-001-g5-traceability`  
+Status: `IN_PROGRESS`
+Candidate branch: `task/TASK-E2E-001-g5-traceability`
 Authoritative progress ledger:
 [`2026-08-27-day-3-day-5.md`](../sessions/plans/2026-08-27-day-3-day-5.md)
 
