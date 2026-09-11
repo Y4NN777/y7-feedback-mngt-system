@@ -189,7 +189,7 @@ test("BDD-E2E-301 runs the complete G5 evidence pack with ephemeral secret mater
   );
   assert.match(workflow, /install -m 600 \/dev\/null \.env\.appwrite-preview/u);
   assert.match(workflow, /trap 'rm -f \.env\.appwrite-preview' EXIT/u);
-  assert.match(workflow, /pnpm provision:appwrite:preview/u);
+  assert.match(workflow, /pnpm provision:appwrite(?:\s|$)/u);
   assert.match(workflow, /pnpm configure:appwrite:function:preview/u);
   assert.match(workflow, /pnpm deploy:appwrite:function:preview/u);
   assert.match(workflow, /pnpm verify:e2e:g5/u);
@@ -206,6 +206,7 @@ test("BDD-E2E-301 runs the complete G5 evidence pack with ephemeral secret mater
   const rootPackage = JSON.parse(
     await readFile(new URL("../package.json", import.meta.url), "utf8"),
   );
+  assert.equal(typeof rootPackage.scripts["provision:appwrite"], "string");
   assert.match(
     rootPackage.scripts["verify:providers:g4:message-sync"],
     /node --env-file-if-exists=\.env\.appwrite-preview/u,
@@ -228,7 +229,7 @@ test("BDD-SLO-301 runs the real Preview SLO gate with protected least-privilege 
   );
   assert.match(workflow, /install -m 600 \/dev\/null \.env\.appwrite-preview/u);
   assert.match(workflow, /trap 'rm -f \.env\.appwrite-preview' EXIT/u);
-  assert.match(workflow, /pnpm provision:appwrite:preview/u);
+  assert.match(workflow, /pnpm provision:appwrite(?:\s|$)/u);
   assert.match(workflow, /pnpm configure:appwrite:function:preview/u);
   assert.match(workflow, /pnpm deploy:appwrite:function:preview/u);
   assert.match(workflow, /pnpm verify:slo:g5/u);
