@@ -16,7 +16,6 @@ import { routeSloAlerts } from "./slo-telemetry.js";
 const concurrency = 4;
 const commands = [
   "verify-appwrite-deployed-g1.js",
-  "verify-appwrite-g2-attachment.js",
   "verify-appwrite-g3-conversation-lifecycle.js",
   "verify-appwrite-g3-workbench.js",
 ] as const;
@@ -69,6 +68,40 @@ function runScript(script: string): Promise<unknown> {
   });
 }
 
+function runPnpmScript(script: string): Promise<unknown> {
+  return new Promise((resolvePromise, reject) => {
+    const child = spawn("pnpm", [script], {
+      env: process.env,
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    let output = "";
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => {
+      if (output.length <= 1_000_000) output += chunk;
+    });
+    child.on("error", () => {
+      reject(new Error("SLO_G5_LOCAL_SCANNER_PROCESS_FAILED"));
+    });
+    child.on("close", (code) => {
+      if (code !== 0) {
+        reject(new Error("SLO_G5_LOCAL_SCANNER_FAILED"));
+        return;
+      }
+      try {
+        const line = output
+          .trim()
+          .split("\n")
+          .reverse()
+          .find((candidate) => candidate.startsWith("{"));
+        if (!line) throw new Error();
+        resolvePromise(JSON.parse(line) as unknown);
+      } catch {
+        reject(new Error("SLO_G5_LOCAL_SCANNER_OUTPUT_INVALID"));
+      }
+    });
+  });
+}
+
 async function probeUrl(url: string): Promise<boolean> {
   const response = await fetch(url, {
     redirect: "error",
@@ -83,9 +116,12 @@ export async function verifySloG5() {
     throw new Error("SLO_G5_PREVIEW_REQUIRED");
   const release = required("RELEASE");
   const startedAt = new Date().toISOString();
-  const evidence = await Promise.all(commands.map((command) => runScript(command)));
-  const mail = await runScript("verify-preview-mail-catcher.js");
-  const collected = [...evidence, mail].flatMap(collectSloEvidenceSamples);
+  const [evidence, mail, attachment] = await Promise.all([
+    Promise.all(commands.map((command) => runScript(command))),
+    runScript("verify-preview-mail-catcher.js"),
+    runPnpmScript("verify:antivirus:local"),
+  ]);
+  const collected = [...evidence, mail, attachment].flatMap(collectSloEvidenceSamples);
   const measuredAt = new Date().toISOString();
   const observations: SloObservation[] = collected.map(([metric, value]) => ({
     metric,
