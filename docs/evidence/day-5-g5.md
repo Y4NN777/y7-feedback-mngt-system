@@ -85,6 +85,9 @@ The current candidate contains these independently revertible outcomes:
 - `499cc12` — the scanner health contract exposes its immutable source commit,
   and both deployment and release gates reject a healthy scanner from any
   other candidate.
+- `110da77` — the release workflow injects `GITHUB_SHA` into the Appwrite
+  Function and Vercel PWA builds, whose public health/metadata must both prove
+  that exact candidate before release readiness can pass.
 
 Local evidence currently passing:
 
@@ -96,11 +99,11 @@ pnpm typecheck
 pnpm test
 pnpm test:coverage
 pnpm build
-pnpm security:scan # 285 files, 0 findings
+pnpm security:scan # 287 files, 0 findings
 pnpm --filter @y7-feedback/web exec playwright test --list # 38 scenarios, 2 projects
 ```
 
-The API suite contains 1,506 tests; its coverage run reports 100% statements,
+The API suite contains 1,519 tests; its coverage run reports 100% statements,
 branches, functions and lines. The Playwright listing proves discovery and
 traceability only; execution remains part of the hosted G5 browser gate.
 
