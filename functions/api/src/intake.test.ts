@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { ValidatedFeedbackDraft } from "@y7-feedback/domain";
+import type { AttachmentStagingGrant } from "./attachment-staging-token";
 
 import {
   createIntakeCoordinator,
@@ -14,6 +15,37 @@ const operationId = "018f4f7e-89ab-7def-8123-456789abcdef";
 const accessProof = "proof_A_abcdefghijklmnopqrstuvwxyz_0123456789ABCDEFG";
 const proofVerifier = `sha256:${String(accessProof.length)}:${accessProof.slice(0, 7)}`;
 const protectedProof = `sealed:${accessProof.split("").reverse().join("")}`;
+
+function stagedAttachment(
+  overrides: Partial<AttachmentStagingGrant> = {},
+): AttachmentStagingGrant {
+  return {
+    attachmentId: "attachment-1",
+    objectId: "private/personal/wisemoney/attachment-1",
+    operationId,
+    workspaceId: "personal",
+    projectId: "wisemoney",
+    displayName: "evidence.txt",
+    mediaType: "text/plain; charset=utf-8",
+    size: 12,
+    sha256: "A".repeat(43),
+    stagedAt: "2026-08-10T14:59:00.000Z",
+    ...overrides,
+  };
+}
+
+function digest(
+  value: ValidatedFeedbackDraft,
+  grants: readonly AttachmentStagingGrant[],
+) {
+  return `digest:${JSON.stringify(value)}:${JSON.stringify(
+    grants.map(({ attachmentId, objectId, sha256 }) => ({
+      attachmentId,
+      objectId,
+      sha256,
+    })),
+  )}`;
+}
 
 function draft(problem = "Le solde ne se rafraîchit pas."): ValidatedFeedbackDraft {
   return {
@@ -81,7 +113,7 @@ function fixedDependencies(
     hashProof: (proof) => `sha256:${String(proof.length)}:${proof.slice(0, 7)}`,
     sealProof: (proof) => `sealed:${proof.split("").reverse().join("")}`,
     openProof: (sealed) => sealed.replace("sealed:", "").split("").reverse().join(""),
-    digestPayload: (value) => `digest:${JSON.stringify(value)}`,
+    digestPayload: digest,
     now: () => "2026-08-10T15:00:00.000Z",
     ...overrides,
   };
@@ -107,7 +139,7 @@ function setup(store = new MemoryStore()) {
     hashProof: (proof) => `sha256:${String(proof.length)}:${proof.slice(0, 7)}`,
     sealProof: (proof) => `sealed:${proof.split("").reverse().join("")}`,
     openProof: (sealed) => sealed.replace("sealed:", "").split("").reverse().join(""),
-    digestPayload: (value) => `digest:${JSON.stringify(value)}`,
+    digestPayload: digest,
     now: () => "2026-08-10T15:00:00.000Z",
   });
   return { coordinator, counters, store };
@@ -187,13 +219,14 @@ describe("trusted intake coordination", () => {
       idempotency: {
         scopeKey: "personal:wisemoney",
         clientOperationId: operationId,
-        payloadDigest: `digest:${JSON.stringify(draft())}`,
+        payloadDigest: digest(draft(), []),
         feedbackId: "feedback-1",
         reference: "Y7-2026-000001",
         protectedProof,
         proofVerifier,
         createdAt: "2026-08-10T15:00:00.000Z",
       },
+      attachments: [],
     });
     expect(JSON.stringify(store.commits[0])).not.toContain(accessProof);
   });
@@ -250,6 +283,91 @@ describe("trusted intake coordination", () => {
     expect(outcome).not.toHaveProperty("accessProof");
     expect(store.commits).toEqual([]);
     expect(store.records.size).toBe(0);
+  });
+
+  it("BDD-UC03-INTAKE-001 binds validated staged evidence to the accepted feedback", async () => {
+    const { coordinator, store } = setup();
+    const attachment = stagedAttachment();
+    const attachmentDraft = { ...draft(), attachmentNames: [attachment.displayName] };
+
+    const outcome = await coordinator.accept({
+      clientOperationId: operationId,
+      draft: attachmentDraft,
+      attachmentGrants: [attachment],
+    });
+
+    expect(outcome.status).toBe("accepted");
+    expect(store.commits[0]?.attachments).toEqual([
+      {
+        id: "attachment-1",
+        objectId: "private/personal/wisemoney/attachment-1",
+        feedbackId: "feedback-1",
+        workspaceId: "personal",
+        projectId: "wisemoney",
+        audience: "reporter",
+        sourceEntry: { kind: "source_submission", id: operationId },
+        displayName: "evidence.txt",
+        mediaType: "text/plain; charset=utf-8",
+        size: 12,
+        sha256: "A".repeat(43),
+        createdAt: "2026-08-10T14:59:00.000Z",
+        lifecycle: "available",
+      },
+    ]);
+  });
+
+  it("BDD-UC03-INTAKE-002 rejects missing, forged, duplicate, or excessive staging grants", async () => {
+    const attachment = stagedAttachment();
+    const attachmentDraft = { ...draft(), attachmentNames: [attachment.displayName] };
+    const invalidCommands = [
+      { draft: attachmentDraft, attachmentGrants: [] },
+      {
+        draft: attachmentDraft,
+        attachmentGrants: [stagedAttachment({ workspaceId: "forged" })],
+      },
+      {
+        draft: { ...draft(), attachmentNames: ["other.txt"] },
+        attachmentGrants: [attachment],
+      },
+      {
+        draft: { ...draft(), attachmentNames: ["evidence.txt", "evidence.txt"] },
+        attachmentGrants: [attachment, attachment],
+      },
+      {
+        draft: { ...draft(), attachmentNames: Array(6).fill("evidence.txt") },
+        attachmentGrants: Array(6).fill(attachment),
+      },
+    ];
+
+    for (const invalid of invalidCommands) {
+      const current = setup();
+      await expect(
+        current.coordinator.accept({ clientOperationId: operationId, ...invalid }),
+      ).resolves.toEqual({ status: "rejected", code: "INTAKE_INVALID" });
+      expect(current.store.commits).toEqual([]);
+    }
+  });
+
+  it("BDD-UC03-IDEMPOTENCY-001 conflicts when staged bytes change under one operation", async () => {
+    const { coordinator, store } = setup();
+    const attachment = stagedAttachment();
+    const attachmentDraft = { ...draft(), attachmentNames: [attachment.displayName] };
+    await coordinator.accept({
+      clientOperationId: operationId,
+      draft: attachmentDraft,
+      attachmentGrants: [attachment],
+    });
+
+    const outcome = await coordinator.accept({
+      clientOperationId: operationId,
+      draft: attachmentDraft,
+      attachmentGrants: [
+        stagedAttachment({ attachmentId: "attachment-2", sha256: "B".repeat(43) }),
+      ],
+    });
+
+    expect(outcome).toEqual({ status: "rejected", code: "OPERATION_CONFLICT" });
+    expect(store.commits).toHaveLength(1);
   });
 
   it("fails closed for invalid operation identity, read failure, and protected-proof failure", async () => {
@@ -314,7 +432,7 @@ describe("trusted intake coordination", () => {
       hashProof: () => "unused-verifier",
       sealProof: () => "unused-envelope",
       openProof,
-      digestPayload: (value) => `digest:${JSON.stringify(value)}`,
+      digestPayload: digest,
       now: () => "2026-08-10T15:00:00.000Z",
     });
 

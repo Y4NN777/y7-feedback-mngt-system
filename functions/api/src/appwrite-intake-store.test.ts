@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { createAttachmentRecord } from "@y7-feedback/domain";
+
 import type { AcceptanceCommit } from "./intake";
 import {
   createAppwriteIntakeStore,
@@ -18,10 +20,13 @@ const schema: AppwriteIntakeSchema = {
   notificationsTableId: "notifications",
   outboxTableId: "outbox",
   idempotencyTableId: "idempotency",
+  attachmentStagingTableId: "attachment_staging",
+  attachmentsTableId: "attachments",
 };
 
 function acceptance(): AcceptanceCommit {
   return {
+    attachments: [],
     feedback: {
       id: "feedback-1",
       projectId: "project-1",
@@ -88,10 +93,38 @@ function acceptance(): AcceptanceCommit {
   };
 }
 
+function acceptanceWithAttachment(): AcceptanceCommit {
+  const input = acceptance();
+  return {
+    ...input,
+    feedback: { ...input.feedback, attachmentNames: ["evidence.txt"] },
+    attachments: [
+      createAttachmentRecord({
+        id: "attachment-1",
+        objectId: "private/workspace-1/project-1/attachment-1",
+        feedbackId: input.feedback.id,
+        workspaceId: input.feedback.workspaceId,
+        projectId: input.feedback.projectId,
+        audience: "reporter",
+        sourceEntry: {
+          kind: "source_submission",
+          id: input.idempotency.clientOperationId,
+        },
+        displayName: "evidence.txt",
+        mediaType: "text/plain; charset=utf-8",
+        size: 12,
+        sha256: "A".repeat(43),
+        createdAt: input.feedback.acceptedAt,
+      }),
+    ],
+  };
+}
+
 class FakeTablesDb implements AppwriteTablesDbPort {
   readonly createdRows: Array<Record<string, unknown>> = [];
   readonly transactionUpdates: Array<Record<string, unknown>> = [];
   listedRows: readonly unknown[] = [];
+  stagedRows: readonly unknown[] = [];
   failTableId: string | undefined;
   failCommit = false;
   failRollback = false;
@@ -105,12 +138,16 @@ class FakeTablesDb implements AppwriteTablesDbPort {
   listRows(
     input: Parameters<AppwriteTablesDbPort["listRows"]>[0],
   ): Promise<{ readonly rows: readonly unknown[] }> {
-    expect(input).toMatchObject({
-      databaseId: "y7",
-      tableId: "idempotency",
-      total: false,
-      ttl: 0,
-    });
+    expect(input).toMatchObject({ databaseId: "y7", total: false, ttl: 0 });
+    if (input.tableId === "attachment_staging") {
+      expect(input.queries).toEqual([
+        "equal:objectId:private/workspace-1/project-1/attachment-1",
+        "equal:operationId:123e4567-e89b-42d3-a456-426614174000",
+        "limit:2",
+      ]);
+      return Promise.resolve({ rows: this.stagedRows });
+    }
+    expect(input.tableId).toBe("idempotency");
     if (this.useSdkQueries) {
       expect(input.queries).toEqual([
         expect.stringContaining('"method":"equal"'),
@@ -240,6 +277,60 @@ describe("Appwrite transactional intake adapter", () => {
     expect(tables.transactionUpdates).toEqual([
       { transactionId: "transaction-1", rollback: true },
     ]);
+  });
+
+  it("BDD-UC03-ATOMIC-001 commits validated attachment metadata with every intake fact", async () => {
+    const tables = new FakeTablesDb();
+    tables.stagedRows = [
+      {
+        objectId: "private/workspace-1/project-1/attachment-1",
+        operationId: "123e4567-e89b-42d3-a456-426614174000",
+      },
+    ];
+    const store = createAppwriteIntakeStore(tables, schema, queries, sensitive);
+
+    await store.commit(acceptanceWithAttachment());
+
+    expect(tables.createdRows).toHaveLength(8);
+    expect(tables.createdRows.at(-1)).toMatchObject({
+      tableId: "attachments",
+      rowId: "attachment-1",
+      data: {
+        feedbackId: "feedback-1",
+        displayName: "evidence.txt",
+        lifecycle: "available",
+        operationId: "123e4567-e89b-42d3-a456-426614174000",
+      },
+      transactionId: "transaction-1",
+    });
+  });
+
+  it("BDD-UC03-ATOMIC-002 rejects missing or mismatched staging ownership before a transaction", async () => {
+    const missing = new FakeTablesDb();
+    const missingStore = createAppwriteIntakeStore(missing, schema, queries, sensitive);
+    await expect(missingStore.commit(acceptanceWithAttachment())).rejects.toThrow(
+      "APPWRITE_ATTACHMENT_STAGING_INCONSISTENT",
+    );
+    expect(missing.createdRows).toEqual([]);
+    expect(missing.transactionUpdates).toEqual([]);
+
+    const mismatched = new FakeTablesDb();
+    mismatched.stagedRows = [
+      {
+        objectId: "private/workspace-1/project-1/attachment-1",
+        operationId: "123e4567-e89b-42d3-a456-426614174999",
+      },
+    ];
+    const mismatchedStore = createAppwriteIntakeStore(
+      mismatched,
+      schema,
+      queries,
+      sensitive,
+    );
+    await expect(mismatchedStore.commit(acceptanceWithAttachment())).rejects.toThrow(
+      "APPWRITE_ATTACHMENT_STAGING_INCONSISTENT",
+    );
+    expect(mismatched.createdRows).toEqual([]);
   });
 
   it("preserves the source failure when rollback fails and never rolls back commit uncertainty", async () => {

@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { Query, type TablesDB } from "node-appwrite";
 
 import type { AcceptanceCommit, IdempotencyRecord, IntakeStore } from "./intake.js";
+import { attachmentMetadataData } from "./appwrite-attachment-acceptance-store.js";
 import type { AppwriteSensitivePersistence } from "./sensitive-data-protector.js";
 
 export interface AppwriteIntakeSchema {
@@ -14,6 +15,8 @@ export interface AppwriteIntakeSchema {
   readonly notificationsTableId: string;
   readonly outboxTableId: string;
   readonly idempotencyTableId: string;
+  readonly attachmentStagingTableId: string;
+  readonly attachmentsTableId: string;
 }
 
 export interface AppwriteTablesDbPort {
@@ -63,6 +66,8 @@ function validateSchema(schema: AppwriteIntakeSchema): void {
     schema.notificationsTableId,
     schema.outboxTableId,
     schema.idempotencyTableId,
+    schema.attachmentStagingTableId,
+    schema.attachmentsTableId,
   ];
   if (
     !appwriteId.test(schema.databaseId) ||
@@ -257,7 +262,33 @@ function rowsForCommit(
         ),
       },
     },
+    ...input.attachments.map((attachment) => ({
+      tableId: schema.attachmentsTableId,
+      rowId: attachment.id,
+      data: attachmentMetadataData(
+        attachment,
+        input.idempotency.clientOperationId,
+        {
+          databaseId: schema.databaseId,
+          stagingTableId: schema.attachmentStagingTableId,
+          attachmentsTableId: schema.attachmentsTableId,
+        },
+        sensitive,
+      ),
+    })),
   ];
+}
+
+function stagedAttachmentMatches(
+  value: unknown,
+  attachment: AcceptanceCommit["attachments"][number],
+  operationId: string,
+): boolean {
+  return (
+    isObject(value) &&
+    value.objectId === attachment.objectId &&
+    value.operationId === operationId
+  );
 }
 
 export function createAppwriteIntakeStore(
@@ -288,6 +319,29 @@ export function createAppwriteIntakeStore(
     },
 
     async commit(input) {
+      for (const attachment of input.attachments) {
+        const staged = await tables.listRows({
+          databaseId: schema.databaseId,
+          tableId: schema.attachmentStagingTableId,
+          queries: [
+            queries.equal("objectId", [attachment.objectId]),
+            queries.equal("operationId", [input.idempotency.clientOperationId]),
+            queries.limit(2),
+          ],
+          total: false,
+          ttl: 0,
+        });
+        if (
+          staged.rows.length !== 1 ||
+          !stagedAttachmentMatches(
+            staged.rows[0],
+            attachment,
+            input.idempotency.clientOperationId,
+          )
+        ) {
+          throw new Error("APPWRITE_ATTACHMENT_STAGING_INCONSISTENT");
+        }
+      }
       const transaction = await tables.createTransaction({ ttl: 60 });
       if (!appwriteId.test(transaction.$id)) {
         throw new Error("APPWRITE_TRANSACTION_INVALID");

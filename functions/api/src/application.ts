@@ -184,7 +184,20 @@ export function createHttpApplication(
     hashProof: hashAccessProof,
     sealProof: protector.sealProof,
     openProof: protector.openProof,
-    digestPayload: digestValidatedDraft,
+    digestPayload: (draft, grants) =>
+      createHash("sha256")
+        .update(digestValidatedDraft(draft))
+        .update("\0")
+        .update(
+          JSON.stringify(
+            grants.map(({ attachmentId, objectId, sha256 }) => ({
+              attachmentId,
+              objectId,
+              sha256,
+            })),
+          ),
+        )
+        .digest("base64url"),
     now: runtime.nowIso,
   });
   const accountlessRepository = createNodeAppwriteAccountlessRepository(
