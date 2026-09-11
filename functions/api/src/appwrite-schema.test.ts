@@ -44,6 +44,7 @@ describe("Appwrite infrastructure manifest", () => {
     const requirements = [
       [schema.workspaceMembershipsTableId, ["workspaceId", "userId"]],
       [schema.workspaceMembershipsTableId, ["userId", "status"]],
+      [schema.workspaceMembershipsTableId, ["workspaceId", "role", "status"]],
       [schema.projectAssignmentsTableId, ["projectId", "userId"]],
       [schema.projectAssignmentsTableId, ["workspaceId", "userId", "status"]],
       [schema.projectSlugsTableId, ["slug"]],

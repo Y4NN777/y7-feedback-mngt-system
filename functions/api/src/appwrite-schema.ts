@@ -148,6 +148,7 @@ export function createAppwriteInfrastructureManifest(
         [
           index("workspace_user_unique", ["workspaceId", "userId"], "unique"),
           index("user_status", ["userId", "status"]),
+          index("workspace_role_status", ["workspaceId", "role", "status"]),
         ],
       ),
       table(
