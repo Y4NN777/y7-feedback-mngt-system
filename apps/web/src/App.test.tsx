@@ -152,6 +152,43 @@ describe("root orientation", () => {
 });
 
 describe("WiseMoney feedback intake", () => {
+  it("BDD-WEB-UC03-002 preserves selected evidence through review and sends it", async () => {
+    window.history.replaceState({}, "", "/wisemoney");
+    const user = userEvent.setup();
+    const accept = vi.fn<IntakeGateway["accept"]>(() =>
+      Promise.resolve({
+        status: "accepted",
+        reference: "Y7-2026-ATTACHMENT",
+        accessProof: "proof_attachment_abcdefghijklmnopqrstuvwxyz_0123456789",
+        replayed: false,
+      }),
+    );
+    renderApp({
+      createOperationId: () => "123e4567-e89b-42d3-a456-426614174000",
+      intakeGateway: { accept },
+    });
+    await screen.findByRole("heading", { name: "Partager un retour sur WiseMoney" });
+    await user.type(
+      screen.getByRole("textbox", { name: "Quel problème avez-vous rencontré ?" }),
+      "Le solde est incorrect.",
+    );
+    const file = new File(["evidence"], "preuve.txt", { type: "text/plain" });
+    await user.upload(
+      screen.getByLabelText("Pièces jointes", { selector: "input" }),
+      file,
+    );
+    await user.click(screen.getByRole("button", { name: "English" }));
+    await user.click(screen.getByRole("button", { name: "Review feedback" }));
+
+    expect(screen.getByText("preuve.txt")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Send feedback" }));
+    expect(accept).toHaveBeenCalledOnce();
+    expect(accept.mock.calls[0]?.[0].attachments).toEqual([
+      { bytes: file, displayName: "preuve.txt" },
+    ]);
+    expect(accept.mock.calls[0]?.[0].draft.attachmentNames).toEqual(["preuve.txt"]);
+  });
+
   it("BDD-OFF-104 restores, saves and queues an accountless draft without claiming acceptance", async () => {
     window.history.replaceState({}, "", "/wisemoney");
     const user = userEvent.setup();

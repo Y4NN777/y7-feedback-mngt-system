@@ -71,6 +71,7 @@ describe("public intake HTTP gateway", () => {
         body: JSON.stringify({
           clientOperationId: "123e4567-e89b-42d3-a456-426614174000",
           locale: "fr",
+          attachments: [],
           feedback: {
             type: "bug",
             source: { type: "bug", problem: "Broken balance" },
@@ -83,6 +84,58 @@ describe("public intake HTTP gateway", () => {
     );
     expect(JSON.stringify(fetcher.mock.calls)).not.toContain("browser-forged");
     expect(JSON.stringify(fetcher.mock.calls)).not.toContain("Browser-local purpose");
+  });
+
+  it("BDD-WEB-UC03-001 stages binary evidence before final intake", async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(
+        response(201, {
+          status: "staged",
+          attachmentId: "attachment-1",
+          token: "encrypted-token",
+          displayName: "preuve-é.txt",
+        }),
+      )
+      .mockResolvedValueOnce(
+        response(201, {
+          status: "accepted",
+          reference: "Y7-2026-000001",
+          accessProof: "proof_abcdefghijklmnopqrstuvwxyz_0123456789ABCDEFG",
+          replayed: false,
+        }),
+      );
+    const gateway = createHttpIntakeGateway("https://feedback-api.example", fetcher);
+    const bytes = new Blob(["evidence"], { type: "text/plain" });
+
+    await gateway.accept({
+      projectSlug: "wisemoney",
+      clientOperationId: "123e4567-e89b-42d3-a456-426614174000",
+      locale: "fr",
+      draft: { ...draft, attachmentNames: ["preuve-é.txt"] },
+      attachments: [{ bytes, displayName: "preuve-é.txt" }],
+    });
+
+    expect(fetcher).toHaveBeenNthCalledWith(
+      1,
+      "https://feedback-api.example/v1/projects/wisemoney/feedback/attachments/stage",
+      expect.objectContaining({
+        method: "POST",
+        body: bytes,
+        headers: {
+          "content-type": "text/plain",
+          "x-y7-file-name": "cHJldXZlLcOpLnR4dA",
+          "x-y7-operation-id": "123e4567-e89b-42d3-a456-426614174000",
+        },
+      }),
+    );
+    const finalRequest = fetcher.mock.calls[1]?.[1] as RequestInit;
+    expect(typeof finalRequest.body).toBe("string");
+    const finalBody = JSON.parse(finalRequest.body as string) as unknown;
+    expect(finalBody).toMatchObject({
+      attachments: [{ attachmentId: "attachment-1", token: "encrypted-token" }],
+      feedback: { attachmentNames: [] },
+    });
   });
 
   it("maps conflict, invalid, dependency, malformed success, and network failure", async () => {

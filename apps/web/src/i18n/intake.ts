@@ -3,6 +3,8 @@ import type { FeedbackType, Locale } from "@y7-feedback/domain";
 interface IntakeMessages {
   readonly attachments: string;
   readonly attachmentsNone: string;
+  readonly attachmentHint: string;
+  readonly attachmentError: string;
   readonly back: string;
   readonly brandLabel: string;
   readonly bug: string;
@@ -59,6 +61,8 @@ export const intakeMessages = {
   fr: {
     attachments: "Pièces jointes",
     attachmentsNone: "Aucune pièce jointe",
+    attachmentHint: "Jusqu’à 5 fichiers de 10 Mo chacun.",
+    attachmentError: "Sélectionnez au maximum 5 fichiers valides de 10 Mo chacun.",
     back: "Retour à l’accueil",
     brandLabel: "Y7 Feedback — accueil",
     bug: "Bug",
@@ -122,6 +126,8 @@ export const intakeMessages = {
   en: {
     attachments: "Attachments",
     attachmentsNone: "No attachments",
+    attachmentHint: "Up to 5 files, 10 MB each.",
+    attachmentError: "Select no more than 5 valid files of up to 10 MB each.",
     back: "Back to home",
     brandLabel: "Y7 Feedback — home",
     bug: "Bug",
