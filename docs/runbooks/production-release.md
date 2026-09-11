@@ -119,8 +119,8 @@ callbacks and webhooks fail closed.
 
 Run `Production release` for the candidate commit. The workflow:
 
-1. proves the permanent scanner is ready and built from the exact candidate
-   commit;
+1. injects the workflow commit as the server and PWA release identity, then
+   proves the permanent scanner is ready and built from that same exact commit;
 2. provisions/migrates Production and deploys a new Appwrite Function revision;
 3. creates a staged Vercel Production deployment with no domain assignment;
 4. smokes the staged deployment through `vercel curl`;
@@ -131,8 +131,10 @@ Run `Production release` for the candidate commit. The workflow:
    it, proves a deleted non-sensitive Appwrite marker remains absent, restores
    the candidate in a `finally` path, and proves the marker is still absent;
 8. proves both configured OAuth callbacks use their exact Production Function
-   routes, then runs the signed antivirus matrix, web security/cache headers,
-   environment isolation and provider callback/webhook denial probes;
+   routes, proves the Function health response and PWA release metadata equal
+   the workflow commit, then runs the signed antivirus matrix, web
+   security/cache headers, environment isolation and provider callback/webhook
+   denial probes;
 9. sends one non-sensitive SMTP verification message and proves retryable and
    terminal transport classification without printing the recipient;
 10. creates a non-sensitive temporary GitHub issue through the Production
