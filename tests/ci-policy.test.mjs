@@ -254,6 +254,7 @@ test("BDD-REL-302 deploys the Production scanner only through protected OIDC", a
   assert.match(workflow, /curl --fail --silent --show-error/u);
   assert.doesNotMatch(workflow, /AZURE_(?:CLIENT_)?SECRET/u);
   assert.doesNotMatch(workflow, /delete|rm -rf/u);
+  assert.doesNotMatch(workflow, /az group create/u);
 
   const actionReferences = [...workflow.matchAll(/^\s+(?:- )?uses: ([^\s#]+)/gmu)].map(
     (match) => match[1],
@@ -261,6 +262,21 @@ test("BDD-REL-302 deploys the Production scanner only through protected OIDC", a
   assert.ok(actionReferences.length >= 2);
   for (const reference of actionReferences)
     assert.match(reference, /^[^@\s]+@[0-9a-f]{40}$/u);
+});
+
+test("BDD-REL-304 bootstraps Production Azure with environment OIDC", async () => {
+  const bootstrap = await readFile(
+    new URL("../scripts/provision-production-azure.sh", import.meta.url),
+    "utf8",
+  );
+  assert.match(bootstrap, /repo:\$\{OIDC_REPOSITORY_SUBJECT\}:environment:production/u);
+  assert.match(bootstrap, /Y4NN777\/y7-feedback-mngt-system/u);
+  assert.match(bootstrap, /identity federated-credential/u);
+  assert.match(bootstrap, /monitor action-group create/u);
+  assert.match(bootstrap, /--role Contributor/u);
+  assert.match(bootstrap, /--scope "\$RESOURCE_GROUP_ID"/u);
+  assert.doesNotMatch(bootstrap, /AZURE_(?:CLIENT_)?SECRET/u);
+  assert.doesNotMatch(bootstrap, /subscription.*(?:Owner|Contributor)/iu);
 });
 
 test("BDD-REL-406 stages, promotes, rolls back and restores Production", async () => {
