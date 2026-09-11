@@ -340,12 +340,22 @@ test("BDD-REL-406 stages, promotes, rolls back and restores Production", async (
   assert.match(workflow, /vercel@50\.35\.0 rollback status/u);
   assert.match(workflow, /api\.vercel\.com\/v13\/deployments/u);
   assert.match(workflow, /PREVIOUS_WEB_DEPLOYMENT_ID/u);
+  assert.match(workflow, /PREVIOUS_WEB_DEPLOYMENT_TARGET/u);
   assert.match(workflow, /NEW_WEB_DEPLOYMENT_ID/u);
   assert.match(workflow, /PRODUCTION_WEB_ROUTING_MISMATCH/u);
   assert.match(workflow, /pnpm verify:release:production/u);
   assert.match(workflow, /pnpm verify:providers:production:github/u);
   assert.match(workflow, /PRODUCTION_GITHUB_EVIDENCE_AUTHORITY_MISSING/u);
   assert.match(workflow, /trap cleanup EXIT/u);
+  assert.match(
+    workflow,
+    /if \[ "\$status" -ne 0 \] && \\\s+\[ "\$RESTORE_PREVIOUS_ON_FAILURE" = "1" \]/u,
+  );
+  assert.match(
+    workflow,
+    /vercel@50\.35\.0 promote "\$PREVIOUS_WEB_DEPLOYMENT_TARGET"/u,
+  );
+  assert.doesNotMatch(workflow, /ROLLBACK_ACTIVE/u);
   assert.doesNotMatch(workflow, /upload-artifact/u);
 
   const actionReferences = [...workflow.matchAll(/^\s+(?:- )?uses: ([^\s#]+)/gmu)].map(
