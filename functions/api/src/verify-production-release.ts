@@ -94,7 +94,11 @@ async function main(): Promise<void> {
     throw new Error("PRODUCTION_RELEASE_EXPLICIT_REHEARSAL_REQUIRED");
   }
   const config = parseServerConfig(process.env);
-  if (config.environment !== "production" || !config.antivirusScanner) {
+  if (
+    config.environment !== "production" ||
+    !config.antivirusScanner ||
+    !config.providers
+  ) {
     throw new Error("PRODUCTION_RELEASE_CONFIGURATION_INVALID");
   }
   const functionOrigin = origin(required("Y7_FUNCTION_DOMAIN_URL"));
@@ -209,6 +213,8 @@ async function main(): Promise<void> {
     previewWebOrigin,
     productionFunctionOrigin: functionOrigin,
     previewFunctionOrigin,
+    githubCallbackUrl: config.providers.github.callbackUrl,
+    gitlabCallbackUrl: config.providers.gitlab.callbackUrl,
     productionScannerOrigin: scannerOrigin,
     previewScannerOrigin,
     activeDeploymentReady: active.status === DeploymentStatus.Ready,
