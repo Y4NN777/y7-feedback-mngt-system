@@ -282,15 +282,16 @@ export function createHttpApplication(
         timeoutMs: config.antivirusScanner.timeoutMs,
       })
     : undefined;
-  const attachmentStaging = malwareScanner
-    ? createAttachmentStaging(
-        attachmentStorage,
-        createAttachmentStagingTokenCodec(sensitive, {
-          tableId: config.appwriteSchema.attachmentsTableId,
-          now: runtime.nowIso,
-          ttlMs: 15 * 60 * 1_000,
-        }),
-        {
+  const attachmentStagingTokens = malwareScanner
+    ? createAttachmentStagingTokenCodec(sensitive, {
+        tableId: config.appwriteSchema.attachmentsTableId,
+        now: runtime.nowIso,
+        ttlMs: 15 * 60 * 1_000,
+      })
+    : undefined;
+  const attachmentStaging =
+    malwareScanner && attachmentStagingTokens
+      ? createAttachmentStaging(attachmentStorage, attachmentStagingTokens, {
           validate: (candidate) =>
             validateAttachment(candidate, {
               malwareScanner,
@@ -298,9 +299,8 @@ export function createHttpApplication(
           createAttachmentId: runtime.createId,
           createObjectId: () => `private/${runtime.createId()}`,
           now: runtime.nowIso,
-        },
-      )
-    : undefined;
+        })
+      : undefined;
   const reporterAttachmentDownload = createReporterAttachmentDownload(
     accountless,
     createAttachmentDownload(attachmentMetadata, attachmentStorage),
@@ -1002,6 +1002,7 @@ export function createHttpApplication(
       workspaceAttachmentDownload,
       workspaceOperations,
       attachmentStaging,
+      attachmentStagingTokens,
     ),
     /* v8 ignore next -- both compositions are exercised by deployed environments */
     ...(sourceConnections === undefined ? {} : { sourceConnections }),

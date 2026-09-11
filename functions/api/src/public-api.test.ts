@@ -8,6 +8,7 @@ import type {
 
 import type { AccountlessAccessCoordinator } from "./accountless-access";
 import type { AttachmentStaging } from "./attachment-staging";
+import type { AttachmentStagingGrant } from "./attachment-staging-token";
 import type { IntakeCommand, IntakeCoordinator } from "./intake";
 import type { ReporterAttachmentDownload } from "./reporter-attachment-download";
 import type { WorkspaceAttachmentDownload } from "./workspace-attachment-download";
@@ -105,6 +106,7 @@ function setup(
       ReturnType<WorkspaceAttachmentDownload>
     >;
     readonly stagingOutcome?: Awaited<ReturnType<AttachmentStaging["stage"]>>;
+    readonly stagingGrant?: AttachmentStagingGrant;
     readonly projectResolutions?: readonly Awaited<
       ReturnType<PublicProjectReader["resolve"]>
     >[];
@@ -181,6 +183,25 @@ function setup(
   );
   const projects: PublicProjectReader = { findBySlug, resolve };
   const intake: IntakeCoordinator = { accept };
+  const verify = vi.fn(
+    (attachmentId: string, token: string): AttachmentStagingGrant => {
+      if (token !== "encrypted-token") throw new Error("invalid token");
+      return (
+        options.stagingGrant ?? {
+          attachmentId,
+          objectId: `private/${attachmentId}`,
+          operationId: "123e4567-e89b-42d3-a456-426614174000",
+          workspaceId: "workspace-authoritative",
+          projectId: "project-authoritative",
+          displayName: "evidence.txt",
+          mediaType: "text/plain; charset=utf-8",
+          size: 12,
+          sha256: "A".repeat(43),
+          stagedAt: "2026-08-10T15:00:00.000Z",
+        }
+      );
+    },
+  );
   const access: AccountlessAccessCoordinator = {
     authorize: () => Promise.resolve({ status: "denied", code: "ACCESS_DENIED" }),
     retrieve,
@@ -199,10 +220,12 @@ function setup(
       workspaceAttachmentDownload,
       undefined,
       { stage },
+      { issue: vi.fn(), verify },
     ),
     findBySlug,
     projects,
     stage,
+    verify,
     retrieve,
     rotate,
     revoke,
@@ -440,6 +463,75 @@ describe("trusted public Function boundary", () => {
       }),
     );
     expect(JSON.stringify(response)).not.toContain("feedback-1");
+  });
+
+  it("BDD-ATT-UC03-009 verifies staging tokens and derives the attachment manifest", async () => {
+    const { api, accept, verify } = setup();
+    const body = {
+      ...bugBody(),
+      attachments: [{ attachmentId: "attachment-1", token: "encrypted-token" }],
+    };
+
+    await expect(
+      api.handle({
+        method: "POST",
+        path: "/v1/projects/wisemoney/feedback",
+        headers: {},
+        body,
+      }),
+    ).resolves.toMatchObject({ statusCode: 201 });
+
+    expect(verify).toHaveBeenCalledWith("attachment-1", "encrypted-token");
+    expect(accept).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clientOperationId: body.clientOperationId,
+        attachmentGrants: [expect.objectContaining({ attachmentId: "attachment-1" })],
+        draft: expect.objectContaining({ attachmentNames: ["evidence.txt"] }),
+      }),
+    );
+  });
+
+  it("BDD-ATT-UC03-010 rejects invalid or cross-scope staging tokens before intake", async () => {
+    const invalid = setup();
+    await expect(
+      invalid.api.handle({
+        method: "POST",
+        path: "/v1/projects/wisemoney/feedback",
+        headers: {},
+        body: {
+          ...bugBody(),
+          attachments: [{ attachmentId: "attachment-1", token: "bad-token" }],
+        },
+      }),
+    ).resolves.toEqual({ statusCode: 400, body: { error: "ERR-INTAKE-INVALID" } });
+    expect(invalid.accept).not.toHaveBeenCalled();
+
+    const forged = setup({
+      stagingGrant: {
+        attachmentId: "attachment-1",
+        objectId: "private/attachment-1",
+        operationId: "123e4567-e89b-42d3-a456-426614174000",
+        workspaceId: "forged-workspace",
+        projectId: "project-authoritative",
+        displayName: "evidence.txt",
+        mediaType: "text/plain; charset=utf-8",
+        size: 12,
+        sha256: "A".repeat(43),
+        stagedAt: "2026-08-10T15:00:00.000Z",
+      },
+    });
+    await expect(
+      forged.api.handle({
+        method: "POST",
+        path: "/v1/projects/wisemoney/feedback",
+        headers: {},
+        body: {
+          ...bugBody(),
+          attachments: [{ attachmentId: "attachment-1", token: "encrypted-token" }],
+        },
+      }),
+    ).resolves.toEqual({ statusCode: 400, body: { error: "ERR-INTAKE-INVALID" } });
+    expect(forged.accept).not.toHaveBeenCalled();
   });
 
   it("maps replay, conflict, and dependency failure without exposing prior success", async () => {
