@@ -178,3 +178,24 @@ test("BDD-E2E-301 runs the complete G5 evidence pack with ephemeral secret mater
     /node --env-file-if-exists=\.env\.appwrite-preview/u,
   );
 });
+
+test("BDD-REL-301 defines a monitored permanent Production antivirus service", async () => {
+  const template = await readFile(
+    new URL("../infra/azure/production-antivirus.bicep", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(template, /@secure\(\)[\s\S]*?param scannerHmacKey string/u);
+  assert.match(template, /Microsoft\.App\/managedEnvironments@2024-03-01/u);
+  assert.match(template, /Microsoft\.App\/containerApps@2024-03-01/u);
+  assert.match(template, /Microsoft\.OperationalInsights\/workspaces@2023-09-01/u);
+  assert.match(template, /minReplicas: 1/u);
+  assert.match(template, /maxReplicas: 2/u);
+  assert.match(template, /secretRef: 'scanner-hmac-key'/u);
+  assert.match(template, /path: '\/health'/u);
+  assert.match(template, /metricName: 'Requests'/u);
+  assert.match(template, /metricName: 'Replicas'/u);
+  assert.match(template, /statusCodeCategory/u);
+  assert.match(template, /retentionInDays: 30/u);
+  assert.doesNotMatch(template, /customDomains|certificateId/u);
+});
