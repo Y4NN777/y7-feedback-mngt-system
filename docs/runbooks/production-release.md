@@ -115,7 +115,12 @@ Run `Production release` for the candidate commit. The workflow:
 7. switches Appwrite to the previous Ready Function deployment, health-checks
    it, and restores the candidate in a `finally` path;
 8. runs the signed antivirus matrix, web security/cache headers, environment
-   isolation and provider callback/webhook denial probes.
+   isolation and provider callback/webhook denial probes;
+9. creates a non-sensitive temporary GitHub issue through the Production
+   provider worker, proves inbound/outbound message synchronization, closes the
+   issue and removes the Appwrite fixture rows. The protected release bundle
+   supplies a dedicated `Y7_GITHUB_VERIFICATION_TOKEN`; it is never installed
+   as a Function variable or retained in evidence.
 
 The release is successful only after
 `PRODUCTION_RELEASE_AND_ROLLBACK_PASSED`. If a smoke fails, leave the last known

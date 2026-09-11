@@ -104,10 +104,16 @@ jobs:
             --print 'process.env.Y7_WEB_ORIGIN || ""')"
           PRODUCTION_SCANNER_ORIGIN="$(node --env-file=.env.appwrite-production \
             --print 'process.env.ANTIVIRUS_SCANNER_ENDPOINT || ""')"
+          PRODUCTION_GITHUB_EVIDENCE_READY="$(node --env-file=.env.appwrite-production \
+            --print 'Boolean(process.env.Y7_GITHUB_VERIFICATION_TOKEN?.trim())')"
           case "$PRODUCTION_WEB_ORIGIN $PRODUCTION_SCANNER_ORIGIN" in
             https://*\ https://*) ;;
             *) echo '{"error":"PRODUCTION_RELEASE_ORIGIN_INVALID"}' >&2; exit 1 ;;
           esac
+          if [ "$PRODUCTION_GITHUB_EVIDENCE_READY" != "true" ]; then
+            echo '{"error":"PRODUCTION_GITHUB_EVIDENCE_AUTHORITY_MISSING"}' >&2
+            exit 1
+          fi
           PREVIOUS_WEB_DEPLOYMENT_ID="$(
             resolve_vercel_deployment_id "$PRODUCTION_WEB_ORIGIN"
           )"
@@ -156,4 +162,5 @@ jobs:
             "$PRODUCTION_WEB_ORIGIN/" >/dev/null
 
           pnpm verify:release:production
+          pnpm verify:providers:production:github
           echo '{"result":"PRODUCTION_RELEASE_AND_ROLLBACK_PASSED"}'

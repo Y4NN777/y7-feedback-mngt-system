@@ -35,7 +35,7 @@ the reviewable candidate is merged.
 | `TASK-SEC-001` | D5.4 security/isolation regression | `pnpm security:scan` plus every denial and environment-isolation command in G5 | `IN_PROGRESS` |
 | `TASK-UX-001` | D5.4 accessibility/320 px regression | `pnpm verify:e2e:g5:browser` on desktop and `mobile-320` | `IN_PROGRESS` |
 | `TASK-REL-001` | D5.5 permanent dependencies and reversible release | `production-antivirus.yml`, `recovery-backup.yml`, `production-release.yml`, then `pnpm verify:release:production` | `IN_PROGRESS` |
-| `TASK-GHDP-001` | D5.6 GitHub Developer Program prerequisites | Production GitHub API proof, public metadata, release proof and submission receipt | `BLOCKED` by `TASK-REL-001` |
+| `TASK-GHDP-001` | D5.6 GitHub Developer Program prerequisites | `pnpm verify:providers:production:github`, public metadata, release proof and submission receipt | `BLOCKED` by `TASK-REL-001` and unfinalized public metadata |
 | `G5` | Gate G5 criteria 1–7 | protected G5 workflow, Production dependency workflows, reversible release and this index | `IN_PROGRESS` |
 
 Operational authority and rotation procedure:
