@@ -47,6 +47,7 @@ jobs:
           NEW_WEB_DEPLOYMENT_ID=""
           PREVIOUS_WEB_DEPLOYMENT_ID=""
           PREVIOUS_WEB_DEPLOYMENT_TARGET=""
+          PREVIOUS_FUNCTION_DEPLOYMENT_ID=""
           RESTORE_PREVIOUS_ON_FAILURE=0
           resolve_vercel_deployment_id() {
             local target="${1#https://}"
@@ -100,15 +101,26 @@ jobs:
           cleanup() {
             local status=$?
             trap - EXIT
-            rm -f .env.appwrite-production .production-web-url
             if [ "$status" -ne 0 ] && \
-               [ "$RESTORE_PREVIOUS_ON_FAILURE" = "1" ] && \
-               [ -n "$PREVIOUS_WEB_DEPLOYMENT_TARGET" ]; then
-              if ! pnpm dlx vercel@50.35.0 promote "$PREVIOUS_WEB_DEPLOYMENT_TARGET" \
-                --yes --token "$VERCEL_TOKEN" >/dev/null; then
-                status=1
+               [ "$RESTORE_PREVIOUS_ON_FAILURE" = "1" ]; then
+              if [ -n "$PREVIOUS_WEB_DEPLOYMENT_TARGET" ]; then
+                if ! pnpm dlx vercel@50.35.0 promote "$PREVIOUS_WEB_DEPLOYMENT_TARGET" \
+                  --yes --token "$VERCEL_TOKEN" >/dev/null; then
+                  status=1
+                fi
+              fi
+              if [ -n "$PREVIOUS_FUNCTION_DEPLOYMENT_ID" ] && \
+                 [ -f .env.appwrite-production ]; then
+                export Y7_PREVIOUS_FUNCTION_DEPLOYMENT_ID="$PREVIOUS_FUNCTION_DEPLOYMENT_ID"
+                if ! node --env-file=.env.appwrite-production \
+                  functions/api/dist/production-function-rollback.js restore \
+                  >/dev/null; then
+                  status=1
+                fi
+                unset Y7_PREVIOUS_FUNCTION_DEPLOYMENT_ID
               fi
             fi
+            rm -f .env.appwrite-production .production-web-url
             exit "$status"
           }
           trap cleanup EXIT
@@ -144,6 +156,15 @@ jobs:
           curl --fail --silent --show-error --max-time 30 \
             "$PRODUCTION_SCANNER_ORIGIN/health" >/dev/null
 
+          pnpm --filter @y7-feedback/config build
+          pnpm --filter @y7-feedback/domain build
+          pnpm --filter @y7-feedback/api build
+          PREVIOUS_FUNCTION_DEPLOYMENT_ID="$(
+            node --env-file=.env.appwrite-production \
+              functions/api/dist/production-function-rollback.js capture
+          )"
+          RESTORE_PREVIOUS_ON_FAILURE=1
+
           pnpm provision:appwrite:production
           pnpm configure:appwrite:function:production
           pnpm deploy:appwrite:function:production
@@ -163,7 +184,6 @@ jobs:
           pnpm dlx vercel@50.35.0 curl / --deployment "$NEW_WEB_URL" \
             --token "$VERCEL_TOKEN" --fail --silent --show-error >/dev/null
 
-          RESTORE_PREVIOUS_ON_FAILURE=1
           pnpm dlx vercel@50.35.0 promote "$NEW_WEB_URL" \
             --yes --token "$VERCEL_TOKEN" >/dev/null
           await_vercel_deployment "$PRODUCTION_WEB_ORIGIN" "$NEW_WEB_DEPLOYMENT_ID"
