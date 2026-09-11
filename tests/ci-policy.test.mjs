@@ -282,6 +282,8 @@ test("BDD-REL-302 deploys the Production scanner only through protected OIDC", a
   assert.match(workflow, /az resource show --ids "\$AZURE_ACTION_GROUP_ID"/u);
   assert.match(workflow, /infra\/azure\/production-antivirus\.bicep/u);
   assert.match(workflow, /ghcr\.io\/y4nn777\/y7-feedback-antivirus:sha-\$GITHUB_SHA/u);
+  assert.match(workflow, /gatewayRelease="\$GITHUB_SHA"/u);
+  assert.match(workflow, /health\?\.release !== process\.env\.EXPECTED_RELEASE/u);
   assert.match(workflow, /docker build --file services\/antivirus\/Dockerfile/u);
   assert.match(workflow, /docker push "\$IMAGE"/u);
   assert.match(workflow, /az deployment group create/u);
@@ -301,6 +303,28 @@ test("BDD-REL-302 deploys the Production scanner only through protected OIDC", a
   assert.ok(actionReferences.length >= 2);
   for (const reference of actionReferences)
     assert.match(reference, /^[^@\s]+@[0-9a-f]{40}$/u);
+});
+
+test("BDD-REL-426 exposes and verifies the immutable scanner release identity", async () => {
+  const template = await readFile(
+    new URL("../infra/azure/production-antivirus.bicep", import.meta.url),
+    "utf8",
+  );
+  const gateway = await readFile(
+    new URL("../services/antivirus/src/main.ts", import.meta.url),
+    "utf8",
+  );
+  const verifier = await readFile(
+    new URL("../functions/api/src/verify-production-release.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(template, /param gatewayRelease string/u);
+  assert.match(template, /name: 'Y7_SCANNER_RELEASE'\s+value: gatewayRelease/u);
+  assert.match(gateway, /parseScannerRelease\(process\.env\.Y7_SCANNER_RELEASE\)/u);
+  assert.match(gateway, /JSON\.stringify\(\{ status: "ok", release \}\)/u);
+  assert.match(verifier, /assertProductionScannerRelease/u);
+  assert.match(verifier, /required\("GITHUB_SHA"\)/u);
 });
 
 test("BDD-REL-304 bootstraps Production Azure with environment OIDC", async () => {

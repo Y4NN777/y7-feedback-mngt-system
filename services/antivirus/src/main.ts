@@ -7,6 +7,7 @@ import {
   type ClamdExchange,
 } from "./clamd-client.js";
 import { createScanGateway } from "./gateway.js";
+import { parseScannerRelease } from "./scanner-release.js";
 
 const maximumBytes = 10 * 1024 * 1024;
 
@@ -55,6 +56,7 @@ function clamdExchange(host: string, port: number): ClamdExchange {
 }
 
 const key = Buffer.from(required("Y7_SCANNER_HMAC_KEY"), "base64url");
+const release = parseScannerRelease(process.env.Y7_SCANNER_RELEASE);
 const port = Number(process.env.PORT ?? "8080");
 const clamdPort = Number(process.env.CLAMAV_PORT ?? "3310");
 if (
@@ -89,7 +91,9 @@ createServer((request, response) => {
         "content-type": "application/json",
         "cache-control": "no-store",
       });
-      response.end(ready ? '{"status":"ok"}' : '{"status":"unavailable"}');
+      response.end(
+        ready ? JSON.stringify({ status: "ok", release }) : '{"status":"unavailable"}',
+      );
     });
     return;
   }
