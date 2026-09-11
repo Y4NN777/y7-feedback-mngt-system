@@ -395,7 +395,9 @@ export function createAppwriteConversationLifecycleStore(
         const projectId = feedback.projectId;
 
         let result: Omit<ConversationLifecycleStoreResult, "status">;
-        const primaryWrites: Promise<void>[] = [];
+        const primaryWrites: Array<() => Promise<void>> = [];
+        const primaryOperations: Readonly<Record<string, unknown>>[] = [];
+        const parallelWrites: Array<() => Promise<void>> = [];
         if (
           input.command.kind === "append_message" ||
           input.command.kind === "append_internal_note"
@@ -416,51 +418,75 @@ export function createAppwriteConversationLifecycleStore(
             input.command.kind === "append_message"
               ? schema.messagesTableId
               : schema.internalNotesTableId;
-          primaryWrites.push(
-            (async () => {
-              const row = await tables.createRow({
-                databaseId: schema.databaseId,
-                tableId,
-                rowId: input.command.eventId,
-                data: {
-                  feedbackId: input.feedbackId,
-                  workspaceId,
-                  projectId,
-                  actorId: appended.actorId,
-                  actorKind: appended.actorKind,
-                  audience: appended.audience,
-                  contentEnvelope: persistence.protector.seal(
-                    {
-                      environment: persistence.environment,
-                      tableId,
-                      rowId: input.command.eventId,
-                      field: "contentEnvelope",
-                    },
-                    appended.content,
-                  ),
-                  occurredAt: appended.occurredAt,
+          primaryOperations.push({
+            action: "create",
+            databaseId: schema.databaseId,
+            tableId,
+            rowId: input.command.eventId,
+            data: {
+              feedbackId: input.feedbackId,
+              workspaceId,
+              projectId,
+              actorId: appended.actorId,
+              actorKind: appended.actorKind,
+              audience: appended.audience,
+              contentEnvelope: persistence.protector.seal(
+                {
+                  environment: persistence.environment,
+                  tableId,
+                  rowId: input.command.eventId,
+                  field: "contentEnvelope",
                 },
-                permissions: [],
-                transactionId,
-              });
-              if (!validRow(row, input.command.eventId)) {
-                throw new AppwriteConversationLifecycleError("ERR-CONV-RETRYABLE");
-              }
-            })(),
-          );
+                appended.content,
+              ),
+              occurredAt: appended.occurredAt,
+              $permissions: [],
+            },
+          });
+          primaryWrites.push(async () => {
+            const row = await tables.createRow({
+              databaseId: schema.databaseId,
+              tableId,
+              rowId: input.command.eventId,
+              data: {
+                feedbackId: input.feedbackId,
+                workspaceId,
+                projectId,
+                actorId: appended.actorId,
+                actorKind: appended.actorKind,
+                audience: appended.audience,
+                contentEnvelope: persistence.protector.seal(
+                  {
+                    environment: persistence.environment,
+                    tableId,
+                    rowId: input.command.eventId,
+                    field: "contentEnvelope",
+                  },
+                  appended.content,
+                ),
+                occurredAt: appended.occurredAt,
+              },
+              permissions: [],
+              transactionId: activeTransactionId,
+            });
+            if (!validRow(row, input.command.eventId)) {
+              throw new AppwriteConversationLifecycleError("ERR-CONV-RETRYABLE");
+            }
+          });
           if (input.command.kind === "append_message") {
-            primaryWrites.push(
+            const message = input.command;
+            parallelWrites.push(() =>
               providerFanout
                 .append({
-                  transactionId,
+                  transactionId: activeTransactionId,
                   feedbackId: input.feedbackId,
                   workspaceId,
                   projectId,
-                  messageId: input.command.eventId,
-                  actorKind: input.command.actorKind,
-                  audience: input.command.audience,
-                  content: input.command.content,
-                  occurredAt: input.command.occurredAt,
+                  messageId: message.eventId,
+                  actorKind: message.actorKind,
+                  audience: message.audience,
+                  content: message.content,
+                  occurredAt: message.occurredAt,
                 })
                 .then(() => undefined),
             );
@@ -504,20 +530,56 @@ export function createAppwriteConversationLifecycleStore(
             input.command,
           );
           const fact = transition.history;
+          primaryOperations.push(
+            {
+              action: "update",
+              databaseId: schema.databaseId,
+              tableId: schema.feedbackTableId,
+              rowId: input.feedbackId,
+              data: { state: transition.next.state },
+            },
+            {
+              action: "create",
+              databaseId: schema.databaseId,
+              tableId: schema.lifecycleTableId,
+              rowId: fact.id,
+              data: {
+                feedbackId: fact.feedbackId,
+                workspaceId,
+                projectId,
+                priorState: fact.priorState,
+                state: fact.state,
+                actorId: fact.actorId,
+                actorKind: fact.actorKind,
+                reasonEnvelope: persistence.protector.seal(
+                  {
+                    environment: persistence.environment,
+                    tableId: schema.lifecycleTableId,
+                    rowId: fact.id,
+                    field: "reasonEnvelope",
+                  },
+                  fact.reason,
+                ),
+                occurredAt: fact.occurredAt,
+                sequence: fact.sequence,
+                $permissions: [],
+              },
+            },
+          );
           primaryWrites.push(
-            (async () => {
+            async () => {
               const updated = await tables.updateRow({
                 databaseId: schema.databaseId,
                 tableId: schema.feedbackTableId,
                 rowId: input.feedbackId,
                 data: { state: transition.next.state },
-                transactionId,
+                transactionId: activeTransactionId,
               });
               if (!validRow(updated, input.feedbackId)) {
                 throw new AppwriteConversationLifecycleError("ERR-CONV-RETRYABLE");
               }
-            })(),
-            (async () => {
+            },
+            async () => {
               const created = await tables.createRow({
                 databaseId: schema.databaseId,
                 tableId: schema.lifecycleTableId,
@@ -543,12 +605,12 @@ export function createAppwriteConversationLifecycleStore(
                   sequence: fact.sequence,
                 },
                 permissions: [],
-                transactionId,
+                transactionId: activeTransactionId,
               });
               if (!validRow(created, fact.id)) {
                 throw new AppwriteConversationLifecycleError("ERR-CONV-RETRYABLE");
               }
-            })(),
+            },
           );
           result = {
             feedbackId: input.feedbackId,
@@ -563,9 +625,44 @@ export function createAppwriteConversationLifecycleStore(
           input.feedbackId,
           input.command.eventId,
         );
+        const idempotencyData = {
+          feedbackId: input.feedbackId,
+          operationId: input.command.eventId,
+          payloadDigest: input.payloadDigest,
+          action: input.command.kind,
+          resultJson: JSON.stringify(result),
+          createdAt: input.command.occurredAt,
+        };
+        primaryOperations.push({
+          action: "create",
+          databaseId: schema.databaseId,
+          tableId: schema.idempotencyTableId,
+          rowId: idempotencyRowId,
+          data: { ...idempotencyData, $permissions: [] },
+        });
         await measured("transactional_writes", () =>
           Promise.all([
-            ...primaryWrites,
+            ...(tables.createOperations
+              ? [
+                  tables
+                    .createOperations({
+                      transactionId: activeTransactionId,
+                      operations: primaryOperations,
+                    })
+                    .then((staged) => {
+                      if (
+                        !object(staged) ||
+                        staged.$id !== activeTransactionId ||
+                        staged.operations !== primaryOperations.length
+                      ) {
+                        throw new AppwriteConversationLifecycleError(
+                          "ERR-CONV-RETRYABLE",
+                        );
+                      }
+                    }),
+                ]
+              : primaryWrites.map((write) => write())),
+            ...parallelWrites.map((write) => write()),
             fanout.append({
               transactionId: activeTransactionId,
               feedback,
@@ -574,26 +671,25 @@ export function createAppwriteConversationLifecycleStore(
               locale: input.locale,
               ...notificationEvent(input.command),
             }),
-            (async () => {
-              const idempotencyRow = await tables.createRow({
-                databaseId: schema.databaseId,
-                tableId: schema.idempotencyTableId,
-                rowId: idempotencyRowId,
-                data: {
-                  feedbackId: input.feedbackId,
-                  operationId: input.command.eventId,
-                  payloadDigest: input.payloadDigest,
-                  action: input.command.kind,
-                  resultJson: JSON.stringify(result),
-                  createdAt: input.command.occurredAt,
-                },
-                permissions: [],
-                transactionId: activeTransactionId,
-              });
-              if (!validRow(idempotencyRow, idempotencyRowId)) {
-                throw new AppwriteConversationLifecycleError("ERR-CONV-RETRYABLE");
-              }
-            })(),
+            ...(tables.createOperations
+              ? []
+              : [
+                  (async () => {
+                    const idempotencyRow = await tables.createRow({
+                      databaseId: schema.databaseId,
+                      tableId: schema.idempotencyTableId,
+                      rowId: idempotencyRowId,
+                      data: idempotencyData,
+                      permissions: [],
+                      transactionId: activeTransactionId,
+                    });
+                    if (!validRow(idempotencyRow, idempotencyRowId)) {
+                      throw new AppwriteConversationLifecycleError(
+                        "ERR-CONV-RETRYABLE",
+                      );
+                    }
+                  })(),
+                ]),
           ]).then(() => undefined),
         );
         await measured("transaction_commit", () =>
@@ -635,6 +731,7 @@ export function createNodeAppwriteConversationLifecycleStore(
       const rows = await tables.listRows({ ...input, queries: [...input.queries] });
       return { rows: rows.rows };
     },
+    /* v8 ignore next -- the Node adapter always uses createOperations */
     createRow: (input) =>
       tables.createRow({ ...input, permissions: [...input.permissions] }),
     createOperations: (input) =>
@@ -642,6 +739,7 @@ export function createNodeAppwriteConversationLifecycleStore(
         transactionId: input.transactionId,
         operations: [...input.operations],
       }),
+    /* v8 ignore next -- the Node adapter always uses createOperations */
     updateRow: (input) => tables.updateRow(input),
     updateTransaction: (input) => tables.updateTransaction(input),
   };
