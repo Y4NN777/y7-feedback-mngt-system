@@ -46,6 +46,31 @@ async function healthy(url: URL): Promise<Response | undefined> {
   }
 }
 
+async function safelyDenied(url: URL, method: "GET" | "POST"): Promise<boolean> {
+  try {
+    const response = await fetch(url, {
+      method,
+      cache: "no-store",
+      credentials: "omit",
+      redirect: "error",
+      headers: method === "POST" ? { "content-type": "application/json" } : {},
+      ...(method === "POST" ? { body: "{}" } : {}),
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (![400, 401, 403].includes(response.status)) return false;
+    const body = (await response.json()) as unknown;
+    return (
+      typeof body === "object" &&
+      body !== null &&
+      "error" in body &&
+      typeof body.error === "string" &&
+      /^ERR-[A-Z0-9-]+$/u.test(body.error)
+    );
+  } catch {
+    return false;
+  }
+}
+
 async function waitForDeployment(
   functions: Functions,
   functionId: string,
@@ -135,6 +160,14 @@ async function main(): Promise<void> {
     healthy(new URL("/", webOrigin)),
     healthy(new URL("/index.html", webOrigin)),
   ]);
+  const providerBoundariesDenyUnsafeRequests = (
+    await Promise.all([
+      safelyDenied(new URL("/providers/github/callback", functionOrigin), "GET"),
+      safelyDenied(new URL("/providers/gitlab/callback", functionOrigin), "GET"),
+      safelyDenied(new URL("/providers/github/webhooks/probe", functionOrigin), "POST"),
+      safelyDenied(new URL("/providers/gitlab/webhooks/probe", functionOrigin), "POST"),
+    ])
+  ).every(Boolean);
   const scanner = createClamAvHttpScanner(parseClamAvHttpScannerConfig(process.env));
   const [cleanVerdict, infectedVerdict] = await Promise.all([
     scanner.scan(new TextEncoder().encode("Y7 production scanner clean probe")),
@@ -162,6 +195,7 @@ async function main(): Promise<void> {
     functionHealthReady: functionHealth !== undefined,
     scannerHealthReady: scannerHealth !== undefined,
     scannerMatrixPassed: cleanVerdict === "clean" && infectedVerdict === "infected",
+    providerBoundariesDenyUnsafeRequests,
     webHealthReady: webHealth !== undefined,
     webHeaders: {
       contentSecurityPolicy: Boolean(
