@@ -226,6 +226,9 @@ test("BDD-SLO-301 runs the real Preview SLO gate with protected least-privilege 
   );
   assert.match(workflow, /install -m 600 \/dev\/null \.env\.appwrite-preview/u);
   assert.match(workflow, /trap 'rm -f \.env\.appwrite-preview' EXIT/u);
+  assert.match(workflow, /pnpm provision:appwrite:preview/u);
+  assert.match(workflow, /pnpm configure:appwrite:function:preview/u);
+  assert.match(workflow, /pnpm deploy:appwrite:function:preview/u);
   assert.match(workflow, /pnpm verify:slo:g5/u);
 
   const actionReferences = [...workflow.matchAll(/^\s+(?:- )?uses: ([^\s#]+)/gmu)].map(
