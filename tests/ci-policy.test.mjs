@@ -159,6 +159,9 @@ test("BDD-E2E-301 runs the complete G5 evidence pack with ephemeral secret mater
   );
   assert.match(workflow, /install -m 600 \/dev\/null \.env\.appwrite-preview/u);
   assert.match(workflow, /trap 'rm -f \.env\.appwrite-preview' EXIT/u);
+  assert.match(workflow, /pnpm provision:appwrite:preview/u);
+  assert.match(workflow, /pnpm configure:appwrite:function:preview/u);
+  assert.match(workflow, /pnpm deploy:appwrite:function:preview/u);
   assert.match(workflow, /pnpm verify:e2e:g5/u);
   assert.doesNotMatch(workflow, /AZURE_(?:CLIENT_)?SECRET/u);
   assert.doesNotMatch(workflow, /upload-artifact/u);

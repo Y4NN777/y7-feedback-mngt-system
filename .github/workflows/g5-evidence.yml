@@ -62,4 +62,7 @@ jobs:
           fi
           printf '%s\n' "$Y7_PREVIEW_EVIDENCE_ENV" > .env.appwrite-preview
           unset Y7_PREVIEW_EVIDENCE_ENV
+          pnpm provision:appwrite:preview
+          pnpm configure:appwrite:function:preview
+          pnpm deploy:appwrite:function:preview
           pnpm verify:e2e:g5
