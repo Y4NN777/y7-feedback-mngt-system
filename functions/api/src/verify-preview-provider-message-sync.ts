@@ -8,6 +8,7 @@ import { parseServerConfig } from "@y7-feedback/config/server";
 import { createAppwriteProviderGrantVault } from "./appwrite-provider-grant-vault.js";
 import { createNodeAppwriteProviderConsentCleanup } from "./appwrite-provider-consent-cleanup.js";
 import { createNodeAppwriteProviderMessageFanout } from "./appwrite-provider-message-fanout.js";
+import { pollVerification } from "./verification-poll.js";
 import { createGitHubMessageProvider } from "./github-message-provider.js";
 import { createGitLabMessageProvider } from "./gitlab-message-provider.js";
 import { resolveProviderMessageSyncEvidenceTarget } from "./provider-message-sync-evidence-target.js";
@@ -415,6 +416,18 @@ async function main(): Promise<void> {
         total: false,
       })
     ).rows;
+  const processDelivery = async (connectionId: string, deliveryId: string) =>
+    pollVerification({
+      attempt: async () => {
+        await invoke("/operational/provider-event-inbox");
+        const rows = await inboxRows(connectionId);
+        return rows.find((row) => row.deliveryId === deliveryId);
+      },
+      accept: (row) =>
+        object(row) && (row.status === "completed" || row.status === "failed"),
+      maximumAttempts: 12,
+      intervalMs: 1_000,
+    });
   const outcomes: Array<Readonly<Record<string, unknown>>> = [];
 
   for (const provider of providers) {
@@ -655,7 +668,13 @@ async function main(): Promise<void> {
         inboundContent,
         createdAt,
       );
-      await invoke("/operational/provider-event-inbox");
+      if (
+        !(await processDelivery(
+          current.connectionId,
+          `msg_create_${suffix}_${provider}`,
+        ))
+      )
+        throw new Error("MESSAGE_SYNC_INBOUND_TIMEOUT");
       let messages = await messageRows(current.feedbackId);
       if (messages.length !== 1 || messages[0]?.revisionKind !== "created") {
         const inbox = await inboxRows(current.connectionId);
@@ -687,7 +706,13 @@ async function main(): Promise<void> {
         { id: "999999999", login: `outsider-${suffix}` },
         `${inboundCommentId}9`,
       );
-      await invoke("/operational/provider-event-inbox");
+      if (
+        !(await processDelivery(
+          current.connectionId,
+          `msg_outsider_${suffix}_${provider}`,
+        ))
+      )
+        throw new Error("MESSAGE_SYNC_OUTSIDER_TIMEOUT");
       if ((await messageRows(current.feedbackId)).length !== 1)
         throw new Error("MESSAGE_SYNC_OUTSIDER_DENIAL_FAILED");
 
@@ -731,7 +756,10 @@ async function main(): Promise<void> {
         revisedContent,
         revisedAt,
       );
-      await invoke("/operational/provider-event-inbox");
+      if (
+        !(await processDelivery(current.connectionId, `msg_edit_${suffix}_${provider}`))
+      )
+        throw new Error("MESSAGE_SYNC_REVISION_TIMEOUT");
       messages = await messageRows(current.feedbackId);
       const original = messages[0];
       const revision = messages[1];
@@ -741,15 +769,57 @@ async function main(): Promise<void> {
         !revision ||
         revision.revisionKind !== "revised" ||
         revision.supersedesMessageId !== original.$id
-      )
+      ) {
+        const inbox = await inboxRows(current.connectionId);
+        process.stderr.write(
+          `${JSON.stringify({
+            diagnostic: "revision",
+            provider,
+            createdAt,
+            revisedAt,
+            messages: messages.map((candidate: unknown) =>
+              object(candidate)
+                ? {
+                    id: typeof candidate.$id === "string" ? candidate.$id : "invalid",
+                    revisionKind:
+                      typeof candidate.revisionKind === "string"
+                        ? candidate.revisionKind
+                        : "invalid",
+                    supersedesMessageId:
+                      typeof candidate.supersedesMessageId === "string"
+                        ? candidate.supersedesMessageId
+                        : null,
+                    providerUpdatedAt:
+                      typeof candidate.providerUpdatedAt === "string"
+                        ? candidate.providerUpdatedAt
+                        : "invalid",
+                  }
+                : { id: "invalid" },
+            ),
+            inbox: inbox.map((row: unknown) =>
+              object(row)
+                ? {
+                    status: typeof row.status === "string" ? row.status : "unknown",
+                    attempts: typeof row.attempts === "number" ? row.attempts : null,
+                    lastErrorCode:
+                      typeof row.lastErrorCode === "string" ? row.lastErrorCode : null,
+                  }
+                : { status: "invalid", attempts: null, lastErrorCode: null },
+            ),
+          })}\n`,
+        );
         throw new Error("MESSAGE_SYNC_REVISION_FAILED");
+      }
       await sendWebhook(
         `msg_old_${suffix}_${provider}`,
         "revised",
         "Delayed old edit",
         createdAt,
       );
-      await invoke("/operational/provider-event-inbox");
+      if (
+        !(await processDelivery(current.connectionId, `msg_old_${suffix}_${provider}`))
+      )
+        throw new Error("MESSAGE_SYNC_REORDER_TIMEOUT");
       if ((await messageRows(current.feedbackId)).length !== 2)
         throw new Error("MESSAGE_SYNC_REORDER_FAILED");
 
