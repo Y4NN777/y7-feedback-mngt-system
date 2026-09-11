@@ -300,6 +300,11 @@ test("BDD-REL-406 stages, promotes, rolls back and restores Production", async (
   assert.match(workflow, /vercel@50\.35\.0 deploy --prod --skip-domain/u);
   assert.match(workflow, /vercel@50\.35\.0 promote/u);
   assert.match(workflow, /vercel@50\.35\.0 rollback/u);
+  assert.match(workflow, /vercel@50\.35\.0 rollback status/u);
+  assert.match(workflow, /api\.vercel\.com\/v13\/deployments/u);
+  assert.match(workflow, /PREVIOUS_WEB_DEPLOYMENT_ID/u);
+  assert.match(workflow, /NEW_WEB_DEPLOYMENT_ID/u);
+  assert.match(workflow, /PRODUCTION_WEB_ROUTING_MISMATCH/u);
   assert.match(workflow, /pnpm verify:release:production/u);
   assert.match(workflow, /trap cleanup EXIT/u);
   assert.doesNotMatch(workflow, /upload-artifact/u);
