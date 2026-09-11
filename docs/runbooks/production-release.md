@@ -34,7 +34,10 @@ the repository's `production` environment and receives `Contributor` only on
 Run the `Production antivirus` workflow. It deploys the immutable
 `ghcr.io/y4nn777/y7-feedback-antivirus:sha-<commit>` gateway with pinned ClamAV,
 at least one warm replica, truthful readiness, Log Analytics and routed 5xx/no
-replica alerts. The workflow fails before deployment unless all of these exist:
+replica alerts. It then submits an Azure Monitor static-metric test notification
+through the configured Action Group without printing its receiver. Require both
+`PRODUCTION_SCANNER_READY` and `PRODUCTION_ALERT_TEST_SUBMITTED`. The workflow
+fails before deployment unless all of these exist:
 
 - Azure OIDC identity;
 - a new 32-byte scanner HMAC secret and non-secret key identifier;
