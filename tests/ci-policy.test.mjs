@@ -189,6 +189,7 @@ test("BDD-E2E-301 runs the complete G5 evidence pack with ephemeral secret mater
   );
   assert.match(workflow, /install -m 600 \/dev\/null \.env\.appwrite-preview/u);
   assert.match(workflow, /trap 'rm -f \.env\.appwrite-preview' EXIT/u);
+  assert.match(workflow, /printf '\\nRELEASE=%s\\n' "\$GITHUB_SHA"/u);
   assert.match(workflow, /pnpm provision:appwrite(?:\s|$)/u);
   assert.match(workflow, /pnpm configure:appwrite:function:preview/u);
   assert.match(workflow, /pnpm deploy:appwrite:function:preview/u);
@@ -229,6 +230,7 @@ test("BDD-SLO-301 runs the real Preview SLO gate with protected least-privilege 
   );
   assert.match(workflow, /install -m 600 \/dev\/null \.env\.appwrite-preview/u);
   assert.match(workflow, /trap 'rm -f \.env\.appwrite-preview' EXIT/u);
+  assert.match(workflow, /printf '\\nRELEASE=%s\\n' "\$GITHUB_SHA"/u);
   assert.match(workflow, /pnpm provision:appwrite(?:\s|$)/u);
   assert.match(workflow, /pnpm configure:appwrite:function:preview/u);
   assert.match(workflow, /pnpm deploy:appwrite:function:preview/u);
