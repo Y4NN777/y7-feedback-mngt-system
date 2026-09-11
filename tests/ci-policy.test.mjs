@@ -198,6 +198,9 @@ test("BDD-REL-301 defines a monitored permanent Production antivirus service", a
   assert.match(template, /path: '\/health'/u);
   assert.match(template, /metricName: 'Requests'/u);
   assert.match(template, /metricName: 'Replicas'/u);
+  assert.match(template, /param actionGroupId string/u);
+  assert.doesNotMatch(template, /param actionGroupId string = ''/u);
+  assert.match(template, /actions: alertActions/u);
   assert.match(template, /statusCodeCategory/u);
   assert.match(template, /retentionInDays: 30/u);
   assert.doesNotMatch(template, /customDomains|certificateId/u);
@@ -215,6 +218,8 @@ test("BDD-REL-302 deploys the Production scanner only through protected OIDC", a
   assert.match(workflow, /cancel-in-progress: false/u);
   assert.match(workflow, /AZURE_PRODUCTION_CLIENT_ID/u);
   assert.match(workflow, /secrets\.Y7_PRODUCTION_SCANNER_HMAC_KEY/u);
+  assert.match(workflow, /AZURE_PRODUCTION_ACTION_GROUP_ID/u);
+  assert.match(workflow, /az resource show --ids "\$AZURE_ACTION_GROUP_ID"/u);
   assert.match(workflow, /infra\/azure\/production-antivirus\.bicep/u);
   assert.match(workflow, /ghcr\.io\/y4nn777\/y7-feedback-antivirus:sha-\$GITHUB_SHA/u);
   assert.match(workflow, /az deployment group create/u);

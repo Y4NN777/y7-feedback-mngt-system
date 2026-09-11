@@ -22,6 +22,7 @@ jobs:
       AZURE_LOCATION: centralus
       Y7_SCANNER_KEY_ID: ${{ vars.Y7_PRODUCTION_SCANNER_KEY_ID }}
       Y7_SCANNER_HMAC_KEY: ${{ secrets.Y7_PRODUCTION_SCANNER_HMAC_KEY }}
+      AZURE_ACTION_GROUP_ID: ${{ vars.AZURE_PRODUCTION_ACTION_GROUP_ID }}
     steps:
       - name: Check out repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -37,10 +38,15 @@ jobs:
           set -Eeuo pipefail
           set +x
           umask 077
-          if [ -z "$Y7_SCANNER_KEY_ID" ] || [ -z "$Y7_SCANNER_HMAC_KEY" ]; then
+          if [ -z "$Y7_SCANNER_KEY_ID" ] || \
+             [ -z "$Y7_SCANNER_HMAC_KEY" ] || \
+             [ -z "$AZURE_ACTION_GROUP_ID" ]; then
             echo '{"error":"PRODUCTION_SCANNER_AUTHORITY_MISSING"}' >&2
             exit 1
           fi
+          az resource show --ids "$AZURE_ACTION_GROUP_ID" \
+            --api-version 2023-01-01 \
+            --query id --output tsv >/dev/null
           az group create \
             --name "$AZURE_RESOURCE_GROUP" \
             --location "$AZURE_LOCATION" \
@@ -54,7 +60,7 @@ jobs:
               gatewayImage="ghcr.io/y4nn777/y7-feedback-antivirus:sha-$GITHUB_SHA" \
               scannerKeyId="$Y7_SCANNER_KEY_ID" \
               scannerHmacKey="$Y7_SCANNER_HMAC_KEY" \
-              actionGroupId="${{ vars.AZURE_PRODUCTION_ACTION_GROUP_ID }}" \
+              actionGroupId="$AZURE_ACTION_GROUP_ID" \
             --output none
       - name: Verify truthful Production readiness
         shell: bash
