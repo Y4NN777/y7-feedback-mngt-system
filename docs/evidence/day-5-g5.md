@@ -38,6 +38,9 @@ the reviewable candidate is merged.
 | `TASK-GHDP-001` | D5.6 GitHub Developer Program prerequisites | Production GitHub API proof, public metadata, release proof and submission receipt | `BLOCKED` by `TASK-REL-001` |
 | `G5` | Gate G5 criteria 1–7 | protected G5 workflow, Production dependency workflows, reversible release and this index | `IN_PROGRESS` |
 
+Operational authority and rotation procedure:
+[`production-release.md`](../runbooks/production-release.md).
+
 ## Candidate-local evidence
 
 The current candidate contains these independently revertible outcomes:
@@ -50,6 +53,9 @@ The current candidate contains these independently revertible outcomes:
   alerts;
 - `d5f37e8` — scheduled encrypted Production backup with dedicated OIDC
   environment and corrected repository subject.
+- `0f01896` — Production callback/webhook fail-closed smoke;
+- `83a1b59` — exhaustive SMTP/recipient authority tests restoring the API
+  authorization boundary to 100% branch coverage.
 
 Local evidence currently passing:
 
@@ -59,7 +65,8 @@ pnpm format:check
 pnpm lint
 pnpm typecheck
 pnpm --filter @y7-feedback/config test
-pnpm --filter @y7-feedback/api test   # 1,426 tests
+pnpm --filter @y7-feedback/api test   # 1,455 tests
+pnpm --filter @y7-feedback/api test:coverage # 100% statements/branches/functions/lines
 ```
 
 These results prove code and policy behavior only. They do not prove deployed
