@@ -227,18 +227,14 @@ function attachmentGrantsFrom(
   if (!Array.isArray(value) || value.length > 5) {
     throw new Error("PUBLIC_INPUT_INVALID");
   }
-  if (value.length > 0 && !tokens) throw new Error("ATTACHMENT_FINALIZE_UNAVAILABLE");
+  if (value.length === 0) return [];
+  if (!tokens) throw new Error("ATTACHMENT_FINALIZE_UNAVAILABLE");
   return value.map((item) => {
     if (!isObject(item)) throw new Error("PUBLIC_INPUT_INVALID");
     const attachmentId = requiredString(item.attachmentId, 200);
     const token = requiredString(item.token, 10_000);
     try {
-      return (
-        tokens?.verify(attachmentId, token) ??
-        (() => {
-          throw new Error();
-        })()
-      );
+      return tokens.verify(attachmentId, token);
     } catch {
       throw new Error("PUBLIC_INPUT_INVALID");
     }
