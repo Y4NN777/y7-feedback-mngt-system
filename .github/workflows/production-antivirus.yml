@@ -1,0 +1,83 @@
+name: Production antivirus
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: production-antivirus
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy and verify permanent scanner
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: production
+    env:
+      AZURE_RESOURCE_GROUP: rg-y7-feedback-production-cus
+      AZURE_LOCATION: centralus
+      Y7_SCANNER_KEY_ID: ${{ vars.Y7_PRODUCTION_SCANNER_KEY_ID }}
+      Y7_SCANNER_HMAC_KEY: ${{ secrets.Y7_PRODUCTION_SCANNER_HMAC_KEY }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Authenticate with Azure workload identity
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
+        with:
+          client-id: ${{ vars.AZURE_PRODUCTION_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Deploy immutable monitored scanner
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          set +x
+          umask 077
+          if [ -z "$Y7_SCANNER_KEY_ID" ] || [ -z "$Y7_SCANNER_HMAC_KEY" ]; then
+            echo '{"error":"PRODUCTION_SCANNER_AUTHORITY_MISSING"}' >&2
+            exit 1
+          fi
+          az group create \
+            --name "$AZURE_RESOURCE_GROUP" \
+            --location "$AZURE_LOCATION" \
+            --output none
+          az deployment group create \
+            --name "antivirus-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --template-file infra/azure/production-antivirus.bicep \
+            --parameters \
+              location="$AZURE_LOCATION" \
+              gatewayImage="ghcr.io/y4nn777/y7-feedback-antivirus:sha-$GITHUB_SHA" \
+              scannerKeyId="$Y7_SCANNER_KEY_ID" \
+              scannerHmacKey="$Y7_SCANNER_HMAC_KEY" \
+              actionGroupId="${{ vars.AZURE_PRODUCTION_ACTION_GROUP_ID }}" \
+            --output none
+      - name: Verify truthful Production readiness
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          ORIGIN="$(az containerapp show \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name ca-y7-antivirus-production \
+            --query 'properties.configuration.ingress.fqdn' \
+            --output tsv)"
+          if [ -z "$ORIGIN" ]; then
+            echo '{"error":"PRODUCTION_SCANNER_ORIGIN_MISSING"}' >&2
+            exit 1
+          fi
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent --show-error \
+              --connect-timeout 10 \
+              --max-time 20 \
+              "https://$ORIGIN/health" >/dev/null; then
+              echo '{"result":"PRODUCTION_SCANNER_READY"}'
+              exit 0
+            fi
+            if [ "$attempt" -lt 60 ]; then sleep 10; fi
+          done
+          echo '{"error":"PRODUCTION_SCANNER_READINESS_TIMEOUT"}' >&2
+          exit 1
