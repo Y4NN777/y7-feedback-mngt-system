@@ -34,20 +34,28 @@ function runScript(script: string): Promise<unknown> {
       [new URL(script, import.meta.url).pathname, "--apply", "--domain"],
       {
         env: process.env,
-        stdio: ["ignore", "pipe", "ignore"],
+        stdio: ["ignore", "pipe", "pipe"],
       },
     );
     let output = "";
+    let failureOutput = "";
     child.stdout.setEncoding("utf8");
     child.stdout.on("data", (chunk: string) => {
       if (output.length <= 1_000_000) output += chunk;
+    });
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (chunk: string) => {
+      if (failureOutput.length <= 10_000) failureOutput += chunk;
     });
     child.on("error", () => {
       reject(new Error("SLO_G5_PROBE_PROCESS_FAILED"));
     });
     child.on("close", (code) => {
       if (code !== 0) {
-        reject(new Error("SLO_G5_PROBE_FAILED"));
+        const stableCode = [
+          ...failureOutput.matchAll(/"(?:code|error)":"([A-Z0-9_]+)"/gu),
+        ].at(-1)?.[1];
+        reject(new Error(`SLO_G5_PROBE_FAILED:${script}:${stableCode ?? "UNKNOWN"}`));
         return;
       }
       try {
@@ -75,15 +83,9 @@ export async function verifySloG5() {
     throw new Error("SLO_G5_PREVIEW_REQUIRED");
   const release = required("RELEASE");
   const startedAt = new Date().toISOString();
-  const rounds = await Promise.all(
-    Array.from({ length: concurrency }, async () => {
-      const evidence: unknown[] = [];
-      for (const command of commands) evidence.push(await runScript(command));
-      return evidence;
-    }),
-  );
+  const evidence = await Promise.all(commands.map((command) => runScript(command)));
   const mail = await runScript("verify-preview-mail-catcher.js");
-  const collected = [...rounds.flat(), mail].flatMap(collectSloEvidenceSamples);
+  const collected = [...evidence, mail].flatMap(collectSloEvidenceSamples);
   const measuredAt = new Date().toISOString();
   const observations: SloObservation[] = collected.map(([metric, value]) => ({
     metric,
@@ -103,7 +105,22 @@ export async function verifySloG5() {
     iterations: observations.length,
     observations,
   });
-  if (report.status !== "passed") throw new Error("SLO_G5_THRESHOLDS_FAILED");
+  if (report.status !== "passed") {
+    process.stderr.write(
+      `${JSON.stringify({
+        result: "SLO_G5_THRESHOLDS_FAILED",
+        series: report.series.map(({ id, metric, result }) => ({
+          id,
+          metric,
+          status: result.status,
+          sampleCount: result.sampleCount,
+          value: result.status === "insufficient_data" ? null : result.value,
+          target: result.status === "insufficient_data" ? null : result.target,
+        })),
+      })}\n`,
+    );
+    throw new Error("SLO_G5_THRESHOLDS_FAILED");
+  }
   const present = new Set<SloMetric>(observations.map(({ metric }) => metric));
   if (report.series.some(({ metric }) => !present.has(metric)))
     throw new Error("SLO_G5_SERIES_INCOMPLETE");
