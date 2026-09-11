@@ -17,6 +17,10 @@ function ready(
     previewWebOrigin: "https://preview.example.com",
     productionFunctionOrigin: "https://production-function.appwrite.network",
     previewFunctionOrigin: "https://preview-function.appwrite.network",
+    githubCallbackUrl:
+      "https://production-function.appwrite.network/providers/github/callback",
+    gitlabCallbackUrl:
+      "https://production-function.appwrite.network/providers/gitlab/callback",
     productionScannerOrigin: "https://production-scanner.azurecontainerapps.io",
     previewScannerOrigin: "https://preview-scanner.azurecontainerapps.io",
     activeDeploymentReady: true,
@@ -53,7 +57,7 @@ describe("Production release policy", () => {
   it("BDD-REL-401 accepts only an isolated healthy reversible release", () => {
     expect(assertProductionReleaseReady(ready())).toEqual({
       status: "ready",
-      checks: 22,
+      checks: 24,
     });
   });
 
@@ -82,6 +86,32 @@ describe("Production release policy", () => {
       assertProductionReleaseReady(ready({ nonSecretFunctionVariables: ["RELEASE"] })),
     ).toThrow("PRODUCTION_RELEASE_FUNCTION_AUTHORITY_INVALID");
   });
+
+  it.each([
+    [
+      "githubCallbackUrl",
+      "https://preview-function.appwrite.network/providers/github/callback",
+    ],
+    [
+      "githubCallbackUrl",
+      "https://production-function.appwrite.network/providers/gitlab/callback",
+    ],
+    [
+      "gitlabCallbackUrl",
+      "https://preview-function.appwrite.network/providers/gitlab/callback",
+    ],
+    [
+      "gitlabCallbackUrl",
+      "https://production-function.appwrite.network/providers/gitlab/callback?preview=true",
+    ],
+  ] as const)(
+    "BDD-REL-420 rejects a provider callback outside its exact Production route at %s",
+    (key, value) => {
+      expect(() => assertProductionReleaseReady(ready({ [key]: value }))).toThrow(
+        "PRODUCTION_RELEASE_PROVIDER_CALLBACK_AUTHORITY_INVALID",
+      );
+    },
+  );
 
   it.each([
     { functionHealthReady: false },

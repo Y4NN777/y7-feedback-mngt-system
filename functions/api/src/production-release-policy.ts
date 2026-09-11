@@ -7,6 +7,8 @@ export interface ProductionReleaseSnapshot {
   readonly previewWebOrigin: string;
   readonly productionFunctionOrigin: string;
   readonly previewFunctionOrigin: string;
+  readonly githubCallbackUrl: string;
+  readonly gitlabCallbackUrl: string;
   readonly productionScannerOrigin: string;
   readonly previewScannerOrigin: string;
   readonly activeDeploymentReady: boolean;
@@ -50,7 +52,7 @@ function sameSet(left: readonly string[], right: readonly string[]): boolean {
 
 export function assertProductionReleaseReady(snapshot: ProductionReleaseSnapshot): {
   readonly status: "ready";
-  readonly checks: 22;
+  readonly checks: 24;
 } {
   if (
     snapshot.productionProjectId === snapshot.previewProjectId ||
@@ -71,6 +73,14 @@ export function assertProductionReleaseReady(snapshot: ProductionReleaseSnapshot
     throw new Error("PRODUCTION_RELEASE_FUNCTION_AUTHORITY_INVALID");
   }
   if (
+    snapshot.githubCallbackUrl !==
+      `${snapshot.productionFunctionOrigin}/providers/github/callback` ||
+    snapshot.gitlabCallbackUrl !==
+      `${snapshot.productionFunctionOrigin}/providers/gitlab/callback`
+  ) {
+    throw new Error("PRODUCTION_RELEASE_PROVIDER_CALLBACK_AUTHORITY_INVALID");
+  }
+  if (
     !snapshot.activeDeploymentReady ||
     !snapshot.rollbackDeploymentReady ||
     !snapshot.functionHealthReady ||
@@ -88,5 +98,5 @@ export function assertProductionReleaseReady(snapshot: ProductionReleaseSnapshot
   ) {
     throw new Error("PRODUCTION_RELEASE_READINESS_FAILED");
   }
-  return { status: "ready", checks: 22 };
+  return { status: "ready", checks: 24 };
 }
