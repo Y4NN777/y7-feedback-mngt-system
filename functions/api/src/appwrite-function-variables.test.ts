@@ -105,5 +105,8 @@ describe("Appwrite Function variable policy", () => {
     );
     expect(appwriteFunctionVariableKeys).not.toContain("Y7_GITHUB_VERIFICATION_TOKEN");
     expect(appwriteFunctionVariableKeys).not.toContain("Y7_GITLAB_VERIFICATION_TOKEN");
+    expect(appwriteFunctionVariableKeys).not.toContain(
+      "Y7_PRODUCTION_EMAIL_VERIFICATION_RECIPIENT",
+    );
   });
 });

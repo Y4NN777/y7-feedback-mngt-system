@@ -95,7 +95,10 @@ Production SMTP uses `Y7_EMAIL_SMTP_*` and `Y7_EMAIL_FROM`. Recipient addresses
 are resolved from Appwrite at delivery time; they are not copied into outbox
 payloads, logs or Function variables. Rotate the SMTP password in the provider
 and `Y7_PRODUCTION_RELEASE_ENV`, deploy the Function, then verify one allowed
-handoff and one retry/terminal outcome without retaining captured email.
+handoff and one retry/terminal outcome with `pnpm verify:mail:production`. The
+protected bundle supplies `Y7_PRODUCTION_EMAIL_VERIFICATION_RECIPIENT` only to
+the release runner; it is never installed as a Function variable, printed or
+retained as evidence.
 
 GitHub and GitLab client secrets and callback URLs are Production-specific.
 Rotate one provider at a time: create the new secret, update the protected
@@ -119,7 +122,9 @@ Run `Production release` for the candidate commit. The workflow:
    the candidate in a `finally` path, and proves the marker is still absent;
 8. runs the signed antivirus matrix, web security/cache headers, environment
    isolation and provider callback/webhook denial probes;
-9. creates a non-sensitive temporary GitHub issue through the Production
+9. sends one non-sensitive SMTP verification message and proves retryable and
+   terminal transport classification without printing the recipient;
+10. creates a non-sensitive temporary GitHub issue through the Production
    provider worker, proves inbound/outbound message synchronization, closes the
    issue and removes the Appwrite fixture rows. The protected release bundle
    supplies a dedicated `Y7_GITHUB_VERIFICATION_TOKEN`; it is never installed
