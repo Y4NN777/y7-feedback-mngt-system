@@ -47,9 +47,8 @@ jobs:
           az resource show --ids "$AZURE_ACTION_GROUP_ID" \
             --api-version 2023-01-01 \
             --query id --output tsv >/dev/null
-          az group create \
+          az group show \
             --name "$AZURE_RESOURCE_GROUP" \
-            --location "$AZURE_LOCATION" \
             --output none
           az deployment group create \
             --name "antivirus-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" \

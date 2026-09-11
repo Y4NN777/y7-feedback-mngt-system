@@ -22,6 +22,15 @@ GitHub environment secret or an Appwrite secret Function variable.
 
 ## Permanent antivirus deployment
 
+Before the first deployment, open Azure Cloud Shell and run
+`scripts/provision-production-azure.sh` from a trusted checkout. Set
+`AZURE_PRODUCTION_ALERT_EMAIL` only in that ephemeral shell; the script neither
+prints nor stores it. Record the emitted `clientId` and `actionGroupId` as the
+protected GitHub environment variables `AZURE_PRODUCTION_CLIENT_ID` and
+`AZURE_PRODUCTION_ACTION_GROUP_ID`. The created workload identity trusts only
+the repository's `production` environment and receives `Contributor` only on
+`rg-y7-feedback-production-cus`, never at subscription scope.
+
 Run the `Production antivirus` workflow. It deploys the immutable
 `ghcr.io/y4nn777/y7-feedback-antivirus:sha-<commit>` gateway with pinned ClamAV,
 at least one warm replica, truthful readiness, Log Analytics and routed 5xx/no
