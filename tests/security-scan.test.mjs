@@ -24,6 +24,23 @@ test("BDD-SEC-001 accepts public endpoint and project identifiers", () => {
   );
 });
 
+test("BDD-SEC-002 rejects literal emails in curated session evidence only", () => {
+  assert.deepEqual(
+    findProhibitedContent(
+      "docs/sessions/plans/plan.md",
+      "Author: verified.user@example.test",
+    ),
+    ["docs/sessions/plans/plan.md: literal email in curated session evidence"],
+  );
+  assert.deepEqual(
+    findProhibitedContent(
+      "docs/sessions/raw/rollout.jsonl",
+      "verified.user@example.test",
+    ),
+    [],
+  );
+});
+
 test("BDD-SEC-001 scans configured directories and individual files", async () => {
   const result = await scanRepository();
 
