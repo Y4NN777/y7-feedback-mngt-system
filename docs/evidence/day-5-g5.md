@@ -75,6 +75,8 @@ The current candidate contains these independently revertible outcomes:
   Codex snapshots remain outside the scan and Git history.
 - `7f1faa7` — Production creates and deletes a non-sensitive Appwrite marker,
   then proves it remains absent across Function rollback and roll-forward.
+- `98bdfeb` — scheduled Production backup rejects mismatched environment labels,
+  missing Preview comparison authority and shared Preview/Production projects.
 
 Local evidence currently passing:
 
