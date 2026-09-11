@@ -57,6 +57,9 @@ export default function handler(context: FunctionContext): Promise<unknown> {
     notificationDiagnostic: (event) => {
       context.log(JSON.stringify(event));
     },
+    conversationLifecycleDiagnostic: (event) => {
+      context.log(JSON.stringify({ event: "conversation_lifecycle_phase", ...event }));
+    },
   });
   return routeRequest(context, dependencies);
 }

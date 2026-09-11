@@ -162,6 +162,15 @@ export interface ApplicationRuntime {
   }) => void;
   readonly principalVerifier?: AppwritePrincipalVerifier;
   readonly notificationDiagnostic?: (event: OutboxSafeEvent) => void;
+  readonly conversationLifecycleDiagnostic?: (event: {
+    readonly phase:
+      | "transaction_create"
+      | "initial_reads"
+      | "transactional_writes"
+      | "transaction_commit";
+    readonly outcome: "succeeded" | "failed";
+    readonly durationMs: number;
+  }) => void;
 }
 
 export function deriveReporterActorId(reference: string): string {
@@ -654,6 +663,12 @@ export function createHttpApplication(
           },
           sensitive,
         ),
+        runtime.conversationLifecycleDiagnostic === undefined
+          ? undefined
+          : {
+              nowMs: runtime.nowMs,
+              observe: runtime.conversationLifecycleDiagnostic,
+            },
       ),
       createNodeAppwriteConversationProjectionStore(
         runtime.tables,
