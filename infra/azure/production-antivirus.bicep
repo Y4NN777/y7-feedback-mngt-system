@@ -9,6 +9,10 @@ param appName string = 'ca-y7-antivirus-production'
 
 @description('Immutable Y7 scanner gateway image, normally a sha-* GHCR tag.')
 param gatewayImage string
+@description('Exact lowercase Git commit represented by the immutable gateway image.')
+@minLength(40)
+@maxLength(40)
+param gatewayRelease string
 
 @description('Pinned ClamAV daemon image.')
 param clamavImage string = 'clamav/clamav:1.5.4'
@@ -97,6 +101,10 @@ resource scanner 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'Y7_SCANNER_KEY_ID'
               value: scannerKeyId
+            }
+            {
+              name: 'Y7_SCANNER_RELEASE'
+              value: gatewayRelease
             }
             {
               name: 'Y7_SCANNER_HMAC_KEY'

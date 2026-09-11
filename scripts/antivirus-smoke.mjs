@@ -10,6 +10,7 @@ const environment = {
   ...process.env,
   Y7_SCANNER_KEY_ID: keyId,
   Y7_SCANNER_HMAC_KEY: hmacKey,
+  Y7_SCANNER_RELEASE: "0".repeat(40),
   CLAMAV_HOST: "127.0.0.1",
   CLAMAV_PORT: "3310",
   PORT: port,

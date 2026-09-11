@@ -8,6 +8,7 @@ services:
       CLAMAV_PORT: "3310"
       Y7_SCANNER_KEY_ID: ${Y7_SCANNER_KEY_ID}
       Y7_SCANNER_HMAC_KEY: ${Y7_SCANNER_HMAC_KEY}
+      Y7_SCANNER_RELEASE: ${Y7_SCANNER_RELEASE}
     ports:
       - "127.0.0.1:8080:8080"
     depends_on:

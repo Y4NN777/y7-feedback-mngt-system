@@ -13,6 +13,7 @@ import { createClamAvHttpScanner } from "./clamav-http-scanner.js";
 import { parseClamAvHttpScannerConfig } from "./clamav-http-scanner-config.js";
 import { proveProductionDeletionContinuity } from "./production-deletion-continuity.js";
 import { assertProductionReleaseReady } from "./production-release-policy.js";
+import { assertProductionScannerRelease } from "./production-scanner-evidence.js";
 
 function required(name: string): string {
   const value = process.env[name]?.trim();
@@ -106,6 +107,7 @@ async function main(): Promise<void> {
   const previewWebOrigin = origin(required("Y7_PREVIEW_WEB_ORIGIN"));
   const previewScannerOrigin = origin(required("Y7_PREVIEW_SCANNER_ENDPOINT"));
   const previewProjectId = required("Y7_PREVIEW_APPWRITE_PROJECT_ID");
+  const candidateRelease = required("GITHUB_SHA");
   const scannerOrigin = origin(config.antivirusScanner.endpoint);
   const webOrigin = origin(config.webOrigin);
 
@@ -188,6 +190,10 @@ async function main(): Promise<void> {
     healthy(new URL("/", webOrigin)),
     healthy(new URL("/index.html", webOrigin)),
   ]);
+  assertProductionScannerRelease(
+    scannerHealth === undefined ? undefined : await scannerHealth.json(),
+    candidateRelease,
+  );
   const providerBoundariesDenyUnsafeRequests = (
     await Promise.all([
       safelyDenied(new URL("/providers/github/callback", functionOrigin), "GET"),

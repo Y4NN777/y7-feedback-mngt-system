@@ -71,6 +71,7 @@ jobs:
             --parameters \
               location="$AZURE_LOCATION" \
               gatewayImage="ghcr.io/y4nn777/y7-feedback-antivirus:sha-$GITHUB_SHA" \
+              gatewayRelease="$GITHUB_SHA" \
               scannerKeyId="$Y7_SCANNER_KEY_ID" \
               scannerHmacKey="$Y7_SCANNER_HMAC_KEY" \
               actionGroupId="$AZURE_ACTION_GROUP_ID" \
@@ -89,10 +90,22 @@ jobs:
             exit 1
           fi
           for attempt in $(seq 1 60); do
-            if curl --fail --silent --show-error \
+            HEALTH="$(curl --fail --silent --show-error \
               --connect-timeout 10 \
               --max-time 20 \
-              "https://$ORIGIN/health" >/dev/null; then
+              "https://$ORIGIN/health" || true)"
+            if HEALTH="$HEALTH" EXPECTED_RELEASE="$GITHUB_SHA" node --input-type=module <<'NODE'
+          try {
+            const health = JSON.parse(process.env.HEALTH ?? "null");
+            if (
+              health?.status !== "ok" ||
+              health?.release !== process.env.EXPECTED_RELEASE
+            ) process.exit(1);
+          } catch {
+            process.exit(1);
+          }
+          NODE
+            then
               echo '{"result":"PRODUCTION_SCANNER_READY"}'
               exit 0
             fi
