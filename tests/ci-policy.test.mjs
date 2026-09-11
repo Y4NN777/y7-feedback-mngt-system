@@ -210,6 +210,32 @@ test("BDD-E2E-301 runs the complete G5 evidence pack with ephemeral secret mater
   );
 });
 
+test("BDD-SLO-301 runs the real Preview SLO gate with protected least-privilege configuration", async () => {
+  const workflow = await readFile(
+    new URL("../.github/workflows/slo-g5.yml", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(workflow, /workflow_dispatch:/u);
+  assert.match(workflow, /permissions:\s+contents: read/u);
+  assert.doesNotMatch(workflow, /id-token: write/u);
+  assert.match(workflow, /environment: g5-preview/u);
+  assert.match(
+    workflow,
+    /Y7_PREVIEW_EVIDENCE_ENV: \$\{\{ secrets\.Y7_PREVIEW_EVIDENCE_ENV \}\}/u,
+  );
+  assert.match(workflow, /install -m 600 \/dev\/null \.env\.appwrite-preview/u);
+  assert.match(workflow, /trap 'rm -f \.env\.appwrite-preview' EXIT/u);
+  assert.match(workflow, /pnpm verify:slo:g5/u);
+
+  const actionReferences = [...workflow.matchAll(/^\s+(?:- )?uses: ([^\s#]+)/gmu)].map(
+    (match) => match[1],
+  );
+  assert.ok(actionReferences.length >= 3);
+  for (const reference of actionReferences)
+    assert.match(reference, /^[^@\s]+@[0-9a-f]{40}$/u);
+});
+
 test("BDD-REL-301 defines a monitored permanent Production antivirus service", async () => {
   const template = await readFile(
     new URL("../infra/azure/production-antivirus.bicep", import.meta.url),
