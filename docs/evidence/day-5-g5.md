@@ -60,7 +60,11 @@ The current candidate contains these independently revertible outcomes:
 - `081c789` — reproducible Azure Production bootstrap with environment-bound
   OIDC, resource-group-scoped deployment authority and alert routing;
 - `f34788f` — exact Vercel candidate/previous deployment identity checks across
-  promotion, rollback and roll-forward.
+  promotion, rollback and roll-forward;
+- `73dcb10` — immutable Production scanner image built and published for the
+  exact protected workflow commit before Azure deployment;
+- `2af346c` — real Azure Monitor Action Group test notification submitted after
+  scanner readiness without retaining or printing the receiver.
 
 Local evidence currently passing:
 
