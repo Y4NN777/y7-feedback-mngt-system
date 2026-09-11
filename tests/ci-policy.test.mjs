@@ -136,6 +136,34 @@ test("BDD-REC-301 runs the real recovery drill with isolated OIDC authority", as
   assert.match(provision, /GITHUB_OIDC_REPOSITORY_SUBJECT/u);
 });
 
+test("BDD-REL-303 schedules encrypted Production backup with dedicated authority", async () => {
+  const workflow = await readFile(
+    new URL("../.github/workflows/recovery-backup.yml", import.meta.url),
+    "utf8",
+  );
+  assert.match(workflow, /cron: "17 2 \* \* \*"/u);
+  assert.match(workflow, /environment: production-recovery-backup/u);
+  assert.match(workflow, /Y7_ENVIRONMENT: production/u);
+  assert.match(workflow, /Y7_PRODUCTION_APPWRITE_PROJECT_ID/u);
+  assert.match(workflow, /secrets\.Y7_PRODUCTION_RECOVERY_APPWRITE_API_KEY/u);
+  assert.match(workflow, /run: pnpm recovery:backup/u);
+  assert.doesNotMatch(workflow, /Y7_RECOVERY_SOURCE_ENVIRONMENT/u);
+
+  const provision = await readFile(
+    new URL("../scripts/provision-recovery-azure.sh", import.meta.url),
+    "utf8",
+  );
+  assert.match(
+    provision,
+    /repo:\$\{OIDC_REPOSITORY_SUBJECT\}:environment:production-recovery-backup/u,
+  );
+  assert.match(
+    provision,
+    /GITHUB_OIDC_REPOSITORY_SUBJECT:-Y4NN777\/y7-feedback-mngt-system/u,
+  );
+  assert.doesNotMatch(provision, /Y4NN777@171065166/u);
+});
+
 test("BDD-E2E-301 runs the complete G5 evidence pack with ephemeral secret material", async () => {
   const workflow = await readFile(
     new URL("../.github/workflows/g5-evidence.yml", import.meta.url),
