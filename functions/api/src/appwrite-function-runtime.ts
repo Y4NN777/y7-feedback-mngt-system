@@ -2,6 +2,7 @@ export type FunctionEnvironment = Readonly<Record<string, string | undefined>>;
 
 const endpointKey = "APPWRITE_FUNCTION_API_ENDPOINT";
 const projectKey = "APPWRITE_FUNCTION_PROJECT_ID";
+const appwriteId = /^[A-Za-z0-9][A-Za-z0-9._-]{0,35}$/u;
 
 function normalized(value: string | undefined): string | undefined {
   if (value === undefined) return undefined;
@@ -16,6 +17,36 @@ function executionKeys(
     .filter(([key]) => key.toLowerCase() === "x-appwrite-key")
     .map(([, value]) => normalized(value))
     .filter((value): value is string => value !== undefined);
+}
+
+function headerValues(
+  headers: Readonly<Record<string, string | undefined>>,
+  expected: string,
+): readonly string[] {
+  return Object.entries(headers)
+    .filter(([key]) => key.toLowerCase() === expected)
+    .map(([, value]) => normalized(value))
+    .filter((value): value is string => value !== undefined);
+}
+
+export function resolveAppwriteFunctionPrincipal(
+  headers: Readonly<Record<string, string | undefined>>,
+): { readonly principalId: string; readonly jwt: string } | undefined {
+  const principalIds = headerValues(headers, "x-appwrite-user-id");
+  const jwts = headerValues(headers, "x-appwrite-user-jwt");
+  if (principalIds.length === 0 && jwts.length === 0) return undefined;
+  const [principalId] = principalIds;
+  const [jwt] = jwts;
+  if (
+    principalIds.length !== 1 ||
+    jwts.length !== 1 ||
+    principalId === undefined ||
+    jwt === undefined ||
+    !appwriteId.test(principalId)
+  ) {
+    return undefined;
+  }
+  return { principalId, jwt };
 }
 
 function conflicts(configured: string | undefined, authoritative: string): boolean {
