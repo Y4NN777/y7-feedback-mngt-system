@@ -100,3 +100,28 @@ jobs:
           done
           echo '{"error":"PRODUCTION_SCANNER_READINESS_TIMEOUT"}' >&2
           exit 1
+      - name: Prove Production alert routing
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          set +x
+          RECEIVER_NAME=""
+          RECEIVER_EMAIL=""
+          read -r RECEIVER_NAME RECEIVER_EMAIL < <(az monitor action-group show \
+            --name ag-y7-feedback-production \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --query 'emailReceivers[0].[name,emailAddress]' \
+            --output tsv)
+          if [ -z "$RECEIVER_NAME" ] || [ -z "$RECEIVER_EMAIL" ]; then
+            echo '{"error":"PRODUCTION_ALERT_RECEIVER_MISSING"}' >&2
+            exit 1
+          fi
+          az monitor action-group test-notifications create \
+            --action-group ag-y7-feedback-production \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --alert-type metricstaticthreshold \
+            --add-action email "$RECEIVER_NAME" "$RECEIVER_EMAIL" \
+              usecommonalertschema \
+            --output none
+          unset RECEIVER_NAME RECEIVER_EMAIL
+          echo '{"result":"PRODUCTION_ALERT_TEST_SUBMITTED"}'
