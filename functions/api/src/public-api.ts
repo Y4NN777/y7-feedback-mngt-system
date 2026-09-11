@@ -11,6 +11,7 @@ import {
 } from "@y7-feedback/domain";
 
 import type { AccountlessAccessCoordinator } from "./accountless-access.js";
+import type { AttachmentStaging } from "./attachment-staging.js";
 import type { IntakeCoordinator, IntakeOutcome } from "./intake.js";
 import type { ReporterAttachmentDownload } from "./reporter-attachment-download.js";
 import type { WorkspaceAttachmentDownload } from "./workspace-attachment-download.js";
@@ -44,6 +45,7 @@ export interface PublicApiRequest {
   readonly path: string;
   readonly headers: Readonly<Record<string, string | undefined>>;
   readonly body: unknown;
+  readonly bodyBinary?: Uint8Array;
 }
 
 export type PublicApiResponse =
@@ -70,6 +72,8 @@ const operationIdPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const intakePath =
   /^\/v1\/projects\/([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)\/feedback$/u;
+const attachmentStagingPath =
+  /^\/v1\/projects\/([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)\/feedback\/attachments\/stage$/u;
 const projectPath = /^\/v1\/projects\/([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)$/u;
 const workspaceAttachmentPath =
   /^\/v1\/workspaces\/([A-Za-z0-9][A-Za-z0-9._-]{0,35})\/projects\/([A-Za-z0-9][A-Za-z0-9._-]{0,35})\/attachments\/download$/u;
@@ -261,9 +265,72 @@ export function createPublicApi(
   reporterAttachmentDownload?: ReporterAttachmentDownload,
   workspaceAttachmentDownload?: WorkspaceAttachmentDownload,
   workspaceOperations?: WorkspaceProjectOperations,
+  attachmentStaging?: AttachmentStaging,
 ): PublicApi {
   return {
     async handle(request) {
+      const stagingMatch = attachmentStagingPath.exec(request.path);
+      if (request.method === "POST" && stagingMatch) {
+        const slug = stagingMatch[1];
+        if (!attachmentStaging) {
+          return {
+            statusCode: 503,
+            body: { error: "ERR-ATTACHMENT-UNAVAILABLE" },
+          };
+        }
+        try {
+          if (!slug || !request.bodyBinary) {
+            throw new Error("ATTACHMENT_STAGING_INVALID");
+          }
+          const project = await projects.findBySlug(slug);
+          if (!project || project.slug !== slug || !project.feedbackConfig.active) {
+            return { statusCode: 404, body: { error: "ERR-PROJECT-UNAVAILABLE" } };
+          }
+          const encodedName = requiredString(
+            header(request.headers, "x-y7-file-name"),
+            512,
+          );
+          const decodedName = Buffer.from(encodedName, "base64url");
+          if (decodedName.toString("base64url") !== encodedName) {
+            throw new Error("ATTACHMENT_STAGING_INVALID");
+          }
+          const outcome = await attachmentStaging.stage({
+            operationId: requiredString(
+              header(request.headers, "x-y7-operation-id"),
+              36,
+            ),
+            workspaceId: project.feedbackConfig.workspaceId,
+            projectId: project.feedbackConfig.projectId,
+            file: {
+              bytes: request.bodyBinary,
+              clientName: new TextDecoder("utf-8", { fatal: true }).decode(decodedName),
+              clientMediaType: requiredString(
+                header(request.headers, "content-type"),
+                100,
+              ),
+            },
+          });
+          return outcome.status === "staged"
+            ? {
+                statusCode: 201,
+                body: {
+                  status: "staged",
+                  attachmentId: outcome.attachmentId,
+                  token: outcome.token,
+                  displayName: outcome.displayName,
+                },
+              }
+            : outcome.status === "rejected"
+              ? { statusCode: 400, body: { error: "ERR-ATTACHMENT-REJECTED" } }
+              : {
+                  statusCode: 503,
+                  body: { error: "ERR-ATTACHMENT-UNAVAILABLE" },
+                };
+        } catch {
+          return { statusCode: 400, body: { error: "ERR-ATTACHMENT-REJECTED" } };
+        }
+      }
+
       const operationMatch = workspaceOperationPath.exec(request.path);
       if (request.method === "POST" && operationMatch) {
         const [, workspaceId, projectId, rawAction] = operationMatch;

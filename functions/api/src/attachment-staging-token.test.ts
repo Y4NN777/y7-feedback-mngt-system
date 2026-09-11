@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { createSensitiveDataProtector } from "./sensitive-data-protector";
 import {
@@ -15,7 +15,7 @@ const grant: AttachmentStagingGrant = {
   displayName: "evidence.txt",
   mediaType: "text/plain; charset=utf-8",
   size: 8,
-  sha256: "a".repeat(64),
+  sha256: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
   stagedAt: "2026-09-11T00:00:00.000Z",
 };
 
@@ -82,6 +82,54 @@ describe("encrypted Attachment staging grants", () => {
       "ATTACHMENT_STAGING_TOKEN_INVALID",
     );
     expect(() => target.issue({ ...grant, size: 10 * 1024 * 1024 + 1 })).toThrow(
+      "ATTACHMENT_STAGING_TOKEN_INVALID",
+    );
+  });
+
+  it.each([
+    null,
+    [],
+    { ...grant, attachmentId: "bad/id" },
+    { ...grant, objectId: "private/" + "x".repeat(500) },
+    { ...grant, operationId: "invalid" },
+    { ...grant, workspaceId: "bad/id" },
+    { ...grant, projectId: "bad/id" },
+    { ...grant, displayName: " " },
+    { ...grant, displayName: "x".repeat(256) },
+    { ...grant, mediaType: "application/zip" },
+    { ...grant, size: 0 },
+    { ...grant, sha256: "invalid" },
+    { ...grant, stagedAt: "invalid" },
+  ])("rejects malformed grant %#", (candidate) => {
+    expect(() => codec().issue(candidate as AttachmentStagingGrant)).toThrow(
+      "ATTACHMENT_STAGING_TOKEN_INVALID",
+    );
+  });
+
+  it("rejects invalid codec options, encryption failure and invalid verification input", () => {
+    expect(() =>
+      createAttachmentStagingTokenCodec(
+        { environment: "preview", protector: { seal: vi.fn(), open: vi.fn() } },
+        { tableId: "bad/id", now: () => grant.stagedAt, ttlMs: 0 },
+      ),
+    ).toThrow("ATTACHMENT_STAGING_TOKEN_INVALID");
+    const failing = createAttachmentStagingTokenCodec(
+      {
+        environment: "preview",
+        protector: {
+          seal: () => {
+            throw new Error("failure");
+          },
+          open: () => "null",
+        },
+      },
+      { tableId: "attachments", now: () => "invalid", ttlMs: 1_000 },
+    );
+    expect(() => failing.issue(grant)).toThrow("ATTACHMENT_STAGING_TOKEN_INVALID");
+    expect(() => failing.verify("bad/id", "token")).toThrow(
+      "ATTACHMENT_STAGING_TOKEN_INVALID",
+    );
+    expect(() => failing.verify(grant.attachmentId, "token")).toThrow(
       "ATTACHMENT_STAGING_TOKEN_INVALID",
     );
   });
