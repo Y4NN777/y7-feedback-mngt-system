@@ -135,3 +135,46 @@ test("BDD-REC-301 runs the real recovery drill with isolated OIDC authority", as
   assert.match(provision, /Storage Blob Data Contributor/u);
   assert.match(provision, /GITHUB_OIDC_REPOSITORY_SUBJECT/u);
 });
+
+test("BDD-E2E-301 runs the complete G5 evidence pack with ephemeral secret material", async () => {
+  const workflow = await readFile(
+    new URL("../.github/workflows/g5-evidence.yml", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(workflow, /workflow_dispatch:/u);
+  assert.match(
+    workflow,
+    /permissions:\s+contents: read\s+id-token: write\s+issues: write/u,
+  );
+  assert.match(workflow, /environment: g5-preview/u);
+  assert.match(workflow, /cancel-in-progress: false/u);
+  assert.match(
+    workflow,
+    /client-id: \$\{\{ vars\.AZURE_RECOVERY_DRILL_CLIENT_ID \}\}/u,
+  );
+  assert.match(
+    workflow,
+    /Y7_PREVIEW_EVIDENCE_ENV: \$\{\{ secrets\.Y7_PREVIEW_EVIDENCE_ENV \}\}/u,
+  );
+  assert.match(workflow, /install -m 600 \/dev\/null \.env\.appwrite-preview/u);
+  assert.match(workflow, /trap 'rm -f \.env\.appwrite-preview' EXIT/u);
+  assert.match(workflow, /pnpm verify:e2e:g5/u);
+  assert.doesNotMatch(workflow, /AZURE_(?:CLIENT_)?SECRET/u);
+  assert.doesNotMatch(workflow, /upload-artifact/u);
+
+  const actionReferences = [...workflow.matchAll(/^\s+(?:- )?uses: ([^\s#]+)/gmu)].map(
+    (match) => match[1],
+  );
+  assert.ok(actionReferences.length >= 4);
+  for (const reference of actionReferences)
+    assert.match(reference, /^[^@\s]+@[0-9a-f]{40}$/u);
+
+  const rootPackage = JSON.parse(
+    await readFile(new URL("../package.json", import.meta.url), "utf8"),
+  );
+  assert.match(
+    rootPackage.scripts["verify:providers:g4:message-sync"],
+    /node --env-file-if-exists=\.env\.appwrite-preview/u,
+  );
+});
