@@ -120,7 +120,7 @@ describe("root orientation", () => {
   it("BDD-ROOT-001 shows exactly the three French intents without enumeration", () => {
     renderApp();
 
-    expect(screen.getByRole("main")).toHaveAttribute("data-visual-anchor", "swiss");
+    expect(screen.getByRole("main")).toHaveAttribute("data-visual-anchor", "organic");
     expect(screen.getAllByRole("article")).toHaveLength(3);
     expect(screen.getByRole("heading", { name: "Donner un avis" })).toBeInTheDocument();
     expect(

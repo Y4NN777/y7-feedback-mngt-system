@@ -75,7 +75,7 @@ test("BDD-UX-001 has no serious accessibility issue or horizontal overflow", asy
 }) => {
   await page.goto("/");
 
-  await expect(page.getByRole("main")).toHaveAttribute("data-visual-anchor", "swiss");
+  await expect(page.getByRole("main")).toHaveAttribute("data-visual-anchor", "organic");
   const visualTokens = await page.evaluate(() => {
     const root = getComputedStyle(document.documentElement);
     const brandElement = document.querySelector<HTMLElement>(".brand");
@@ -89,10 +89,10 @@ test("BDD-UX-001 has no serious accessibility issue or horizontal overflow", asy
     };
   });
   expect(visualTokens).toEqual({
-    accent: "rgb(0, 47, 167)",
-    radius: "0px",
-    surface: "rgb(247, 247, 248)",
-    typeface: '"Helvetica Neue", Helvetica, Arial, sans-serif',
+    accent: "rgb(79, 90, 46)",
+    radius: "50%",
+    surface: "rgb(232, 220, 199)",
+    typeface: '"Epilogue Variable", sans-serif',
   });
 
   const accessibility = await new AxeBuilder({ page })

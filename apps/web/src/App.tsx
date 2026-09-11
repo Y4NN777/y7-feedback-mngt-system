@@ -121,14 +121,14 @@ function ProjectRoute({
   }, [query.data, redirect]);
   if (query.isPending || query.data?.status === "redirect") {
     return (
-      <main className="root-page" data-visual-anchor="swiss">
+      <main className="root-page" data-visual-anchor="organic">
         <p role="status">{copy.projectLoading}</p>
       </main>
     );
   }
   if (!query.data || query.data.status === "unavailable") {
     return (
-      <main className="root-page" data-visual-anchor="swiss">
+      <main className="root-page" data-visual-anchor="organic">
         <fieldset className="language-switcher">
           <legend>{copy.languageLabel}</legend>
           <button
@@ -305,7 +305,7 @@ export function App({
   }
 
   return (
-    <main className="root-page" data-visual-anchor="swiss">
+    <main className="root-page" data-visual-anchor="organic">
       <header className="masthead">
         <a className="brand" href="/" aria-label={copy.brandLabel}>
           Y7
