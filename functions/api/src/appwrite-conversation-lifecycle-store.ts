@@ -128,6 +128,23 @@ export interface ConversationLifecycleStore {
   ): Promise<ConversationLifecycleStoreResult>;
 }
 
+export type ConversationLifecyclePhase =
+  | "transaction_create"
+  | "initial_reads"
+  | "transactional_writes"
+  | "transaction_commit";
+
+export interface ConversationLifecycleDiagnostic {
+  readonly phase: ConversationLifecyclePhase;
+  readonly outcome: "succeeded" | "failed";
+  readonly durationMs: number;
+}
+
+export interface ConversationLifecycleInstrumentation {
+  readonly nowMs: () => number;
+  readonly observe: (event: ConversationLifecycleDiagnostic) => void;
+}
+
 const appwriteId = /^[A-Za-z0-9][A-Za-z0-9._-]{0,35}$/u;
 const states = new Set<FeedbackLifecycleState>([
   "received",
@@ -263,53 +280,84 @@ export function createAppwriteConversationLifecycleStore(
   providerFanout: ProviderMessageFanout = {
     append: () => Promise.resolve({ queued: 0 }),
   },
+  instrumentation?: ConversationLifecycleInstrumentation,
 ): ConversationLifecycleStore {
   validateSchema(schema);
+  const measured = async <T>(
+    phase: ConversationLifecyclePhase,
+    operation: () => Promise<T>,
+  ): Promise<T> => {
+    if (instrumentation === undefined) return operation();
+    const startedAt = instrumentation.nowMs();
+    try {
+      const result = await operation();
+      instrumentation.observe({
+        phase,
+        outcome: "succeeded",
+        durationMs: Math.max(0, instrumentation.nowMs() - startedAt),
+      });
+      return result;
+    } catch (error: unknown) {
+      instrumentation.observe({
+        phase,
+        outcome: "failed",
+        durationMs: Math.max(0, instrumentation.nowMs() - startedAt),
+      });
+      throw error;
+    }
+  };
   return {
     async execute(input) {
       let transactionId: string | undefined;
       let closed = false;
       try {
-        const transaction = await tables.createTransaction({ ttl: 60 });
+        const transaction = await measured("transaction_create", () =>
+          tables.createTransaction({ ttl: 60 }),
+        );
         if (!appwriteId.test(transaction.$id)) {
           throw new AppwriteConversationLifecycleError("ERR-CONV-RETRYABLE");
         }
-        transactionId = transaction.$id;
-        const [idempotency, feedback, lifecycleFacts] = await Promise.all([
-          tables.listRows({
-            databaseId: schema.databaseId,
-            tableId: schema.idempotencyTableId,
-            queries: [
-              queries.equal("feedbackId", [input.feedbackId]),
-              queries.equal("operationId", [input.command.eventId]),
-              queries.limit(2),
-            ],
-            total: false,
-            ttl: 0,
-            transactionId,
-          }),
-          tables.getRow({
-            databaseId: schema.databaseId,
-            tableId: schema.feedbackTableId,
-            rowId: input.feedbackId,
-            transactionId,
-          }),
-          input.command.kind === "append_message" ||
-          input.command.kind === "append_internal_note"
-            ? Promise.resolve(undefined)
-            : tables.listRows({
+        const activeTransactionId = transaction.$id;
+        transactionId = activeTransactionId;
+        const [idempotency, feedback, lifecycleFacts] = await measured(
+          "initial_reads",
+          () =>
+            Promise.all([
+              tables.listRows({
                 databaseId: schema.databaseId,
-                tableId: schema.lifecycleTableId,
+                tableId: schema.idempotencyTableId,
                 queries: [
                   queries.equal("feedbackId", [input.feedbackId]),
-                  queries.orderDesc("sequence"),
+                  queries.equal("operationId", [input.command.eventId]),
                   queries.limit(2),
                 ],
                 total: false,
                 ttl: 0,
-                transactionId,
+                transactionId: activeTransactionId,
               }),
-        ]);
+              tables.getRow({
+                databaseId: schema.databaseId,
+                tableId: schema.feedbackTableId,
+                rowId: input.feedbackId,
+                transactionId: activeTransactionId,
+              }),
+              input.command.kind === "append_message" ||
+              input.command.kind === "append_internal_note"
+                ? Promise.resolve(undefined)
+                : tables.listRows({
+                    databaseId: schema.databaseId,
+                    tableId: schema.lifecycleTableId,
+                    queries: [
+                      queries.equal("feedbackId", [input.feedbackId]),
+                      queries.orderDesc("sequence"),
+                      queries.limit(2),
+                    ],
+                    total: false,
+                    ttl: 0,
+                    transactionId: activeTransactionId,
+                  }),
+            ]),
+        );
         if (idempotency.rows.length > 1) {
           throw new AppwriteConversationLifecycleError("ERR-CONV-RETRYABLE");
         }
@@ -515,38 +563,45 @@ export function createAppwriteConversationLifecycleStore(
           input.feedbackId,
           input.command.eventId,
         );
-        await Promise.all([
-          ...primaryWrites,
-          fanout.append({
-            transactionId,
-            feedback,
-            eventId: input.command.eventId,
-            occurredAt: input.command.occurredAt,
-            locale: input.locale,
-            ...notificationEvent(input.command),
+        await measured("transactional_writes", () =>
+          Promise.all([
+            ...primaryWrites,
+            fanout.append({
+              transactionId: activeTransactionId,
+              feedback,
+              eventId: input.command.eventId,
+              occurredAt: input.command.occurredAt,
+              locale: input.locale,
+              ...notificationEvent(input.command),
+            }),
+            (async () => {
+              const idempotencyRow = await tables.createRow({
+                databaseId: schema.databaseId,
+                tableId: schema.idempotencyTableId,
+                rowId: idempotencyRowId,
+                data: {
+                  feedbackId: input.feedbackId,
+                  operationId: input.command.eventId,
+                  payloadDigest: input.payloadDigest,
+                  action: input.command.kind,
+                  resultJson: JSON.stringify(result),
+                  createdAt: input.command.occurredAt,
+                },
+                permissions: [],
+                transactionId: activeTransactionId,
+              });
+              if (!validRow(idempotencyRow, idempotencyRowId)) {
+                throw new AppwriteConversationLifecycleError("ERR-CONV-RETRYABLE");
+              }
+            })(),
+          ]).then(() => undefined),
+        );
+        await measured("transaction_commit", () =>
+          tables.updateTransaction({
+            transactionId: activeTransactionId,
+            commit: true,
           }),
-          (async () => {
-            const idempotencyRow = await tables.createRow({
-              databaseId: schema.databaseId,
-              tableId: schema.idempotencyTableId,
-              rowId: idempotencyRowId,
-              data: {
-                feedbackId: input.feedbackId,
-                operationId: input.command.eventId,
-                payloadDigest: input.payloadDigest,
-                action: input.command.kind,
-                resultJson: JSON.stringify(result),
-                createdAt: input.command.occurredAt,
-              },
-              permissions: [],
-              transactionId,
-            });
-            if (!validRow(idempotencyRow, idempotencyRowId)) {
-              throw new AppwriteConversationLifecycleError("ERR-CONV-RETRYABLE");
-            }
-          })(),
-        ]);
-        await tables.updateTransaction({ transactionId, commit: true });
+        );
         closed = true;
         return { status: "applied", ...result };
       } catch (error: unknown) {
@@ -571,6 +626,7 @@ export function createNodeAppwriteConversationLifecycleStore(
   persistence: AppwriteSensitivePersistence,
   fanoutOverride?: ConversationNotificationFanout,
   providerFanoutOverride?: ProviderMessageFanout,
+  instrumentation?: ConversationLifecycleInstrumentation,
 ): ConversationLifecycleStore {
   const port: AppwriteConversationLifecycleTablesPort = {
     createTransaction: (input) => tables.createTransaction(input),
@@ -618,5 +674,6 @@ export function createNodeAppwriteConversationLifecycleStore(
         ),
     },
     providerFanoutOverride,
+    instrumentation,
   );
 }

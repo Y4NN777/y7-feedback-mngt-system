@@ -6,6 +6,7 @@ import {
   createAppwriteConversationLifecycleStore,
   createNodeAppwriteConversationLifecycleStore,
   type AppwriteConversationLifecycleTablesPort,
+  type ConversationLifecycleDiagnostic,
 } from "./appwrite-conversation-lifecycle-store";
 
 const schema = {
@@ -146,6 +147,36 @@ const messageCommand = {
 };
 
 describe("Appwrite conversation and lifecycle transaction", () => {
+  it("BDD-SLO-211 reports only allow-listed phase timings", async () => {
+    const tables = new FakeTables();
+    const observe = vi.fn<(event: ConversationLifecycleDiagnostic) => void>();
+    const ticks = [0, 3, 3, 8, 8, 15, 15, 19];
+    let tick = 0;
+    const instrumented = createAppwriteConversationLifecycleStore(
+      tables,
+      schema,
+      queries,
+      persistence,
+      { append: vi.fn().mockResolvedValue({ notifications: 0, emailAttempts: 0 }) },
+      { append: vi.fn().mockResolvedValue({ queued: 0 }) },
+      {
+        nowMs: () => ticks[tick++] ?? 19,
+        observe,
+      },
+    );
+
+    await expect(
+      instrumented.execute({ ...common, command: messageCommand }),
+    ).resolves.toMatchObject({ status: "applied" });
+
+    expect(observe.mock.calls.map(([event]) => event)).toEqual([
+      { phase: "transaction_create", outcome: "succeeded", durationMs: 3 },
+      { phase: "initial_reads", outcome: "succeeded", durationMs: 5 },
+      { phase: "transactional_writes", outcome: "succeeded", durationMs: 7 },
+      { phase: "transaction_commit", outcome: "succeeded", durationMs: 4 },
+    ]);
+  });
+
   it("BDD-SLO-210 overlaps independent conversation reads and validated writes", async () => {
     const tables = new FakeTables();
     let releaseIdempotencyRead: (() => void) | undefined;
