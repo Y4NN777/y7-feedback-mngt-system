@@ -56,6 +56,7 @@
     "test:e2e:offline": "pnpm --filter @y7-feedback/web test:e2e:offline",
     "verify:e2e:g5:browser": "pnpm test:e2e",
     "verify:e2e:g5:matrix": "pnpm --filter @y7-feedback/api build && node functions/api/dist/verify-e2e-g5-matrix.js --apply",
+    "verify:e2e:g5": "pnpm --filter @y7-feedback/api build && node functions/api/dist/verify-e2e-g5.js --apply",
     "test:runtime-deps": "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build",
     "typecheck": "pnpm -r --if-present typecheck",
     "verify:pwa:g4": "pnpm --filter @y7-feedback/web build && pnpm test:e2e:offline",
