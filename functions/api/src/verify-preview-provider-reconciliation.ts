@@ -11,21 +11,7 @@ import { parseServerConfig } from "@y7-feedback/config/server";
 
 import { resolveAppwriteFunctionTarget } from "./appwrite-function-variables.js";
 import { createNodeAppwriteProviderGrantVault } from "./appwrite-provider-grant-vault.js";
-
-export function hasHealthyScheduledReconciliation(
-  executions: ReadonlyArray<{
-    readonly trigger: ExecutionTrigger;
-    readonly status: ExecutionStatus;
-    readonly responseStatusCode: number;
-  }>,
-): boolean {
-  return executions.some(
-    ({ trigger, status, responseStatusCode }) =>
-      trigger === ExecutionTrigger.Schedule &&
-      status === ExecutionStatus.Completed &&
-      responseStatusCode === 200,
-  );
-}
+import { hasHealthyScheduledReconciliation } from "./provider-reconciliation-evidence.js";
 
 async function absentDelete(
   tables: TablesDB,
