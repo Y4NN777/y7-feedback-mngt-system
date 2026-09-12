@@ -22,6 +22,10 @@ jobs:
       CI: true
       GH_TOKEN: ${{ github.token }}
       Y7_PREVIEW_EVIDENCE_ENV: ${{ secrets.Y7_PREVIEW_EVIDENCE_ENV }}
+      ANTIVIRUS_SCANNER_ENDPOINT: ${{ vars.ANTIVIRUS_SCANNER_ENDPOINT }}
+      ANTIVIRUS_SCANNER_KEY_ID: ${{ vars.ANTIVIRUS_SCANNER_KEY_ID }}
+      ANTIVIRUS_SCANNER_HMAC_KEY: ${{ secrets.ANTIVIRUS_SCANNER_HMAC_KEY }}
+      ANTIVIRUS_SCANNER_TIMEOUT_MS: ${{ vars.ANTIVIRUS_SCANNER_TIMEOUT_MS }}
       AZURE_RECOVERY_ACCOUNT_URL: ${{ vars.AZURE_RECOVERY_ACCOUNT_URL }}
       AZURE_RECOVERY_CONTAINER: ${{ vars.AZURE_RECOVERY_CONTAINER }}
     steps:
@@ -60,9 +64,23 @@ jobs:
             echo '{"error":"G5_PREVIEW_EVIDENCE_ENV_MISSING"}' >&2
             exit 1
           fi
+          if [ -z "$ANTIVIRUS_SCANNER_ENDPOINT" ] || \
+             [ -z "$ANTIVIRUS_SCANNER_KEY_ID" ] || \
+             [ -z "$ANTIVIRUS_SCANNER_HMAC_KEY" ] || \
+             [ -z "$ANTIVIRUS_SCANNER_TIMEOUT_MS" ]; then
+            echo '{"error":"G5_PREVIEW_ANTIVIRUS_AUTHORITY_MISSING"}' >&2
+            exit 1
+          fi
           printf '%s\n' "$Y7_PREVIEW_EVIDENCE_ENV" > .env.appwrite-preview
           unset Y7_PREVIEW_EVIDENCE_ENV
-          printf '\nRELEASE=%s\n' "$GITHUB_SHA" >> .env.appwrite-preview
+          printf '\nRELEASE=%s\nANTIVIRUS_SCANNER_ENDPOINT=%s\nANTIVIRUS_SCANNER_KEY_ID=%s\nANTIVIRUS_SCANNER_HMAC_KEY=%s\nANTIVIRUS_SCANNER_TIMEOUT_MS=%s\n' \
+            "$GITHUB_SHA" \
+            "$ANTIVIRUS_SCANNER_ENDPOINT" \
+            "$ANTIVIRUS_SCANNER_KEY_ID" \
+            "$ANTIVIRUS_SCANNER_HMAC_KEY" \
+            "$ANTIVIRUS_SCANNER_TIMEOUT_MS" \
+            >> .env.appwrite-preview
+          unset ANTIVIRUS_SCANNER_HMAC_KEY
           pnpm provision:appwrite
           pnpm configure:appwrite:function:preview
           pnpm deploy:appwrite:function:preview
