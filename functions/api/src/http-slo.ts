@@ -45,17 +45,16 @@ function metrics(input: HttpSloInput): readonly SloMetric[] {
       (intake.test(input.path) ||
         reporterControl.test(input.path) ||
         workspaceAttachmentControl.test(input.path))) ||
-    input.operation === "conversation_lifecycle" ||
-    input.operation === "workbench";
-  if (!critical) return [];
+    input.operation === "conversation_lifecycle";
+  const dashboard =
+    input.operation === "workbench" && input.method.toUpperCase() === "GET";
+  if (!critical && !dashboard) return [];
   return [
-    "critical_api_ms",
+    ...(critical ? (["critical_api_ms"] as const) : []),
     ...(intake.test(input.path) && input.method.toUpperCase() === "POST"
       ? (["feedback_commit_ms"] as const)
       : []),
-    ...(input.operation === "workbench" && input.method.toUpperCase() === "GET"
-      ? (["dashboard_ms"] as const)
-      : []),
+    ...(dashboard ? (["dashboard_ms"] as const) : []),
   ];
 }
 
