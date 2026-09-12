@@ -12,6 +12,7 @@ import { pollVerification } from "./verification-poll.js";
 import { createGitHubMessageProvider } from "./github-message-provider.js";
 import { createGitLabMessageProvider } from "./gitlab-message-provider.js";
 import { resolveProviderMessageSyncEvidenceTarget } from "./provider-message-sync-evidence-target.js";
+import { resolveProviderVerificationToken } from "./provider-verification-token.js";
 import { createSensitiveDataProtector } from "./sensitive-data-protector.js";
 import type { ProviderGrantVault } from "./source-provider.js";
 
@@ -54,24 +55,23 @@ async function json(
   return body;
 }
 
-function githubToken(): string {
-  const configured = process.env.Y7_GITHUB_VERIFICATION_TOKEN?.trim();
-  if (configured) return configured;
-  try {
-    return execFileSync("gh", ["auth", "token"], {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    }).trim();
-  } catch {
-    throw new Error("MESSAGE_SYNC_GITHUB_CREDENTIAL_REQUIRED");
-  }
-}
-
-function gitlabToken(fallback?: string): string {
-  const configured = process.env.Y7_GITLAB_VERIFICATION_TOKEN?.trim();
-  if (configured) return configured;
-  if (fallback) return fallback;
-  throw new Error("MESSAGE_SYNC_GITLAB_CREDENTIAL_REQUIRED");
+function providerToken(provider: Provider, fallback?: string): string {
+  return resolveProviderVerificationToken({
+    provider,
+    configuredToken:
+      provider === "github"
+        ? process.env.Y7_GITHUB_VERIFICATION_TOKEN
+        : process.env.Y7_GITLAB_VERIFICATION_TOKEN,
+    authorizedGrantToken: fallback,
+    cliToken:
+      provider === "github"
+        ? () =>
+            execFileSync("gh", ["auth", "token"], {
+              encoding: "utf8",
+              stdio: ["ignore", "pipe", "ignore"],
+            })
+        : undefined,
+  });
 }
 
 async function providerRequest(
@@ -101,7 +101,7 @@ async function providerRequest(
 
 async function target(
   provider: Provider,
-  gitlabFallbackToken?: string,
+  fallbackToken?: string,
 ): Promise<
   Omit<
     Target,
@@ -115,7 +115,7 @@ async function target(
   >
 > {
   if (provider === "github") {
-    const token = githubToken();
+    const token = providerToken(provider, fallbackToken);
     const repositoryPath =
       process.env.Y7_GITHUB_VERIFICATION_REPOSITORY?.trim() ||
       "Y4NN777/y7-feedback-mngt-system";
@@ -146,7 +146,7 @@ async function target(
       },
     };
   }
-  const token = gitlabToken(gitlabFallbackToken);
+  const token = providerToken(provider, fallbackToken);
   const repositoryId =
     process.env.Y7_GITLAB_VERIFICATION_PROJECT_ID?.trim() || "83836910";
   const origin = new URL(
@@ -231,17 +231,21 @@ async function main(): Promise<void> {
     },
     Buffer.from(config.providerGrantEnvelopeKey, "base64url"),
   );
-  let gitlabFallbackToken: string | undefined;
-  if (
-    providers.includes("gitlab") &&
-    !process.env.Y7_GITLAB_VERIFICATION_TOKEN?.trim()
-  ) {
+  const fallbackTokens: Partial<Record<Provider, string>> = {};
+  for (const provider of providers) {
+    const configuredToken =
+      provider === "github"
+        ? process.env.Y7_GITHUB_VERIFICATION_TOKEN
+        : process.env.Y7_GITLAB_VERIFICATION_TOKEN;
+    if (configuredToken?.trim()) continue;
     const repositoryId =
-      process.env.Y7_GITLAB_VERIFICATION_PROJECT_ID?.trim() || "83836910";
+      provider === "github"
+        ? process.env.Y7_GITHUB_VERIFICATION_REPOSITORY_ID?.trim() || "1329343404"
+        : process.env.Y7_GITLAB_VERIFICATION_PROJECT_ID?.trim() || "83836910";
     const connections = await tables.listRows({
       databaseId: config.appwriteSchema.databaseId,
       tableId: config.appwriteSchema.sourceConnectionsTableId,
-      queries: [Query.equal("provider", ["gitlab"]), Query.limit(100)],
+      queries: [Query.equal("provider", [provider]), Query.limit(100)],
       total: false,
     });
     for (const row of connections.rows) {
@@ -259,38 +263,51 @@ async function main(): Promise<void> {
         ) {
           continue;
         }
-        gitlabFallbackToken = (
-          await existingVault.open("gitlab", row.encryptedGrantRef)
+        fallbackTokens[provider] = (
+          await existingVault.open(provider, row.encryptedGrantRef)
         ).accessToken;
         break;
       } catch {
         // Ignore malformed, expired or key-incompatible historical connections.
       }
     }
-    if (!gitlabFallbackToken) {
+    if (!fallbackTokens[provider]) {
       const grants = await tables.listRows({
         databaseId: config.appwriteSchema.databaseId,
         tableId: config.appwriteSchema.providerGrantsTableId,
         queries: [
-          Query.equal("provider", ["gitlab"]),
+          Query.equal("provider", [provider]),
           Query.orderDesc("$createdAt"),
           Query.limit(100),
         ],
         total: false,
       });
-      const origin = new URL(
-        process.env.GITLAB_OAUTH_ORIGIN?.trim() || "https://gitlab.com/",
-      );
       for (const row of grants.rows) {
         try {
-          const candidate = (await existingVault.open("gitlab", row.$id)).accessToken;
+          const candidate = (await existingVault.open(provider, row.$id)).accessToken;
+          const githubRepository =
+            process.env.Y7_GITHUB_VERIFICATION_REPOSITORY?.trim() ||
+            "Y4NN777/y7-feedback-mngt-system";
+          const gitlabOrigin = new URL(
+            process.env.GITLAB_OAUTH_ORIGIN?.trim() || "https://gitlab.com/",
+          );
           const [identity, repository] = await Promise.all([
-            fetch(new URL("api/v4/user", origin), {
-              headers: { authorization: `Bearer ${candidate}` },
-              signal: AbortSignal.timeout(15_000),
-            }),
             fetch(
-              new URL(`api/v4/projects/${encodeURIComponent(repositoryId)}`, origin),
+              provider === "github"
+                ? "https://api.github.com/user"
+                : new URL("api/v4/user", gitlabOrigin),
+              {
+                headers: { authorization: `Bearer ${candidate}` },
+                signal: AbortSignal.timeout(15_000),
+              },
+            ),
+            fetch(
+              provider === "github"
+                ? `https://api.github.com/repos/${githubRepository}`
+                : new URL(
+                    `api/v4/projects/${encodeURIComponent(repositoryId)}`,
+                    gitlabOrigin,
+                  ),
               {
                 headers: { authorization: `Bearer ${candidate}` },
                 signal: AbortSignal.timeout(15_000),
@@ -298,11 +315,11 @@ async function main(): Promise<void> {
             ),
           ]);
           if (identity.ok && repository.ok) {
-            gitlabFallbackToken = candidate;
+            fallbackTokens[provider] = candidate;
             break;
           }
         } catch {
-          // Continue until a still-valid OAuth grant for the verification project is found.
+          // Continue until a still-valid OAuth grant for the verification repository is found.
         }
       }
     }
@@ -431,7 +448,7 @@ async function main(): Promise<void> {
   const outcomes: Array<Readonly<Record<string, unknown>>> = [];
 
   for (const provider of providers) {
-    const discovered = await target(provider, gitlabFallbackToken);
+    const discovered = await target(provider, fallbackTokens[provider]);
     const ids = {
       grantId: `${provider === "github" ? "mgh" : "mgl"}_${suffix}`,
       connectionId: `${provider === "github" ? "cgh" : "cgl"}_${suffix}`,
