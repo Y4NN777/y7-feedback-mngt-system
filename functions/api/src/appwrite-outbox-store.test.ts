@@ -121,6 +121,23 @@ describe("Appwrite durable outbox adapter", () => {
     await expect(target.store.claim(request)).resolves.toBeNull();
   });
 
+  it.each(["-lease_token_1234", "_lease_token_1234"])(
+    "BDD-OUTBOX-DB-006 accepts canonical Base64URL lease token %s",
+    async (leaseToken) => {
+      const target = setup();
+      await expect(target.store.claim({ ...request, leaseToken })).resolves.toEqual(
+        expect.objectContaining({ leaseToken }),
+      );
+      await expect(
+        target.store.markDelivered({
+          outboxId: "outbox_1",
+          leaseToken,
+          deliveredAt: "2026-08-24T20:01:01.000Z",
+        }),
+      ).resolves.toBeUndefined();
+    },
+  );
+
   it("BDD-OUTBOX-DB-002 reschedules and reclaims only when due", async () => {
     const target = setup();
     await target.store.claim(request);

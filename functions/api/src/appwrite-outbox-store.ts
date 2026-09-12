@@ -79,7 +79,7 @@ const defaultQueries: AppwriteOutboxQueryPort = {
 };
 
 const appwriteId = /^[A-Za-z0-9][A-Za-z0-9._-]{0,35}$/u;
-const token = /^[A-Za-z0-9][A-Za-z0-9_-]{7,63}$/u;
+const token = /^[A-Za-z0-9_-]{8,64}$/u;
 const statuses = new Set(["pending", "retryable", "processing", "delivered", "failed"]);
 
 function invalid(): never {
