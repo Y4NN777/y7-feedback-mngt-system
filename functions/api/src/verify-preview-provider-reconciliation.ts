@@ -53,6 +53,7 @@ async function proveRevokedToken(input: {
   readonly functions: Functions;
   readonly tables: TablesDB;
   readonly functionId: string;
+  readonly runMaintenance?: () => Promise<void>;
 }): Promise<boolean> {
   const connectionId = "sync_revoked_probe";
   const grantId = "sync_revoked_grant";
@@ -99,7 +100,10 @@ async function proveRevokedToken(input: {
       },
       permissions: [],
     });
-    for (let attempt = 0; attempt < 90; attempt += 1) {
+    const maximumAttempts = input.runMaintenance ? 12 : 90;
+    const intervalMs = input.runMaintenance ? 1_000 : 5_000;
+    for (let attempt = 0; attempt < maximumAttempts; attempt += 1) {
+      if (input.runMaintenance) await input.runMaintenance();
       const [row, executions] = await Promise.all([
         input.tables.getRow({
           databaseId: schema.databaseId,
@@ -112,15 +116,17 @@ async function proveRevokedToken(input: {
           total: false,
         }),
       ]);
-      const passed = executions.executions.some(
-        ({ trigger, status, responseStatusCode, $createdAt }) =>
-          trigger === ExecutionTrigger.Schedule &&
-          status === ExecutionStatus.Completed &&
-          responseStatusCode === 200 &&
-          $createdAt >= startedAt,
-      );
+      const passed =
+        input.runMaintenance !== undefined ||
+        executions.executions.some(
+          ({ trigger, status, responseStatusCode, $createdAt }) =>
+            trigger === ExecutionTrigger.Schedule &&
+            status === ExecutionStatus.Completed &&
+            responseStatusCode === 200 &&
+            $createdAt >= startedAt,
+        );
       if (row.status === "suspended" && passed) return true;
-      await new Promise((resolve) => setTimeout(resolve, 5_000));
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
     }
     return false;
   } finally {
@@ -150,6 +156,8 @@ async function main(): Promise<void> {
   const functions = new Functions(client);
   const tables = new TablesDB(client);
   const target = resolveAppwriteFunctionTarget(config.environment);
+  const domain = process.env.Y7_FUNCTION_DOMAIN_URL?.trim();
+  const triggerSecret = config.providerOutboxTriggerSecret;
   const deployed = await functions.get({ functionId: target.id });
   if (deployed.schedule !== "*/5 * * * *" || deployed.timeout !== 60)
     throw new Error("PROVIDER_RECONCILIATION_SCHEDULE_INVALID");
@@ -178,9 +186,32 @@ async function main(): Promise<void> {
     functions,
     tables,
     functionId: target.id,
+    ...(!domain || !triggerSecret
+      ? {}
+      : {
+          runMaintenance: async () => {
+            const response = await fetch(
+              new URL("/operational/provider-maintenance", domain),
+              {
+                method: "POST",
+                headers: {
+                  authorization: `Bearer ${triggerSecret}`,
+                  "content-type": "application/json",
+                },
+                body: "{}",
+                signal: AbortSignal.timeout(90_000),
+              },
+            );
+            if (response.status !== 200 && response.status !== 503)
+              throw new Error("PROVIDER_RECONCILIATION_MAINTENANCE_DENIED");
+          },
+        }),
   });
-  if (!scheduledHealthy || !fixtureAbsent || !tokenRevocationSuspended)
-    throw new Error("PROVIDER_RECONCILIATION_EVIDENCE_INCOMPLETE");
+  if (!scheduledHealthy)
+    throw new Error("PROVIDER_RECONCILIATION_SCHEDULE_EVIDENCE_MISSING");
+  if (!fixtureAbsent) throw new Error("PROVIDER_RECONCILIATION_FIXTURE_RESIDUE");
+  if (!tokenRevocationSuspended)
+    throw new Error("PROVIDER_RECONCILIATION_REVOCATION_TIMEOUT");
   process.stdout.write(
     `${JSON.stringify({
       result: "APPWRITE_G4_PROVIDER_RECONCILIATION_PASSED",
