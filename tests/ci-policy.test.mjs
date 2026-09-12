@@ -97,9 +97,6 @@ test("BDD-REC-301 runs the real recovery drill with isolated OIDC authority", as
   );
 
   assert.match(workflow, /workflow_dispatch:/u);
-  assert.match(workflow, /G5_EVIDENCE_SCOPE: \$\{\{ inputs\.scope \|\| 'full' \}\}/u);
-  assert.match(workflow, /reconciliation\) pnpm verify:providers:g4:reconciliation/u);
-  assert.match(workflow, /state-sync\) pnpm verify:providers:g4:state-sync/u);
   assert.match(workflow, /permissions:\s+contents: read\s+id-token: write/u);
   assert.match(workflow, /environment: recovery-drill/u);
   assert.match(
@@ -177,6 +174,9 @@ test("BDD-E2E-301 runs the complete G5 evidence pack with ephemeral secret mater
   );
 
   assert.match(workflow, /workflow_dispatch:/u);
+  assert.match(workflow, /G5_EVIDENCE_SCOPE: \$\{\{ inputs\.scope \|\| 'full' \}\}/u);
+  assert.match(workflow, /reconciliation\) pnpm verify:providers:g4:reconciliation/u);
+  assert.match(workflow, /state-sync\) pnpm verify:providers:g4:state-sync/u);
   assert.match(
     workflow,
     /permissions:\s+contents: read\s+id-token: write\s+issues: write/u,
@@ -240,7 +240,10 @@ test("BDD-SLO-301 runs the real Preview SLO gate with protected least-privilege 
   );
   assert.match(workflow, /install -m 600 \/dev\/null \.env\.appwrite-preview/u);
   assert.match(workflow, /trap 'rm -f \.env\.appwrite-preview' EXIT/u);
-  assert.match(workflow, /printf '\\nRELEASE=%s\\n' "\$GITHUB_SHA"/u);
+  assert.match(
+    workflow,
+    /printf '\\nRELEASE=%s\\n(?:[^']*\\n)*' \\\n\s+"\$GITHUB_SHA"/u,
+  );
   assert.match(workflow, /pnpm provision:appwrite(?:\s|$)/u);
   assert.match(workflow, /pnpm configure:appwrite:function:preview/u);
   assert.match(workflow, /pnpm deploy:appwrite:function:preview/u);
