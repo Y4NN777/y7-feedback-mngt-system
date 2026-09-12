@@ -395,7 +395,7 @@ Rules:
 pnpm format:check
 pnpm lint
 pnpm typecheck
-pnpm test --filter <affected-workspace>
+pnpm --filter <affected-workspace> test
 ```
 
 ### Before opening or updating a pull request
