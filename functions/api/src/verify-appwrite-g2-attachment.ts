@@ -20,6 +20,7 @@ import { createNodeAppwritePrivateAttachmentStorage } from "./appwrite-private-a
 import { createAttachmentDownload } from "./attachment-download.js";
 import { createAttachmentLifecycleCoordinator } from "./attachment-lifecycle.js";
 import { createAttachmentSaga } from "./attachment-saga.js";
+import { acceptAttachmentEvidence } from "./attachment-evidence-retry.js";
 import { validateAttachment } from "./attachment-validation.js";
 import { parseClamAvHttpScannerConfig } from "./clamav-http-scanner-config.js";
 import { createClamAvHttpScanner } from "./clamav-http-scanner.js";
@@ -300,7 +301,7 @@ async function main(): Promise<void> {
         let authPassed = false;
         let authFailure: unknown;
         try {
-          const internalAcceptance = await internalSaga.accept({
+          const internalAcceptance = await acceptAttachmentEvidence(internalSaga, {
             operationId: internalOperationId,
             feedbackId: parentIds.feedbackId,
             workspaceId: "workspace_alpha",
@@ -316,6 +317,7 @@ async function main(): Promise<void> {
             ],
           });
           if (
+            !internalAcceptance ||
             internalAcceptance.status !== "accepted" ||
             internalAcceptance.attachmentIds[0] !== internalAttachmentId
           ) {
