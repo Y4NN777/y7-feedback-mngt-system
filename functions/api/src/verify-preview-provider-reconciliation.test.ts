@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ExecutionStatus, ExecutionTrigger } from "node-appwrite";
 
-import { hasHealthyScheduledReconciliation } from "./verify-preview-provider-reconciliation";
+import { hasHealthyScheduledReconciliation } from "./provider-reconciliation-evidence";
 
 describe("provider reconciliation evidence", () => {
   it("accepts current scheduled health after historical outage evidence expires", () => {

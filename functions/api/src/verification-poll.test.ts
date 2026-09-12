@@ -110,4 +110,19 @@ describe("retryVerificationOperation", () => {
     ).rejects.toBe(failure);
     expect(operation).toHaveBeenCalledTimes(2);
   });
+
+  it("uses its default delay before retrying an operation", async () => {
+    const operation = vi
+      .fn<() => Promise<string>>()
+      .mockRejectedValueOnce(new Error("transient"))
+      .mockResolvedValueOnce("completed");
+
+    await expect(
+      retryVerificationOperation({
+        operation,
+        maximumAttempts: 2,
+        intervalMs: 0,
+      }),
+    ).resolves.toBe("completed");
+  });
 });
