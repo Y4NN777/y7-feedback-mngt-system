@@ -382,6 +382,14 @@ const crossScenarioEvidenceCommands = [
   "pnpm verify:slo:g5",
 ] as const;
 
+const retainedEvidenceCommands = [
+  "pnpm verify:appwrite:g3:composed",
+  "pnpm verify:providers:g3:issue-link",
+  "pnpm verify:providers:g3:sources",
+] as const;
+
+const retainedEvidence = new Set<string>(retainedEvidenceCommands);
+
 export function buildE2eG5Commands(): readonly string[] {
   return [
     ...new Set([
@@ -389,6 +397,7 @@ export function buildE2eG5Commands(): readonly string[] {
       ...crossScenarioEvidenceCommands,
     ]),
   ]
+    .filter((command) => !retainedEvidence.has(command))
     .map(parseE2eG5Command)
     .sort();
 }
@@ -402,6 +411,7 @@ export function buildE2eG5Index() {
     errorCount: matrix.filter(({ id }) => id.startsWith("ERR-")).length,
     environments: [...new Set(matrix.map(({ environment }) => environment))].sort(),
     evidenceCommands: buildE2eG5Commands().map((command) => `pnpm ${command}`),
+    retainedEvidenceCommands,
     scenarios: matrix.map(({ id, requirementIds, environment }) => ({
       id,
       requirementIds,
