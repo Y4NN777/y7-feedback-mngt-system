@@ -13,6 +13,7 @@ import { createGitHubMessageProvider } from "./github-message-provider.js";
 import { createGitLabMessageProvider } from "./gitlab-message-provider.js";
 import { resolveProviderMessageSyncEvidenceTarget } from "./provider-message-sync-evidence-target.js";
 import { resolveProviderVerificationToken } from "./provider-verification-token.js";
+import { removeProviderVerificationWebhooks } from "./provider-verification-webhook-cleanup.js";
 import { createSensitiveDataProtector } from "./sensitive-data-protector.js";
 import type { ProviderGrantVault } from "./source-provider.js";
 
@@ -470,6 +471,7 @@ async function main(): Promise<void> {
     let issueId: string | undefined;
     let issueUrl: string | undefined;
     let inboundCommentId: string | undefined;
+    let webhookCleanupFailed = false;
     const vault: ProviderGrantVault = createAppwriteProviderGrantVault(
       {
         createRow: (input) =>
@@ -1029,6 +1031,21 @@ async function main(): Promise<void> {
       });
     } finally {
       try {
+        await removeProviderVerificationWebhooks({
+          provider,
+          token: current.token,
+          repository: current.repository,
+          callbackUrl: new URL(
+            `/providers/${provider}/webhooks/${current.connectionId}`,
+            domain,
+          ).toString(),
+          gitlabOrigin:
+            process.env.GITLAB_OAUTH_ORIGIN?.trim() || "https://gitlab.com/",
+        });
+      } catch {
+        webhookCleanupFailed = true;
+      }
+      try {
         await tables.deleteRow({
           databaseId,
           tableId: config.appwriteSchema.sourceConnectionsTableId,
@@ -1134,6 +1151,7 @@ async function main(): Promise<void> {
       }
       created.length = 0;
     }
+    if (webhookCleanupFailed) throw new Error("MESSAGE_SYNC_WEBHOOK_CLEANUP_FAILED");
   }
   process.stdout.write(
     `${JSON.stringify({ result: "PROVIDER_MESSAGE_SYNC_REAL_MATRIX_PASSED", environment: evidenceEnvironment, providers: outcomes })}\n`,
