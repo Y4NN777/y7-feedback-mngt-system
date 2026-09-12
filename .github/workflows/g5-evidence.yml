@@ -2,6 +2,20 @@ name: Complete G5 evidence
 
 on:
   workflow_dispatch:
+    inputs:
+      scope:
+        description: Evidence slice to execute before the final full gate
+        required: true
+        default: full
+        type: choice
+        options:
+          - full
+          - attachments
+          - providers
+          - reconciliation
+          - state-sync
+          - recovery
+          - slo
 
 permissions:
   contents: read
@@ -20,6 +34,7 @@ jobs:
     environment: g5-preview
     env:
       CI: true
+      G5_EVIDENCE_SCOPE: ${{ inputs.scope || 'full' }}
       GH_TOKEN: ${{ github.token }}
       Y7_GITHUB_VERIFICATION_TOKEN: ${{ secrets.Y7_GITHUB_VERIFICATION_TOKEN }}
       Y7_GITLAB_VERIFICATION_TOKEN: ${{ secrets.Y7_GITLAB_VERIFICATION_TOKEN }}
@@ -89,4 +104,16 @@ jobs:
           pnpm provision:appwrite
           pnpm configure:appwrite:function:preview
           pnpm deploy:appwrite:function:preview
-          pnpm verify:e2e:g5
+          case "$G5_EVIDENCE_SCOPE" in
+            full) pnpm verify:e2e:g5 ;;
+            attachments) pnpm verify:appwrite:g2:attachments ;;
+            providers)
+              pnpm verify:providers:g4:message-sync:github
+              pnpm verify:providers:g4:message-sync:gitlab
+              ;;
+            reconciliation) pnpm verify:providers:g4:reconciliation ;;
+            state-sync) pnpm verify:providers:g4:state-sync ;;
+            recovery) pnpm verify:recovery:g5 ;;
+            slo) pnpm verify:slo:g5 ;;
+            *) echo '{"error":"G5_EVIDENCE_SCOPE_INVALID"}' >&2; exit 1 ;;
+          esac
