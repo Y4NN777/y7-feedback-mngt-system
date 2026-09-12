@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { pollVerification } from "./verification-poll.js";
+import { pollVerification, retryVerificationOperation } from "./verification-poll.js";
 
 describe("pollVerification", () => {
   it("returns immediately when the first observation is accepted", async () => {
@@ -73,5 +73,41 @@ describe("pollVerification", () => {
       }),
     ).resolves.toBe("completed");
     expect(attempt).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("retryVerificationOperation", () => {
+  it("retries a transient real-service failure and returns the successful result", async () => {
+    const operation = vi
+      .fn<() => Promise<string>>()
+      .mockRejectedValueOnce(new Error("transient"))
+      .mockResolvedValueOnce("completed");
+    const delay = vi.fn().mockResolvedValue(undefined);
+
+    await expect(
+      retryVerificationOperation({
+        operation,
+        maximumAttempts: 3,
+        intervalMs: 250,
+        delay,
+      }),
+    ).resolves.toBe("completed");
+    expect(operation).toHaveBeenCalledTimes(2);
+    expect(delay).toHaveBeenCalledWith(250);
+  });
+
+  it("rethrows after the bounded attempt limit", async () => {
+    const failure = new Error("persistent");
+    const operation = vi.fn<() => Promise<string>>().mockRejectedValue(failure);
+
+    await expect(
+      retryVerificationOperation({
+        operation,
+        maximumAttempts: 2,
+        intervalMs: 0,
+        delay: vi.fn().mockResolvedValue(undefined),
+      }),
+    ).rejects.toBe(failure);
+    expect(operation).toHaveBeenCalledTimes(2);
   });
 });
