@@ -398,8 +398,8 @@ async function main(): Promise<void> {
           signal: AbortSignal.timeout(90_000),
         }),
       accept: (candidate) => candidate.status !== 503,
-      maximumAttempts: 4,
-      intervalMs: 1_000,
+      maximumAttempts: 12,
+      intervalMs: 2_000,
     });
     if (!response || response.status !== 200)
       throw new Error("MESSAGE_SYNC_MAINTENANCE_FAILED");
