@@ -50,9 +50,10 @@ describe("scheduled provider maintenance", () => {
       webhooks: { runOnce: webhooks },
     });
 
-    await expect(maintenance.runOnce()).rejects.toThrow(
-      "PROVIDER_MAINTENANCE_RETRYABLE",
-    );
+    await expect(maintenance.runOnce()).rejects.toMatchObject({
+      message: "PROVIDER_MAINTENANCE_RETRYABLE",
+      failedCapabilities: ["inbox"],
+    });
     expect(outbox).toHaveBeenCalledOnce();
     expect(webhooks).toHaveBeenCalledOnce();
   });

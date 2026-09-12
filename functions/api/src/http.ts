@@ -12,6 +12,7 @@ import type { ProjectAdministrationHttp } from "./project-administration-http.js
 import type { ProviderIssueOutboxHttp } from "./provider-issue-outbox-http.js";
 import type { ProviderEventInboxHttp } from "./provider-event-inbox-http.js";
 import type { ProviderMaintenance } from "./provider-maintenance.js";
+import { ProviderMaintenanceFailure } from "./provider-maintenance.js";
 import type { ProviderMaintenanceHttp } from "./provider-maintenance-http.js";
 import type { ProviderWebhookHttpResponse } from "./provider-webhook-http.js";
 import type { SourceConnectionHttp } from "./source-connection-http.js";
@@ -202,10 +203,19 @@ export async function routeRequest(
     ? await dependencies.providerMaintenance
         ?.runOnce()
         .then((body) => ({ statusCode: 200 as const, body }))
-        .catch(() => ({
-          statusCode: 503 as const,
-          body: { error: "ERR-PROVIDER-MAINTENANCE-RETRYABLE" },
-        }))
+        .catch((error: unknown) => {
+          if (error instanceof ProviderMaintenanceFailure)
+            log(
+              JSON.stringify({
+                event: "provider.maintenance.failed",
+                failedCapabilities: error.failedCapabilities,
+              }),
+            );
+          return {
+            statusCode: 503 as const,
+            body: { error: "ERR-PROVIDER-MAINTENANCE-RETRYABLE" },
+          };
+        })
     : null;
   const providerWebhookResponse =
     isHealth || isIngressProbe || isProviderMaintenance

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { routeRequest, type FunctionContext } from "./http";
+import { createProviderMaintenance } from "./provider-maintenance";
 import type { PublicApi } from "./public-api";
 import type { ProjectAdministrationHttp } from "./project-administration-http";
 
@@ -602,6 +603,24 @@ describe("trusted API entrypoint", () => {
       { error: "ERR-PROVIDER-MAINTENANCE-RETRYABLE" },
       503,
       expect.any(Object),
+    );
+  });
+
+  it("BDD-SYNC-068 logs only allow-listed failed maintenance capabilities", async () => {
+    const { context } = createContext("POST", "/", {
+      headers: { "x-appwrite-trigger": "schedule" },
+    });
+    await routeRequest(context, {
+      ...dependencies,
+      providerMaintenance: createProviderMaintenance({
+        inbox: { runOnce: () => Promise.reject(new Error("private cause")) },
+      }),
+    });
+    expect(context.log).toHaveBeenCalledWith(
+      '{"event":"provider.maintenance.failed","failedCapabilities":["inbox"]}',
+    );
+    expect(JSON.stringify(vi.mocked(context.log).mock.calls)).not.toContain(
+      "private cause",
     );
   });
 
