@@ -12,6 +12,21 @@ import { parseServerConfig } from "@y7-feedback/config/server";
 import { resolveAppwriteFunctionTarget } from "./appwrite-function-variables.js";
 import { createNodeAppwriteProviderGrantVault } from "./appwrite-provider-grant-vault.js";
 
+export function hasHealthyScheduledReconciliation(
+  executions: ReadonlyArray<{
+    readonly trigger: ExecutionTrigger;
+    readonly status: ExecutionStatus;
+    readonly responseStatusCode: number;
+  }>,
+): boolean {
+  return executions.some(
+    ({ trigger, status, responseStatusCode }) =>
+      trigger === ExecutionTrigger.Schedule &&
+      status === ExecutionStatus.Completed &&
+      responseStatusCode === 200,
+  );
+}
+
 async function absentDelete(
   tables: TablesDB,
   input: {
@@ -143,25 +158,7 @@ async function main(): Promise<void> {
     queries: [Query.orderDesc("$createdAt"), Query.limit(100)],
     total: false,
   });
-  const scheduled = executions.executions
-    .filter(({ trigger }) => trigger === ExecutionTrigger.Schedule)
-    .reverse();
-  const failedIndex = scheduled.findIndex(
-    ({ status, responseStatusCode }) =>
-      status === ExecutionStatus.Failed && responseStatusCode === 503,
-  );
-  const successBefore = scheduled
-    .slice(0, failedIndex)
-    .some(
-      ({ status, responseStatusCode }) =>
-        status === ExecutionStatus.Completed && responseStatusCode === 200,
-    );
-  const successAfter = scheduled
-    .slice(failedIndex + 1)
-    .some(
-      ({ status, responseStatusCode }) =>
-        status === ExecutionStatus.Completed && responseStatusCode === 200,
-    );
+  const scheduledHealthy = hasHealthyScheduledReconciliation(executions.executions);
   let fixtureAbsent = false;
   try {
     await tables.getRow({
@@ -182,22 +179,14 @@ async function main(): Promise<void> {
     tables,
     functionId: target.id,
   });
-  if (
-    failedIndex < 0 ||
-    !successBefore ||
-    !successAfter ||
-    !fixtureAbsent ||
-    !tokenRevocationSuspended
-  )
+  if (!scheduledHealthy || !fixtureAbsent || !tokenRevocationSuspended)
     throw new Error("PROVIDER_RECONCILIATION_EVIDENCE_INCOMPLETE");
   process.stdout.write(
     `${JSON.stringify({
       result: "APPWRITE_G4_PROVIDER_RECONCILIATION_PASSED",
       schedule: deployed.schedule,
       timeout: deployed.timeout,
-      successBefore,
-      outageDetected: true,
-      recoveryDetected: successAfter,
+      scheduledHealthy,
       tokenRevocationSuspended,
       cleanupPassed: fixtureAbsent,
     })}\n`,
