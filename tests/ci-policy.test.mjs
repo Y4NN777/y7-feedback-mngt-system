@@ -97,6 +97,9 @@ test("BDD-REC-301 runs the real recovery drill with isolated OIDC authority", as
   );
 
   assert.match(workflow, /workflow_dispatch:/u);
+  assert.match(workflow, /G5_EVIDENCE_SCOPE: \$\{\{ inputs\.scope \|\| 'full' \}\}/u);
+  assert.match(workflow, /reconciliation\) pnpm verify:providers:g4:reconciliation/u);
+  assert.match(workflow, /state-sync\) pnpm verify:providers:g4:state-sync/u);
   assert.match(workflow, /permissions:\s+contents: read\s+id-token: write/u);
   assert.match(workflow, /environment: recovery-drill/u);
   assert.match(
