@@ -449,8 +449,8 @@ async function main(): Promise<void> {
       },
       accept: (row) =>
         object(row) && (row.status === "completed" || row.status === "failed"),
-      maximumAttempts: 12,
-      intervalMs: 1_000,
+      maximumAttempts: 30,
+      intervalMs: 500,
     });
   const outcomes: Array<Readonly<Record<string, unknown>>> = [];
 
@@ -1028,6 +1028,15 @@ async function main(): Promise<void> {
         prohibitedPayloadExcluded: true,
       });
     } finally {
+      try {
+        await tables.deleteRow({
+          databaseId,
+          tableId: config.appwriteSchema.sourceConnectionsTableId,
+          rowId: current.connectionId,
+        });
+      } catch {
+        /* The connection may already be absent after an earlier cleanup attempt. */
+      }
       if (inboundCommentId && issueId) {
         try {
           if (provider === "github")
