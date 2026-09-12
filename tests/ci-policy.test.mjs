@@ -189,6 +189,14 @@ test("BDD-E2E-301 runs the complete G5 evidence pack with ephemeral secret mater
   );
   assert.match(
     workflow,
+    /if: env\.G5_EVIDENCE_SCOPE == 'full' \|\| env\.G5_EVIDENCE_SCOPE == 'recovery'/u,
+  );
+  assert.match(
+    workflow,
+    /if: env\.G5_EVIDENCE_SCOPE == 'full'\s+run: pnpm --filter @y7-feedback\/web exec playwright install/u,
+  );
+  assert.match(
+    workflow,
     /Y7_PREVIEW_EVIDENCE_ENV: \$\{\{ secrets\.Y7_PREVIEW_EVIDENCE_ENV \}\}/u,
   );
   assert.match(workflow, /install -m 600 \/dev\/null \.env\.appwrite-preview/u);
