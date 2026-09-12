@@ -624,6 +624,27 @@ describe("trusted API entrypoint", () => {
     );
   });
 
+  it("BDD-SYNC-068 preserves safe diagnostics across runtime boundaries", async () => {
+    const { context } = createContext("POST", "/", {
+      headers: { "x-appwrite-trigger": "schedule" },
+    });
+    await routeRequest(context, {
+      ...dependencies,
+      providerMaintenance: {
+        runOnce: () =>
+          Promise.reject(
+            Object.assign(new Error("PROVIDER_MAINTENANCE_RETRYABLE"), {
+              name: "ProviderMaintenanceFailure",
+              failedCapabilities: ["messageReconciliation"],
+            }),
+          ),
+      },
+    });
+    expect(context.log).toHaveBeenCalledWith(
+      '{"event":"provider.maintenance.failed","failedCapabilities":["messageReconciliation"]}',
+    );
+  });
+
   it("TASK-SYNC-002 routes an authenticated explicit maintenance trigger", async () => {
     const handle = vi.fn(() =>
       Promise.resolve({ statusCode: 200, body: { status: "completed" } }),

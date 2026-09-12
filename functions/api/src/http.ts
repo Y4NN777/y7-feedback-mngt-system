@@ -204,11 +204,23 @@ export async function routeRequest(
         ?.runOnce()
         .then((body) => ({ statusCode: 200 as const, body }))
         .catch((error: unknown) => {
-          if (error instanceof ProviderMaintenanceFailure)
+          const failedCapabilities =
+            error instanceof ProviderMaintenanceFailure
+              ? error.failedCapabilities
+              : typeof error === "object" &&
+                  error !== null &&
+                  "name" in error &&
+                  error.name === "ProviderMaintenanceFailure" &&
+                  "failedCapabilities" in error &&
+                  Array.isArray(error.failedCapabilities) &&
+                  error.failedCapabilities.every((value) => typeof value === "string")
+                ? error.failedCapabilities
+                : undefined;
+          if (failedCapabilities !== undefined)
             log(
               JSON.stringify({
                 event: "provider.maintenance.failed",
-                failedCapabilities: error.failedCapabilities,
+                failedCapabilities,
               }),
             );
           return {
