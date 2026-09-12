@@ -54,11 +54,11 @@ export async function removeProviderVerificationWebhooks(input: {
   const base =
     input.provider === "github"
       ? new URL(
-          `repos/${encodeURIComponent(input.repository.owner)}/${encodeURIComponent(input.repository.name)}/hooks/`,
+          `repos/${encodeURIComponent(input.repository.owner)}/${encodeURIComponent(input.repository.name)}/hooks`,
           "https://api.github.com/",
         )
       : new URL(
-          `api/v4/projects/${encodeURIComponent(input.repository.id)}/hooks/`,
+          `api/v4/projects/${encodeURIComponent(input.repository.id)}/hooks`,
           input.gitlabOrigin,
         );
   const listed = await request(fetcher, input.token, input.provider, base, "GET");
@@ -77,7 +77,13 @@ export async function removeProviderVerificationWebhooks(input: {
   });
   await Promise.all(
     matches.map((id) =>
-      request(fetcher, input.token, input.provider, new URL(id, base), "DELETE"),
+      request(
+        fetcher,
+        input.token,
+        input.provider,
+        new URL(`${base.toString()}/${id}`),
+        "DELETE",
+      ),
     ),
   );
   return matches.length;
