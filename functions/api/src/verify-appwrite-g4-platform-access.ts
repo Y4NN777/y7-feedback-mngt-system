@@ -16,6 +16,7 @@ import { parseServerConfig } from "@y7-feedback/config/server";
 import { createNodeAppwritePlatformAccessExpiryWorker } from "./appwrite-platform-access-store.js";
 import { createPlatformAccessAuditId } from "./platform-access-audit-id.js";
 import { createSensitiveDataProtector } from "./sensitive-data-protector.js";
+import { retryVerificationOperation } from "./verification-poll.js";
 
 let verificationStage = "BOOT";
 
@@ -532,7 +533,7 @@ async function main(): Promise<void> {
     verificationStage = "EXPIRY_WAIT";
     await new Promise((resolve) => setTimeout(resolve, 4_000));
     verificationStage = "EXPIRY_EXECUTION";
-    await createNodeAppwritePlatformAccessExpiryWorker(
+    const expiryWorker = createNodeAppwritePlatformAccessExpiryWorker(
       tables,
       {
         databaseId: config.appwriteSchema.databaseId,
@@ -545,7 +546,12 @@ async function main(): Promise<void> {
         now: () => new Date().toISOString(),
         createAuditId: createPlatformAccessAuditId,
       },
-    ).runOnce();
+    );
+    await retryVerificationOperation({
+      operation: () => expiryWorker.runOnce(),
+      maximumAttempts: 4,
+      intervalMs: 1_000,
+    });
     verificationStage = "EXPIRY_READ";
     const expired = await tables.getRow({
       databaseId: config.appwriteSchema.databaseId,
