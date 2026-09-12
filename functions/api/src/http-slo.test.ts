@@ -44,7 +44,7 @@ describe("HTTP SLO classification", () => {
     );
   });
 
-  it("BDD-SLO-303 records dashboard and critical request series", () => {
+  it("BDD-SLO-303 records workbench reads only in the dashboard series", () => {
     const events = classifyHttpSloMeasurements({
       ...input,
       method: "GET",
@@ -52,10 +52,7 @@ describe("HTTP SLO classification", () => {
       operation: "workbench",
       statusCode: 200,
     });
-    expect(events.map(({ metricName }) => metricName)).toEqual([
-      "critical_api_ms",
-      "dashboard_ms",
-    ]);
+    expect(events.map(({ metricName }) => metricName)).toEqual(["dashboard_ms"]);
   });
 
   it.each([
