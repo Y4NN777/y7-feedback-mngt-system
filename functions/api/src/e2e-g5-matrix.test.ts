@@ -97,6 +97,11 @@ describe("G5 end-to-end traceability matrix", () => {
       errorCount: 19,
       environments: ["appwrite_preview", "local_browser"],
       evidenceCommands: buildE2eG5Commands().map((command) => `pnpm ${command}`),
+      retainedEvidenceCommands: [
+        "pnpm verify:appwrite:g3:composed",
+        "pnpm verify:providers:g3:issue-link",
+        "pnpm verify:providers:g3:sources",
+      ],
       scenarios: matrix.map(({ id, requirementIds, environment }) => ({
         id,
         requirementIds,
@@ -119,12 +124,23 @@ describe("G5 end-to-end traceability matrix", () => {
     expect(commands).toContain("verify:providers:g4:message-sync:gitlab");
     expect(commands).toContain("verify:slo:g5");
     expect(commands).toContain("security:scan");
+    expect(commands).not.toContain("verify:appwrite:g3:composed");
+    expect(commands).not.toContain("verify:providers:g3:issue-link");
+    expect(commands).not.toContain("verify:providers:g3:sources");
     expect(
       commands.every(
         (command) =>
           command === "security:scan" || /^verify:[a-z0-9:-]+$/u.test(command),
       ),
     ).toBe(true);
+  });
+
+  it("BDD-E2E-207 does not execute OAuth-state evidence without its temporary fixture", () => {
+    expect(buildE2eG5Index().retainedEvidenceCommands).toEqual([
+      "pnpm verify:appwrite:g3:composed",
+      "pnpm verify:providers:g3:issue-link",
+      "pnpm verify:providers:g3:sources",
+    ]);
   });
 
   it("rejects an evidence command outside the root verify surface", () => {
