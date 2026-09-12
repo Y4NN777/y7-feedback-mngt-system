@@ -60,6 +60,7 @@ jobs:
           cache: pnpm
           package-manager-cache: false
       - name: Authenticate the isolated recovery drill with Azure workload identity
+        if: env.G5_EVIDENCE_SCOPE == 'full' || env.G5_EVIDENCE_SCOPE == 'recovery'
         uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
         with:
           client-id: ${{ vars.AZURE_RECOVERY_DRILL_CLIENT_ID }}
@@ -68,6 +69,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Install Chromium and browser dependencies
+        if: env.G5_EVIDENCE_SCOPE == 'full'
         run: pnpm --filter @y7-feedback/web exec playwright install --with-deps chromium
       - name: Run the complete destructive G5 evidence matrix
         shell: bash
