@@ -348,7 +348,7 @@ async function main(): Promise<void> {
       deploymentId: definition.deploymentId,
     });
     let ready = false;
-    for (let attempt = 0; attempt < 90; attempt += 1) {
+    for (let attempt = 0; attempt < 300; attempt += 1) {
       const deployment = await functions.getDeployment({
         functionId,
         deploymentId: duplicate.$id,
