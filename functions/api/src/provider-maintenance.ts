@@ -6,6 +6,16 @@ export interface ProviderMaintenance {
   runOnce(): Promise<Readonly<Record<string, unknown>>>;
 }
 
+export class ProviderMaintenanceFailure extends Error {
+  readonly failedCapabilities: readonly string[];
+
+  constructor(failedCapabilities: readonly string[]) {
+    super("PROVIDER_MAINTENANCE_RETRYABLE");
+    this.name = "ProviderMaintenanceFailure";
+    this.failedCapabilities = failedCapabilities;
+  }
+}
+
 function capabilityStatus(value: object) {
   const status = "status" in value ? value.status : undefined;
   return typeof status === "string" ? status : "completed";
@@ -43,9 +53,13 @@ export function createProviderMaintenance(input: {
       const outcomes = await Promise.allSettled(
         capabilities.map(([, capability]) => capability.runOnce()),
       );
-      if (outcomes.some(({ status }) => status === "rejected")) {
-        throw new Error("PROVIDER_MAINTENANCE_RETRYABLE");
-      }
+      const failedCapabilities = outcomes.flatMap((outcome, index) =>
+        outcome.status === "rejected" && capabilities[index] !== undefined
+          ? [capabilities[index][0]]
+          : [],
+      );
+      if (failedCapabilities.length > 0)
+        throw new ProviderMaintenanceFailure(failedCapabilities);
       const result: Record<string, unknown> = {
         status: "completed",
       };
