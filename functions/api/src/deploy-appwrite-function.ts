@@ -78,7 +78,7 @@ async function waitUntilReady(
   functionId: string,
   deploymentId: string,
 ): Promise<string> {
-  for (let attempt = 0; attempt < 90; attempt += 1) {
+  for (let attempt = 0; attempt < 300; attempt += 1) {
     const deployment = await functions.getDeployment({ functionId, deploymentId });
     if (deployment.status === DeploymentStatus.Ready) return deployment.status;
     if (deployment.status === DeploymentStatus.Failed) {
