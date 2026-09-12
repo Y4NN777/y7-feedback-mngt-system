@@ -45,6 +45,26 @@ async function main(): Promise<void> {
     .setKey(config.appwriteApiKey);
   const tables = new TablesDB(client);
   const users = new Users(client);
+  const wait = (milliseconds: number) =>
+    new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
+  const deleteRowReliably = async (tableId: string, rowId: string) => {
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= 4; attempt += 1) {
+      try {
+        await tables.deleteRow({
+          databaseId: config.appwriteSchema.databaseId,
+          tableId,
+          rowId,
+        });
+        return;
+      } catch (error: unknown) {
+        if (object(error) && Number(error.code) === 404) return;
+        lastError = error;
+        if (attempt < 4) await wait(attempt * 150);
+      }
+    }
+    throw lastError;
+  };
   const api = createHttpFunctionPublicApi({ baseUrl: domain, fetch });
   const protector = createSensitiveDataProtector(
     config.sensitiveDataActiveKeyId,
@@ -189,20 +209,29 @@ async function main(): Promise<void> {
       value: Readonly<Record<string, unknown>>,
       expected = 201,
     ) => {
-      try {
-        return await request(
-          "POST",
-          actor === "workspace"
-            ? `${workspacePath}/conversation/commands`
-            : `${reporterPath}/commands`,
-          actor === "workspace" ? bearer : reporter,
-          actor === "workspace" ? { command: value } : { reference, command: value },
-          expected,
-        );
-      } catch (error: unknown) {
-        const kind = typeof value.kind === "string" ? value.kind : "invalid";
-        throw new Error(`APPWRITE_G3_CONVERSATION_STEP_${kind}`, { cause: error });
+      for (let attempt = 1; attempt <= 3; attempt += 1) {
+        try {
+          return await request(
+            "POST",
+            actor === "workspace"
+              ? `${workspacePath}/conversation/commands`
+              : `${reporterPath}/commands`,
+            actor === "workspace" ? bearer : reporter,
+            actor === "workspace" ? { command: value } : { reference, command: value },
+            expected,
+          );
+        } catch (error: unknown) {
+          const retryable =
+            error instanceof Error &&
+            error.message.includes(
+              `APPWRITE_G3_CONVERSATION_HTTP_${String(expected)}_503_`,
+            );
+          if (retryable && expected < 400 && attempt < 3) continue;
+          const kind = typeof value.kind === "string" ? value.kind : "invalid";
+          throw new Error(`APPWRITE_G3_CONVERSATION_STEP_${kind}`, { cause: error });
+        }
       }
+      throw new Error("APPWRITE_G3_CONVERSATION_RETRY_EXHAUSTED");
     };
 
     const note = {
@@ -378,11 +407,7 @@ async function main(): Promise<void> {
           total: false,
         });
         for (const row of rows.rows) {
-          await tables.deleteRow({
-            databaseId: config.appwriteSchema.databaseId,
-            tableId,
-            rowId: row.$id,
-          });
+          await deleteRowReliably(tableId, row.$id);
         }
       } catch {
         // Cleanup continues so every independently known fixture is attempted.
@@ -390,11 +415,7 @@ async function main(): Promise<void> {
     }
     for (const [tableId, rowId] of createdRows.reverse()) {
       try {
-        await tables.deleteRow({
-          databaseId: config.appwriteSchema.databaseId,
-          tableId,
-          rowId,
-        });
+        await deleteRowReliably(tableId, rowId);
       } catch {
         // A prior cascade or retry may already have removed the row.
       }
