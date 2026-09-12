@@ -386,16 +386,23 @@ async function main(): Promise<void> {
     created.push([tableId, rowId]);
   };
   const invoke = async (_path: string) => {
-    const response = await fetch(new URL(_path, domain), {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${triggerSecret}`,
-        "content-type": "application/json",
-      },
-      body: "{}",
-      signal: AbortSignal.timeout(90_000),
+    const response = await pollVerification({
+      attempt: () =>
+        fetch(new URL(_path, domain), {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${triggerSecret}`,
+            "content-type": "application/json",
+          },
+          body: "{}",
+          signal: AbortSignal.timeout(90_000),
+        }),
+      accept: (candidate) => candidate.status !== 503,
+      maximumAttempts: 4,
+      intervalMs: 1_000,
     });
-    if (response.status !== 200) throw new Error("MESSAGE_SYNC_MAINTENANCE_FAILED");
+    if (!response || response.status !== 200)
+      throw new Error("MESSAGE_SYNC_MAINTENANCE_FAILED");
     return json(response, "MESSAGE_SYNC_MAINTENANCE_FAILED");
   };
   const messageRows = async (feedbackId: string) =>
