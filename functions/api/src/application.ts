@@ -22,6 +22,7 @@ import { createNodeAppwritePrivacyProviderCleanup } from "./appwrite-privacy-pro
 import { createNodeAppwriteAbuseCounterStore } from "./appwrite-abuse-counter-store.js";
 import { createNodeAppwritePrivateAttachmentStorage } from "./appwrite-private-attachment-storage.js";
 import { createNodeAppwritePrincipalVerifier } from "./appwrite-principal-verifier.js";
+import { createPlatformAccessAuditId } from "./platform-access-audit-id.js";
 import {
   createNodeAppwritePlatformAccessExpiryWorker,
   createNodeAppwritePlatformAccessStore,
@@ -362,11 +363,7 @@ export function createHttpApplication(
               sensitive,
               {
                 now: runtime.nowIso,
-                createAuditId: (grantId, sequence) =>
-                  createHash("sha256")
-                    .update(`${grantId}:${String(sequence)}`)
-                    .digest("base64url")
-                    .slice(0, 36),
+                createAuditId: createPlatformAccessAuditId,
                 content: createNodeAppwritePlatformContentReader(
                   runtime.tables,
                   {
@@ -401,11 +398,7 @@ export function createHttpApplication(
         sensitive,
         {
           now: runtime.nowIso,
-          createAuditId: (grantId, sequence) =>
-            createHash("sha256")
-              .update(`${grantId}:${String(sequence)}`)
-              .digest("base64url")
-              .slice(0, 36),
+          createAuditId: createPlatformAccessAuditId,
         },
       )
     : undefined;

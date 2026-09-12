@@ -1,4 +1,4 @@
-import { createHash, createHmac, randomBytes, randomUUID } from "node:crypto";
+import { createHmac, randomBytes, randomUUID } from "node:crypto";
 
 import {
   Account,
@@ -14,6 +14,7 @@ import {
 import { parseServerConfig } from "@y7-feedback/config/server";
 
 import { createNodeAppwritePlatformAccessExpiryWorker } from "./appwrite-platform-access-store.js";
+import { createPlatformAccessAuditId } from "./platform-access-audit-id.js";
 import { createSensitiveDataProtector } from "./sensitive-data-protector.js";
 
 let verificationStage = "BOOT";
@@ -542,11 +543,7 @@ async function main(): Promise<void> {
       { environment: config.environment, protector },
       {
         now: () => new Date().toISOString(),
-        createAuditId: (grantId, sequence) =>
-          createHash("sha256")
-            .update(`${grantId}:${String(sequence)}`)
-            .digest("base64url")
-            .slice(0, 36),
+        createAuditId: createPlatformAccessAuditId,
       },
     ).runOnce();
     verificationStage = "EXPIRY_READ";
