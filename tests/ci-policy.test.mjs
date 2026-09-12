@@ -9,6 +9,7 @@ test("BDD-CI-001 runs the complete pull-request gate with pinned least-privilege
   );
 
   assert.match(workflow, /pull_request:/u);
+  assert.doesNotMatch(workflow, /- "task\/\*\*"/u);
   assert.match(workflow, /permissions:\s+contents: read/u);
   assert.match(workflow, /node-version: 24/u);
   assert.match(workflow, /version: 10\.32\.1/u);
