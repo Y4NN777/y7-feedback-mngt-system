@@ -73,15 +73,18 @@ jobs:
             echo '{"error":"G5_PREVIEW_ANTIVIRUS_AUTHORITY_MISSING"}' >&2
             exit 1
           fi
+          PROVIDER_OUTBOX_TRIGGER_SECRET="$(openssl rand -base64 48 | tr -d '\n')"
           printf '%s\n' "$Y7_PREVIEW_EVIDENCE_ENV" > .env.appwrite-preview
           unset Y7_PREVIEW_EVIDENCE_ENV
-          printf '\nRELEASE=%s\nANTIVIRUS_SCANNER_ENDPOINT=%s\nANTIVIRUS_SCANNER_KEY_ID=%s\nANTIVIRUS_SCANNER_HMAC_KEY=%s\nANTIVIRUS_SCANNER_TIMEOUT_MS=%s\n' \
+          printf '\nRELEASE=%s\nPROVIDER_OUTBOX_TRIGGER_SECRET=%s\nANTIVIRUS_SCANNER_ENDPOINT=%s\nANTIVIRUS_SCANNER_KEY_ID=%s\nANTIVIRUS_SCANNER_HMAC_KEY=%s\nANTIVIRUS_SCANNER_TIMEOUT_MS=%s\n' \
             "$GITHUB_SHA" \
+            "$PROVIDER_OUTBOX_TRIGGER_SECRET" \
             "$ANTIVIRUS_SCANNER_ENDPOINT" \
             "$ANTIVIRUS_SCANNER_KEY_ID" \
             "$ANTIVIRUS_SCANNER_HMAC_KEY" \
             "$ANTIVIRUS_SCANNER_TIMEOUT_MS" \
             >> .env.appwrite-preview
+          unset PROVIDER_OUTBOX_TRIGGER_SECRET
           unset ANTIVIRUS_SCANNER_HMAC_KEY
           pnpm provision:appwrite
           pnpm configure:appwrite:function:preview
