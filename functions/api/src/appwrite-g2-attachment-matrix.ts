@@ -9,6 +9,7 @@ import {
   type AppwriteG1MatrixTables,
 } from "./appwrite-g1-matrix.js";
 import type { PublicApi } from "./public-api.js";
+import { acceptAttachmentEvidence } from "./attachment-evidence-retry.js";
 
 export interface AppwriteG2AttachmentSchema extends AppwriteG1MatrixSchema {
   readonly attachmentBucketId: string;
@@ -149,7 +150,7 @@ export async function runAppwriteG2AttachmentMatrix(
     Omit<AppwriteG2AttachmentResult, "removedObject" | "cleanedRows"> | undefined;
   try {
     const access = await acceptFeedback(api, input.intakeOperationId);
-    const acceptance = await saga.accept({
+    const acceptance = await acceptAttachmentEvidence(saga, {
       operationId: input.attachmentOperationId,
       feedbackId: input.intakeIds.feedbackId,
       workspaceId: "workspace_alpha",
@@ -165,6 +166,7 @@ export async function runAppwriteG2AttachmentMatrix(
       ],
     });
     if (
+      !acceptance ||
       acceptance.status !== "accepted" ||
       acceptance.feedbackId !== input.intakeIds.feedbackId ||
       acceptance.attachmentIds.length !== 1 ||
