@@ -19,6 +19,7 @@ import {
   resolveAppwriteFunctionDeploymentAuthority,
   resolveAppwriteFunctionTarget,
 } from "./appwrite-function-variables.js";
+import { resolveAppwriteFunctionRuntimeSpecification } from "./appwrite-function-capacity.js";
 
 const buildCommands =
   "corepack enable && corepack prepare pnpm@10.32.1 --activate && pnpm install --frozen-lockfile && pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build";
@@ -59,7 +60,7 @@ async function ensureFunction(
       ProjectKeyScopes.UsersRead,
       ProjectKeyScopes.TeamsRead,
     ],
-    runtimeSpecification: "s-1vcpu-1gb",
+    runtimeSpecification: resolveAppwriteFunctionRuntimeSpecification(environment),
     deploymentRetention: 3,
   };
   try {
