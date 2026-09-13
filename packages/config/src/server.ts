@@ -314,20 +314,21 @@ function parseSensitiveDataKeys(
   value: string | undefined,
   activeKeyIdValue: string | undefined,
   prohibitedKeys: readonly string[],
+  errorCode: "SENSITIVE_DATA_KEYS_INVALID" | "ABUSE_HMAC_KEYS_INVALID",
 ): {
   readonly activeKeyId: string;
   readonly keys: Readonly<Record<string, string>>;
 } {
   const activeKeyId = requireValue(activeKeyIdValue);
-  if (!keyId.test(activeKeyId)) throw new ConfigError("SENSITIVE_DATA_KEYS_INVALID");
+  if (!keyId.test(activeKeyId)) throw new ConfigError(errorCode);
   let parsed: unknown;
   try {
     parsed = JSON.parse(requireValue(value)) as unknown;
   } catch {
-    throw new ConfigError("SENSITIVE_DATA_KEYS_INVALID");
+    throw new ConfigError(errorCode);
   }
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    throw new ConfigError("SENSITIVE_DATA_KEYS_INVALID");
+    throw new ConfigError(errorCode);
   }
   const entries = Object.entries(parsed as Readonly<Record<string, unknown>>);
   const materials = new Set<string>();
@@ -348,7 +349,7 @@ function parseSensitiveDataKeys(
     }) ||
     !Object.hasOwn(parsed, activeKeyId)
   ) {
-    throw new ConfigError("SENSITIVE_DATA_KEYS_INVALID");
+    throw new ConfigError(errorCode);
   }
   return {
     activeKeyId,
@@ -482,6 +483,7 @@ export function parseServerConfig(
     input.SENSITIVE_DATA_ENVELOPE_KEYS,
     input.SENSITIVE_DATA_ACTIVE_KEY_ID,
     [accessProofEnvelopeKey, providerGrantEnvelopeKey],
+    "SENSITIVE_DATA_KEYS_INVALID",
   );
   const abuseHmacKeys = parseSensitiveDataKeys(
     input.ABUSE_HMAC_KEYS,
@@ -491,6 +493,7 @@ export function parseServerConfig(
       providerGrantEnvelopeKey,
       ...Object.values(sensitiveDataKeys.keys),
     ],
+    "ABUSE_HMAC_KEYS_INVALID",
   );
   const providers = parseProviders(input);
   const notificationEmail = parseNotificationEmail(input);
