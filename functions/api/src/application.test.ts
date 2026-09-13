@@ -23,6 +23,7 @@ const config: ServerConfig = {
   appwriteProjectId: "feedback-preview",
   appwriteApiKey: "server-only-key",
   webOrigin: "https://y7-feedback.vercel.app",
+  intakePersistenceMode: "normalized",
   appwriteSchema: {
     ...canonicalDay4SchemaIds,
     authoritativeCommitsTableId: "authoritative_commits",
@@ -110,8 +111,19 @@ class FakeTables {
   }
 
   createRow(input: Readonly<Record<string, unknown>>) {
+    if (
+      input.tableId === "authoritative_commits" &&
+      this.rows.some(
+        (row) => row.tableId === "authoritative_commits" && row.rowId === input.rowId,
+      )
+    ) {
+      return Promise.reject({ code: 409 });
+    }
     this.rows.push(input);
-    return Promise.resolve({ $id: input.rowId });
+    return Promise.resolve({
+      $id: input.rowId,
+      ...(isObject(input.data) ? input.data : {}),
+    });
   }
 
   createOperations(input: {
@@ -136,6 +148,14 @@ class FakeTables {
   }
 
   getRow(input: { readonly tableId: string; readonly rowId: string }) {
+    if (input.tableId === "authoritative_commits") {
+      const stored = this.rows.find(
+        (row) => row.tableId === input.tableId && row.rowId === input.rowId,
+      );
+      if (stored && isObject(stored.data)) {
+        return Promise.resolve({ $id: input.rowId, ...stored.data });
+      }
+    }
     if (input.tableId === "projects" && input.rowId === "project-conversation") {
       return Promise.resolve({
         $id: input.rowId,
@@ -193,6 +213,29 @@ class FakeTables {
 }
 
 describe("trusted Function composition root", () => {
+  it("BDD-SLO-486 composes authoritative persistence for Production", () => {
+    expect(() =>
+      createHttpApplication(
+        {
+          ...config,
+          environment: "production",
+          backendEnvironment: "production",
+          intakePersistenceMode: "authoritative",
+        },
+        {
+          tables: new FakeTables() as unknown as import("node-appwrite").TablesDB,
+          storage: {} as import("node-appwrite").Storage,
+          createId: () => "generated-id",
+          createReference: () => "Y7-2026-000001",
+          createCorrelationId: () => "correlation-1",
+          nowIso: () => "2026-08-10T14:00:00.000Z",
+          nowMs: () => 104,
+          startedAt: () => 100,
+        },
+      ),
+    ).not.toThrow();
+  });
+
   it("derives a stable non-reversible Reporter actor identifier", () => {
     const actorId = deriveReporterActorId("Y7-2026-SECRET-REFERENCE");
     expect(actorId).toMatch(/^reporter_[a-f0-9]{27}$/u);
@@ -290,6 +333,77 @@ describe("trusted Function composition root", () => {
     expect(persisted).not.toContain(proof);
     expect(persisted).not.toContain("Le solde est incorrect.");
     expect(persisted).toContain("v1.");
+  });
+
+  it("BDD-SLO-485 accepts intake through exactly one authoritative Appwrite write", async () => {
+    const tables = new FakeTables();
+    let sequence = 0;
+    const dependencies = createHttpApplication(
+      { ...config, intakePersistenceMode: "authoritative" },
+      {
+        tables: tables as unknown as import("node-appwrite").TablesDB,
+        storage: {} as import("node-appwrite").Storage,
+        createId: () => `generated-${String(++sequence)}`,
+        createReference: () => "Y7-2026-000001",
+        createCorrelationId: () => "correlation-1",
+        nowIso: () => "2026-08-10T14:00:00.000Z",
+        nowMs: () => 104,
+        startedAt: () => 100,
+      },
+    );
+    const json = vi.fn();
+    const context = {
+      req: {
+        method: "POST",
+        path: "/v1/projects/wisemoney/feedback",
+        headers: {
+          "content-type": "application/json",
+          "x-appwrite-client-ip": "203.0.113.10",
+        },
+        bodyJson: {
+          clientOperationId: "123e4567-e89b-42d3-a456-426614174000",
+          locale: "fr",
+          feedback: {
+            type: "bug",
+            source: { type: "bug", problem: "Le solde est incorrect." },
+            reporter: { kind: "unidentified" },
+            context: [],
+            attachmentNames: [],
+          },
+        },
+      },
+      res: { json },
+      log: vi.fn(),
+      error: vi.fn(),
+    } satisfies FunctionContext;
+    await routeRequest(context, dependencies);
+    expect(json).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "accepted", replayed: false }),
+      201,
+      expect.any(Object),
+    );
+    const authoritativeRows = tables.rows.filter(
+      (row) => row.tableId === "authoritative_commits",
+    );
+    expect(authoritativeRows).toHaveLength(1);
+    expect(authoritativeRows[0]).toMatchObject({
+      tableId: "authoritative_commits",
+      permissions: [],
+      data: expect.objectContaining({
+        commandKind: "feedback.accepted",
+        projectionState: "pending",
+      }),
+    });
+    json.mockClear();
+    await routeRequest(context, dependencies);
+    expect(json).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "accepted", replayed: true }),
+      200,
+      expect.any(Object),
+    );
+    expect(
+      tables.rows.filter((row) => row.tableId === "authoritative_commits"),
+    ).toHaveLength(1);
   });
 
   it("BDD-ADMIN-001 composes the trusted Owner route and atomic Appwrite store", async () => {

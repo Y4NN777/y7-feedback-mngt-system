@@ -11,6 +11,9 @@ import { createAttachmentStagingTokenCodec } from "./attachment-staging-token.js
 import { validateAttachment } from "./attachment-validation.js";
 import { createClamAvHttpScanner } from "./clamav-http-scanner.js";
 import { createNodeAppwriteIntakeStore } from "./appwrite-intake-store.js";
+import { createAppwriteAuthoritativeCommitStore } from "./appwrite-authoritative-commit-store.js";
+import { createAuthoritativeIntakeEnvelope } from "./authoritative-intake-envelope.js";
+import { createAuthoritativeIntakeStore } from "./authoritative-intake-store.js";
 import { createNodeAppwriteOutboxStore } from "./appwrite-outbox-store.js";
 import { createNodeAppwriteNotificationRecipientResolver } from "./appwrite-notification-recipient-resolver.js";
 import { createNodeAppwriteIntelligenceStore } from "./appwrite-intelligence-store.js";
@@ -195,11 +198,32 @@ export function createHttpApplication(
       })),
     ),
   };
-  const intakeStore = createNodeAppwriteIntakeStore(
+  const normalizedIntakeStore = createNodeAppwriteIntakeStore(
     runtime.tables,
     config.appwriteSchema,
     sensitive,
   );
+  const intakeStore =
+    config.intakePersistenceMode === "authoritative"
+      ? createAuthoritativeIntakeStore(
+          config.environment === "preview" ? "preview" : "production",
+          createAppwriteAuthoritativeCommitStore(
+            {
+              createRow: (input) =>
+                runtime.tables.createRow({
+                  ...input,
+                  permissions: [...input.permissions],
+                }),
+              getRow: (input) => runtime.tables.getRow(input),
+            },
+            config.appwriteSchema,
+          ),
+          createAuthoritativeIntakeEnvelope(
+            sensitive,
+            config.appwriteSchema.authoritativeCommitsTableId,
+          ),
+        )
+      : normalizedIntakeStore;
   const intake = createIntakeCoordinator(intakeStore, {
     createFeedbackId: runtime.createId,
     createReporterId: runtime.createId,

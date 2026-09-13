@@ -149,6 +149,7 @@ describe("trusted environment contract", () => {
       appwriteProjectId: "feedback-preview",
       appwriteApiKey: "server-only-key",
       webOrigin: "https://y7-feedback.vercel.app",
+      intakePersistenceMode: "normalized",
       appwriteSchema: {
         databaseId: "feedback",
         workspacesTableId: "workspaces",
@@ -202,6 +203,28 @@ describe("trusted environment contract", () => {
       },
       release: "commit-123",
     });
+  });
+
+  it("BDD-SLO-484 parses the server-only authoritative intake mode", () => {
+    expect(
+      parseServerConfig({
+        ...validServer,
+        INTAKE_PERSISTENCE_MODE: "authoritative",
+      }).intakePersistenceMode,
+    ).toBe("authoritative");
+    expect(() =>
+      parseServerConfig({ ...validServer, INTAKE_PERSISTENCE_MODE: "unsafe" }),
+    ).toThrow(new ConfigError("INTAKE_PERSISTENCE_MODE_INVALID"));
+    expect(() =>
+      parseServerConfig({
+        ...validServer,
+        Y7_ENVIRONMENT: "development",
+        APPWRITE_ENVIRONMENT: "development",
+        APPWRITE_ENDPOINT: "http://localhost/v1",
+        Y7_WEB_ORIGIN: "http://localhost:5173",
+        INTAKE_PERSISTENCE_MODE: "authoritative",
+      }),
+    ).toThrow(new ConfigError("INTAKE_PERSISTENCE_MODE_INVALID"));
   });
 
   it("BDD-ENV-003 rejects missing server authority", () => {

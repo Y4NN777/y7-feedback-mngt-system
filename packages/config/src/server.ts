@@ -14,6 +14,7 @@ export interface ServerConfig {
   readonly appwriteProjectId: string;
   readonly appwriteApiKey: string;
   readonly webOrigin: string;
+  readonly intakePersistenceMode: "normalized" | "authoritative";
   readonly antivirusScanner?: {
     readonly endpoint: string;
     readonly keyId: string;
@@ -498,6 +499,16 @@ export function parseServerConfig(
   );
   const platformAccess = parsePlatformAccess(input);
   const antivirusScanner = parseAntivirusScanner(input, environment);
+  const intakePersistenceMode = input.INTAKE_PERSISTENCE_MODE ?? "normalized";
+  if (
+    intakePersistenceMode !== "normalized" &&
+    intakePersistenceMode !== "authoritative"
+  ) {
+    throw new ConfigError("INTAKE_PERSISTENCE_MODE_INVALID");
+  }
+  if (intakePersistenceMode === "authoritative" && environment === "development") {
+    throw new ConfigError("INTAKE_PERSISTENCE_MODE_INVALID");
+  }
   return {
     environment,
     backendEnvironment,
@@ -505,6 +516,7 @@ export function parseServerConfig(
     appwriteProjectId: requireValue(input.APPWRITE_PROJECT_ID),
     appwriteApiKey: requireValue(input.APPWRITE_API_KEY),
     webOrigin: parseWebOrigin(input.Y7_WEB_ORIGIN, environment),
+    intakePersistenceMode,
     ...(antivirusScanner === undefined ? {} : { antivirusScanner }),
     ...(providerOutboxTriggerSecret === undefined
       ? {}
