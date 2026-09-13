@@ -140,7 +140,7 @@ jobs:
                     process.stdin.on("data", (chunk) => { body += chunk; });
                     process.stdin.on("end", () => {
                       const match = body.match(
-                        /<meta name="y7-release" content="([^"]+)" \/>/u,
+                        /<meta name="y7-release" content="([^"]+)"\s*\/?>/u,
                       );
                       process.stdout.write(match?.[1] ?? "");
                     });

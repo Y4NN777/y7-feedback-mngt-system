@@ -22,10 +22,14 @@ export function assertProductionWebRelease(
   html: string,
   candidateRelease: string,
 ): true {
-  if (
-    !commitSha.test(candidateRelease) ||
-    !html.includes(`<meta name="y7-release" content="${candidateRelease}" />`)
-  ) {
+  if (!commitSha.test(candidateRelease)) {
+    throw new Error("PRODUCTION_WEB_RELEASE_MISMATCH");
+  }
+  const releaseMarker = new RegExp(
+    `<meta name="y7-release" content="${candidateRelease}"\\s*/?>`,
+    "u",
+  );
+  if (!releaseMarker.test(html)) {
     throw new Error("PRODUCTION_WEB_RELEASE_MISMATCH");
   }
   return true;
