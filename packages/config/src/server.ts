@@ -314,42 +314,50 @@ function parseSensitiveDataKeys(
   value: string | undefined,
   activeKeyIdValue: string | undefined,
   prohibitedKeys: readonly string[],
-  errorCode: "SENSITIVE_DATA_KEYS_INVALID" | "ABUSE_HMAC_KEYS_INVALID",
+  errorCodes:
+    | Readonly<{
+        invalid: "SENSITIVE_DATA_KEYS_INVALID";
+        malformed: "SENSITIVE_DATA_KEYS_INVALID";
+        activeKeyMissing: "SENSITIVE_DATA_KEYS_INVALID";
+        materialInvalid: "SENSITIVE_DATA_KEYS_INVALID";
+        materialCollision: "SENSITIVE_DATA_KEYS_INVALID";
+      }>
+    | Readonly<{
+        invalid: "ABUSE_HMAC_KEYS_INVALID";
+        malformed: "ABUSE_HMAC_KEYS_JSON_INVALID";
+        activeKeyMissing: "ABUSE_HMAC_ACTIVE_KEY_MISSING";
+        materialInvalid: "ABUSE_HMAC_MATERIAL_INVALID";
+        materialCollision: "ABUSE_HMAC_MATERIAL_COLLISION";
+      }>,
 ): {
   readonly activeKeyId: string;
   readonly keys: Readonly<Record<string, string>>;
 } {
   const activeKeyId = requireValue(activeKeyIdValue);
-  if (!keyId.test(activeKeyId)) throw new ConfigError(errorCode);
+  if (!keyId.test(activeKeyId)) throw new ConfigError(errorCodes.invalid);
   let parsed: unknown;
   try {
     parsed = JSON.parse(requireValue(value)) as unknown;
   } catch {
-    throw new ConfigError(errorCode);
+    throw new ConfigError(errorCodes.malformed);
   }
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    throw new ConfigError(errorCode);
+    throw new ConfigError(errorCodes.malformed);
   }
   const entries = Object.entries(parsed as Readonly<Record<string, unknown>>);
+  if (entries.length === 0) throw new ConfigError(errorCodes.malformed);
+  if (!Object.hasOwn(parsed, activeKeyId)) {
+    throw new ConfigError(errorCodes.activeKeyMissing);
+  }
   const materials = new Set<string>();
-  if (
-    entries.length === 0 ||
-    entries.some(([id, material]) => {
-      if (
-        !keyId.test(id) ||
-        typeof material !== "string" ||
-        !proofKey.test(material) ||
-        materials.has(material) ||
-        prohibitedKeys.includes(material)
-      ) {
-        return true;
-      }
-      materials.add(material);
-      return false;
-    }) ||
-    !Object.hasOwn(parsed, activeKeyId)
-  ) {
-    throw new ConfigError(errorCode);
+  for (const [id, material] of entries) {
+    if (!keyId.test(id) || typeof material !== "string" || !proofKey.test(material)) {
+      throw new ConfigError(errorCodes.materialInvalid);
+    }
+    if (materials.has(material) || prohibitedKeys.includes(material)) {
+      throw new ConfigError(errorCodes.materialCollision);
+    }
+    materials.add(material);
   }
   return {
     activeKeyId,
@@ -483,7 +491,13 @@ export function parseServerConfig(
     input.SENSITIVE_DATA_ENVELOPE_KEYS,
     input.SENSITIVE_DATA_ACTIVE_KEY_ID,
     [accessProofEnvelopeKey, providerGrantEnvelopeKey],
-    "SENSITIVE_DATA_KEYS_INVALID",
+    {
+      invalid: "SENSITIVE_DATA_KEYS_INVALID",
+      malformed: "SENSITIVE_DATA_KEYS_INVALID",
+      activeKeyMissing: "SENSITIVE_DATA_KEYS_INVALID",
+      materialInvalid: "SENSITIVE_DATA_KEYS_INVALID",
+      materialCollision: "SENSITIVE_DATA_KEYS_INVALID",
+    },
   );
   const abuseHmacKeys = parseSensitiveDataKeys(
     input.ABUSE_HMAC_KEYS,
@@ -493,7 +507,13 @@ export function parseServerConfig(
       providerGrantEnvelopeKey,
       ...Object.values(sensitiveDataKeys.keys),
     ],
-    "ABUSE_HMAC_KEYS_INVALID",
+    {
+      invalid: "ABUSE_HMAC_KEYS_INVALID",
+      malformed: "ABUSE_HMAC_KEYS_JSON_INVALID",
+      activeKeyMissing: "ABUSE_HMAC_ACTIVE_KEY_MISSING",
+      materialInvalid: "ABUSE_HMAC_MATERIAL_INVALID",
+      materialCollision: "ABUSE_HMAC_MATERIAL_COLLISION",
+    },
   );
   const providers = parseProviders(input);
   const notificationEmail = parseNotificationEmail(input);
