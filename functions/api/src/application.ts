@@ -12,8 +12,11 @@ import { validateAttachment } from "./attachment-validation.js";
 import { createClamAvHttpScanner } from "./clamav-http-scanner.js";
 import { createNodeAppwriteIntakeStore } from "./appwrite-intake-store.js";
 import { createAppwriteAuthoritativeCommitStore } from "./appwrite-authoritative-commit-store.js";
+import { createNodeAppwriteAuthoritativeProjectionStore } from "./appwrite-authoritative-projection-store.js";
 import { createAuthoritativeIntakeEnvelope } from "./authoritative-intake-envelope.js";
+import { createAuthoritativeIntakeProjectionHandler } from "./authoritative-intake-projector.js";
 import { createAuthoritativeIntakeStore } from "./authoritative-intake-store.js";
+import { createAuthoritativeProjector } from "./authoritative-projector.js";
 import { createNodeAppwriteOutboxStore } from "./appwrite-outbox-store.js";
 import { createNodeAppwriteNotificationRecipientResolver } from "./appwrite-notification-recipient-resolver.js";
 import { createNodeAppwriteIntelligenceStore } from "./appwrite-intelligence-store.js";
@@ -203,25 +206,27 @@ export function createHttpApplication(
     config.appwriteSchema,
     sensitive,
   );
+  const authoritativeEnvelope = createAuthoritativeIntakeEnvelope(
+    sensitive,
+    config.appwriteSchema.authoritativeCommitsTableId,
+  );
+  const authoritativeCommitStore = createAppwriteAuthoritativeCommitStore(
+    {
+      createRow: (input) =>
+        runtime.tables.createRow({
+          ...input,
+          permissions: [...input.permissions],
+        }),
+      getRow: (input) => runtime.tables.getRow(input),
+    },
+    config.appwriteSchema,
+  );
   const intakeStore =
     config.intakePersistenceMode === "authoritative"
       ? createAuthoritativeIntakeStore(
           config.environment === "preview" ? "preview" : "production",
-          createAppwriteAuthoritativeCommitStore(
-            {
-              createRow: (input) =>
-                runtime.tables.createRow({
-                  ...input,
-                  permissions: [...input.permissions],
-                }),
-              getRow: (input) => runtime.tables.getRow(input),
-            },
-            config.appwriteSchema,
-          ),
-          createAuthoritativeIntakeEnvelope(
-            sensitive,
-            config.appwriteSchema.authoritativeCommitsTableId,
-          ),
+          authoritativeCommitStore,
+          authoritativeEnvelope,
         )
       : normalizedIntakeStore;
   const intake = createIntakeCoordinator(intakeStore, {
@@ -1077,6 +1082,29 @@ export function createHttpApplication(
         })
       : undefined;
   const providerMaintenance = (() => {
+    const authoritativeProjector = createAuthoritativeProjector(
+      createNodeAppwriteAuthoritativeProjectionStore(
+        runtime.tables,
+        config.appwriteSchema,
+      ),
+      createAuthoritativeIntakeProjectionHandler(
+        authoritativeEnvelope,
+        normalizedIntakeStore,
+      ),
+      {
+        now: runtime.nowIso,
+        leaseUntil: (now) => new Date(Date.parse(now) + 5 * 60_000).toISOString(),
+        retryAt: (now, attempt) =>
+          new Date(
+            Date.parse(now) + Math.min(2 ** attempt * 1_000, 15 * 60_000),
+          ).toISOString(),
+        errorCode: () => "INTAKE_PROJECTION_RETRYABLE",
+      },
+    );
+    const authoritativeProjections = {
+      runOnce: () =>
+        authoritativeProjector.runOnce(`${config.environment}-intake-projector`),
+    };
     if (
       config.providers &&
       providerIssueOutboxWorker &&
@@ -1142,6 +1170,7 @@ export function createHttpApplication(
         createGitLabMessageProvider(config.providers.gitlab.origin, vault),
       ];
       return createProviderMaintenance({
+        authoritativeProjections,
         inbox: providerEventInboxWorker,
         outbox: providerIssueOutboxWorker,
         messages: providerMessageOutboxWorker,
@@ -1191,6 +1220,7 @@ export function createHttpApplication(
       });
     }
     return createProviderMaintenance({
+      authoritativeProjections,
       privacy: privacyPurgeWorker,
       ...(notificationOutboxWorker === undefined
         ? {}

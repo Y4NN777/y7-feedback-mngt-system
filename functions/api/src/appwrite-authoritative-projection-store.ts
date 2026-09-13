@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 
+import { Query, type TablesDB } from "node-appwrite";
+
 import { planAuthoritativeCommit } from "@y7-feedback/domain";
 import type { AuthoritativeCommit } from "@y7-feedback/domain";
 
@@ -301,3 +303,29 @@ export function createAppwriteAuthoritativeProjectionStore(
     },
   };
 }
+
+/* v8 ignore start -- Thin Node SDK and Query composition wrapper. */
+export function createNodeAppwriteAuthoritativeProjectionStore(
+  tables: TablesDB,
+  schema: AppwriteAuthoritativeProjectionSchema,
+): AuthoritativeProjectionStore {
+  return createAppwriteAuthoritativeProjectionStore(
+    {
+      createTransaction: (input) => tables.createTransaction(input),
+      updateTransaction: (input) => tables.updateTransaction(input),
+      listRows: async (input) => {
+        const result = await tables.listRows({ ...input, queries: [...input.queries] });
+        return { rows: result.rows };
+      },
+      getRow: (input) => tables.getRow(input),
+      updateRow: (input) => tables.updateRow(input),
+    },
+    schema,
+    {
+      equal: (attribute, values) => Query.equal(attribute, [...values]),
+      orderAsc: (attribute) => Query.orderAsc(attribute),
+      limit: (value) => Query.limit(value),
+    },
+  );
+}
+/* v8 ignore stop */
