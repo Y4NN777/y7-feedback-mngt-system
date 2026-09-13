@@ -294,31 +294,42 @@ export function createAppwriteConversationProjectionStore(
         queries.orderAsc("occurredAt"),
         queries.limit(500),
       ];
-      const messageRows = await tables.listRows({
-        databaseId: schema.databaseId,
-        tableId: schema.messagesTableId,
-        queries: includeNotes
-          ? commonQueries
-          : [
-              queries.equal("feedbackId", [input.feedbackId]),
-              queries.equal("audience", ["reporter"]),
-              queries.orderAsc("occurredAt"),
-              queries.limit(500),
-            ],
-        total: false,
-        ttl: 0,
-      });
-      const lifecycleRows = await tables.listRows({
-        databaseId: schema.databaseId,
-        tableId: schema.lifecycleTableId,
-        queries: [
-          queries.equal("feedbackId", [input.feedbackId]),
-          queries.orderAsc("sequence"),
-          queries.limit(500),
-        ],
-        total: false,
-        ttl: 0,
-      });
+      const [messageRows, lifecycleRows, noteRows] = await Promise.all([
+        tables.listRows({
+          databaseId: schema.databaseId,
+          tableId: schema.messagesTableId,
+          queries: includeNotes
+            ? commonQueries
+            : [
+                queries.equal("feedbackId", [input.feedbackId]),
+                queries.equal("audience", ["reporter"]),
+                queries.orderAsc("occurredAt"),
+                queries.limit(500),
+              ],
+          total: false,
+          ttl: 0,
+        }),
+        tables.listRows({
+          databaseId: schema.databaseId,
+          tableId: schema.lifecycleTableId,
+          queries: [
+            queries.equal("feedbackId", [input.feedbackId]),
+            queries.orderAsc("sequence"),
+            queries.limit(500),
+          ],
+          total: false,
+          ttl: 0,
+        }),
+        includeNotes
+          ? tables.listRows({
+              databaseId: schema.databaseId,
+              tableId: schema.internalNotesTableId,
+              queries: commonQueries,
+              total: false,
+              ttl: 0,
+            })
+          : Promise.resolve({ rows: [] }),
+      ]);
       const messages = messageRows.rows.map((row) =>
         parseConversationProjectionMessage(
           row,
@@ -340,13 +351,6 @@ export function createAppwriteConversationProjectionStore(
         lifecycle: history,
       };
       if (!includeNotes) return base;
-      const noteRows = await tables.listRows({
-        databaseId: schema.databaseId,
-        tableId: schema.internalNotesTableId,
-        queries: commonQueries,
-        total: false,
-        ttl: 0,
-      });
       return {
         ...base,
         internalNotes: noteRows.rows.map((row) =>

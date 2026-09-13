@@ -150,6 +150,50 @@ describe("Appwrite Conversation projections", () => {
     });
   });
 
+  it("BDD-SLO-005 starts independent projection reads together only after scope validation", async () => {
+    let releaseFeedback: ((value: unknown) => void) | undefined;
+    const feedbackPending = new Promise<unknown>((resolve) => {
+      releaseFeedback = resolve;
+    });
+    const started = new Set<string>();
+    const tables: AppwriteConversationProjectionTablesPort = {
+      getRow: vi.fn(() => feedbackPending),
+      listRows: vi.fn<AppwriteConversationProjectionTablesPort["listRows"]>((input) => {
+        started.add(input.tableId);
+        const rows =
+          input.tableId === schema.messagesTableId
+            ? [message]
+            : input.tableId === schema.internalNotesTableId
+              ? [note]
+              : [fact];
+        return Promise.resolve({ rows });
+      }),
+    };
+
+    const result = createAppwriteConversationProjectionStore(
+      tables,
+      schema,
+      queries,
+      persistence,
+    ).readWorkspace({
+      feedbackId: "feedback_1",
+      workspaceId: "workspace_1",
+      projectId: "project_1",
+    });
+
+    await Promise.resolve();
+    expect(started).toEqual(new Set());
+    releaseFeedback?.(feedback);
+    await expect(result).resolves.toMatchObject({ feedbackId: "feedback_1" });
+    expect(started).toEqual(
+      new Set([
+        schema.messagesTableId,
+        schema.lifecycleTableId,
+        schema.internalNotesTableId,
+      ]),
+    );
+  });
+
   it("BDD-CONV-PROJ-002 never queries or exposes Internal Notes to Reporter", async () => {
     const tables = new FakeTables();
     const projection = await store(tables).readReporter({ feedbackId: "feedback_1" });
