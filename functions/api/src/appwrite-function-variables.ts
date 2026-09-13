@@ -165,6 +165,10 @@ const optionalFunctionVariableKeys = new Set<
   "Y7_EMAIL_FROM",
 ]);
 
+export const requiredAppwriteFunctionVariableKeys = appwriteFunctionVariableKeys.filter(
+  (key) => !optionalFunctionVariableKeys.has(key),
+);
+
 export interface ExistingFunctionVariable {
   readonly id: string;
   readonly key: string;

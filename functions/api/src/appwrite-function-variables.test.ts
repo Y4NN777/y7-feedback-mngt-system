@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   appwriteFunctionVariableKeys,
+  requiredAppwriteFunctionVariableKeys,
   planAppwriteFunctionVariables,
   resolveAuthoritativeCommitEvent,
   resolveAppwriteFunctionDeploymentAuthority,
@@ -197,6 +198,17 @@ describe("Appwrite Function variable policy", () => {
     expect(appwriteFunctionVariableKeys).not.toContain("Y7_GITLAB_VERIFICATION_TOKEN");
     expect(appwriteFunctionVariableKeys).not.toContain(
       "Y7_PRODUCTION_EMAIL_VERIFICATION_RECIPIENT",
+    );
+  });
+
+  it("BDD-REL-432 exposes one required-variable contract to configuration and release verification", () => {
+    expect(requiredAppwriteFunctionVariableKeys).toContain("APPWRITE_DATABASE_ID");
+    expect(requiredAppwriteFunctionVariableKeys).toContain("RELEASE");
+    expect(requiredAppwriteFunctionVariableKeys).not.toContain(
+      "APPWRITE_PLATFORM_OPERATOR_TEAM_ID",
+    );
+    expect(requiredAppwriteFunctionVariableKeys).not.toContain(
+      "INTAKE_PERSISTENCE_MODE",
     );
   });
 });
