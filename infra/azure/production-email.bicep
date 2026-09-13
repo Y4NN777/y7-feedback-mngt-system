@@ -16,7 +16,7 @@ param smtpUsername string = 'y7-feedback-production'
 @description('Azure geography where email data is stored at rest.')
 param dataLocation string = 'Europe'
 
-resource emailService 'Microsoft.Communication/emailServices@2025-05-01' = {
+resource emailService 'Microsoft.Communication/emailServices@2025-09-01' = {
   name: emailServiceName
   location: 'global'
   properties: {
@@ -24,7 +24,7 @@ resource emailService 'Microsoft.Communication/emailServices@2025-05-01' = {
   }
 }
 
-resource managedDomain 'Microsoft.Communication/emailServices/domains@2025-05-01' = {
+resource managedDomain 'Microsoft.Communication/emailServices/domains@2025-09-01' = {
   parent: emailService
   name: 'AzureManagedDomain'
   location: 'global'
@@ -34,7 +34,7 @@ resource managedDomain 'Microsoft.Communication/emailServices/domains@2025-05-01
   }
 }
 
-resource communicationService 'Microsoft.Communication/communicationServices@2025-05-01' = {
+resource communicationService 'Microsoft.Communication/communicationServices@2025-09-01' = {
   name: communicationServiceName
   location: 'global'
   properties: {

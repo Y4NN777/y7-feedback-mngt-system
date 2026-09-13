@@ -188,7 +188,7 @@ test("BDD-REL-304 provisions Production SMTP through protected OIDC authority", 
   assert.doesNotMatch(workflow, /AZURE_(?:CLIENT_)?SECRET/u);
   assert.doesNotMatch(workflow, /smtp.*password/iu);
 
-  assert.match(template, /emailServices@2025-05-01/u);
+  assert.match(template, /emailServices@2025-09-01/u);
   assert.match(template, /domainManagement: 'AzureManaged'/u);
   assert.match(template, /userEngagementTracking: 'Disabled'/u);
   assert.match(template, /linkedDomains: \[managedDomain\.id\]/u);
