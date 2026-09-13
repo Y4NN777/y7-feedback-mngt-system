@@ -7,7 +7,7 @@ import type { AppwriteSensitivePersistence } from "./sensitive-data-protector.js
 
 const required = z.string().min(1).max(10_000);
 const timestamp = z.iso.datetime({ offset: false, precision: 3 });
-const contextValue = z.union([z.string(), z.number().finite(), z.boolean()]);
+const contextValue = z.union([z.string(), z.number(), z.boolean()]);
 
 const attribution = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("unidentified") }).strict(),

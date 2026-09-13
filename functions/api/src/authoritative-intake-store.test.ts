@@ -22,7 +22,9 @@ const acceptance = {
 function setup(status: "applied" | "replayed" = "applied") {
   const seal = vi.fn(() => "sealed_payload");
   const open = vi.fn(() => acceptance);
-  const accept = vi.fn(async (commit: AuthoritativeCommit) => ({ status, commit }));
+  const accept = vi.fn((commit: AuthoritativeCommit) =>
+    Promise.resolve({ status, commit }),
+  );
   const store = createAuthoritativeIntakeStore("preview", { accept }, { seal, open });
   return { store, seal, open, accept };
 }
@@ -70,10 +72,12 @@ describe("ADR-015 authoritative intake acceptance", () => {
 
   it("BDD-SLO-473 fails closed when persistence returns another identity", async () => {
     const target = setup();
-    target.accept.mockImplementationOnce(async (commit) => ({
-      status: "applied",
-      commit: { ...commit, id: "commit_other" },
-    }));
+    target.accept.mockImplementationOnce((commit) =>
+      Promise.resolve({
+        status: "applied",
+        commit: { ...commit, id: "commit_other" },
+      }),
+    );
     await expect(target.store.acceptAuthoritatively(acceptance)).rejects.toThrow(
       "AUTHORITATIVE_INTAKE_COMMIT_INVALID",
     );

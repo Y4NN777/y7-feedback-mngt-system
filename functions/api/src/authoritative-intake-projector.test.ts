@@ -67,7 +67,7 @@ describe("ADR-015 authoritative intake projection", () => {
   it.each(Object.keys(record) as (keyof IdempotencyRecord)[])(
     "BDD-SLO-463 fails closed when projected %s differs",
     async (field) => {
-      const target = setup({ ...record, [field]: `${String(record[field])}_other` });
+      const target = setup({ ...record, [field]: `${record[field]}_other` });
       await expect(target.handler.project(commit)).rejects.toThrow(
         "AUTHORITATIVE_INTAKE_PROJECTION_CONFLICT",
       );

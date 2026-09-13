@@ -60,7 +60,7 @@ function setup(rows: readonly unknown[] = [row()]) {
     (field: string, values: readonly string[]) => `equal:${field}:${values.join(",")}`,
   );
   const orderAsc = vi.fn((field: string) => `asc:${field}`);
-  const limit = vi.fn((value: number) => `limit:${value}`);
+  const limit = vi.fn((value: number) => `limit:${String(value)}`);
   const store = createAppwriteAuthoritativeProjectionStore(
     { createTransaction, updateTransaction, listRows, getRow, updateRow },
     { databaseId: "feedback", authoritativeCommitsTableId: "authoritative_commits" },
@@ -187,14 +187,9 @@ describe("ADR-015 Appwrite authoritative projection leases", () => {
       availableAt: "2026-09-13T02:02:00.000Z",
       errorCode: "PROJECTION_RETRYABLE",
     });
-    expect(target.updateRow).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          projectionState: "failed",
-          lastErrorCode: "PROJECTION_RETRYABLE",
-        }),
-      }),
-    );
+    const lastWrite = target.updateRow.mock.calls.at(-1)?.[0];
+    expect(lastWrite?.data.projectionState).toBe("failed");
+    expect(lastWrite?.data.lastErrorCode).toBe("PROJECTION_RETRYABLE");
   });
 
   it.each([
