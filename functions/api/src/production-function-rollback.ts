@@ -3,9 +3,11 @@ import { fileURLToPath } from "node:url";
 
 import { Client, Functions, Query } from "node-appwrite";
 
-import { parseServerConfig } from "@y7-feedback/config/server";
-
-import { productionFunctionId } from "./appwrite-function-variables.js";
+import {
+  productionFunctionId,
+  resolveAppwriteFunctionDeploymentAuthority,
+  type AppwriteFunctionDeploymentAuthority,
+} from "./appwrite-function-variables.js";
 
 const deploymentId = /^[A-Za-z0-9][A-Za-z0-9._-]{0,35}$/u;
 
@@ -27,6 +29,16 @@ export interface ProductionFunctionDeploymentsPort {
     readonly functionId: string;
     readonly deploymentId: string;
   }) => Promise<unknown>;
+}
+
+export function resolveProductionRollbackAuthority(
+  input: Readonly<Record<string, string | undefined>>,
+): AppwriteFunctionDeploymentAuthority {
+  const authority = resolveAppwriteFunctionDeploymentAuthority(input);
+  if (authority.environment !== "production") {
+    throw new Error("PRODUCTION_FUNCTION_ROLLBACK_ENVIRONMENT_INVALID");
+  }
+  return authority;
 }
 
 export async function captureProductionFunctionDeployment(
@@ -78,15 +90,12 @@ export async function restoreProductionFunctionDeployment(
 
 /* v8 ignore start -- composition and CLI execution require live Production authority. */
 function productionFunctions(): ProductionFunctionDeploymentsPort {
-  const config = parseServerConfig(process.env);
-  if (config.environment !== "production") {
-    throw new Error("PRODUCTION_FUNCTION_ROLLBACK_ENVIRONMENT_INVALID");
-  }
+  const authority = resolveProductionRollbackAuthority(process.env);
   return new Functions(
     new Client()
-      .setEndpoint(config.appwriteEndpoint)
-      .setProject(config.appwriteProjectId)
-      .setKey(config.appwriteApiKey),
+      .setEndpoint(authority.endpoint)
+      .setProject(authority.projectId)
+      .setKey(authority.apiKey),
   );
 }
 
