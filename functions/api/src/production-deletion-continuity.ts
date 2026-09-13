@@ -6,6 +6,12 @@ export interface ProductionDeletionProbeTablesPort {
     readonly permissions: readonly string[];
     readonly rowSecurity: boolean;
     readonly enabled: boolean;
+    readonly columns: readonly {
+      readonly key: string;
+      readonly type: "varchar";
+      readonly size: number;
+      readonly required: boolean;
+    }[];
   }) => Promise<unknown>;
   readonly deleteTable: (input: {
     readonly databaseId: string;
@@ -15,7 +21,7 @@ export interface ProductionDeletionProbeTablesPort {
     readonly databaseId: string;
     readonly tableId: string;
     readonly rowId: string;
-    readonly data: Readonly<Record<string, never>>;
+    readonly data: Readonly<Record<string, string>>;
     readonly permissions: readonly string[];
   }) => Promise<unknown>;
   readonly deleteRow: (input: {
@@ -80,13 +86,14 @@ export async function proveProductionDeletionContinuity(
       permissions: [],
       rowSecurity: true,
       enabled: true,
+      columns: [{ key: "marker", type: "varchar", size: 16, required: true }],
     });
     tableCreated = true;
     await tables.createRow({
       databaseId: input.databaseId,
       tableId: input.tableId,
       rowId: input.markerId,
-      data: {},
+      data: { marker: "deleted" },
       permissions: [],
     });
     await tables.deleteRow({

@@ -13,34 +13,40 @@ describe("Production deletion continuity probe", () => {
       expect(present).toBe(false);
       return Promise.resolve();
     });
-    const result = await proveProductionDeletionContinuity(
-      {
-        createTable: vi.fn().mockResolvedValue(undefined),
-        deleteTable: vi.fn().mockResolvedValue(undefined),
-        createRow: vi.fn(() => {
-          present = true;
-          return Promise.resolve();
-        }),
-        deleteRow: vi.fn(() => {
-          present = false;
-          return Promise.resolve();
-        }),
-        getRow: vi.fn(() => {
-          if (!present) return Promise.reject(missing());
-          return Promise.resolve({ $id: "marker" });
-        }),
-      },
-      {
-        databaseId: "feedback",
-        tableId: "rel_probe_0123456789abcdef",
-        markerId: "marker_0123456789abcdef",
-        rollback: observe,
-        rollForward: observe,
-      },
-    );
+    const tables = {
+      createTable: vi.fn().mockResolvedValue(undefined),
+      deleteTable: vi.fn().mockResolvedValue(undefined),
+      createRow: vi.fn(() => {
+        present = true;
+        return Promise.resolve();
+      }),
+      deleteRow: vi.fn(() => {
+        present = false;
+        return Promise.resolve();
+      }),
+      getRow: vi.fn(() => {
+        if (!present) return Promise.reject(missing());
+        return Promise.resolve({ $id: "marker" });
+      }),
+    };
+    const result = await proveProductionDeletionContinuity(tables, {
+      databaseId: "feedback",
+      tableId: "rel_probe_0123456789abcdef",
+      markerId: "marker_0123456789abcdef",
+      rollback: observe,
+      rollForward: observe,
+    });
 
     expect(result).toEqual({ rollbackAbsent: true, rollForwardAbsent: true });
     expect(observe).toHaveBeenCalledTimes(2);
+    expect(tables.createTable).toHaveBeenCalledWith(
+      expect.objectContaining({
+        columns: [{ key: "marker", type: "varchar", size: 16, required: true }],
+      }),
+    );
+    expect(tables.createRow).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { marker: "deleted" } }),
+    );
   });
 
   it("BDD-REL-412 fails when a deployment makes the deleted marker visible", async () => {
