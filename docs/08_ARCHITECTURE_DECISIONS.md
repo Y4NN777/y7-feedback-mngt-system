@@ -18,6 +18,7 @@
 | ADR-012 | Vercel hosts the Vite PWA | Accepted |
 | ADR-013 | Provider-native GitHub and GitLab.com connections behind server adapters | Accepted |
 | ADR-014 | Durable consent-aware bidirectional external-issue synchronization | Accepted |
+| ADR-015 | Single-row authoritative commits with durable projections | Accepted with migration fitness gates |
 
 An ADR is subordinate to `01_PRD.md` through `06_DECISION_TRACEABILITY.md`.
 “Accepted” means selected for the proposed architecture; it does not claim that
@@ -710,6 +711,102 @@ from later events.
 - **Dedicated integration microservice or message broker:** not justified while
   Appwrite Functions, TablesDB inbox/outbox records, and schedules meet the
   required behavior.
+
+## ADR-015 - Single-Row Authoritative Commits with Durable Projections
+
+**Status:** Accepted with migration fitness gates
+
+**Decision drivers:** NFR-SLO-005..006, NFR-CON-001..004, ADR-006,
+INV-AUTH-001, INV-NOTIFY-001, idempotent retry and recovery requirements.
+
+### Context
+
+The shared Appwrite TablesDB tier is the only enabled database capacity for the
+current account. Real Function instrumentation measured four serial phases for
+normalized transactional commands: transaction creation at 127–168 ms,
+transactional reads at 140–429 ms, batched writes at 171–606 ms, and commit at
+214–304 ms. Raising Function CPU did not improve the result. The complete G5
+run therefore measured critical API P95 at 1,740 ms against 500 ms and Feedback
+commit P95 at 1,386 ms against 1,000 ms.
+
+A controlled Preview spike then created 60 independent rows through the same
+regional Appwrite endpoint. It measured P50 232 ms, P95 286 ms and maximum 628
+ms, and removed the temporary table. One authoritative row is consequently a
+plausible path to NFR-SLO-005 on the available infrastructure; a normalized
+multi-row transaction is not.
+
+### Decision
+
+Represent each accepted command as one immutable authoritative commit row. Its
+identifier is derived deterministically from environment, aggregate identity
+and client operation identity. The row contains the validated command kind,
+authoritative scope, payload digest, encrypted private payload, actor and
+acceptance time. Creating that row is the only synchronous persistence write.
+
+The deterministic identifier is the idempotency boundary. A repeated command
+with the same digest returns the original accepted result; reuse with a
+different digest fails closed. Authorization, proof validation, scope
+derivation, Attachment acceptance and command validation still happen before
+the row is created. A response never claims acceptance until Appwrite confirms
+the authoritative row.
+
+Durable projectors lease unprojected commits and atomically update the existing
+normalized tables, audit facts, notification/provider outboxes and read
+projections. Projection checkpoints are monotonic and retry-safe. Existing
+normalized tables remain the query surface during migration. Read-your-write
+paths may overlay the accepted commit only when the same authenticated scope
+and aggregate are proven; they may never use browser state as authority.
+
+Migration is vertical and reversible:
+
+1. introduce the commit envelope, parser, deterministic identity and contract
+   tests without changing runtime routing;
+2. add the Appwrite commit table and projector with failure, duplicate,
+   ordering, isolation and recovery tests;
+3. route Feedback intake through the new path behind a server-only mode and
+   prove parity plus P95 on Preview;
+4. migrate conversation/lifecycle and the remaining critical mutations one at
+   a time;
+5. remove each old synchronous write path only after projection lag, recovery,
+   authorization and SLO gates pass.
+
+### Fitness gates
+
+- one synchronous Appwrite write on the accepted hot path;
+- P95 at most 500 ms for critical API acceptance and at most 1 second for
+  Feedback creation under the declared load envelope;
+- 100% branch coverage for identity, digest conflict, authorization and
+  projector state transitions;
+- forced failure before commit creates no acceptance; forced failure after
+  commit preserves acceptance and is recovered by projector retry;
+- duplicate delivery creates no duplicate fact, notification, issue operation
+  or audit record;
+- sibling Workspace/Project scope and revoked proof remain non-disclosing;
+- backup and deletion replay include authoritative commits and projector
+  checkpoints before Production enablement.
+
+### Consequences
+
+- Synchronous latency no longer includes transaction creation, projection
+  reads, normalized writes and transaction commit.
+- The authoritative write model and normalized read models become explicitly
+  different, adding projector and lag operations.
+- Existing domain ports remain stable; Appwrite-specific commit and projector
+  adapters stay in the Function layer.
+- The migration does not weaken atomicity: acceptance is one indivisible row,
+  while every derived side effect is durable, idempotent and recoverable.
+
+### Alternatives not selected
+
+- **Per-Feedback mutable aggregate row:** row growth, concurrent writers and the
+  lack of a demonstrated Appwrite compare-and-swap contract make lost updates
+  and hot-row contention unacceptable.
+- **Keep the normalized transaction:** preserves the current model but cannot
+  meet the accepted SLO on the available shared tier.
+- **Return before any durable write:** can meet latency but permits false
+  success and violates committed acceptance.
+- **Weaken thresholds or exclude slow commands:** contradicts the product and
+  contract rather than solving the persistence floor.
 
 ## 2. Deferred Implementation Records
 
