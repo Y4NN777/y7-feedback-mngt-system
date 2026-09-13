@@ -35,3 +35,14 @@ export function collectSloEvidenceSamples(
   if (result.length === 0) throw new Error("SLO_G5_EVIDENCE_INVALID");
   return result;
 }
+
+export function collectCriticalApiLoadSamples(value: unknown): readonly number[] {
+  const samples = record(value).criticalApiLoadSamplesMs;
+  if (!Array.isArray(samples) || samples.length === 0) return [];
+  const valid: number[] = [];
+  for (const sample of samples as unknown[]) {
+    if (typeof sample !== "number" || !Number.isFinite(sample) || sample < 0) return [];
+    valid.push(sample);
+  }
+  return valid;
+}

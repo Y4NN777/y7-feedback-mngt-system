@@ -9,8 +9,12 @@ import {
   type SloObservation,
 } from "@y7-feedback/domain";
 
+import { probeUrl } from "./availability-probe.js";
 import { buildMeasurementSeriesIndex } from "./slo-series.js";
-import { collectSloEvidenceSamples } from "./slo-g5-evidence.js";
+import {
+  collectCriticalApiLoadSamples,
+  collectSloEvidenceSamples,
+} from "./slo-g5-evidence.js";
 import { stableProbeFailureCode } from "./slo-probe-failure.js";
 import { routeSloAlerts } from "./slo-telemetry.js";
 
@@ -104,14 +108,6 @@ function runPnpmScript(script: string): Promise<unknown> {
   });
 }
 
-async function probeUrl(url: string): Promise<boolean> {
-  const response = await fetch(url, {
-    redirect: "error",
-    signal: AbortSignal.timeout(30_000),
-  });
-  return response.ok;
-}
-
 export async function verifySloG5() {
   if (!process.argv.includes("--apply")) throw new Error("SLO_G5_APPLY_REQUIRED");
   if ((process.env.Y7_ENVIRONMENT?.trim() || "preview") !== "preview")
@@ -121,12 +117,21 @@ export async function verifySloG5() {
   const rootUrl = required("Y7_WEB_ORIGIN");
   if (!(await probeUrl(healthUrl))) throw new Error("SLO_G5_WARMUP_FAILED");
   const startedAt = new Date().toISOString();
-  const [evidence, mail, attachment] = await Promise.all([
-    Promise.all(commands.map((command) => runScript(command))),
+  const evidence: unknown[] = [];
+  for (const command of commands) evidence.push(await runScript(command));
+  const [mail, attachment] = await Promise.all([
     runScript("verify-preview-mail-catcher.js"),
     runPnpmScript("verify:antivirus:local"),
   ]);
-  const collected = [...evidence, mail, attachment].flatMap(collectSloEvidenceSamples);
+  const criticalApiLoadSamples = evidence.flatMap(collectCriticalApiLoadSamples);
+  if (criticalApiLoadSamples.length < 40)
+    throw new Error("SLO_G5_CRITICAL_API_LOAD_INCOMPLETE");
+  const collected = [
+    ...[...evidence, mail, attachment]
+      .flatMap(collectSloEvidenceSamples)
+      .filter(([metric]) => metric !== "critical_api_ms"),
+    ...criticalApiLoadSamples.map((sample) => ["critical_api_ms", sample] as const),
+  ];
   const measuredAt = new Date().toISOString();
   const observations: SloObservation[] = collected.map(([metric, value]) => ({
     metric,

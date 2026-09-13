@@ -23,6 +23,7 @@ import {
 } from "./authoritative-conversation-projector.js";
 import { createAuthoritativeConversationStore } from "./authoritative-conversation-store.js";
 import { createAuthoritativeProjector } from "./authoritative-projector.js";
+import { drainAuthoritativeProjectionEvent } from "./authoritative-projection-event.js";
 import { createAuthoritativeProjectionRouter } from "./authoritative-projection-router.js";
 import { createNodeAppwriteOutboxStore } from "./appwrite-outbox-store.js";
 import { createNodeAppwriteNotificationRecipientResolver } from "./appwrite-notification-recipient-resolver.js";
@@ -1191,7 +1192,12 @@ export function createHttpApplication(
     };
     authoritativeProjection = {
       runOnce: () =>
-        authoritativeProjector.runBatch(`${config.environment}-commit-event`, 25),
+        drainAuthoritativeProjectionEvent(
+          authoritativeProjector,
+          `${config.environment}-commit-event`,
+          (milliseconds) =>
+            new Promise((resolvePromise) => setTimeout(resolvePromise, milliseconds)),
+        ),
     };
     if (
       config.providers &&
