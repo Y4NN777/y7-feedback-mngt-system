@@ -10,7 +10,8 @@
     "@y7-feedback/config": "workspace:*",
     "@y7-feedback/domain": "workspace:*",
     "node-appwrite": "27.1.0",
-    "nodemailer": "^9.0.5"
+    "nodemailer": "^9.0.5",
+    "zod": "4.4.3"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
