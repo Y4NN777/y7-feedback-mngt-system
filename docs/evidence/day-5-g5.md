@@ -34,7 +34,7 @@ the reviewable candidate is merged.
 | `TASK-E2E-001`                                 | D5.3, UC-01..12, ERR-001..019                      | `pnpm verify:e2e:g5:matrix`, `pnpm verify:e2e:g5:browser`; protected run [34729440154](https://github.com/Y4NN777/y7-feedback-mngt-system/actions/runs/34729440154)                                                                                                                                      | `DONE`: hosted traceability matrix and all 38 browser scenarios passed                                                            |
 | `TASK-SEC-001`                                 | D5.4 security/isolation regression                 | `pnpm security:scan` plus every denial and environment-isolation command in protected run [34729440154](https://github.com/Y4NN777/y7-feedback-mngt-system/actions/runs/34729440154)                                                                                                                     | `DONE`: 286 files scanned with zero findings; deployed denial/isolation/privacy matrices passed                                   |
 | `TASK-UX-001`                                  | D5.4 accessibility/320 px regression               | `pnpm verify:e2e:g5:browser` on desktop and `mobile-320`; protected run [34729440154](https://github.com/Y4NN777/y7-feedback-mngt-system/actions/runs/34729440154)                                                                                                                                       | `DONE`: 38/38 hosted scenarios passed across both projects                                                                        |
-| `TASK-REL-001`                                 | D5.5 permanent dependencies and reversible release | `production-antivirus.yml`, `recovery-backup.yml`, `production-release.yml`, then `pnpm verify:release:production`                                                                                                                                                                                       | `IN_PROGRESS`                                                                                                                     |
+| `TASK-REL-001`                                 | D5.5 permanent dependencies and reversible release | `production-antivirus.yml`, [Production backup run 34731029856](https://github.com/Y4NN777/y7-feedback-mngt-system/actions/runs/34731029856), `production-release.yml`, then `pnpm verify:release:production`                                                                                            | `IN_PROGRESS`: encrypted Production backup is proven; permanent scanner and reversible release remain                             |
 | `TASK-GHDP-001`                                | D5.6 GitHub Developer Program prerequisites        | `pnpm verify:providers:production:github`, public metadata, release proof and submission receipt                                                                                                                                                                                                         | `BLOCKED` by `TASK-REL-001` and unfinalized public metadata                                                                       |
 | `G5`                                           | Gate G5 criteria 1–7                               | protected G5 workflow, Production dependency workflows, reversible release and this index                                                                                                                                                                                                                | `IN_PROGRESS`                                                                                                                     |
 
@@ -128,6 +128,17 @@ measured 1,740 ms against 500 ms, and SLO-006 measured 1,386 ms against 1,000
 ms. This result is retained rather than hidden by a blind rerun or weaker
 threshold. `TASK-SLO-001`, `TASK-REL-001` and Gate G5 therefore remain
 `IN_PROGRESS`.
+
+## Production recovery backup — 2026-09-13
+
+[Run 34731029856](https://github.com/Y4NN777/y7-feedback-mngt-system/actions/runs/34731029856)
+authenticated through the environment-bound Azure workload identity, read the
+isolated Production Appwrite authority, encrypted and signed the complete
+Production recovery set, and published it to the private Azure recovery
+container. The non-sensitive result reported one 38,324-byte archive entry,
+source mutation coverage through `2026-09-13T01:38:50.542Z`, and exact expiry
+on `2026-10-13T01:38:52.767Z`. The same protected workflow remains scheduled
+daily at `02:17 UTC`.
 
 ## Exact remaining release sequence
 
