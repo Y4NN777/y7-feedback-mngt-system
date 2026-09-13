@@ -453,6 +453,14 @@ test("BDD-REL-406 stages, promotes, rolls back and restores Production", async (
     workflow,
     /PRODUCTION_SMTP_PASSWORD: \$\{\{ secrets\.Y7_PRODUCTION_SMTP_PASSWORD \}\}/u,
   );
+  assert.match(
+    workflow,
+    /PRODUCTION_EMAIL_VERIFICATION_RECIPIENT: \$\{\{ secrets\.Y7_PRODUCTION_EMAIL_VERIFICATION_RECIPIENT \}\}/u,
+  );
+  assert.match(
+    workflow,
+    /Y7_PRODUCTION_EMAIL_VERIFICATION_RECIPIENT:\s+"PRODUCTION_EMAIL_VERIFICATION_RECIPIENT"/u,
+  );
   for (const variable of [
     "Y7_FUNCTION_DOMAIN_URL",
     "Y7_PREVIEW_FUNCTION_DOMAIN_URL",
