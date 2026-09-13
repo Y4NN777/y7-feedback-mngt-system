@@ -140,6 +140,14 @@ source mutation coverage through `2026-09-13T01:38:50.542Z`, and exact expiry
 on `2026-10-13T01:38:52.767Z`. The same protected workflow remains scheduled
 daily at `02:17 UTC`.
 
+On 2026-09-13, the Production Appwrite provisioner completed independently of
+the release workflow with `34` resources created, `18` verified and
+`fixtures: null`. The Production Vercel workflow token was installed directly
+from the already authenticated local CLI without printing or persisting its
+value. These authorities are ready and are not reasons to rerun Preview gates;
+the remaining release dependency is the permanent Azure scanner and its alert
+route.
+
 ## Exact remaining release sequence
 
 1. Select and implement a persistence path capable of satisfying SLO-005 and
