@@ -21,6 +21,12 @@ describe("Production runtime release identity", () => {
         candidate,
       ),
     ).toBe(true);
+    expect(
+      assertProductionWebRelease(
+        `<head><meta name="y7-release" content="${candidate}"></head>`,
+        candidate,
+      ),
+    ).toBe(true);
   });
 
   it.each([
