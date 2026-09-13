@@ -174,6 +174,20 @@ export interface ExistingFunctionVariable {
   readonly key: string;
 }
 
+export interface ManagedFunctionVariableSecurity {
+  readonly key: string;
+  readonly secret: boolean;
+}
+
+export function findNonSecretManagedFunctionVariableKeys(
+  existing: readonly ManagedFunctionVariableSecurity[],
+): readonly string[] {
+  const managedKeys = new Set<string>(appwriteFunctionVariableKeys);
+  return existing
+    .filter(({ key, secret }) => managedKeys.has(key) && !secret)
+    .map(({ key }) => key);
+}
+
 export interface FunctionVariableAction {
   readonly kind: "create" | "update";
   readonly id: string;

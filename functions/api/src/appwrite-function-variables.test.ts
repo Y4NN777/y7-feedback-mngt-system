@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   appwriteFunctionVariableKeys,
+  findNonSecretManagedFunctionVariableKeys,
   requiredAppwriteFunctionVariableKeys,
   planAppwriteFunctionVariables,
   resolveAuthoritativeCommitEvent,
@@ -210,5 +211,16 @@ describe("Appwrite Function variable policy", () => {
     expect(requiredAppwriteFunctionVariableKeys).not.toContain(
       "INTAKE_PERSISTENCE_MODE",
     );
+  });
+
+  it("BDD-REL-433 distinguishes absent optional variables from unsafe configured variables", () => {
+    expect(
+      findNonSecretManagedFunctionVariableKeys([
+        { key: "APPWRITE_DATABASE_ID", secret: true },
+        { key: "RELEASE", secret: false },
+        { key: "UNMANAGED_PLATFORM_VALUE", secret: false },
+      ]),
+    ).toEqual(["RELEASE"]);
+    expect(findNonSecretManagedFunctionVariableKeys([])).toEqual([]);
   });
 });

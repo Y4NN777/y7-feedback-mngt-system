@@ -6,7 +6,7 @@ import { Client, DeploymentStatus, Functions, Query, TablesDB } from "node-appwr
 import { parseServerConfig } from "@y7-feedback/config/server";
 
 import {
-  appwriteFunctionVariableKeys,
+  findNonSecretManagedFunctionVariableKeys,
   productionFunctionId,
   requiredAppwriteFunctionVariableKeys,
 } from "./appwrite-function-variables.js";
@@ -148,8 +148,8 @@ async function main(): Promise<void> {
   const missingFunctionVariables = requiredAppwriteFunctionVariableKeys.filter(
     (key) => !variables.has(key),
   );
-  const nonSecretFunctionVariables = appwriteFunctionVariableKeys.filter(
-    (key) => variables.get(key)?.secret !== true,
+  const nonSecretFunctionVariables = findNonSecretManagedFunctionVariableKeys(
+    definition.vars.map(({ key, secret }) => ({ key, secret })),
   );
 
   let functionRollbackPassed = false;
