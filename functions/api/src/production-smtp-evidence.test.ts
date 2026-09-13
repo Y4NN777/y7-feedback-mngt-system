@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { proveProductionSmtpEvidence } from "./production-smtp-evidence";
+import {
+  ProductionSmtpEvidenceError,
+  proveProductionSmtpEvidence,
+} from "./production-smtp-evidence";
 
 describe("Production SMTP evidence", () => {
   it("BDD-REL-418 requires real handoff plus retryable and terminal classification", async () => {
@@ -28,8 +31,10 @@ describe("Production SMTP evidence", () => {
       terminal: vi.fn().mockResolvedValue("permanent"),
     };
     evidence[key].mockResolvedValueOnce(outcome);
-    await expect(proveProductionSmtpEvidence(evidence)).rejects.toThrow(
-      "PRODUCTION_SMTP_EVIDENCE_FAILED",
+    const failure = proveProductionSmtpEvidence(evidence);
+    await expect(failure).rejects.toThrow("PRODUCTION_SMTP_EVIDENCE_FAILED");
+    await expect(failure).rejects.toMatchObject(
+      key === "handoff" ? { handoff: outcome } : { handoff: "delivered" },
     );
   });
 
@@ -41,5 +46,13 @@ describe("Production SMTP evidence", () => {
         terminal: vi.fn(),
       }),
     ).rejects.toThrow("smtp unavailable");
+  });
+
+  it("BDD-REL-435 exposes only the bounded handoff outcome", () => {
+    expect(new ProductionSmtpEvidenceError("permanent")).toMatchObject({
+      name: "ProductionSmtpEvidenceError",
+      message: "PRODUCTION_SMTP_EVIDENCE_FAILED",
+      handoff: "permanent",
+    });
   });
 });

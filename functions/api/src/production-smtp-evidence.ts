@@ -1,5 +1,15 @@
 type DeliveryOutcome = "delivered" | "retryable" | "permanent";
 
+export class ProductionSmtpEvidenceError extends Error {
+  readonly handoff: DeliveryOutcome;
+
+  constructor(handoff: DeliveryOutcome) {
+    super("PRODUCTION_SMTP_EVIDENCE_FAILED");
+    this.name = "ProductionSmtpEvidenceError";
+    this.handoff = handoff;
+  }
+}
+
 export async function proveProductionSmtpEvidence(input: {
   readonly handoff: () => Promise<DeliveryOutcome>;
   readonly retry: () => Promise<DeliveryOutcome>;
@@ -15,7 +25,7 @@ export async function proveProductionSmtpEvidence(input: {
     input.terminal(),
   ]);
   if (handoff !== "delivered" || retry !== "retryable" || terminal !== "permanent") {
-    throw new Error("PRODUCTION_SMTP_EVIDENCE_FAILED");
+    throw new ProductionSmtpEvidenceError(handoff);
   }
   return { handoff, retry, terminal };
 }
