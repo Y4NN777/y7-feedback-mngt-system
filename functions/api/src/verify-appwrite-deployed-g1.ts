@@ -5,9 +5,15 @@ import { Client, ExecutionMethod, Functions, Query, TablesDB } from "node-appwri
 import { parseServerConfig } from "@y7-feedback/config/server";
 
 import { createAppwriteFunctionPublicApi } from "./appwrite-function-public-api.js";
+import { createNodeAppwriteAuthoritativeProjectionStore } from "./appwrite-authoritative-projection-store.js";
+import { createNodeAppwriteIntakeStore } from "./appwrite-intake-store.js";
 import { previewFunctionId } from "./appwrite-function-variables.js";
+import { createAuthoritativeIntakeEnvelope } from "./authoritative-intake-envelope.js";
+import { createAuthoritativeIntakeProjectionHandler } from "./authoritative-intake-projector.js";
+import { createAuthoritativeProjector } from "./authoritative-projector.js";
 import { createHttpFunctionPublicApi } from "./http-function-public-api.js";
 import type { PublicApiResponse } from "./public-api.js";
+import { createSensitiveDataProtector } from "./sensitive-data-protector.js";
 
 const workspaceId = "workspace_alpha";
 const projectId = "project_alpha";
@@ -120,6 +126,38 @@ async function main(): Promise<void> {
       .setProject(config.appwriteProjectId)
       .setKey(config.appwriteApiKey),
   );
+  const sensitive = {
+    environment: config.environment,
+    protector: createSensitiveDataProtector(
+      config.sensitiveDataActiveKeyId,
+      Object.entries(config.sensitiveDataEnvelopeKeys).map(([id, material]) => ({
+        id,
+        material: Buffer.from(material, "base64url"),
+      })),
+    ),
+  };
+  const authoritativeProjector =
+    config.intakePersistenceMode === "authoritative"
+      ? createAuthoritativeProjector(
+          createNodeAppwriteAuthoritativeProjectionStore(tables, config.appwriteSchema),
+          createAuthoritativeIntakeProjectionHandler(
+            createAuthoritativeIntakeEnvelope(
+              sensitive,
+              config.appwriteSchema.authoritativeCommitsTableId,
+            ),
+            createNodeAppwriteIntakeStore(tables, config.appwriteSchema, sensitive),
+          ),
+          {
+            now: () => new Date().toISOString(),
+            leaseUntil: (now) => new Date(Date.parse(now) + 5 * 60_000).toISOString(),
+            retryAt: (now, attempt) =>
+              new Date(
+                Date.parse(now) + Math.min(2 ** attempt * 1_000, 15 * 60_000),
+              ).toISOString(),
+            errorCode: () => "INTAKE_PROJECTION_RETRYABLE",
+          },
+        )
+      : undefined;
   const operationId = randomUUID();
   const marker = `G1 deployed private marker ${randomBytes(8).toString("hex")}`;
   let reference: string | undefined;
@@ -303,21 +341,9 @@ async function main(): Promise<void> {
       throw new Error("APPWRITE_DEPLOYED_G1_CONFLICT_INVALID");
     }
 
-    if (config.intakePersistenceMode === "authoritative") {
+    if (authoritativeProjector !== undefined) {
+      await authoritativeProjector.runBatch("g1-verifier-projector", 25);
       for (let attempt = 0; attempt < 15; attempt += 1) {
-        try {
-          await publicFunctions.createExecution({
-            functionId: previewFunctionId,
-            body: "{}",
-            async: false,
-            xpath: "/operational/provider-maintenance",
-            method: ExecutionMethod.POST,
-            headers: { "x-appwrite-trigger": "schedule" },
-          });
-        } catch {
-          // Scheduled maintenance uses allSettled; an unrelated capability can
-          // fail the aggregate execution after the projection batch has run.
-        }
         try {
           projectedRows = await discover();
           break;
