@@ -187,6 +187,7 @@ describe("trusted environment contract", () => {
         exceptionalAccessGrantsTableId: "exceptional_access_grants",
         exceptionalAccessAuditTableId: "exceptional_access_audit",
         exceptionalAccessOperationsTableId: "exceptional_access_operations",
+        authoritativeCommitsTableId: "authoritative_commits",
       },
       accessProofEnvelopeKey: "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc",
       providerGrantEnvelopeKey: "CAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg",

@@ -15,6 +15,7 @@ import { createAppwriteInfrastructureManifest } from "./appwrite-schema";
 
 const schema: ServerConfig["appwriteSchema"] = {
   ...canonicalDay4SchemaIds,
+  authoritativeCommitsTableId: "authoritative_commits",
   databaseId: "feedback",
   workspacesTableId: "workspaces",
   workspaceMembershipsTableId: "workspace_memberships",

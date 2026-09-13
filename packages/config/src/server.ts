@@ -72,6 +72,7 @@ export interface ServerConfig {
     readonly exceptionalAccessGrantsTableId: string;
     readonly exceptionalAccessAuditTableId: string;
     readonly exceptionalAccessOperationsTableId: string;
+    readonly authoritativeCommitsTableId: string;
   };
   readonly accessProofEnvelopeKey: string;
   readonly providerGrantEnvelopeKey: string;
@@ -189,6 +190,9 @@ function parseAppwriteSchema(input: Readonly<Record<string, string | undefined>>
     exceptionalAccessOperationsTableId: requireAppwriteId(
       input.APPWRITE_EXCEPTIONAL_ACCESS_OPERATIONS_TABLE_ID ??
         "exceptional_access_operations",
+    ),
+    authoritativeCommitsTableId: requireAppwriteId(
+      input.APPWRITE_AUTHORITATIVE_COMMITS_TABLE_ID ?? "authoritative_commits",
     ),
   };
   if (new Set(Object.values(tableIds)).size !== Object.values(tableIds).length) {

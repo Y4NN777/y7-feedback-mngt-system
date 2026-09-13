@@ -81,6 +81,12 @@ describe("Appwrite infrastructure manifest", () => {
       [schema.externalIssueLinksTableId, ["feedbackId", "state"]],
       [schema.providerOutboxTableId, ["operationId"]],
       [schema.providerOutboxTableId, ["status", "nextAttemptAt"]],
+      [schema.authoritativeCommitsTableId, ["projectionState", "availableAt"]],
+      [
+        schema.authoritativeCommitsTableId,
+        ["aggregateKind", "aggregateId", "acceptedAt"],
+      ],
+      [schema.authoritativeCommitsTableId, ["workspaceId", "projectId"]],
     ] as const;
 
     for (const [tableId, queriedColumns] of requirements) {
@@ -123,6 +129,7 @@ describe("Appwrite infrastructure manifest", () => {
       "conversation_internal_notes.contentEnvelope",
       "conversation_idempotency.resultJson",
       "conversation_lifecycle.reasonEnvelope",
+      "authoritative_commits.sealedPayload",
     ]);
     for (const definition of manifest.tables) {
       const indexed = new Set(definition.indexes.flatMap(({ columns }) => columns));

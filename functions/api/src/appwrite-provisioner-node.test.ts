@@ -6,6 +6,7 @@ import { createAppwriteInfrastructureManifest } from "./appwrite-schema";
 
 const manifest = createAppwriteInfrastructureManifest({
   ...canonicalDay4SchemaIds,
+  authoritativeCommitsTableId: "authoritative_commits",
   databaseId: "feedback",
   workspacesTableId: "workspaces",
   workspaceMembershipsTableId: "workspace_memberships",
