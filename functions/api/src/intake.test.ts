@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { AuthoritativeCommitError } from "@y7-feedback/domain";
+
 import type { ValidatedFeedbackDraft } from "@y7-feedback/domain";
 import type { AttachmentStagingGrant } from "./attachment-staging-token";
 
@@ -203,6 +205,19 @@ describe("trusted intake coordination", () => {
     });
     expect(outcome).toEqual({ status: "rejected", code: "OPERATION_CONFLICT" });
     expect(outcome).not.toHaveProperty("reference");
+  });
+
+  it("BDD-SLO-482A maps an authoritative digest conflict without disclosure", async () => {
+    const coordinator = createIntakeCoordinator(
+      {
+        acceptAuthoritatively: () =>
+          Promise.reject(new AuthoritativeCommitError("AUTHORITATIVE_COMMIT_CONFLICT")),
+      },
+      fixedDependencies(),
+    );
+    await expect(
+      coordinator.accept({ clientOperationId: operationId, draft: draft() }),
+    ).resolves.toEqual({ status: "rejected", code: "OPERATION_CONFLICT" });
   });
 
   it("BDD-SLO-483 fails closed for an invalid authoritative proof", async () => {

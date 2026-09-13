@@ -304,23 +304,19 @@ async function main(): Promise<void> {
     }
 
     if (config.intakePersistenceMode === "authoritative") {
-      if (config.providerOutboxTriggerSecret === undefined) {
-        throw new Error("APPWRITE_DEPLOYED_G1_PROJECTION_AUTHORITY_MISSING");
-      }
       for (let attempt = 0; attempt < 15; attempt += 1) {
         try {
-          await api.handle({
-            method: "POST",
-            path: "/operational/provider-maintenance",
-            headers: {
-              authorization: `Bearer ${config.providerOutboxTriggerSecret}`,
-              "content-type": "application/json",
-            },
-            body: {},
+          await publicFunctions.createExecution({
+            functionId: previewFunctionId,
+            body: "{}",
+            async: false,
+            xpath: "/operational/provider-maintenance",
+            method: ExecutionMethod.POST,
+            headers: { "x-appwrite-trigger": "schedule" },
           });
         } catch {
-          // Every maintenance capability runs through allSettled. Continue by
-          // observing the projection because an unrelated capability may fail.
+          // Scheduled maintenance uses allSettled; an unrelated capability can
+          // fail the aggregate execution after the projection batch has run.
         }
         try {
           projectedRows = await discover();
@@ -471,6 +467,7 @@ async function main(): Promise<void> {
     try {
       discoveredRows = cleanupRows((await discover()).rows);
     } catch (cleanupDiscoveryError: unknown) {
+      if (matrixFailure instanceof Error) throw matrixFailure;
       throw new Error("APPWRITE_DEPLOYED_G1_CLEANUP_DISCOVERY_FAILED", {
         cause: cleanupDiscoveryError,
       });
