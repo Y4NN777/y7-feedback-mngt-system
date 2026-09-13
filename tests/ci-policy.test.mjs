@@ -193,6 +193,7 @@ test("BDD-REL-304 provisions Production SMTP through protected OIDC authority", 
   assert.match(template, /userEngagementTracking: 'Disabled'/u);
   assert.match(template, /linkedDomains: \[managedDomain\.id\]/u);
   assert.match(template, /smtpUsernames@2025-09-01/u);
+  assert.match(template, /name: 'smtp-authority'/u);
   assert.match(template, /entraApplicationId: entraApplicationId/u);
 });
 
