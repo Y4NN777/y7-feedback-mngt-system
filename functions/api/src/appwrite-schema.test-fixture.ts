@@ -31,5 +31,6 @@ export const schema: ServerConfig["appwriteSchema"] = {
   publicationConsentsTableId: "publication_consents",
   externalIssueLinksTableId: "external_issue_links",
   providerOutboxTableId: "provider_outbox",
+  authoritativeCommitsTableId: "authoritative_commits",
   ...canonicalDay4SchemaIds,
 };

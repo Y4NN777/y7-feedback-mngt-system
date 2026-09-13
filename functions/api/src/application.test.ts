@@ -25,6 +25,7 @@ const config: ServerConfig = {
   webOrigin: "https://y7-feedback.vercel.app",
   appwriteSchema: {
     ...canonicalDay4SchemaIds,
+    authoritativeCommitsTableId: "authoritative_commits",
     databaseId: "feedback",
     workspacesTableId: "workspaces",
     workspaceMembershipsTableId: "workspace_memberships",

@@ -12,6 +12,7 @@ import { canonicalDay4SchemaIds } from "./appwrite-day4-migration";
 
 const schema: ServerConfig["appwriteSchema"] = {
   ...canonicalDay4SchemaIds,
+  authoritativeCommitsTableId: "authoritative_commits",
   databaseId: "feedback",
   workspacesTableId: "workspaces",
   workspaceMembershipsTableId: "workspace_memberships",
