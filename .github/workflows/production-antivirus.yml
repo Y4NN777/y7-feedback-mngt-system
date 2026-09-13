@@ -125,11 +125,16 @@ jobs:
             echo '{"error":"PRODUCTION_ACTION_GROUP_ID_INVALID"}' >&2
             exit 1
           fi
-          read -r RECEIVER_NAME RECEIVER_EMAIL < <(az monitor action-group show \
+          RECEIVER_NAME="$(az monitor action-group show \
             --name "$ACTION_GROUP_NAME" \
             --resource-group "$AZURE_RESOURCE_GROUP" \
-            --query 'emailReceivers[0].[name,emailAddress]' \
-            --output tsv)
+            --query 'emailReceivers[0].name' \
+            --output tsv)"
+          RECEIVER_EMAIL="$(az monitor action-group show \
+            --name "$ACTION_GROUP_NAME" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --query 'emailReceivers[0].emailAddress' \
+            --output tsv)"
           if [ -z "$RECEIVER_NAME" ] || [ -z "$RECEIVER_EMAIL" ]; then
             echo '{"error":"PRODUCTION_ALERT_RECEIVER_MISSING"}' >&2
             exit 1
