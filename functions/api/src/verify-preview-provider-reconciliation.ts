@@ -149,7 +149,11 @@ async function main(): Promise<void> {
     throw new Error("PROVIDER_RECONCILIATION_SCHEDULE_INVALID");
   const executions = await functions.listExecutions({
     functionId: target.id,
-    queries: [Query.orderDesc("$createdAt"), Query.limit(100)],
+    queries: [
+      Query.equal("trigger", [ExecutionTrigger.Schedule]),
+      Query.orderDesc("$createdAt"),
+      Query.limit(10),
+    ],
     total: false,
   });
   const scheduledHealthy = hasHealthyScheduledReconciliation(executions.executions);
