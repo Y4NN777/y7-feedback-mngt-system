@@ -124,6 +124,7 @@ describe("G5 end-to-end traceability matrix", () => {
     expect(commands).toContain("verify:providers:g4:message-sync:gitlab");
     expect(commands).toContain("verify:slo:g5");
     expect(commands).toContain("security:scan");
+    expect(commands[0]).toBe("verify:recovery:g5");
     expect(commands).not.toContain("verify:appwrite:g3:composed");
     expect(commands).not.toContain("verify:providers:g3:issue-link");
     expect(commands).not.toContain("verify:providers:g3:sources");

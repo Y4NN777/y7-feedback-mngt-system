@@ -399,7 +399,11 @@ export function buildE2eG5Commands(): readonly string[] {
   ]
     .filter((command) => !retainedEvidence.has(command))
     .map(parseE2eG5Command)
-    .sort();
+    .sort((left, right) => {
+      if (left === "verify:recovery:g5") return -1;
+      if (right === "verify:recovery:g5") return 1;
+      return left.localeCompare(right);
+    });
 }
 
 export function buildE2eG5Index() {
