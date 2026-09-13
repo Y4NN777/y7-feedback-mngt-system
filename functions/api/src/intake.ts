@@ -1,4 +1,5 @@
 import {
+  AuthoritativeCommitError,
   createAttachmentRecord,
   issueAccessGrant,
   type AttachmentRecord,
@@ -346,7 +347,13 @@ export function createIntakeCoordinator(
         }
         await store.commit(commit);
         return accepted(commit.idempotency, issued.proof, false);
-      } catch {
+      } catch (error: unknown) {
+        if (
+          error instanceof AuthoritativeCommitError &&
+          error.code === "AUTHORITATIVE_COMMIT_CONFLICT"
+        ) {
+          return { status: "rejected", code: "OPERATION_CONFLICT" };
+        }
         return retryable();
       }
     },
