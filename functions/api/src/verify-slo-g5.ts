@@ -13,12 +13,17 @@ import { probeUrl } from "./availability-probe.js";
 import { buildMeasurementSeriesIndex } from "./slo-series.js";
 import {
   collectCriticalApiLoadSamples,
+  collectDashboardLoadSamples,
   collectSloEvidenceSamples,
 } from "./slo-g5-evidence.js";
 import { stableProbeFailureCode } from "./slo-probe-failure.js";
 import { routeSloAlerts } from "./slo-telemetry.js";
+import {
+  declaredSloConcurrency,
+  declaredSloSamplesPerReadMetric,
+} from "./slo-capacity-envelope.js";
 
-const concurrency = 4;
+const concurrency = declaredSloConcurrency;
 const commands = [
   "verify-appwrite-deployed-g1.js",
   "verify-appwrite-g3-conversation-lifecycle.js",
@@ -124,13 +129,17 @@ export async function verifySloG5() {
     runPnpmScript("verify:antivirus:local"),
   ]);
   const criticalApiLoadSamples = evidence.flatMap(collectCriticalApiLoadSamples);
-  if (criticalApiLoadSamples.length < 40)
+  const dashboardLoadSamples = evidence.flatMap(collectDashboardLoadSamples);
+  if (criticalApiLoadSamples.length < declaredSloSamplesPerReadMetric)
     throw new Error("SLO_G5_CRITICAL_API_LOAD_INCOMPLETE");
+  if (dashboardLoadSamples.length < declaredSloSamplesPerReadMetric)
+    throw new Error("SLO_G5_DASHBOARD_LOAD_INCOMPLETE");
   const collected = [
     ...[...evidence, mail, attachment]
       .flatMap(collectSloEvidenceSamples)
-      .filter(([metric]) => metric !== "critical_api_ms"),
+      .filter(([metric]) => metric !== "critical_api_ms" && metric !== "dashboard_ms"),
     ...criticalApiLoadSamples.map((sample) => ["critical_api_ms", sample] as const),
+    ...dashboardLoadSamples.map((sample) => ["dashboard_ms", sample] as const),
   ];
   const measuredAt = new Date().toISOString();
   const observations: SloObservation[] = collected.map(([metric, value]) => ({

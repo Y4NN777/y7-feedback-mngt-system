@@ -1,11 +1,18 @@
 import { randomBytes } from "node:crypto";
 
-import { Client, Query, TablesDB, Users } from "node-appwrite";
+import { Client, Functions, Query, TablesDB, Users } from "node-appwrite";
 
 import { parseServerConfig } from "@y7-feedback/config/server";
 
 import { createSensitiveDataProtector } from "./sensitive-data-protector.js";
+import { createAppwriteFunctionExecutionPublicApi } from "./appwrite-function-execution-public-api.js";
+import { resolveAppwriteFunctionTarget } from "./appwrite-function-variables.js";
 import { readOperationalDuration } from "./http-function-public-api.js";
+import { runBoundedLatencyProbe } from "./bounded-latency-probe.js";
+import {
+  declaredSloConcurrency,
+  declaredSloSamplesPerReadMetric,
+} from "./slo-capacity-envelope.js";
 import { createNodeAppwriteWorkbenchStore } from "./appwrite-workbench-store.js";
 import { createNodeAppwriteWorkspaceCapabilityScopeResolver } from "./appwrite-workspace-capability-scope.js";
 
@@ -43,6 +50,10 @@ async function main(): Promise<void> {
     .setKey(config.appwriteApiKey);
   const tables = new TablesDB(client);
   const users = new Users(client);
+  const regionalApi = createAppwriteFunctionExecutionPublicApi({
+    functions: new Functions(client),
+    functionId: resolveAppwriteFunctionTarget(config.environment).id,
+  });
   const protector = createSensitiveDataProtector(
     config.sensitiveDataActiveKeyId,
     Object.entries(config.sensitiveDataEnvelopeKeys).map(([id, material]) => ({
@@ -51,6 +62,7 @@ async function main(): Promise<void> {
     })),
   );
   const dashboardSamplesMs: number[] = [];
+  let dashboardLoadSamplesMs: readonly number[] = [];
   const notificationVisibilitySamplesMs: number[] = [];
   const createRow = async (
     tableId: string,
@@ -338,6 +350,29 @@ async function main(): Promise<void> {
     )
       throw new Error("APPWRITE_G3_WORKBENCH_DETAIL_INVALID");
     detailPassed = true;
+
+    dashboardLoadSamplesMs = await runBoundedLatencyProbe({
+      concurrency: declaredSloConcurrency,
+      iterations: declaredSloSamplesPerReadMetric,
+      probe: async () => {
+        const response = await regionalApi.handle({
+          method: "GET",
+          path: `${path}?type=bug&state=received&assignment=all`,
+          headers: { authorization: `Bearer ${ownerJwt}` },
+          body: undefined,
+        });
+        const payload: unknown = response?.body;
+        if (
+          response?.statusCode !== 200 ||
+          !object(payload) ||
+          !Array.isArray(payload.result) ||
+          payload.result.length !== 1
+        ) {
+          throw new Error("APPWRITE_G3_WORKBENCH_LOAD_RESPONSE_INVALID");
+        }
+        return Math.round(response.operationalDurationMs ?? Number.NaN);
+      },
+    });
 
     const classify = {
       kind: "classify_feedback",
@@ -630,6 +665,7 @@ async function main(): Promise<void> {
       realtimeSignalPassed,
       notificationVisibleP95Ms,
       dashboardSamplesMs,
+      dashboardLoadSamplesMs,
       notificationVisibilitySamplesMs,
       cleanupPassed: true,
     }),

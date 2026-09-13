@@ -1,13 +1,19 @@
 import { createHash, randomBytes } from "node:crypto";
 
-import { Client, Query, TablesDB, Users } from "node-appwrite";
+import { Client, Functions, Query, TablesDB, Users } from "node-appwrite";
 
 import { parseServerConfig } from "@y7-feedback/config/server";
 
 import { runBoundedLatencyProbe } from "./bounded-latency-probe.js";
+import { createAppwriteFunctionExecutionPublicApi } from "./appwrite-function-execution-public-api.js";
+import { resolveAppwriteFunctionTarget } from "./appwrite-function-variables.js";
 import { createHttpFunctionPublicApi } from "./http-function-public-api.js";
 import { createAccessProof, hashAccessProof } from "./proof-crypto.js";
 import { createSensitiveDataProtector } from "./sensitive-data-protector.js";
+import {
+  declaredSloConcurrency,
+  declaredSloSamplesPerReadMetric,
+} from "./slo-capacity-envelope.js";
 
 function object(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -46,6 +52,10 @@ async function main(): Promise<void> {
     .setKey(config.appwriteApiKey);
   const tables = new TablesDB(client);
   const users = new Users(client);
+  const regionalApi = createAppwriteFunctionExecutionPublicApi({
+    functions: new Functions(client),
+    functionId: resolveAppwriteFunctionTarget(config.environment).id,
+  });
   const wait = (milliseconds: number) =>
     new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
   const deleteRowReliably = async (tableId: string, rowId: string) => {
@@ -371,11 +381,11 @@ async function main(): Promise<void> {
       throw new Error("APPWRITE_G3_CONVERSATION_WORKSPACE_PROJECTION_INVALID");
     }
     criticalApiLoadSamplesMs = await runBoundedLatencyProbe({
-      concurrency: 4,
-      iterations: 40,
+      concurrency: declaredSloConcurrency,
+      iterations: declaredSloSamplesPerReadMetric,
       probe: async () => {
         const startedAt = performance.now();
-        const response = await api.handle({
+        const response = await regionalApi.handle({
           method: "GET",
           path: `${workspacePath}/conversation`,
           headers: bearer,

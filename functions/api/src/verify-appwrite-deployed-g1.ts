@@ -4,6 +4,7 @@ import { Client, ExecutionMethod, Functions, Query, TablesDB } from "node-appwri
 
 import { parseServerConfig } from "@y7-feedback/config/server";
 
+import { createAppwriteFunctionExecutionPublicApi } from "./appwrite-function-execution-public-api.js";
 import { createAppwriteFunctionPublicApi } from "./appwrite-function-public-api.js";
 import { previewFunctionId } from "./appwrite-function-variables.js";
 import { createHttpFunctionPublicApi } from "./http-function-public-api.js";
@@ -114,12 +115,15 @@ async function main(): Promise<void> {
           };
         },
       });
-  const tables = new TablesDB(
-    new Client()
-      .setEndpoint(config.appwriteEndpoint)
-      .setProject(config.appwriteProjectId)
-      .setKey(config.appwriteApiKey),
-  );
+  const adminClient = new Client()
+    .setEndpoint(config.appwriteEndpoint)
+    .setProject(config.appwriteProjectId)
+    .setKey(config.appwriteApiKey);
+  const tables = new TablesDB(adminClient);
+  const regionalApi = createAppwriteFunctionExecutionPublicApi({
+    functions: new Functions(adminClient),
+    functionId: previewFunctionId,
+  });
   const operationId = randomUUID();
   const marker = `G1 deployed private marker ${randomBytes(8).toString("hex")}`;
   let reference: string | undefined;
@@ -128,6 +132,14 @@ async function main(): Promise<void> {
   let cleanedRows = 0;
   let feedbackCommitMs = 0;
   const criticalApiSamplesMs: number[] = [];
+
+  const regionalWarmup = await regionalApi.handle({
+    method: "GET",
+    path: "/health",
+    headers: {},
+    body: undefined,
+  });
+  expectResponse(regionalWarmup, 200);
 
   const findOne = async (
     tableId: string,
@@ -251,7 +263,7 @@ async function main(): Promise<void> {
     }
 
     const feedbackCommitStartedAt = performance.now();
-    const acceptedResponse = await api.handle({
+    const acceptedResponse = await regionalApi.handle({
       method: "POST",
       path: "/v1/projects/wisemoney/feedback",
       headers: { "content-type": "application/json" },
