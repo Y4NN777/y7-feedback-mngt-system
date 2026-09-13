@@ -189,7 +189,21 @@ jobs:
             if (!value || /[\r\n]/u.test(value)) {
               throw new Error(`PRODUCTION_RELEASE_AUTHORITY_MISSING:${source}`);
             }
-            lines.push(`${target}=${JSON.stringify(value)}`);
+            if (target === "ABUSE_HMAC_KEYS") {
+              let keyring;
+              try {
+                keyring = JSON.parse(value);
+              } catch {
+                throw new Error("PRODUCTION_ABUSE_HMAC_KEYS_JSON_INVALID");
+              }
+              const normalized = JSON.stringify(keyring);
+              if (normalized.includes("'")) {
+                throw new Error("PRODUCTION_ABUSE_HMAC_KEYS_FORMAT_INVALID");
+              }
+              lines.push(`${target}='${normalized}'`);
+            } else {
+              lines.push(`${target}=${JSON.stringify(value)}`);
+            }
             delete process.env[source];
           }
           appendFileSync(".env.appwrite-production", `\n${lines.join("\n")}\n`, {

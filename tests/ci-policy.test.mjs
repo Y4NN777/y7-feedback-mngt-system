@@ -454,6 +454,9 @@ test("BDD-REL-406 stages, promotes, rolls back and restores Production", async (
     /PRODUCTION_SMTP_PASSWORD: \$\{\{ secrets\.Y7_PRODUCTION_SMTP_PASSWORD \}\}/u,
   );
   assert.match(workflow, /PRODUCTION_RELEASE_AUTHORITY_MISSING:\$\{source\}/u);
+  assert.match(workflow, /target === "ABUSE_HMAC_KEYS"/u);
+  assert.match(workflow, /PRODUCTION_ABUSE_HMAC_KEYS_JSON_INVALID/u);
+  assert.match(workflow, /lines\.push\(`\$\{target\}='\$\{normalized\}'`\)/u);
   assert.match(workflow, /appendFileSync\("\.env\.appwrite-production"/u);
   assert.match(workflow, /pnpm provision:appwrite:production/u);
   assert.match(workflow, /pnpm configure:appwrite:function:production/u);
