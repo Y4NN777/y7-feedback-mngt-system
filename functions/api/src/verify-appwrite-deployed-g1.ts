@@ -61,6 +61,17 @@ function idempotencyId(operationId: string): string {
   return `idem_${digest.slice(0, 31)}`;
 }
 
+function authoritativeCommitId(operationId: string): string {
+  const digest = createHash("sha256")
+    .update("preview")
+    .update("\0")
+    .update(`${workspaceId}:${projectId}`)
+    .update("\0")
+    .update(operationId)
+    .digest("hex");
+  return `commit_${digest.slice(0, 29)}`;
+}
+
 function envelope(row: Row, field: string): boolean {
   return typeof row[field] === "string" && row[field].startsWith("v1.");
 }
@@ -196,8 +207,22 @@ async function main(): Promise<void> {
       ] as const,
     };
   };
+  const cleanupRows = (
+    rows: readonly (readonly [string, string])[],
+  ): readonly (readonly [string, string])[] => [
+    ...rows,
+    ...(config.intakePersistenceMode === "authoritative"
+      ? [
+          [
+            config.appwriteSchema.authoritativeCommitsTableId,
+            authoritativeCommitId(operationId),
+          ] as const,
+        ]
+      : []),
+  ];
 
   let discoveredRows: readonly (readonly [string, string])[] = [];
+  let projectedRows: Awaited<ReturnType<typeof discover>> | undefined;
   try {
     const unavailable = expectResponse(
       await api.handle({
@@ -276,6 +301,28 @@ async function main(): Promise<void> {
     );
     if (conflict.error !== "ERR-OPERATION-CONFLICT") {
       throw new Error("APPWRITE_DEPLOYED_G1_CONFLICT_INVALID");
+    }
+
+    if (config.intakePersistenceMode === "authoritative") {
+      await publicFunctions.createExecution({
+        functionId: previewFunctionId,
+        body: "{}",
+        async: false,
+        xpath: "/operational/provider-maintenance",
+        method: ExecutionMethod.POST,
+        headers: { "x-appwrite-trigger": "schedule" },
+      });
+      for (let attempt = 0; attempt < 15; attempt += 1) {
+        try {
+          projectedRows = await discover();
+          break;
+        } catch {
+          await new Promise((resolve) => setTimeout(resolve, 1_000));
+        }
+      }
+      if (projectedRows === undefined) {
+        throw new Error("APPWRITE_DEPLOYED_G1_PROJECTION_TIMEOUT");
+      }
     }
 
     for (const headers of [{}, { authorization: `FeedbackProof ${"A".repeat(43)}` }]) {
@@ -390,7 +437,7 @@ async function main(): Promise<void> {
       throw new Error("APPWRITE_DEPLOYED_G1_REVOKED_PROOF_INVALID");
     }
 
-    const discovered = await discover();
+    const discovered = projectedRows ?? (await discover());
     const { feedback, grant, idempotency, outbox, reporter } = discovered;
     const serialized = JSON.stringify([reporter, feedback, grant, outbox, idempotency]);
     if (
@@ -406,14 +453,14 @@ async function main(): Promise<void> {
     ) {
       throw new Error("APPWRITE_DEPLOYED_G1_ENVELOPE_INVALID");
     }
-    discoveredRows = discovered.rows;
+    discoveredRows = cleanupRows(discovered.rows);
   } catch (error: unknown) {
     matrixFailure = error;
   }
 
   if (reference !== undefined && discoveredRows.length === 0) {
     try {
-      discoveredRows = (await discover()).rows;
+      discoveredRows = cleanupRows((await discover()).rows);
     } catch (cleanupDiscoveryError: unknown) {
       throw new Error("APPWRITE_DEPLOYED_G1_CLEANUP_DISCOVERY_FAILED", {
         cause: cleanupDiscoveryError,
@@ -434,7 +481,8 @@ async function main(): Promise<void> {
       ? matrixFailure
       : new Error("APPWRITE_DEPLOYED_G1_FAILED");
   }
-  if (cleanedRows !== 7) {
+  const expectedCleanedRows = config.intakePersistenceMode === "authoritative" ? 8 : 7;
+  if (cleanedRows !== expectedCleanedRows) {
     throw new Error("APPWRITE_DEPLOYED_G1_CLEANUP_INVALID");
   }
   process.stdout.write(
