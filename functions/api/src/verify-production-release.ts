@@ -9,6 +9,7 @@ import {
   appwriteFunctionVariableKeys,
   productionFunctionId,
 } from "./appwrite-function-variables.js";
+import { retryAppwriteAdminCall } from "./appwrite-admin-retry.js";
 import { createClamAvHttpScanner } from "./clamav-http-scanner.js";
 import { parseClamAvHttpScannerConfig } from "./clamav-http-scanner-config.js";
 import { proveProductionDeletionContinuity } from "./production-deletion-continuity.js";
@@ -84,7 +85,7 @@ async function waitForDeployment(
   deploymentId: string,
 ): Promise<boolean> {
   for (let attempt = 0; attempt < 30; attempt += 1) {
-    const current = await functions.get({ functionId });
+    const current = await retryAppwriteAdminCall(() => functions.get({ functionId }));
     if (current.deploymentId === deploymentId) return true;
     await new Promise((resolve) => setTimeout(resolve, 2_000));
   }
@@ -121,12 +122,16 @@ async function main(): Promise<void> {
     .setKey(config.appwriteApiKey);
   const functions = new Functions(client);
   const tables = new TablesDB(client);
-  const definition = await functions.get({ functionId: productionFunctionId });
-  const deployments = await functions.listDeployments({
-    functionId: productionFunctionId,
-    queries: [Query.orderDesc("$createdAt"), Query.limit(10)],
-    total: false,
-  });
+  const definition = await retryAppwriteAdminCall(() =>
+    functions.get({ functionId: productionFunctionId }),
+  );
+  const deployments = await retryAppwriteAdminCall(() =>
+    functions.listDeployments({
+      functionId: productionFunctionId,
+      queries: [Query.orderDesc("$createdAt"), Query.limit(10)],
+      total: false,
+    }),
+  );
   const active = deployments.deployments.find(
     ({ $id }) => $id === definition.deploymentId,
   );
@@ -168,10 +173,12 @@ async function main(): Promise<void> {
       tableId: `rel_${probeSuffix}`,
       markerId: `marker_${probeSuffix}`,
       rollback: async () => {
-        await functions.updateFunctionDeployment({
-          functionId: productionFunctionId,
-          deploymentId: rollback.$id,
-        });
+        await retryAppwriteAdminCall(() =>
+          functions.updateFunctionDeployment({
+            functionId: productionFunctionId,
+            deploymentId: rollback.$id,
+          }),
+        );
         functionRollbackPassed =
           (await waitForDeployment(functions, productionFunctionId, rollback.$id)) &&
           (await healthy(new URL("/health", functionOrigin))) !== undefined;
@@ -179,10 +186,12 @@ async function main(): Promise<void> {
           throw new Error("PRODUCTION_FUNCTION_ROLLBACK_FAILED");
       },
       rollForward: async () => {
-        await functions.updateFunctionDeployment({
-          functionId: productionFunctionId,
-          deploymentId: active.$id,
-        });
+        await retryAppwriteAdminCall(() =>
+          functions.updateFunctionDeployment({
+            functionId: productionFunctionId,
+            deploymentId: active.$id,
+          }),
+        );
         functionRollForwardPassed =
           (await waitForDeployment(functions, productionFunctionId, active.$id)) &&
           (await healthy(new URL("/health", functionOrigin))) !== undefined;

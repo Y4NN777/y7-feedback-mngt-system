@@ -8,6 +8,7 @@ import {
   resolveAppwriteFunctionDeploymentAuthority,
   type AppwriteFunctionDeploymentAuthority,
 } from "./appwrite-function-variables.js";
+import { retryAppwriteAdminCall } from "./appwrite-admin-retry.js";
 
 const deploymentId = /^[A-Za-z0-9][A-Za-z0-9._-]{0,35}$/u;
 
@@ -44,7 +45,9 @@ export function resolveProductionRollbackAuthority(
 export async function captureProductionFunctionDeployment(
   functions: ProductionFunctionDeploymentsPort,
 ): Promise<string> {
-  const current = await functions.get({ functionId: productionFunctionId });
+  const current = await retryAppwriteAdminCall(() =>
+    functions.get({ functionId: productionFunctionId }),
+  );
   if (!deploymentId.test(current.deploymentId)) {
     throw new Error("PRODUCTION_FUNCTION_ACTIVE_DEPLOYMENT_INVALID");
   }
@@ -62,26 +65,32 @@ export async function restoreProductionFunctionDeployment(
   if (!deploymentId.test(targetDeploymentId)) {
     throw new Error("PRODUCTION_FUNCTION_ROLLBACK_TARGET_INVALID");
   }
-  const deployments = await functions.listDeployments({
-    functionId: productionFunctionId,
-    queries: [Query.limit(100)],
-    total: false,
-  });
+  const deployments = await retryAppwriteAdminCall(() =>
+    functions.listDeployments({
+      functionId: productionFunctionId,
+      queries: [Query.limit(100)],
+      total: false,
+    }),
+  );
   const target = deployments.deployments.find(
     ({ $id, status }) => $id === targetDeploymentId && status === "ready",
   );
   if (!target) throw new Error("PRODUCTION_FUNCTION_ROLLBACK_TARGET_INVALID");
 
-  await functions.updateFunctionDeployment({
-    functionId: productionFunctionId,
-    deploymentId: targetDeploymentId,
-  });
+  await retryAppwriteAdminCall(() =>
+    functions.updateFunctionDeployment({
+      functionId: productionFunctionId,
+      deploymentId: targetDeploymentId,
+    }),
+  );
   const attempts = options.attempts ?? 30;
   const delay =
     options.delay ??
     (() => new Promise<void>((resolvePromise) => setTimeout(resolvePromise, 2_000)));
   for (let attempt = 0; attempt < attempts; attempt += 1) {
-    const current = await functions.get({ functionId: productionFunctionId });
+    const current = await retryAppwriteAdminCall(() =>
+      functions.get({ functionId: productionFunctionId }),
+    );
     if (current.deploymentId === targetDeploymentId) return;
     if (attempt + 1 < attempts) await delay();
   }

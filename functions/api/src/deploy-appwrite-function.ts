@@ -15,6 +15,7 @@ import { InputFile } from "node-appwrite/file";
 
 import type { ApplicationEnvironment } from "@y7-feedback/config/public";
 
+import { retryAppwriteAdminCall } from "./appwrite-admin-retry.js";
 import {
   resolveAppwriteFunctionDeploymentAuthority,
   resolveAppwriteFunctionTarget,
@@ -65,8 +66,8 @@ async function ensureFunction(
     deploymentRetention: 3,
   };
   try {
-    await functions.get({ functionId: target.id });
-    await functions.update(settings);
+    await retryAppwriteAdminCall(() => functions.get({ functionId: target.id }));
+    await retryAppwriteAdminCall(() => functions.update(settings));
     return "updated";
   } catch (error: unknown) {
     if (!(error instanceof AppwriteException) || error.code !== 404) throw error;
@@ -81,7 +82,9 @@ async function waitUntilReady(
   deploymentId: string,
 ): Promise<string> {
   for (let attempt = 0; attempt < 300; attempt += 1) {
-    const deployment = await functions.getDeployment({ functionId, deploymentId });
+    const deployment = await retryAppwriteAdminCall(() =>
+      functions.getDeployment({ functionId, deploymentId }),
+    );
     if (deployment.status === DeploymentStatus.Ready) return deployment.status;
     if (deployment.status === DeploymentStatus.Failed) {
       throw new Error("APPWRITE_FUNCTION_DEPLOYMENT_FAILED");
