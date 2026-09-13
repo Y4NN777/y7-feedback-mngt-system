@@ -453,6 +453,18 @@ test("BDD-REL-406 stages, promotes, rolls back and restores Production", async (
     workflow,
     /PRODUCTION_SMTP_PASSWORD: \$\{\{ secrets\.Y7_PRODUCTION_SMTP_PASSWORD \}\}/u,
   );
+  for (const variable of [
+    "Y7_FUNCTION_DOMAIN_URL",
+    "Y7_PREVIEW_FUNCTION_DOMAIN_URL",
+    "Y7_PREVIEW_WEB_ORIGIN",
+    "Y7_PREVIEW_SCANNER_ENDPOINT",
+    "Y7_PREVIEW_APPWRITE_PROJECT_ID",
+  ]) {
+    assert.match(
+      workflow,
+      new RegExp(`${variable}: \\$\\{\\{ vars\\.${variable} \\}\\}`),
+    );
+  }
   assert.match(workflow, /PRODUCTION_RELEASE_AUTHORITY_MISSING:\$\{source\}/u);
   assert.match(workflow, /target === "ABUSE_HMAC_KEYS"/u);
   assert.match(workflow, /PRODUCTION_ABUSE_HMAC_KEYS_JSON_INVALID/u);
