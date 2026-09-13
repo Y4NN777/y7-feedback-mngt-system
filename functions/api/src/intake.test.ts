@@ -146,6 +146,88 @@ function setup(store = new MemoryStore()) {
 }
 
 describe("trusted intake coordination", () => {
+  it("BDD-SLO-481 accepts and replays through the authoritative capability", async () => {
+    let original: AcceptanceCommit | undefined;
+    const acceptAuthoritatively = vi.fn(async (input: AcceptanceCommit) => {
+      const replayed = original !== undefined;
+      original ??= input;
+      return { acceptance: original, replayed };
+    });
+    const coordinator = createIntakeCoordinator(
+      { acceptAuthoritatively },
+      fixedDependencies(),
+    );
+    const command = { clientOperationId: operationId, draft: draft() };
+    await expect(coordinator.accept(command)).resolves.toEqual({
+      status: "accepted",
+      feedbackId: "feedback-fixed",
+      reference: "Y7-2026-999999",
+      accessProof,
+      replayed: false,
+    });
+    await expect(coordinator.accept(command)).resolves.toEqual({
+      status: "accepted",
+      feedbackId: "feedback-fixed",
+      reference: "Y7-2026-999999",
+      accessProof,
+      replayed: true,
+    });
+    expect(acceptAuthoritatively).toHaveBeenCalledTimes(2);
+  });
+
+  it("BDD-SLO-482 rejects a mismatched authoritative replay without disclosure", async () => {
+    const dependencies = fixedDependencies();
+    const normalized = setup().store;
+    await createIntakeCoordinator(normalized, dependencies).accept({
+      clientOperationId: operationId,
+      draft: draft(),
+    });
+    const persisted = normalized.commits[0]!;
+    const coordinator = createIntakeCoordinator(
+      {
+        acceptAuthoritatively: async () => ({
+          acceptance: {
+            ...persisted,
+            idempotency: { ...persisted.idempotency, payloadDigest: "different" },
+          },
+          replayed: true,
+        }),
+      },
+      dependencies,
+    );
+    const outcome = await coordinator.accept({
+      clientOperationId: operationId,
+      draft: draft(),
+    });
+    expect(outcome).toEqual({ status: "rejected", code: "OPERATION_CONFLICT" });
+    expect(outcome).not.toHaveProperty("reference");
+  });
+
+  it("BDD-SLO-483 fails closed for an invalid authoritative proof", async () => {
+    const dependencies = fixedDependencies();
+    const normalized = setup().store;
+    await createIntakeCoordinator(normalized, dependencies).accept({
+      clientOperationId: operationId,
+      draft: draft(),
+    });
+    const persisted = normalized.commits[0]!;
+    const coordinator = createIntakeCoordinator(
+      {
+        acceptAuthoritatively: async () => ({
+          acceptance: {
+            ...persisted,
+            idempotency: { ...persisted.idempotency, protectedProof: "sealed:short" },
+          },
+          replayed: true,
+        }),
+      },
+      dependencies,
+    );
+    await expect(
+      coordinator.accept({ clientOperationId: operationId, draft: draft() }),
+    ).resolves.toEqual({ status: "retryable", code: "INTAKE_UNAVAILABLE" });
+  });
+
   it("BDD-INTAKE-001 commits the complete acceptance invariant before success", async () => {
     const { coordinator, store } = setup();
 

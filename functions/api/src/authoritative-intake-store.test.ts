@@ -30,7 +30,7 @@ function setup(status: "applied" | "replayed" = "applied") {
 describe("ADR-015 authoritative intake acceptance", () => {
   it("BDD-SLO-471 persists acceptance through one deterministic commit", async () => {
     const target = setup();
-    await expect(target.store.accept(acceptance)).resolves.toEqual({
+    await expect(target.store.acceptAuthoritatively(acceptance)).resolves.toEqual({
       acceptance,
       replayed: false,
     });
@@ -61,7 +61,7 @@ describe("ADR-015 authoritative intake acceptance", () => {
     };
     const target = setup("replayed");
     target.open.mockReturnValueOnce(original);
-    await expect(target.store.accept(acceptance)).resolves.toEqual({
+    await expect(target.store.acceptAuthoritatively(acceptance)).resolves.toEqual({
       acceptance: original,
       replayed: true,
     });
@@ -74,7 +74,7 @@ describe("ADR-015 authoritative intake acceptance", () => {
       status: "applied",
       commit: { ...commit, id: "commit_other" },
     }));
-    await expect(target.store.accept(acceptance)).rejects.toThrow(
+    await expect(target.store.acceptAuthoritatively(acceptance)).rejects.toThrow(
       "AUTHORITATIVE_INTAKE_COMMIT_INVALID",
     );
   });
@@ -86,10 +86,10 @@ describe("ADR-015 authoritative intake acceptance", () => {
       { accept: preview.accept },
       { seal: preview.seal, open: preview.open },
     );
-    await production.accept(acceptance);
+    await production.acceptAuthoritatively(acceptance);
     const productionId = preview.accept.mock.calls[0]?.[0].id;
     const changed = setup();
-    await changed.store.accept({
+    await changed.store.acceptAuthoritatively({
       ...acceptance,
       idempotency: {
         ...acceptance.idempotency,

@@ -93,6 +93,13 @@ export interface IntakeStore {
   commit(input: AcceptanceCommit): Promise<void>;
 }
 
+export interface AuthoritativeIntakeStore {
+  acceptAuthoritatively(input: AcceptanceCommit): Promise<{
+    readonly acceptance: AcceptanceCommit;
+    readonly replayed: boolean;
+  }>;
+}
+
 export interface IntakeDependencies {
   readonly createFeedbackId: () => string;
   readonly createReporterId: () => string;
@@ -181,7 +188,7 @@ function validAttachmentGrants(command: IntakeCommand): boolean {
 }
 
 export function createIntakeCoordinator(
-  store: IntakeStore,
+  store: IntakeStore | AuthoritativeIntakeStore,
   dependencies: IntakeDependencies,
 ): IntakeCoordinator {
   return {
@@ -195,12 +202,14 @@ export function createIntakeCoordinator(
 
       const scopeKey = `${command.draft.workspaceId}:${command.draft.projectId}`;
       let payloadDigest: string;
-      let existing: IdempotencyRecord | null;
+      let existing: IdempotencyRecord | null = null;
       try {
         payloadDigest = required(
           dependencies.digestPayload(command.draft, command.attachmentGrants ?? []),
         );
-        existing = await store.findIdempotency(scopeKey, command.clientOperationId);
+        if ("findIdempotency" in store) {
+          existing = await store.findIdempotency(scopeKey, command.clientOperationId);
+        }
       } catch {
         return retryable();
       }
@@ -316,6 +325,25 @@ export function createIntakeCoordinator(
             }),
           ),
         };
+        if ("acceptAuthoritatively" in store) {
+          const result = await store.acceptAuthoritatively(commit);
+          const persisted = result.acceptance.idempotency;
+          if (
+            persisted.scopeKey !== scopeKey ||
+            persisted.clientOperationId !== command.clientOperationId ||
+            persisted.payloadDigest !== payloadDigest
+          ) {
+            return { status: "rejected", code: "OPERATION_CONFLICT" };
+          }
+          const proof = dependencies.openProof(persisted.protectedProof);
+          if (
+            proof.length < 43 ||
+            dependencies.hashProof(proof) !== persisted.proofVerifier
+          ) {
+            return retryable();
+          }
+          return accepted(persisted, proof, result.replayed);
+        }
         await store.commit(commit);
         return accepted(commit.idempotency, issued.proof, false);
       } catch {

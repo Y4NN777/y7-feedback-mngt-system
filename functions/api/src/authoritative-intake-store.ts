@@ -11,7 +11,7 @@ export interface AuthoritativeIntakeEnvelopeCodec extends AuthoritativeIntakeEnv
 }
 
 export interface AuthoritativeIntakeAcceptanceStore {
-  accept(input: AcceptanceCommit): Promise<{
+  acceptAuthoritatively(input: AcceptanceCommit): Promise<{
     readonly acceptance: AcceptanceCommit;
     readonly replayed: boolean;
   }>;
@@ -37,7 +37,7 @@ export function createAuthoritativeIntakeStore(
   envelope: AuthoritativeIntakeEnvelopeCodec,
 ): AuthoritativeIntakeAcceptanceStore {
   return {
-    async accept(input) {
+    async acceptAuthoritatively(input) {
       const id = commitId(environment, input);
       const sealedPayload = envelope.seal(id, input);
       const planned = planAuthoritativeCommit(
