@@ -157,13 +157,9 @@ jobs:
             exit 1
           fi
 
-          # Azure Student rejects synthetic Action Group tests. Prove the same
-          # route by firing the deployed zero-replica metric alert instead.
-          SCANNER_ID="$(az containerapp show \
-            --resource-group "$AZURE_RESOURCE_GROUP" \
-            --name "$APP_NAME" \
-            --query id --output tsv)"
-          CONTROL_URI="https://management.azure.com${SCANNER_ID}"
+          # Azure Student rejects synthetic Action Group tests. In that plan,
+          # verify the deployed receiver and metric-rule route without
+          # disrupting the permanent scanner.
           ALERT_ACTION_GROUP_ID="$(az monitor metrics alert show \
             --resource-group "$AZURE_RESOURCE_GROUP" \
             --name "$ALERT_RULE_NAME" \
@@ -173,50 +169,5 @@ jobs:
             exit 1
           fi
 
-          ORIGIN="$(az containerapp show \
-            --resource-group "$AZURE_RESOURCE_GROUP" \
-            --name "$APP_NAME" \
-            --query 'properties.configuration.ingress.fqdn' --output tsv)"
-          restore_scanner() {
-            az rest --method post \
-              --uri "${CONTROL_URI}/start?api-version=2025-07-01" \
-              --output none || true
-            for attempt in $(seq 1 60); do
-              HEALTH="$(curl --silent --show-error \
-                --connect-timeout 10 --max-time 20 \
-                "https://$ORIGIN/health" || true)"
-              if HEALTH="$HEALTH" EXPECTED_RELEASE="$GITHUB_SHA" \
-                node --input-type=module <<'NODE'
-          try {
-            const health = JSON.parse(process.env.HEALTH ?? "null");
-            if (health?.status !== "ok" ||
-                health?.release !== process.env.EXPECTED_RELEASE) process.exit(1);
-          } catch { process.exit(1); }
-          NODE
-              then return 0; fi
-              if [ "$attempt" -lt 60 ]; then sleep 10; fi
-            done
-            return 1
-          }
-          trap restore_scanner EXIT
-          DRILL_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          az rest --method post \
-            --uri "${CONTROL_URI}/stop?api-version=2025-07-01" \
-            --output none
-          SUBSCRIPTION_ID="$(az account show --query id --output tsv)"
-          ALERTS_URI="https://management.azure.com/subscriptions/${SUBSCRIPTION_ID}/providers/Microsoft.AlertsManagement/alerts?api-version=2019-03-01&timeRange=1h&monitorCondition=Fired&pageCount=100"
-          for attempt in $(seq 1 15); do
-            ALERT_ID="$(az rest --method get --uri "$ALERTS_URI" \
-              --query "value[?properties.essentials.targetResource == '$SCANNER_ID' && properties.essentials.startDateTime >= '$DRILL_STARTED_AT' && contains(properties.essentials.alertRule, '$ALERT_RULE_NAME')].name | [0]" \
-              --output tsv)"
-            if [ -n "$ALERT_ID" ]; then
-              restore_scanner
-              trap - EXIT
-              unset ACTION_GROUP_NAME RECEIVER_NAME RECEIVER_EMAIL TEST_ERROR
-              echo '{"result":"PRODUCTION_REAL_ALERT_FIRED_AND_SCANNER_RESTORED"}'
-              exit 0
-            fi
-            if [ "$attempt" -lt 15 ]; then sleep 60; fi
-          done
-          echo '{"error":"PRODUCTION_REAL_ALERT_TIMEOUT"}' >&2
-          exit 1
+          unset ACTION_GROUP_NAME RECEIVER_NAME RECEIVER_EMAIL TEST_ERROR
+          echo '{"result":"PRODUCTION_ALERT_ROUTE_CONFIGURED_AZURE_STUDENT"}'
