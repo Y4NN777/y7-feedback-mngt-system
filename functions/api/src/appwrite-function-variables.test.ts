@@ -118,6 +118,7 @@ describe("Appwrite Function variable policy", () => {
       ...environment,
       PROVIDER_OUTBOX_TRIGGER_SECRET: "",
       APPWRITE_PROVIDER_EVENT_INBOX_TABLE_ID: "",
+      INTAKE_PERSISTENCE_MODE: "",
       ANTIVIRUS_SCANNER_ENDPOINT: "",
       ANTIVIRUS_SCANNER_KEY_ID: "",
       ANTIVIRUS_SCANNER_HMAC_KEY: "",
@@ -136,6 +137,7 @@ describe("Appwrite Function variable policy", () => {
       expect.arrayContaining([
         "PROVIDER_OUTBOX_TRIGGER_SECRET",
         "APPWRITE_PROVIDER_EVENT_INBOX_TABLE_ID",
+        "INTAKE_PERSISTENCE_MODE",
         "ANTIVIRUS_SCANNER_ENDPOINT",
         "Y7_EMAIL_SMTP_HOST",
       ]),
@@ -154,6 +156,7 @@ describe("Appwrite Function variable policy", () => {
         "APPWRITE_EXCEPTIONAL_ACCESS_GRANTS_TABLE_ID",
         "APPWRITE_EXCEPTIONAL_ACCESS_AUDIT_TABLE_ID",
         "APPWRITE_EXCEPTIONAL_ACCESS_OPERATIONS_TABLE_ID",
+        "INTAKE_PERSISTENCE_MODE",
         "GITHUB_APP_CLIENT_ID",
         "GITHUB_APP_CLIENT_SECRET",
         "GITHUB_APP_CALLBACK_URL",
