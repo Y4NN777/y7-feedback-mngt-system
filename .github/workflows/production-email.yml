@@ -54,9 +54,7 @@ jobs:
           )"
           SENDER_DOMAIN="$(jq -er '.senderAddress.value' <<<"$DEPLOYMENT_OUTPUT")"
           SMTP_AUTH_USERNAME="$(jq -er '.smtpUsername.value' <<<"$DEPLOYMENT_OUTPUT")"
-          PRINCIPAL_ID="$(az ad sp show \
-            --id "${{ vars.Y7_PRODUCTION_SMTP_ENTRA_CLIENT_ID }}" \
-            --query id --output tsv)"
+          PRINCIPAL_ID="${{ vars.Y7_PRODUCTION_SMTP_ENTRA_PRINCIPAL_ID }}"
           ROLE_ASSIGNMENT_ID="$(az role assignment list \
             --assignee "$PRINCIPAL_ID" \
             --role "Communication and Email Service Owner" \

@@ -184,13 +184,15 @@ test("BDD-REL-304 provisions Production SMTP through protected OIDC authority", 
   assert.match(workflow, /azure\/login@[0-9a-f]{40}/u);
   assert.match(workflow, /AZURE_PRODUCTION_CLIENT_ID/u);
   assert.match(workflow, /Y7_PRODUCTION_SMTP_ENTRA_CLIENT_ID/u);
+  assert.match(workflow, /Y7_PRODUCTION_SMTP_ENTRA_PRINCIPAL_ID/u);
   assert.match(
     workflow,
     /entraApplicationId="\$\{\{ vars\.Y7_PRODUCTION_SMTP_ENTRA_CLIENT_ID \}\}"/u,
   );
+  assert.doesNotMatch(workflow, /az ad sp show/u);
   assert.match(
     workflow,
-    /az ad sp show[\s\S]*--id "\$\{\{ vars\.Y7_PRODUCTION_SMTP_ENTRA_CLIENT_ID \}\}"/u,
+    /PRINCIPAL_ID="\$\{\{ vars\.Y7_PRODUCTION_SMTP_ENTRA_PRINCIPAL_ID \}\}"/u,
   );
   assert.match(workflow, /Communication and Email Service Owner/u);
   assert.match(workflow, /role assignment list/u);
