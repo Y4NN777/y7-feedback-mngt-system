@@ -45,7 +45,7 @@ resource communicationService 'Microsoft.Communication/communicationServices@202
 
 resource smtpAuthority 'Microsoft.Communication/communicationServices/smtpUsernames@2025-09-01' = {
   parent: communicationService
-  name: smtpUsername
+  name: 'smtp-authority'
   properties: {
     entraApplicationId: entraApplicationId
     tenantId: tenantId
