@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   collectCriticalApiLoadSamples,
+  collectDashboardLoadSamples,
   collectSloEvidenceSamples,
 } from "./slo-g5-evidence";
 
@@ -48,5 +49,18 @@ describe("dedicated critical API load evidence", () => {
     expect(collectCriticalApiLoadSamples({ criticalApiLoadSamplesMs: [-1] })).toEqual(
       [],
     );
+  });
+});
+
+describe("dedicated Dashboard load evidence", () => {
+  it("BDD-SLO-220 accepts only finite non-negative Dashboard durations", () => {
+    expect(collectDashboardLoadSamples({ dashboardLoadSamplesMs: [18, 24] })).toEqual([
+      18, 24,
+    ]);
+    expect(collectDashboardLoadSamples({ dashboardLoadSamplesMs: [] })).toEqual([]);
+    expect(collectDashboardLoadSamples({})).toEqual([]);
+    expect(
+      collectDashboardLoadSamples({ dashboardLoadSamplesMs: [Number.NaN, -1] }),
+    ).toEqual([]);
   });
 });

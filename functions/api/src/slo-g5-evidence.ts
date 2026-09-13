@@ -46,3 +46,13 @@ export function collectCriticalApiLoadSamples(value: unknown): readonly number[]
   }
   return valid;
 }
+
+export function collectDashboardLoadSamples(value: unknown): readonly number[] {
+  const samples = record(value).dashboardLoadSamplesMs;
+  return Array.isArray(samples)
+    ? samples.filter(
+        (sample): sample is number =>
+          typeof sample === "number" && Number.isFinite(sample) && sample >= 0,
+      )
+    : [];
+}
