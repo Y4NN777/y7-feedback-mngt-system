@@ -278,10 +278,8 @@ jobs:
           curl --fail --silent --show-error --max-time 30 \
             "$PRODUCTION_WEB_ORIGIN/" >/dev/null
 
-          pnpm dlx vercel@50.35.0 rollback "$PREVIOUS_WEB_DEPLOYMENT_TARGET" --yes \
-            --scope "$VERCEL_ORG_ID" --token "$VERCEL_TOKEN" >/dev/null
-          pnpm dlx vercel@50.35.0 rollback status \
-            --scope "$VERCEL_ORG_ID" --token "$VERCEL_TOKEN" >/dev/null
+          pnpm dlx vercel@50.35.0 promote "$PREVIOUS_WEB_DEPLOYMENT_TARGET" \
+            --scope "$VERCEL_ORG_ID" --yes --token "$VERCEL_TOKEN" >/dev/null
           await_vercel_deployment "$PRODUCTION_WEB_ORIGIN" "$PREVIOUS_WEB_DEPLOYMENT_ID"
           curl --fail --silent --show-error --max-time 30 \
             "$PRODUCTION_WEB_ORIGIN/" >/dev/null
