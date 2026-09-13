@@ -44,7 +44,7 @@ jobs:
             --parameters \
               emailServiceName="$EMAIL_SERVICE_NAME" \
               communicationServiceName="$COMMUNICATION_SERVICE_NAME" \
-              entraApplicationId="${{ vars.AZURE_PRODUCTION_CLIENT_ID }}" \
+              entraApplicationId="${{ vars.Y7_PRODUCTION_SMTP_ENTRA_CLIENT_ID }}" \
               tenantId="${{ vars.AZURE_TENANT_ID }}" \
               smtpUsername="$SMTP_USERNAME" \
             --query properties.outputs \
@@ -55,7 +55,7 @@ jobs:
           SENDER_DOMAIN="$(jq -er '.senderAddress.value' <<<"$DEPLOYMENT_OUTPUT")"
           SMTP_AUTH_USERNAME="$(jq -er '.smtpUsername.value' <<<"$DEPLOYMENT_OUTPUT")"
           PRINCIPAL_ID="$(az ad sp show \
-            --id "${{ vars.AZURE_PRODUCTION_CLIENT_ID }}" \
+            --id "${{ vars.Y7_PRODUCTION_SMTP_ENTRA_CLIENT_ID }}" \
             --query id --output tsv)"
           ROLE_ASSIGNMENT_ID="$(az role assignment list \
             --assignee "$PRINCIPAL_ID" \
