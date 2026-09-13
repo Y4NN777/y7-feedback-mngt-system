@@ -68,6 +68,7 @@ function conflict(error: unknown): boolean {
 
 function commitFromRow(value: Readonly<Record<string, unknown>>): AuthoritativeCommit {
   try {
+    const acceptedAt = new Date(value.acceptedAt as string).toISOString();
     return planAuthoritativeCommit(
       {
         environment: value.environment as AuthoritativeCommit["environment"],
@@ -81,7 +82,7 @@ function commitFromRow(value: Readonly<Record<string, unknown>>): AuthoritativeC
         actorId: value.actorId as string,
         payloadDigest: value.payloadDigest as string,
         sealedPayload: value.sealedPayload as string,
-        acceptedAt: value.acceptedAt as string,
+        acceptedAt,
       },
       () => value.$id as string,
     );
