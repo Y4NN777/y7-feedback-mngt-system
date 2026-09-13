@@ -333,6 +333,15 @@ describe("trusted environment contract", () => {
     }
   });
 
+  it("BDD-ABUSE-CONFIG-001 identifies an invalid anti-abuse keyring", () => {
+    expect(() =>
+      parseServerConfig({
+        ...validServer,
+        ABUSE_HMAC_ACTIVE_KEY_ID: "missing",
+      }),
+    ).toThrow(new ConfigError("ABUSE_HMAC_KEYS_INVALID"));
+  });
+
   it("BDD-ISSUE-CONFIG-001 requires a canonical secure Web origin", () => {
     expect(
       parseServerConfig({
