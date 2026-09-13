@@ -163,6 +163,7 @@ jobs:
             --resource-group "$AZURE_RESOURCE_GROUP" \
             --name "$APP_NAME" \
             --query id --output tsv)"
+          CONTROL_URI="https://management.azure.com${SCANNER_ID}"
           ALERT_ACTION_GROUP_ID="$(az monitor metrics alert show \
             --resource-group "$AZURE_RESOURCE_GROUP" \
             --name "$ALERT_RULE_NAME" \
@@ -177,9 +178,8 @@ jobs:
             --name "$APP_NAME" \
             --query 'properties.configuration.ingress.fqdn' --output tsv)"
           restore_scanner() {
-            az containerapp start \
-              --resource-group "$AZURE_RESOURCE_GROUP" \
-              --name "$APP_NAME" \
+            az rest --method post \
+              --uri "${CONTROL_URI}/start?api-version=2025-07-01" \
               --output none || true
             for attempt in $(seq 1 60); do
               HEALTH="$(curl --silent --show-error \
@@ -200,9 +200,8 @@ jobs:
           }
           trap restore_scanner EXIT
           DRILL_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          az containerapp stop \
-            --resource-group "$AZURE_RESOURCE_GROUP" \
-            --name "$APP_NAME" \
+          az rest --method post \
+            --uri "${CONTROL_URI}/stop?api-version=2025-07-01" \
             --output none
           SUBSCRIPTION_ID="$(az account show --query id --output tsv)"
           ALERTS_URI="https://management.azure.com/subscriptions/${SUBSCRIPTION_ID}/providers/Microsoft.AlertsManagement/alerts?api-version=2019-03-01&timeRange=1h&monitorCondition=Fired&pageCount=100"
