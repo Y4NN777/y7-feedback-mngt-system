@@ -30,6 +30,7 @@ export function createProviderMaintenance(input: {
   readonly webhooks?: ProviderMaintenanceCapability;
   readonly privacy?: ProviderMaintenanceCapability;
   readonly platform?: ProviderMaintenanceCapability;
+  readonly authoritativeProjections?: ProviderMaintenanceCapability;
 }): ProviderMaintenance {
   const capabilities = Object.entries(input) as Array<
     [
@@ -42,6 +43,7 @@ export function createProviderMaintenance(input: {
         | "webhooks"
         | "privacy"
         | "platform"
+        | "authoritativeProjections"
       ),
       ProviderMaintenanceCapability,
     ]
