@@ -317,6 +317,12 @@ test("BDD-REL-302 deploys the Production scanner only through protected OIDC", a
   assert.match(workflow, /--action-group "\$ACTION_GROUP_NAME"/u);
   assert.match(workflow, /--alert-type metricstaticthreshold/u);
   assert.match(workflow, /PRODUCTION_ALERT_TEST_SUBMITTED/u);
+  assert.match(workflow, /Free subscription not supported/u);
+  assert.match(workflow, /az containerapp stop/u);
+  assert.match(workflow, /trap restore_scanner EXIT/u);
+  assert.match(workflow, /az containerapp start/u);
+  assert.match(workflow, /Microsoft\.AlertsManagement\/alerts/u);
+  assert.match(workflow, /PRODUCTION_REAL_ALERT_FIRED_AND_SCANNER_RESTORED/u);
   assert.match(workflow, /curl --fail --silent --show-error/u);
   assert.doesNotMatch(workflow, /AZURE_(?:CLIENT_)?SECRET/u);
   assert.doesNotMatch(workflow, /delete|rm -rf/u);
