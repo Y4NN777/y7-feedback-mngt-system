@@ -434,8 +434,8 @@ test("BDD-REL-406 stages, promotes, rolls back and restores Production", async (
   assert.match(workflow, /VERCEL_TOKEN: \$\{\{ secrets\.VERCEL_TOKEN \}\}/u);
   assert.equal(
     workflow.match(/--scope "\$VERCEL_ORG_ID"/gu)?.length,
-    7,
-    "every Vercel mutation and rollback command must target the owning team",
+    6,
+    "every Vercel mutation and routing check must target the owning team",
   );
   assert.match(
     workflow,
@@ -482,11 +482,13 @@ test("BDD-REL-406 stages, promotes, rolls back and restores Production", async (
   );
   assert.match(workflow, /--build-env VITE_RELEASE="\$GITHUB_SHA"/u);
   assert.match(workflow, /vercel@50\.35\.0 promote/u);
-  assert.match(
-    workflow,
-    /vercel@50\.35\.0 rollback "\$PREVIOUS_WEB_DEPLOYMENT_TARGET"/u,
+  assert.equal(
+    workflow.match(/vercel@50\.35\.0 promote "\$PREVIOUS_WEB_DEPLOYMENT_TARGET"/gu)
+      ?.length,
+    2,
+    "the rehearsal and failure cleanup must restore the captured deployment deterministically",
   );
-  assert.match(workflow, /vercel@50\.35\.0 rollback status/u);
+  assert.doesNotMatch(workflow, /vercel@50\.35\.0 rollback/u);
   assert.match(workflow, /api\.vercel\.com\/v13\/deployments/u);
   assert.match(workflow, /PREVIOUS_WEB_DEPLOYMENT_ID/u);
   assert.match(workflow, /PREVIOUS_WEB_DEPLOYMENT_TARGET/u);
