@@ -57,17 +57,20 @@ jobs:
           PRINCIPAL_ID="$(az ad sp show \
             --id "${{ vars.AZURE_PRODUCTION_CLIENT_ID }}" \
             --query id --output tsv)"
-          az role assignment create \
-            --assignee-object-id "$PRINCIPAL_ID" \
-            --assignee-principal-type ServicePrincipal \
+          ROLE_ASSIGNMENT_ID="$(az role assignment list \
+            --assignee "$PRINCIPAL_ID" \
             --role "Communication and Email Service Owner" \
             --scope "$COMMUNICATION_SERVICE_ID" \
-            --output none
+            --query '[0].id' --output tsv)"
+          if [ -z "$ROLE_ASSIGNMENT_ID" ]; then
+            echo '{"error":"PRODUCTION_EMAIL_ROLE_ASSIGNMENT_MISSING"}' >&2
+            exit 1
+          fi
           {
             printf 'sender=%s\n' "donotreply@$SENDER_DOMAIN"
             printf 'username=%s\n' "$SMTP_AUTH_USERNAME"
           } >>"$GITHUB_OUTPUT"
-          unset DEPLOYMENT_OUTPUT PRINCIPAL_ID COMMUNICATION_SERVICE_ID
+          unset DEPLOYMENT_OUTPUT PRINCIPAL_ID COMMUNICATION_SERVICE_ID ROLE_ASSIGNMENT_ID
           echo '{"result":"PRODUCTION_EMAIL_AUTHORITY_PROVISIONED"}'
       - name: Verify non-secret SMTP configuration
         shell: bash
