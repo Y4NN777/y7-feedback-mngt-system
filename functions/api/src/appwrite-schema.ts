@@ -630,6 +630,12 @@ export function createAppwriteInfrastructureManifest(
         [
           index("projection_available", ["projectionState", "availableAt"]),
           index("aggregate_accepted", ["aggregateKind", "aggregateId", "acceptedAt"]),
+          index("aggregate_projection_accepted", [
+            "aggregateKind",
+            "aggregateId",
+            "projectionState",
+            "acceptedAt",
+          ]),
           index("workspace_project", ["workspaceId", "projectId"]),
         ],
       ),

@@ -117,6 +117,9 @@ export async function verifySloG5() {
   if ((process.env.Y7_ENVIRONMENT?.trim() || "preview") !== "preview")
     throw new Error("SLO_G5_PREVIEW_REQUIRED");
   const release = required("RELEASE");
+  const healthUrl = new URL("/health", required("Y7_FUNCTION_DOMAIN_URL")).toString();
+  const rootUrl = required("Y7_WEB_ORIGIN");
+  if (!(await probeUrl(healthUrl))) throw new Error("SLO_G5_WARMUP_FAILED");
   const startedAt = new Date().toISOString();
   const [evidence, mail, attachment] = await Promise.all([
     Promise.all(commands.map((command) => runScript(command))),
@@ -163,8 +166,6 @@ export async function verifySloG5() {
   if (report.series.some(({ metric }) => !present.has(metric)))
     throw new Error("SLO_G5_SERIES_INCOMPLETE");
 
-  const healthUrl = new URL("/health", required("Y7_FUNCTION_DOMAIN_URL")).toString();
-  const rootUrl = required("Y7_WEB_ORIGIN");
   const [syntheticUptimePassed, webRumOriginPassed] = await Promise.all([
     probeUrl(healthUrl),
     probeUrl(rootUrl),

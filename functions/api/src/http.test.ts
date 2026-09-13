@@ -589,6 +589,31 @@ describe("trusted API entrypoint", () => {
     );
   });
 
+  it("ADR-015 routes native Appwrite commit events to immediate projection", async () => {
+    const runOnce = vi.fn(() => Promise.resolve({ status: "completed" }));
+    const scheduledRunOnce = vi.fn(() => Promise.resolve({ status: "completed" }));
+    const publicHandle = vi.fn<PublicApi["handle"]>();
+    const { context, json } = createContext("POST", "/", {
+      headers: { "x-appwrite-trigger": "event" },
+    });
+
+    await routeRequest(context, {
+      ...dependencies,
+      authoritativeProjection: { runOnce },
+      providerMaintenance: { runOnce: scheduledRunOnce },
+      publicApi: { handle: publicHandle },
+    });
+
+    expect(runOnce).toHaveBeenCalledOnce();
+    expect(scheduledRunOnce).not.toHaveBeenCalled();
+    expect(publicHandle).not.toHaveBeenCalled();
+    expect(json).toHaveBeenCalledWith(
+      { status: "completed" },
+      200,
+      expect.objectContaining({ "cache-control": "no-store" }),
+    );
+  });
+
   it("BDD-SYNC-068 fails a scheduled execution when maintenance is unavailable", async () => {
     const { context, json } = createContext("POST", "/", {
       headers: { "x-appwrite-trigger": "schedule" },

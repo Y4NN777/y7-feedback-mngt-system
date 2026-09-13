@@ -11,7 +11,10 @@ import type { PublicApi } from "./public-api.js";
 import type { ProjectAdministrationHttp } from "./project-administration-http.js";
 import type { ProviderIssueOutboxHttp } from "./provider-issue-outbox-http.js";
 import type { ProviderEventInboxHttp } from "./provider-event-inbox-http.js";
-import type { ProviderMaintenance } from "./provider-maintenance.js";
+import type {
+  ProviderMaintenance,
+  ProviderMaintenanceCapability,
+} from "./provider-maintenance.js";
 import { ProviderMaintenanceFailure } from "./provider-maintenance.js";
 import type { ProviderMaintenanceHttp } from "./provider-maintenance-http.js";
 import type { ProviderWebhookHttpResponse } from "./provider-webhook-http.js";
@@ -70,6 +73,7 @@ export interface HttpDependencies {
   readonly providerIssueOutbox?: ProviderIssueOutboxHttp;
   readonly providerEventInbox?: ProviderEventInboxHttp;
   readonly providerMaintenance?: ProviderMaintenance;
+  readonly authoritativeProjection?: ProviderMaintenanceCapability;
   readonly providerMaintenanceHttp?: ProviderMaintenanceHttp;
   readonly providerWebhook?: {
     readonly handle: (request: {
@@ -152,7 +156,10 @@ export async function routeRequest(
   }
 
   const isHealth = method === "GET" && req.path === "/health";
-  const isProviderMaintenance = requestHeaders["x-appwrite-trigger"] === "schedule";
+  const appwriteTrigger = requestHeaders["x-appwrite-trigger"];
+  const isScheduledMaintenance = appwriteTrigger === "schedule";
+  const isAuthoritativeProjection = appwriteTrigger === "event";
+  const isProviderMaintenance = isScheduledMaintenance || isAuthoritativeProjection;
   const isIngressProbe =
     dependencies.environment === "preview" &&
     method === "POST" &&
@@ -200,7 +207,11 @@ export async function routeRequest(
   }
   const probeResponse = isIngressProbe ? ingressProbe(req) : null;
   const maintenanceResponse = isProviderMaintenance
-    ? await dependencies.providerMaintenance
+    ? await (
+        isAuthoritativeProjection
+          ? dependencies.authoritativeProjection
+          : dependencies.providerMaintenance
+      )
         ?.runOnce()
         .then((body) => ({ statusCode: 200 as const, body }))
         .catch((error: unknown) => {

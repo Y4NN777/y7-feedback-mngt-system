@@ -25,7 +25,11 @@ function setup(status: "applied" | "replayed" = "applied") {
   const accept = vi.fn((commit: AuthoritativeCommit) =>
     Promise.resolve({ status, commit }),
   );
-  const store = createAuthoritativeIntakeStore("preview", { accept }, { seal, open });
+  const store = createAuthoritativeIntakeStore(
+    "preview",
+    { accept, find: () => Promise.resolve(null) },
+    { seal, open },
+  );
   return { store, seal, open, accept };
 }
 
@@ -87,7 +91,7 @@ describe("ADR-015 authoritative intake acceptance", () => {
     const preview = setup();
     const production = createAuthoritativeIntakeStore(
       "production",
-      { accept: preview.accept },
+      { accept: preview.accept, find: () => Promise.resolve(null) },
       { seal: preview.seal, open: preview.open },
     );
     await production.acceptAuthoritatively(acceptance);

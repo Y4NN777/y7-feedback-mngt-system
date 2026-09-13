@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { AuthoritativeCommitError } from "@y7-feedback/domain";
+
 import type { AccountlessAccessCoordinator } from "./accountless-access";
 import {
   AppwriteConversationProjectionError,
@@ -501,6 +503,19 @@ describe("trusted Conversation and lifecycle orchestration", () => {
         }),
       ).resolves.toEqual({ status });
     }
+    for (const [code, status] of [
+      ["AUTHORITATIVE_COMMIT_CONFLICT", "conflict"],
+      ["AUTHORITATIVE_COMMIT_INVALID", "invalid"],
+    ] as const) {
+      target.execute.mockRejectedValueOnce(new AuthoritativeCommitError(code));
+      await expect(
+        target.coordinator.executeWorkspace({
+          ...context,
+          jwt: "valid.jwt.token",
+          command: message,
+        }),
+      ).resolves.toEqual({ status });
+    }
     target.execute.mockRejectedValueOnce(new Error("adapter detail"));
     await expect(
       target.coordinator.executeWorkspace({
@@ -509,5 +524,8 @@ describe("trusted Conversation and lifecycle orchestration", () => {
         command: message,
       }),
     ).resolves.toEqual({ status: "retryable" });
+    expect(
+      target.execute.mock.calls.flatMap(([value]) => Object.keys(value)),
+    ).not.toEqual(expect.arrayContaining(["jwt", "reference", "proof"]));
   });
 });

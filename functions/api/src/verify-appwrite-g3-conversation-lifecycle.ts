@@ -247,16 +247,21 @@ async function main(): Promise<void> {
     };
     await command("workspace", note);
     await command("workspace", question);
-    const idempotency = await tables.listRows({
-      databaseId: config.appwriteSchema.databaseId,
-      tableId: config.appwriteSchema.conversationIdempotencyTableId,
-      queries: [
-        Query.equal("feedbackId", [feedbackId]),
-        Query.equal("operationId", [question.eventId]),
-        Query.limit(2),
-      ],
-      total: false,
-    });
+    let idempotency: { readonly rows: readonly unknown[] } | undefined;
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      idempotency = await tables.listRows({
+        databaseId: config.appwriteSchema.databaseId,
+        tableId: config.appwriteSchema.conversationIdempotencyTableId,
+        queries: [
+          Query.equal("feedbackId", [feedbackId]),
+          Query.equal("operationId", [question.eventId]),
+          Query.limit(2),
+        ],
+        total: false,
+      });
+      if (idempotency.rows.length === 1) break;
+      await wait(250);
+    }
     const expectedDigest = createHash("sha256")
       .update(
         JSON.stringify({
@@ -267,9 +272,11 @@ async function main(): Promise<void> {
         }),
       )
       .digest("base64url");
+    const idempotencyRow: unknown = idempotency?.rows[0];
     if (
-      idempotency.rows.length !== 1 ||
-      idempotency.rows[0]?.payloadDigest !== expectedDigest
+      idempotency?.rows.length !== 1 ||
+      !object(idempotencyRow) ||
+      idempotencyRow.payloadDigest !== expectedDigest
     ) {
       throw new Error("APPWRITE_G3_CONVERSATION_DEPLOYMENT_DIGEST_STALE");
     }
@@ -361,6 +368,29 @@ async function main(): Promise<void> {
     ) {
       throw new Error("APPWRITE_G3_CONVERSATION_WORKSPACE_PROJECTION_INVALID");
     }
+    if (config.intakePersistenceMode === "authoritative") {
+      let projectionsComplete = false;
+      for (let attempt = 0; attempt < 60; attempt += 1) {
+        const commits = await tables.listRows({
+          databaseId: config.appwriteSchema.databaseId,
+          tableId: config.appwriteSchema.authoritativeCommitsTableId,
+          queries: [
+            Query.equal("aggregateKind", ["conversation"]),
+            Query.equal("aggregateId", [feedbackId]),
+            Query.limit(20),
+          ],
+          total: false,
+        });
+        projectionsComplete =
+          commits.rows.length === 9 &&
+          commits.rows.every((row) => row.projectionState === "projected");
+        if (projectionsComplete) break;
+        await wait(250);
+      }
+      if (!projectionsComplete) {
+        throw new Error("APPWRITE_G3_CONVERSATION_PROJECTION_TIMEOUT");
+      }
+    }
     const direct = new TablesDB(
       new Client()
         .setEndpoint(config.appwriteEndpoint)
@@ -393,6 +423,28 @@ async function main(): Promise<void> {
       }
     }
   } finally {
+    if (config.intakePersistenceMode === "authoritative") {
+      try {
+        const commits = await tables.listRows({
+          databaseId: config.appwriteSchema.databaseId,
+          tableId: config.appwriteSchema.authoritativeCommitsTableId,
+          queries: [
+            Query.equal("aggregateKind", ["conversation"]),
+            Query.equal("aggregateId", [feedbackId]),
+            Query.limit(100),
+          ],
+          total: false,
+        });
+        for (const commit of commits.rows) {
+          await deleteRowReliably(
+            config.appwriteSchema.authoritativeCommitsTableId,
+            commit.$id,
+          );
+        }
+      } catch {
+        // Cleanup continues so every independently known fixture is attempted.
+      }
+    }
     for (const tableId of [
       config.appwriteSchema.conversationIdempotencyTableId,
       config.appwriteSchema.conversationLifecycleTableId,
@@ -461,8 +513,10 @@ async function main(): Promise<void> {
 }
 
 void main().catch((error: unknown) => {
-  process.stderr.write(
-    `${error instanceof Error ? error.message : "APPWRITE_G3_CONVERSATION_FAILED"}\n`,
-  );
+  const code =
+    error instanceof Error && /^[A-Z][A-Z0-9_:.-]{2,160}$/u.test(error.message)
+      ? error.message
+      : "APPWRITE_G3_CONVERSATION_FAILED";
+  process.stderr.write(`${JSON.stringify({ status: "error", code })}\n`);
   process.exitCode = 1;
 });

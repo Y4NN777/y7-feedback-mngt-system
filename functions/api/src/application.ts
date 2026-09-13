@@ -16,7 +16,14 @@ import { createNodeAppwriteAuthoritativeProjectionStore } from "./appwrite-autho
 import { createAuthoritativeIntakeEnvelope } from "./authoritative-intake-envelope.js";
 import { createAuthoritativeIntakeProjectionHandler } from "./authoritative-intake-projector.js";
 import { createAuthoritativeIntakeStore } from "./authoritative-intake-store.js";
+import { createAuthoritativeConversationEnvelope } from "./authoritative-conversation-envelope.js";
+import {
+  authoritativeProjectionErrorCode,
+  createAuthoritativeConversationProjectionHandler,
+} from "./authoritative-conversation-projector.js";
+import { createAuthoritativeConversationStore } from "./authoritative-conversation-store.js";
 import { createAuthoritativeProjector } from "./authoritative-projector.js";
+import { createAuthoritativeProjectionRouter } from "./authoritative-projection-router.js";
 import { createNodeAppwriteOutboxStore } from "./appwrite-outbox-store.js";
 import { createNodeAppwriteNotificationRecipientResolver } from "./appwrite-notification-recipient-resolver.js";
 import { createNodeAppwriteIntelligenceStore } from "./appwrite-intelligence-store.js";
@@ -36,6 +43,8 @@ import {
 import { createNodeAppwritePlatformAuthority } from "./appwrite-platform-authority.js";
 import { createNodeAppwritePlatformContentReader } from "./appwrite-platform-content-reader.js";
 import { createNodeAppwriteConversationLifecycleStore } from "./appwrite-conversation-lifecycle-store.js";
+import { createNodeAppwriteConversationPendingCommitReader } from "./appwrite-conversation-pending-commits.js";
+import { createNodeAppwriteConversationPreflight } from "./appwrite-conversation-preflight.js";
 import { createNodeAppwriteConversationProjectionStore } from "./appwrite-conversation-projection-store.js";
 import { createNodeAppwriteProjectAdministrationStore } from "./appwrite-project-administration-store.js";
 import { createNodeAppwritePublicProjectReader } from "./appwrite-public-project-reader.js";
@@ -120,7 +129,10 @@ import { createProviderMessageAuthorVerifier } from "./provider-message-authorit
 import { createProviderMessageEventHandler } from "./provider-message-event.js";
 import { createProviderEventInboxWorker } from "./provider-event-inbox.js";
 import { createProviderEventInboxHttp } from "./provider-event-inbox-http.js";
-import { createProviderMaintenance } from "./provider-maintenance.js";
+import {
+  createProviderMaintenance,
+  type ProviderMaintenanceCapability,
+} from "./provider-maintenance.js";
 import { createProviderMaintenanceHttp } from "./provider-maintenance-http.js";
 import { createProviderWebhookReconciliation } from "./provider-webhook-reconciliation.js";
 import { createAbuseGate } from "./abuse.js";
@@ -654,44 +666,75 @@ export function createHttpApplication(
       principalVerifier,
       workspaceScope,
       accountless,
-      createNodeAppwriteConversationLifecycleStore(
-        runtime.tables,
-        {
-          databaseId: config.appwriteSchema.databaseId,
-          feedbackTableId: config.appwriteSchema.feedbackTableId,
-          messagesTableId: config.appwriteSchema.conversationMessagesTableId,
-          internalNotesTableId: config.appwriteSchema.conversationInternalNotesTableId,
-          lifecycleTableId: config.appwriteSchema.conversationLifecycleTableId,
-          idempotencyTableId: config.appwriteSchema.conversationIdempotencyTableId,
-          accessGrantsTableId: config.appwriteSchema.accessGrantsTableId,
-          reportersTableId: config.appwriteSchema.reportersTableId,
-          workspaceMembershipsTableId:
-            config.appwriteSchema.workspaceMembershipsTableId,
-          projectAssignmentsTableId: config.appwriteSchema.projectAssignmentsTableId,
-          notificationsTableId: config.appwriteSchema.notificationsTableId,
-          notificationSignalsTableId: config.appwriteSchema.notificationSignalsTableId,
-          outboxTableId: config.appwriteSchema.outboxTableId,
-        },
-        sensitive,
-        undefined,
-        createNodeAppwriteProviderMessageFanout(
+      (() => {
+        const normalized = createNodeAppwriteConversationLifecycleStore(
           runtime.tables,
           {
             databaseId: config.appwriteSchema.databaseId,
-            externalIssueLinksTableId: config.appwriteSchema.externalIssueLinksTableId,
-            publicationConsentsTableId:
-              config.appwriteSchema.publicationConsentsTableId,
-            providerSyncOutboxTableId: config.appwriteSchema.providerSyncOutboxTableId,
+            feedbackTableId: config.appwriteSchema.feedbackTableId,
+            messagesTableId: config.appwriteSchema.conversationMessagesTableId,
+            internalNotesTableId:
+              config.appwriteSchema.conversationInternalNotesTableId,
+            lifecycleTableId: config.appwriteSchema.conversationLifecycleTableId,
+            idempotencyTableId: config.appwriteSchema.conversationIdempotencyTableId,
+            accessGrantsTableId: config.appwriteSchema.accessGrantsTableId,
+            reportersTableId: config.appwriteSchema.reportersTableId,
+            workspaceMembershipsTableId:
+              config.appwriteSchema.workspaceMembershipsTableId,
+            projectAssignmentsTableId: config.appwriteSchema.projectAssignmentsTableId,
+            notificationsTableId: config.appwriteSchema.notificationsTableId,
+            notificationSignalsTableId:
+              config.appwriteSchema.notificationSignalsTableId,
+            outboxTableId: config.appwriteSchema.outboxTableId,
           },
           sensitive,
-        ),
-        runtime.conversationLifecycleDiagnostic === undefined
-          ? undefined
-          : {
-              nowMs: runtime.nowMs,
-              observe: runtime.conversationLifecycleDiagnostic,
+          undefined,
+          createNodeAppwriteProviderMessageFanout(
+            runtime.tables,
+            {
+              databaseId: config.appwriteSchema.databaseId,
+              externalIssueLinksTableId:
+                config.appwriteSchema.externalIssueLinksTableId,
+              publicationConsentsTableId:
+                config.appwriteSchema.publicationConsentsTableId,
+              providerSyncOutboxTableId:
+                config.appwriteSchema.providerSyncOutboxTableId,
             },
-      ),
+            sensitive,
+          ),
+          runtime.conversationLifecycleDiagnostic === undefined
+            ? undefined
+            : {
+                nowMs: runtime.nowMs,
+                observe: runtime.conversationLifecycleDiagnostic,
+              },
+        );
+        if (config.intakePersistenceMode !== "authoritative") return normalized;
+        const envelope = createAuthoritativeConversationEnvelope(
+          sensitive,
+          config.appwriteSchema.authoritativeCommitsTableId,
+        );
+        return createAuthoritativeConversationStore(
+          config.environment === "preview" ? "preview" : "production",
+          authoritativeCommitStore,
+          envelope,
+          createNodeAppwriteConversationPreflight(
+            runtime.tables,
+            {
+              databaseId: config.appwriteSchema.databaseId,
+              feedbackTableId: config.appwriteSchema.feedbackTableId,
+              lifecycleTableId: config.appwriteSchema.conversationLifecycleTableId,
+            },
+            {
+              commits: createNodeAppwriteConversationPendingCommitReader(
+                runtime.tables,
+                config.appwriteSchema,
+              ),
+              envelope,
+            },
+          ),
+        );
+      })(),
       createNodeAppwriteConversationProjectionStore(
         runtime.tables,
         {
@@ -1081,16 +1124,57 @@ export function createHttpApplication(
           log: (event) => runtime.notificationDiagnostic?.(event),
         })
       : undefined;
+  let authoritativeProjection: ProviderMaintenanceCapability | undefined;
   const providerMaintenance = (() => {
+    const normalizedConversationStore = createNodeAppwriteConversationLifecycleStore(
+      runtime.tables,
+      {
+        databaseId: config.appwriteSchema.databaseId,
+        feedbackTableId: config.appwriteSchema.feedbackTableId,
+        messagesTableId: config.appwriteSchema.conversationMessagesTableId,
+        internalNotesTableId: config.appwriteSchema.conversationInternalNotesTableId,
+        lifecycleTableId: config.appwriteSchema.conversationLifecycleTableId,
+        idempotencyTableId: config.appwriteSchema.conversationIdempotencyTableId,
+        accessGrantsTableId: config.appwriteSchema.accessGrantsTableId,
+        reportersTableId: config.appwriteSchema.reportersTableId,
+        workspaceMembershipsTableId: config.appwriteSchema.workspaceMembershipsTableId,
+        projectAssignmentsTableId: config.appwriteSchema.projectAssignmentsTableId,
+        notificationsTableId: config.appwriteSchema.notificationsTableId,
+        notificationSignalsTableId: config.appwriteSchema.notificationSignalsTableId,
+        outboxTableId: config.appwriteSchema.outboxTableId,
+      },
+      sensitive,
+      undefined,
+      createNodeAppwriteProviderMessageFanout(
+        runtime.tables,
+        {
+          databaseId: config.appwriteSchema.databaseId,
+          externalIssueLinksTableId: config.appwriteSchema.externalIssueLinksTableId,
+          publicationConsentsTableId: config.appwriteSchema.publicationConsentsTableId,
+          providerSyncOutboxTableId: config.appwriteSchema.providerSyncOutboxTableId,
+        },
+        sensitive,
+      ),
+    );
+    const conversationEnvelope = createAuthoritativeConversationEnvelope(
+      sensitive,
+      config.appwriteSchema.authoritativeCommitsTableId,
+    );
     const authoritativeProjector = createAuthoritativeProjector(
       createNodeAppwriteAuthoritativeProjectionStore(
         runtime.tables,
         config.appwriteSchema,
       ),
-      createAuthoritativeIntakeProjectionHandler(
-        authoritativeEnvelope,
-        normalizedIntakeStore,
-      ),
+      createAuthoritativeProjectionRouter({
+        feedback: createAuthoritativeIntakeProjectionHandler(
+          authoritativeEnvelope,
+          normalizedIntakeStore,
+        ),
+        conversation: createAuthoritativeConversationProjectionHandler(
+          conversationEnvelope,
+          normalizedConversationStore,
+        ),
+      }),
       {
         now: runtime.nowIso,
         leaseUntil: (now) => new Date(Date.parse(now) + 5 * 60_000).toISOString(),
@@ -1098,12 +1182,16 @@ export function createHttpApplication(
           new Date(
             Date.parse(now) + Math.min(2 ** attempt * 1_000, 15 * 60_000),
           ).toISOString(),
-        errorCode: () => "INTAKE_PROJECTION_RETRYABLE",
+        errorCode: authoritativeProjectionErrorCode,
       },
     );
     const authoritativeProjections = {
       runOnce: () =>
-        authoritativeProjector.runBatch(`${config.environment}-intake-projector`, 25),
+        authoritativeProjector.runBatch(`${config.environment}-commit-projector`, 25),
+    };
+    authoritativeProjection = {
+      runOnce: () =>
+        authoritativeProjector.runBatch(`${config.environment}-commit-event`, 25),
     };
     if (
       config.providers &&
@@ -1246,6 +1334,7 @@ export function createHttpApplication(
     /* v8 ignore next -- optional composition is covered by configuration parsing. */
     ...(providerEventInbox === undefined ? {} : { providerEventInbox }),
     providerMaintenance,
+    authoritativeProjection,
     /* v8 ignore next -- optional composition is covered by the HTTP contract. */
     ...(!config.providerOutboxTriggerSecret
       ? {}

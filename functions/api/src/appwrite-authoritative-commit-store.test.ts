@@ -40,6 +40,18 @@ function setup() {
 }
 
 describe("ADR-015 Appwrite authoritative commit store", () => {
+  it("BDD-SLO-410 loads an existing canonical commit without writing", async () => {
+    const target = setup();
+    await expect(target.store.find("commit_a")).resolves.toEqual(commit);
+    expect(target.createRow).not.toHaveBeenCalled();
+    target.getRow.mockRejectedValueOnce({ code: 404 });
+    await expect(target.store.find("commit_missing")).resolves.toBeNull();
+    await expect(target.store.find("bad/id")).resolves.toBeNull();
+    const failure = new Error("transport");
+    target.getRow.mockRejectedValueOnce(failure);
+    await expect(target.store.find("commit_a")).rejects.toBe(failure);
+  });
+
   it("BDD-SLO-411 accepts through exactly one non-transactional write", async () => {
     const target = setup();
     await expect(target.store.accept(commit)).resolves.toEqual({

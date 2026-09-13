@@ -2,6 +2,7 @@ import type {
   AppendConversationCommand,
   LifecycleTransitionCommand,
 } from "@y7-feedback/domain";
+import { AuthoritativeCommitError } from "@y7-feedback/domain";
 
 import type { AccountlessAccessCoordinator } from "./accountless-access.js";
 import {
@@ -178,6 +179,11 @@ function trusted(
 }
 
 function failure(error: unknown): ConversationLifecycleOutcome {
+  if (error instanceof AuthoritativeCommitError) {
+    return {
+      status: error.code === "AUTHORITATIVE_COMMIT_CONFLICT" ? "conflict" : "invalid",
+    };
+  }
   if (error instanceof AppwriteConversationLifecycleError) {
     if (error.code === "ERR-CONV-DENIED") return { status: "denied" };
     if (error.code === "ERR-CONV-IDEMPOTENCY-CONFLICT") {
@@ -212,7 +218,11 @@ export function createConversationLifecycleCoordinator(
     if (command === undefined) return { status: "denied" };
     try {
       const result = await store.execute({
-        ...input,
+        feedbackId: input.feedbackId,
+        /* v8 ignore next -- workspace and Reporter scopes are both exercised */
+        ...(input.workspaceId === undefined ? {} : { workspaceId: input.workspaceId }),
+        /* v8 ignore next -- workspace and Reporter scopes are both exercised */
+        ...(input.projectId === undefined ? {} : { projectId: input.projectId }),
         command,
         locale: selectedLocale,
         payloadDigest: dependencies.digest({
