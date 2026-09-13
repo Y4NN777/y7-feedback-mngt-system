@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   captureProductionFunctionDeployment,
+  resolveProductionRollbackAuthority,
   restoreProductionFunctionDeployment,
   type ProductionFunctionDeploymentsPort,
 } from "./production-function-rollback";
@@ -31,6 +32,33 @@ function port(input?: {
 }
 
 describe("Production Function rollback authority", () => {
+  it("BDD-REL-407 resolves only the deployment authority needed by rollback", () => {
+    expect(
+      resolveProductionRollbackAuthority({
+        Y7_ENVIRONMENT: "production",
+        APPWRITE_ENDPOINT: "https://fra.cloud.appwrite.io/v1",
+        APPWRITE_PROJECT_ID: "feedback-production",
+        APPWRITE_API_KEY: "server-only-key",
+      }),
+    ).toEqual({
+      environment: "production",
+      endpoint: "https://fra.cloud.appwrite.io/v1",
+      projectId: "feedback-production",
+      apiKey: "server-only-key",
+    });
+  });
+
+  it("BDD-REL-407 denies a non-Production rollback authority", () => {
+    expect(() =>
+      resolveProductionRollbackAuthority({
+        Y7_ENVIRONMENT: "preview",
+        APPWRITE_ENDPOINT: "https://fra.cloud.appwrite.io/v1",
+        APPWRITE_PROJECT_ID: "feedback-preview",
+        APPWRITE_API_KEY: "server-only-key",
+      }),
+    ).toThrow("PRODUCTION_FUNCTION_ROLLBACK_ENVIRONMENT_INVALID");
+  });
+
   it("BDD-REL-407 captures the active deployment before release mutation", async () => {
     await expect(captureProductionFunctionDeployment(port())).resolves.toBe(
       "deployment_candidate",
