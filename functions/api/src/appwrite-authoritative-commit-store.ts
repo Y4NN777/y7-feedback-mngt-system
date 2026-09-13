@@ -48,6 +48,7 @@ function canonicalRow(
   if (!object(value) || value.$id !== expected.id) return null;
   let candidate: AuthoritativeCommit;
   try {
+    const acceptedAt = new Date(value.acceptedAt as string).toISOString();
     candidate = planAuthoritativeCommit(
       {
         environment: value.environment as AuthoritativeCommit["environment"],
@@ -61,7 +62,7 @@ function canonicalRow(
         actorId: value.actorId as string,
         payloadDigest: value.payloadDigest as string,
         sealedPayload: value.sealedPayload as string,
-        acceptedAt: value.acceptedAt as string,
+        acceptedAt,
       },
       () => expected.id,
     );
