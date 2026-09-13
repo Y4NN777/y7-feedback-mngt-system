@@ -100,6 +100,15 @@ describe("ADR-015 Appwrite authoritative projection leases", () => {
     });
   });
 
+  it("BDD-SLO-431A canonicalizes the Appwrite UTC datetime representation", async () => {
+    const target = setup([row({ acceptedAt: "2026-09-13T02:00:00.000+00:00" })]);
+    await expect(
+      target.store.claim({ workerId: "worker_a", now, leaseUntil }),
+    ).resolves.toMatchObject({
+      commit: { acceptedAt: "2026-09-13T02:00:00.000Z" },
+    });
+  });
+
   it("BDD-SLO-432 returns idle for future, active and projected rows", async () => {
     const target = setup([
       row({ availableAt: "2026-09-13T03:00:00.000Z" }),

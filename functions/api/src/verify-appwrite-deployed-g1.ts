@@ -304,15 +304,24 @@ async function main(): Promise<void> {
     }
 
     if (config.intakePersistenceMode === "authoritative") {
-      await publicFunctions.createExecution({
-        functionId: previewFunctionId,
-        body: "{}",
-        async: false,
-        xpath: "/operational/provider-maintenance",
-        method: ExecutionMethod.POST,
-        headers: { "x-appwrite-trigger": "schedule" },
-      });
+      if (config.providerOutboxTriggerSecret === undefined) {
+        throw new Error("APPWRITE_DEPLOYED_G1_PROJECTION_AUTHORITY_MISSING");
+      }
       for (let attempt = 0; attempt < 15; attempt += 1) {
+        try {
+          await api.handle({
+            method: "POST",
+            path: "/operational/provider-maintenance",
+            headers: {
+              authorization: `Bearer ${config.providerOutboxTriggerSecret}`,
+              "content-type": "application/json",
+            },
+            body: {},
+          });
+        } catch {
+          // Every maintenance capability runs through allSettled. Continue by
+          // observing the projection because an unrelated capability may fail.
+        }
         try {
           projectedRows = await discover();
           break;
@@ -511,10 +520,19 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  const code =
-    error instanceof Error && /^APPWRITE_DEPLOYED_G1_[A-Z_]+$/u.test(error.message)
+  const safeCause =
+    error instanceof Error && /^[A-Z][A-Z0-9_:.-]{2,160}$/u.test(error.message)
       ? error.message
-      : "APPWRITE_DEPLOYED_G1_FAILED";
+      : typeof error === "object" && error !== null && "code" in error
+        ? String(error.code)
+        : error instanceof Error
+          ? error.name
+          : "unknown";
+  const code =
+    error instanceof Error &&
+    /^APPWRITE_DEPLOYED_G1_[A-Z_]+(?::\{[^\n]*\})?$/u.test(error.message)
+      ? error.message
+      : `APPWRITE_DEPLOYED_G1_FAILED:${safeCause}`;
   process.stderr.write(`${JSON.stringify({ status: "error", code })}\n`);
   process.exitCode = 1;
 });
