@@ -61,6 +61,11 @@ class MemoryAccessRepository implements AccountlessAccessRepository {
     return Promise.resolve(this.resource);
   }
 
+  loadGrantByReference(): Promise<AccessGrant | null> {
+    if (this.failLoad) return Promise.reject(new Error("load unavailable"));
+    return Promise.resolve(this.resource?.grant ?? null);
+  }
+
   saveGrant(grant: AccessGrant): Promise<void> {
     if (this.failSave) return Promise.reject(new Error("save unavailable"));
     this.savedGrants.push(grant);

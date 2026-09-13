@@ -314,21 +314,26 @@ export function createAppwriteAccountlessRepository(
   sensitive: AppwriteSensitivePersistence,
 ): AccountlessAccessRepository {
   validateSchema(schema);
+  const loadGrantByReference = async (reference: string) => {
+    const normalizedReference = required(reference, 100);
+    const result = await tables.listRows({
+      databaseId: schema.databaseId,
+      tableId: schema.accessGrantsTableId,
+      queries: [queries.equal("reference", [normalizedReference]), queries.limit(2)],
+      total: false,
+      ttl: 0,
+    });
+    if (result.rows.length === 0) return null;
+    if (result.rows.length !== 1) {
+      throw new Error("APPWRITE_ACCOUNTLESS_INCONSISTENT");
+    }
+    return parseGrant(result.rows[0], normalizedReference, schema, sensitive);
+  };
   return {
+    loadGrantByReference,
     async loadByReference(reference) {
-      const normalizedReference = required(reference, 100);
-      const result = await tables.listRows({
-        databaseId: schema.databaseId,
-        tableId: schema.accessGrantsTableId,
-        queries: [queries.equal("reference", [normalizedReference]), queries.limit(2)],
-        total: false,
-        ttl: 0,
-      });
-      if (result.rows.length === 0) return null;
-      if (result.rows.length !== 1) {
-        throw new Error("APPWRITE_ACCOUNTLESS_INCONSISTENT");
-      }
-      const grant = parseGrant(result.rows[0], normalizedReference, schema, sensitive);
+      const grant = await loadGrantByReference(reference);
+      if (grant === null) return null;
       const feedback = await tables.getRow({
         databaseId: schema.databaseId,
         tableId: schema.feedbackTableId,
