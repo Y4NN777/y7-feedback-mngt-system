@@ -125,6 +125,35 @@ jobs:
             echo '{"error":"PRODUCTION_WEB_ROUTING_MISMATCH"}' >&2
             return 1
           }
+          await_web_release() {
+            local origin="$1"
+            local expected="$2"
+            local actual=""
+            for attempt in $(seq 1 30); do
+              actual="$(
+                curl --fail --silent --show-error --max-time 30 \
+                  --header 'Cache-Control: no-cache' \
+                  "$origin/index.html?release=$expected&attempt=$attempt" |
+                  node -e '
+                    let body = "";
+                    process.stdin.setEncoding("utf8");
+                    process.stdin.on("data", (chunk) => { body += chunk; });
+                    process.stdin.on("end", () => {
+                      const match = body.match(
+                        /<meta name="y7-release" content="([^"]+)" \/>/u,
+                      );
+                      process.stdout.write(match?.[1] ?? "");
+                    });
+                  '
+              )"
+              if [ "$actual" = "$expected" ]; then
+                return 0
+              fi
+              sleep 2
+            done
+            echo '{"error":"PRODUCTION_WEB_RELEASE_CONVERGENCE_TIMEOUT"}' >&2
+            return 1
+          }
           cleanup() {
             local status=$?
             trap - EXIT
@@ -275,8 +304,7 @@ jobs:
             --scope "$VERCEL_ORG_ID" --yes --token "$VERCEL_TOKEN" >/dev/null
           WEB_ROUTING_MUTATED=1
           await_vercel_deployment "$PRODUCTION_WEB_ORIGIN" "$NEW_WEB_DEPLOYMENT_ID"
-          curl --fail --silent --show-error --max-time 30 \
-            "$PRODUCTION_WEB_ORIGIN/" >/dev/null
+          await_web_release "$PRODUCTION_WEB_ORIGIN" "$GITHUB_SHA"
 
           pnpm dlx vercel@50.35.0 promote "$PREVIOUS_WEB_DEPLOYMENT_TARGET" \
             --scope "$VERCEL_ORG_ID" --yes --token "$VERCEL_TOKEN" >/dev/null
@@ -287,8 +315,7 @@ jobs:
           pnpm dlx vercel@50.35.0 promote "$NEW_WEB_URL" \
             --scope "$VERCEL_ORG_ID" --yes --token "$VERCEL_TOKEN" >/dev/null
           await_vercel_deployment "$PRODUCTION_WEB_ORIGIN" "$NEW_WEB_DEPLOYMENT_ID"
-          curl --fail --silent --show-error --max-time 30 \
-            "$PRODUCTION_WEB_ORIGIN/" >/dev/null
+          await_web_release "$PRODUCTION_WEB_ORIGIN" "$GITHUB_SHA"
 
           pnpm verify:release:production
           pnpm verify:mail:production

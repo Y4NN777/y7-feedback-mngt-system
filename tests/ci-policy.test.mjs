@@ -496,6 +496,9 @@ test("BDD-REL-406 stages, promotes, rolls back and restores Production", async (
   assert.match(workflow, /NEW_WEB_DEPLOYMENT_ID/u);
   assert.match(workflow, /PRODUCTION_WEB_ROUTING_MISMATCH/u);
   assert.match(workflow, /pnpm verify:release:production/u);
+  assert.match(workflow, /await_web_release "\$PRODUCTION_WEB_ORIGIN" "\$GITHUB_SHA"/u);
+  assert.match(workflow, /PRODUCTION_WEB_RELEASE_CONVERGENCE_TIMEOUT/u);
+  assert.match(workflow, /Cache-Control: no-cache/u);
   assert.match(workflow, /pnpm verify:mail:production/u);
   assert.match(workflow, /pnpm verify:providers:production:github/u);
   assert.match(workflow, /PRODUCTION_GITHUB_EVIDENCE_AUTHORITY_MISSING/u);
