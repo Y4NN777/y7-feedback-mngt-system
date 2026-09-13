@@ -37,7 +37,6 @@ jobs:
         run: |
           set -Eeuo pipefail
           set +x
-          az provider register --namespace Microsoft.Communication --wait
           DEPLOYMENT_OUTPUT="$(az deployment group create \
             --name "email-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" \
             --resource-group "$AZURE_RESOURCE_GROUP" \
