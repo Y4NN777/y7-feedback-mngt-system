@@ -152,7 +152,11 @@ async function main(): Promise<void> {
   await proveProductionDeletionContinuity(
     {
       createTable: (input) =>
-        tables.createTable({ ...input, permissions: [...input.permissions] }),
+        tables.createTable({
+          ...input,
+          permissions: [...input.permissions],
+          columns: input.columns.map((column) => ({ ...column })),
+        }),
       deleteTable: (input) => tables.deleteTable(input),
       createRow: (input) =>
         tables.createRow({ ...input, permissions: [...input.permissions] }),
