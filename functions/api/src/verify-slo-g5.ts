@@ -20,6 +20,25 @@ const commands = [
   "verify-appwrite-g3-workbench.js",
 ] as const;
 
+export function stableProbeFailureCode(output: string): string {
+  for (const line of output.trim().split("\n").reverse()) {
+    try {
+      const parsed = JSON.parse(line) as Readonly<Record<string, unknown>>;
+      const value =
+        typeof parsed.code === "string"
+          ? parsed.code
+          : typeof parsed.error === "string"
+            ? parsed.error
+            : undefined;
+      const code = value?.match(/^[A-Z][A-Z0-9_]{2,80}/u)?.[0];
+      if (code !== undefined) return code;
+    } catch {
+      // Ignore non-JSON diagnostics and continue toward the stable final error.
+    }
+  }
+  return "UNKNOWN";
+}
+
 function required(name: string): string {
   const value = process.env[name]?.trim();
   if (!value) throw new Error("SLO_G5_CONFIGURATION_MISSING");
@@ -51,10 +70,11 @@ function runScript(script: string): Promise<unknown> {
     });
     child.on("close", (code) => {
       if (code !== 0) {
-        const stableCode = [
-          ...failureOutput.matchAll(/"(?:code|error)":"([A-Z0-9_]+)"/gu),
-        ].at(-1)?.[1];
-        reject(new Error(`SLO_G5_PROBE_FAILED:${script}:${stableCode ?? "UNKNOWN"}`));
+        reject(
+          new Error(
+            `SLO_G5_PROBE_FAILED:${script}:${stableProbeFailureCode(failureOutput)}`,
+          ),
+        );
         return;
       }
       try {
