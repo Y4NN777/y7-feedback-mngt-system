@@ -432,6 +432,11 @@ test("BDD-REL-406 stages, promotes, rolls back and restores Production", async (
     /Y7_PRODUCTION_RELEASE_ENV: \$\{\{ secrets\.Y7_PRODUCTION_RELEASE_ENV \}\}/u,
   );
   assert.match(workflow, /VERCEL_TOKEN: \$\{\{ secrets\.VERCEL_TOKEN \}\}/u);
+  assert.equal(
+    workflow.match(/--scope "\$VERCEL_ORG_ID"/gu)?.length,
+    7,
+    "every Vercel mutation and rollback command must target the owning team",
+  );
   assert.match(
     workflow,
     /PRODUCTION_SCANNER_HMAC_KEY: \$\{\{ secrets\.Y7_PRODUCTION_SCANNER_HMAC_KEY \}\}/u,
