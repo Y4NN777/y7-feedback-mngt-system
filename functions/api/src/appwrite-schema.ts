@@ -622,6 +622,7 @@ export function createAppwriteInfrastructureManifest(
           integer("projectionAttempts"),
           datetime("availableAt"),
           varchar("claimedBy", 64, { required: false }),
+          varchar("claimToken", 36, { required: false }),
           datetime("claimedUntil", { required: false }),
           varchar("lastErrorCode", 64, { required: false }),
           datetime("projectedAt", { required: false }),
