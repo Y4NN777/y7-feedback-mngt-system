@@ -84,7 +84,8 @@ function canonicalRow(
 }
 
 function data(commit: AuthoritativeCommit): Readonly<Record<string, unknown>> {
-  const { id: _id, ...fields } = commit;
+  const fields: Record<string, unknown> = { ...commit };
+  Reflect.deleteProperty(fields, "id");
   return { ...fields, availableAt: commit.acceptedAt };
 }
 

@@ -102,6 +102,12 @@ function acceptance(): AcceptanceCommit {
   };
 }
 
+function firstAttachment(value: AcceptanceCommit) {
+  const item = value.attachments[0];
+  if (!item) throw new Error("expected attachment fixture");
+  return item;
+}
+
 function authoritative(sealedPayload = "sealed") {
   return planAuthoritativeCommit(
     {
@@ -320,21 +326,21 @@ describe("ADR-015 authoritative intake envelope", () => {
       "attachment feedback",
       (value: AcceptanceCommit) => ({
         ...value,
-        attachments: [{ ...value.attachments[0]!, feedbackId: "other" }],
+        attachments: [{ ...firstAttachment(value), feedbackId: "other" }],
       }),
     ],
     [
       "attachment workspace",
       (value: AcceptanceCommit) => ({
         ...value,
-        attachments: [{ ...value.attachments[0]!, workspaceId: "other" }],
+        attachments: [{ ...firstAttachment(value), workspaceId: "other" }],
       }),
     ],
     [
       "attachment project",
       (value: AcceptanceCommit) => ({
         ...value,
-        attachments: [{ ...value.attachments[0]!, projectId: "other" }],
+        attachments: [{ ...firstAttachment(value), projectId: "other" }],
       }),
     ],
     [
@@ -343,7 +349,7 @@ describe("ADR-015 authoritative intake envelope", () => {
         ...value,
         attachments: [
           {
-            ...value.attachments[0]!,
+            ...firstAttachment(value),
             sourceEntry: { kind: "source_submission" as const, id: "other" },
           },
         ],

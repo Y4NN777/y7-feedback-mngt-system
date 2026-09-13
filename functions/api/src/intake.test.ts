@@ -148,10 +148,10 @@ function setup(store = new MemoryStore()) {
 describe("trusted intake coordination", () => {
   it("BDD-SLO-481 accepts and replays through the authoritative capability", async () => {
     let original: AcceptanceCommit | undefined;
-    const acceptAuthoritatively = vi.fn(async (input: AcceptanceCommit) => {
+    const acceptAuthoritatively = vi.fn((input: AcceptanceCommit) => {
       const replayed = original !== undefined;
       original ??= input;
-      return { acceptance: original, replayed };
+      return Promise.resolve({ acceptance: original, replayed });
     });
     const coordinator = createIntakeCoordinator(
       { acceptAuthoritatively },
@@ -182,16 +182,18 @@ describe("trusted intake coordination", () => {
       clientOperationId: operationId,
       draft: draft(),
     });
-    const persisted = normalized.commits[0]!;
+    const persisted = normalized.commits[0];
+    if (!persisted) throw new Error("expected normalized acceptance");
     const coordinator = createIntakeCoordinator(
       {
-        acceptAuthoritatively: async () => ({
-          acceptance: {
-            ...persisted,
-            idempotency: { ...persisted.idempotency, payloadDigest: "different" },
-          },
-          replayed: true,
-        }),
+        acceptAuthoritatively: () =>
+          Promise.resolve({
+            acceptance: {
+              ...persisted,
+              idempotency: { ...persisted.idempotency, payloadDigest: "different" },
+            },
+            replayed: true,
+          }),
       },
       dependencies,
     );
@@ -210,16 +212,18 @@ describe("trusted intake coordination", () => {
       clientOperationId: operationId,
       draft: draft(),
     });
-    const persisted = normalized.commits[0]!;
+    const persisted = normalized.commits[0];
+    if (!persisted) throw new Error("expected normalized acceptance");
     const coordinator = createIntakeCoordinator(
       {
-        acceptAuthoritatively: async () => ({
-          acceptance: {
-            ...persisted,
-            idempotency: { ...persisted.idempotency, protectedProof: "sealed:short" },
-          },
-          replayed: true,
-        }),
+        acceptAuthoritatively: () =>
+          Promise.resolve({
+            acceptance: {
+              ...persisted,
+              idempotency: { ...persisted.idempotency, protectedProof: "sealed:short" },
+            },
+            replayed: true,
+          }),
       },
       dependencies,
     );

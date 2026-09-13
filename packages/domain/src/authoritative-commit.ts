@@ -49,17 +49,18 @@ export function planAuthoritativeCommit(
   input: AuthoritativeCommitInput,
   deriveId: AuthoritativeCommitIdDeriver,
 ): AuthoritativeCommit {
+  const environment: unknown = input.environment;
+  const aggregateKind: unknown = input.aggregateKind;
+  const actorKind: unknown = input.actorKind;
   if (
-    (input.environment !== "preview" && input.environment !== "production") ||
-    (input.aggregateKind !== "feedback" && input.aggregateKind !== "conversation") ||
+    (environment !== "preview" && environment !== "production") ||
+    (aggregateKind !== "feedback" && aggregateKind !== "conversation") ||
     !identifier.test(input.aggregateId) ||
     !identifier.test(input.operationId) ||
     !commandKind.test(input.commandKind) ||
     !identifier.test(input.workspaceId) ||
     !identifier.test(input.projectId) ||
-    (input.actorKind !== "reporter" &&
-      input.actorKind !== "user" &&
-      input.actorKind !== "system") ||
+    (actorKind !== "reporter" && actorKind !== "user" && actorKind !== "system") ||
     !identifier.test(input.actorId) ||
     !digest.test(input.payloadDigest) ||
     input.sealedPayload.length === 0 ||

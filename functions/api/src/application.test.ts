@@ -117,7 +117,7 @@ class FakeTables {
         (row) => row.tableId === "authoritative_commits" && row.rowId === input.rowId,
       )
     ) {
-      return Promise.reject({ code: 409 });
+      return Promise.reject(Object.assign(new Error("conflict"), { code: 409 }));
     }
     this.rows.push(input);
     return Promise.resolve({
@@ -386,14 +386,16 @@ describe("trusted Function composition root", () => {
       (row) => row.tableId === "authoritative_commits",
     );
     expect(authoritativeRows).toHaveLength(1);
-    expect(authoritativeRows[0]).toMatchObject({
+    const authoritativeRow = authoritativeRows[0];
+    expect(authoritativeRow).toMatchObject({
       tableId: "authoritative_commits",
       permissions: [],
-      data: expect.objectContaining({
-        commandKind: "feedback.accepted",
-        projectionState: "pending",
-      }),
     });
+    if (!authoritativeRow || !isObject(authoritativeRow.data)) {
+      throw new Error("expected authoritative row data");
+    }
+    expect(authoritativeRow.data.commandKind).toBe("feedback.accepted");
+    expect(authoritativeRow.data.projectionState).toBe("pending");
     json.mockClear();
     await routeRequest(context, dependencies);
     expect(json).toHaveBeenCalledWith(
