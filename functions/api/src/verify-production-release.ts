@@ -8,6 +8,7 @@ import { parseServerConfig } from "@y7-feedback/config/server";
 import {
   appwriteFunctionVariableKeys,
   productionFunctionId,
+  requiredAppwriteFunctionVariableKeys,
 } from "./appwrite-function-variables.js";
 import { retryAppwriteAdminCall } from "./appwrite-admin-retry.js";
 import { createClamAvHttpScanner } from "./clamav-http-scanner.js";
@@ -144,7 +145,7 @@ async function main(): Promise<void> {
   const variables = new Map(
     definition.vars.map((variable) => [variable.key, variable]),
   );
-  const missingFunctionVariables = appwriteFunctionVariableKeys.filter(
+  const missingFunctionVariables = requiredAppwriteFunctionVariableKeys.filter(
     (key) => !variables.has(key),
   );
   const nonSecretFunctionVariables = appwriteFunctionVariableKeys.filter(
