@@ -333,13 +333,52 @@ describe("trusted environment contract", () => {
     }
   });
 
-  it("BDD-ABUSE-CONFIG-001 identifies an invalid anti-abuse keyring", () => {
-    expect(() =>
-      parseServerConfig({
-        ...validServer,
-        ABUSE_HMAC_ACTIVE_KEY_ID: "missing",
-      }),
-    ).toThrow(new ConfigError("ABUSE_HMAC_KEYS_INVALID"));
+  it("BDD-ABUSE-CONFIG-001 identifies the safe anti-abuse keyring failure", () => {
+    const cases = [
+      [{ ABUSE_HMAC_KEYS: "not-json" }, "ABUSE_HMAC_KEYS_JSON_INVALID"],
+      [{ ABUSE_HMAC_KEYS: "[]" }, "ABUSE_HMAC_KEYS_JSON_INVALID"],
+      [{ ABUSE_HMAC_KEYS: "{}" }, "ABUSE_HMAC_KEYS_JSON_INVALID"],
+      [{ ABUSE_HMAC_ACTIVE_KEY_ID: "missing" }, "ABUSE_HMAC_ACTIVE_KEY_MISSING"],
+      [
+        {
+          ABUSE_HMAC_KEYS: JSON.stringify({
+            abuse_2026_08: "CwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCws",
+            "bad/key": "DgoKDgoKDgoKDgoKDgoKDgoKDgoKDgoKDgoKDgoKDgo",
+          }),
+        },
+        "ABUSE_HMAC_MATERIAL_INVALID",
+      ],
+      [
+        { ABUSE_HMAC_KEYS: JSON.stringify({ abuse_2026_08: 42 }) },
+        "ABUSE_HMAC_MATERIAL_INVALID",
+      ],
+      [
+        { ABUSE_HMAC_KEYS: JSON.stringify({ abuse_2026_08: "short" }) },
+        "ABUSE_HMAC_MATERIAL_INVALID",
+      ],
+      [
+        {
+          ABUSE_HMAC_KEYS: JSON.stringify({
+            abuse_2026_08: validServer.ACCESS_PROOF_ENVELOPE_KEY,
+          }),
+        },
+        "ABUSE_HMAC_MATERIAL_COLLISION",
+      ],
+      [
+        {
+          ABUSE_HMAC_KEYS: JSON.stringify({
+            abuse_2026_08: "DgoKDgoKDgoKDgoKDgoKDgoKDgoKDgoKDgoKDgoKDgo",
+            abuse_2026_07: "DgoKDgoKDgoKDgoKDgoKDgoKDgoKDgoKDgoKDgoKDgo",
+          }),
+        },
+        "ABUSE_HMAC_MATERIAL_COLLISION",
+      ],
+    ] as const;
+    for (const [override, expected] of cases) {
+      expect(() => parseServerConfig({ ...validServer, ...override })).toThrow(
+        new ConfigError(expected),
+      );
+    }
   });
 
   it("BDD-ISSUE-CONFIG-001 requires a canonical secure Web origin", () => {
