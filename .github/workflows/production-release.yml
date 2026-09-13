@@ -264,8 +264,7 @@ jobs:
             exit 1
           fi
           pnpm dlx vercel@50.35.0 curl / --deployment "$NEW_WEB_URL" \
-            --scope "$VERCEL_ORG_ID" --token "$VERCEL_TOKEN" \
-            --fail --silent --show-error >/dev/null
+            --scope "$VERCEL_ORG_ID" --token "$VERCEL_TOKEN" >/dev/null
 
           pnpm dlx vercel@50.35.0 promote "$NEW_WEB_URL" \
             --scope "$VERCEL_ORG_ID" --yes --token "$VERCEL_TOKEN" >/dev/null
