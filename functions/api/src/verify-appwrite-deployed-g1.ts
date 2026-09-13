@@ -28,7 +28,12 @@ function expectResponse(
   statusCode: number,
 ): Readonly<Record<string, unknown>> {
   if (response?.statusCode !== statusCode) {
-    throw new Error("APPWRITE_DEPLOYED_G1_STATUS_INVALID");
+    throw new Error(
+      `APPWRITE_DEPLOYED_G1_STATUS_INVALID:${JSON.stringify({
+        expected: statusCode,
+        actual: response?.statusCode ?? null,
+      })}`,
+    );
   }
   return record(response.body);
 }
