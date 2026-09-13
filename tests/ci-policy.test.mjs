@@ -511,6 +511,19 @@ test("BDD-REL-406 stages, promotes, rolls back and restores Production", async (
   assert.doesNotMatch(workflow, /ROLLBACK_ACTIVE/u);
   assert.doesNotMatch(workflow, /upload-artifact/u);
 
+  for (const relativePath of [
+    "../functions/api/src/configure-appwrite-function.ts",
+    "../functions/api/src/deploy-appwrite-function.ts",
+    "../functions/api/src/production-function-rollback.ts",
+    "../functions/api/src/verify-production-release.ts",
+  ]) {
+    const releaseAdapter = await readFile(
+      new URL(relativePath, import.meta.url),
+      "utf8",
+    );
+    assert.match(releaseAdapter, /retryAppwriteAdminCall/u);
+  }
+
   const webBuild = await readFile(
     new URL("../apps/web/vite.config.ts", import.meta.url),
     "utf8",
