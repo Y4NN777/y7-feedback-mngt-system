@@ -129,6 +129,16 @@ ms. This result is retained rather than hidden by a blind rerun or weaker
 threshold. `TASK-SLO-001`, `TASK-REL-001` and Gate G5 therefore remain
 `IN_PROGRESS`.
 
+PR [#96](https://github.com/Y4NN777/y7-feedback-mngt-system/pull/96)
+subsequently merged the ADR-015 authoritative intake and conversation commit
+path into `main` at `6a2fc76`. The real Preview conversation lifecycle passed
+with complete fixture cleanup; the local capacity matrix passed SLO-005..010
+with critical API P95 435 ms and Feedback commit 315 ms. Protected run
+[34742466360](https://github.com/Y4NN777/y7-feedback-mngt-system/actions/runs/34742466360)
+verified the exact active release without redeploying it and passed
+SLO-006..010, but measured critical API P95 1,074 ms against 500 ms. No
+unchanged blind rerun is accepted as stronger evidence.
+
 ## Production recovery backup — 2026-09-13
 
 [Run 34731029856](https://github.com/Y4NN777/y7-feedback-mngt-system/actions/runs/34731029856)
@@ -150,8 +160,9 @@ route.
 
 ## Exact remaining release sequence
 
-1. Select and implement a persistence path capable of satisfying SLO-005 and
-   SLO-006 without weakening atomicity, then run one protected SLO matrix.
+1. Establish a stable release capacity and measurement origin that reproduces
+   the already-passing local SLO-005 result in protected evidence; do not rerun
+   unchanged infrastructure.
 2. Deploy and verify the permanent Production antivirus service and its routed
    alerts.
 3. Run one encrypted Production backup and verify the scheduled configuration.
