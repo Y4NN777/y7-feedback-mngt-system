@@ -390,6 +390,24 @@ test("BDD-REL-406 stages, promotes, rolls back and restores Production", async (
     /Y7_PRODUCTION_RELEASE_ENV: \$\{\{ secrets\.Y7_PRODUCTION_RELEASE_ENV \}\}/u,
   );
   assert.match(workflow, /VERCEL_TOKEN: \$\{\{ secrets\.VERCEL_TOKEN \}\}/u);
+  assert.match(
+    workflow,
+    /PRODUCTION_SCANNER_HMAC_KEY: \$\{\{ secrets\.Y7_PRODUCTION_SCANNER_HMAC_KEY \}\}/u,
+  );
+  assert.match(
+    workflow,
+    /PRODUCTION_GITHUB_CLIENT_SECRET: \$\{\{ secrets\.Y7_PRODUCTION_GITHUB_CLIENT_SECRET \}\}/u,
+  );
+  assert.match(
+    workflow,
+    /PRODUCTION_GITLAB_CLIENT_SECRET: \$\{\{ secrets\.Y7_PRODUCTION_GITLAB_CLIENT_SECRET \}\}/u,
+  );
+  assert.match(
+    workflow,
+    /PRODUCTION_SMTP_PASSWORD: \$\{\{ secrets\.Y7_PRODUCTION_SMTP_PASSWORD \}\}/u,
+  );
+  assert.match(workflow, /PRODUCTION_RELEASE_AUTHORITY_MISSING:\$\{source\}/u);
+  assert.match(workflow, /appendFileSync\("\.env\.appwrite-production"/u);
   assert.match(workflow, /pnpm provision:appwrite:production/u);
   assert.match(workflow, /pnpm configure:appwrite:function:production/u);
   assert.match(workflow, /pnpm deploy:appwrite:function:production/u);

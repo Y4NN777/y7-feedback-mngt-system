@@ -21,6 +21,27 @@ jobs:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+      PRODUCTION_SCANNER_ENDPOINT: ${{ vars.Y7_PRODUCTION_SCANNER_ENDPOINT }}
+      PRODUCTION_SCANNER_KEY_ID: ${{ vars.Y7_PRODUCTION_SCANNER_KEY_ID }}
+      PRODUCTION_SCANNER_HMAC_KEY: ${{ secrets.Y7_PRODUCTION_SCANNER_HMAC_KEY }}
+      PRODUCTION_SCANNER_TIMEOUT_MS: ${{ vars.Y7_PRODUCTION_SCANNER_TIMEOUT_MS }}
+      PRODUCTION_GITHUB_CLIENT_ID: ${{ vars.Y7_PRODUCTION_GITHUB_CLIENT_ID }}
+      PRODUCTION_GITHUB_CLIENT_SECRET: ${{ secrets.Y7_PRODUCTION_GITHUB_CLIENT_SECRET }}
+      PRODUCTION_GITHUB_CALLBACK_URL: ${{ vars.Y7_PRODUCTION_GITHUB_CALLBACK_URL }}
+      PRODUCTION_GITLAB_CLIENT_ID: ${{ vars.Y7_PRODUCTION_GITLAB_CLIENT_ID }}
+      PRODUCTION_GITLAB_CLIENT_SECRET: ${{ secrets.Y7_PRODUCTION_GITLAB_CLIENT_SECRET }}
+      PRODUCTION_GITLAB_CALLBACK_URL: ${{ vars.Y7_PRODUCTION_GITLAB_CALLBACK_URL }}
+      PRODUCTION_GITLAB_ORIGIN: ${{ vars.Y7_PRODUCTION_GITLAB_ORIGIN }}
+      PRODUCTION_SMTP_HOST: ${{ vars.Y7_PRODUCTION_SMTP_HOST }}
+      PRODUCTION_SMTP_PORT: ${{ vars.Y7_PRODUCTION_SMTP_PORT }}
+      PRODUCTION_SMTP_SECURE: ${{ vars.Y7_PRODUCTION_SMTP_SECURE }}
+      PRODUCTION_SMTP_USER: ${{ vars.Y7_PRODUCTION_SMTP_USER }}
+      PRODUCTION_SMTP_PASSWORD: ${{ secrets.Y7_PRODUCTION_SMTP_PASSWORD }}
+      PRODUCTION_EMAIL_FROM: ${{ vars.Y7_PRODUCTION_EMAIL_FROM }}
+      PRODUCTION_ABUSE_HMAC_ACTIVE_KEY_ID: ${{ vars.Y7_PRODUCTION_ABUSE_HMAC_ACTIVE_KEY_ID }}
+      PRODUCTION_ABUSE_HMAC_KEYS: ${{ secrets.Y7_PRODUCTION_ABUSE_HMAC_KEYS }}
+      PRODUCTION_PROVIDER_OUTBOX_TRIGGER_SECRET: ${{ secrets.Y7_PRODUCTION_PROVIDER_OUTBOX_TRIGGER_SECRET }}
+      PRODUCTION_GITHUB_VERIFICATION_TOKEN: ${{ secrets.Y7_GITHUB_VERIFICATION_TOKEN }}
     steps:
       - name: Check out repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -132,6 +153,48 @@ jobs:
           install -m 600 /dev/null .env.appwrite-production
           printf '%s\n' "$Y7_PRODUCTION_RELEASE_ENV" > .env.appwrite-production
           unset Y7_PRODUCTION_RELEASE_ENV
+          node --input-type=module <<'NODE'
+          import { appendFileSync } from "node:fs";
+
+          const authorities = {
+            ANTIVIRUS_SCANNER_ENDPOINT: "PRODUCTION_SCANNER_ENDPOINT",
+            ANTIVIRUS_SCANNER_KEY_ID: "PRODUCTION_SCANNER_KEY_ID",
+            ANTIVIRUS_SCANNER_HMAC_KEY: "PRODUCTION_SCANNER_HMAC_KEY",
+            ANTIVIRUS_SCANNER_TIMEOUT_MS: "PRODUCTION_SCANNER_TIMEOUT_MS",
+            GITHUB_APP_CLIENT_ID: "PRODUCTION_GITHUB_CLIENT_ID",
+            GITHUB_APP_CLIENT_SECRET: "PRODUCTION_GITHUB_CLIENT_SECRET",
+            GITHUB_APP_CALLBACK_URL: "PRODUCTION_GITHUB_CALLBACK_URL",
+            GITLAB_OAUTH_CLIENT_ID: "PRODUCTION_GITLAB_CLIENT_ID",
+            GITLAB_OAUTH_CLIENT_SECRET: "PRODUCTION_GITLAB_CLIENT_SECRET",
+            GITLAB_OAUTH_CALLBACK_URL: "PRODUCTION_GITLAB_CALLBACK_URL",
+            GITLAB_OAUTH_ORIGIN: "PRODUCTION_GITLAB_ORIGIN",
+            Y7_EMAIL_SMTP_HOST: "PRODUCTION_SMTP_HOST",
+            Y7_EMAIL_SMTP_PORT: "PRODUCTION_SMTP_PORT",
+            Y7_EMAIL_SMTP_SECURE: "PRODUCTION_SMTP_SECURE",
+            Y7_EMAIL_SMTP_USER: "PRODUCTION_SMTP_USER",
+            Y7_EMAIL_SMTP_PASSWORD: "PRODUCTION_SMTP_PASSWORD",
+            Y7_EMAIL_FROM: "PRODUCTION_EMAIL_FROM",
+            ABUSE_HMAC_ACTIVE_KEY_ID: "PRODUCTION_ABUSE_HMAC_ACTIVE_KEY_ID",
+            ABUSE_HMAC_KEYS: "PRODUCTION_ABUSE_HMAC_KEYS",
+            PROVIDER_OUTBOX_TRIGGER_SECRET:
+              "PRODUCTION_PROVIDER_OUTBOX_TRIGGER_SECRET",
+            Y7_GITHUB_VERIFICATION_TOKEN:
+              "PRODUCTION_GITHUB_VERIFICATION_TOKEN",
+          };
+          const lines = [];
+          for (const [target, source] of Object.entries(authorities)) {
+            const value = process.env[source]?.trim();
+            if (!value || /[\r\n]/u.test(value)) {
+              throw new Error(`PRODUCTION_RELEASE_AUTHORITY_MISSING:${source}`);
+            }
+            lines.push(`${target}=${JSON.stringify(value)}`);
+            delete process.env[source];
+          }
+          appendFileSync(".env.appwrite-production", `\n${lines.join("\n")}\n`, {
+            encoding: "utf8",
+            mode: 0o600,
+          });
+          NODE
           printf '\nRELEASE=%s\n' "$GITHUB_SHA" >> .env.appwrite-production
 
           PRODUCTION_WEB_ORIGIN="$(node --env-file=.env.appwrite-production \
