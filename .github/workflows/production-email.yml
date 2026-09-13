@@ -1,0 +1,85 @@
+name: Production email authority
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: production-email-authority
+  cancel-in-progress: false
+
+jobs:
+  provision:
+    name: Provision Azure SMTP authority
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    env:
+      AZURE_RESOURCE_GROUP: rg-y7-feedback-production-cus
+      EMAIL_SERVICE_NAME: ecs-y7-feedback-production
+      COMMUNICATION_SERVICE_NAME: acs-y7-feedback-production
+      SMTP_USERNAME: y7-feedback-production
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Authenticate with Azure workload identity
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
+        with:
+          client-id: ${{ vars.AZURE_PRODUCTION_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Provision linked Azure-managed email domain
+        id: provision
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          set +x
+          az provider register --namespace Microsoft.Communication --wait
+          DEPLOYMENT_OUTPUT="$(az deployment group create \
+            --name "email-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --template-file infra/azure/production-email.bicep \
+            --parameters \
+              emailServiceName="$EMAIL_SERVICE_NAME" \
+              communicationServiceName="$COMMUNICATION_SERVICE_NAME" \
+              entraApplicationId="${{ vars.AZURE_PRODUCTION_CLIENT_ID }}" \
+              tenantId="${{ vars.AZURE_TENANT_ID }}" \
+              smtpUsername="$SMTP_USERNAME" \
+            --query properties.outputs \
+            --output json)"
+          COMMUNICATION_SERVICE_ID="$(
+            jq -er '.communicationServiceId.value' <<<"$DEPLOYMENT_OUTPUT"
+          )"
+          SENDER_DOMAIN="$(jq -er '.senderAddress.value' <<<"$DEPLOYMENT_OUTPUT")"
+          SMTP_AUTH_USERNAME="$(jq -er '.smtpUsername.value' <<<"$DEPLOYMENT_OUTPUT")"
+          PRINCIPAL_ID="$(az ad sp show \
+            --id "${{ vars.AZURE_PRODUCTION_CLIENT_ID }}" \
+            --query id --output tsv)"
+          az role assignment create \
+            --assignee-object-id "$PRINCIPAL_ID" \
+            --assignee-principal-type ServicePrincipal \
+            --role "Communication and Email Service Owner" \
+            --scope "$COMMUNICATION_SERVICE_ID" \
+            --output none
+          {
+            printf 'sender=%s\n' "donotreply@$SENDER_DOMAIN"
+            printf 'username=%s\n' "$SMTP_AUTH_USERNAME"
+          } >>"$GITHUB_OUTPUT"
+          unset DEPLOYMENT_OUTPUT PRINCIPAL_ID COMMUNICATION_SERVICE_ID
+          echo '{"result":"PRODUCTION_EMAIL_AUTHORITY_PROVISIONED"}'
+      - name: Verify non-secret SMTP configuration
+        shell: bash
+        env:
+          SMTP_SENDER: ${{ steps.provision.outputs.sender }}
+          SMTP_AUTH_USERNAME: ${{ steps.provision.outputs.username }}
+        run: |
+          set -Eeuo pipefail
+          case "$SMTP_SENDER" in
+            donotreply@*.azurecomm.net) ;;
+            *) echo '{"error":"PRODUCTION_EMAIL_SENDER_INVALID"}' >&2; exit 1 ;;
+          esac
+          test "$SMTP_AUTH_USERNAME" = "$SMTP_USERNAME"
+          echo '{"result":"PRODUCTION_EMAIL_CONFIGURATION_VERIFIED"}'

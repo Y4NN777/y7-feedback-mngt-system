@@ -168,6 +168,33 @@ test("BDD-REL-303 schedules encrypted Production backup with dedicated authority
   );
 });
 
+test("BDD-REL-304 provisions Production SMTP through protected OIDC authority", async () => {
+  const workflow = await readFile(
+    new URL("../.github/workflows/production-email.yml", import.meta.url),
+    "utf8",
+  );
+  const template = await readFile(
+    new URL("../infra/azure/production-email.bicep", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(workflow, /workflow_dispatch:/u);
+  assert.match(workflow, /permissions:\s+contents: read\s+id-token: write/u);
+  assert.match(workflow, /environment: production/u);
+  assert.match(workflow, /azure\/login@[0-9a-f]{40}/u);
+  assert.match(workflow, /AZURE_PRODUCTION_CLIENT_ID/u);
+  assert.match(workflow, /Communication and Email Service Owner/u);
+  assert.doesNotMatch(workflow, /AZURE_(?:CLIENT_)?SECRET/u);
+  assert.doesNotMatch(workflow, /smtp.*password/iu);
+
+  assert.match(template, /emailServices@2025-05-01/u);
+  assert.match(template, /domainManagement: 'AzureManaged'/u);
+  assert.match(template, /userEngagementTracking: 'Disabled'/u);
+  assert.match(template, /linkedDomains: \[managedDomain\.id\]/u);
+  assert.match(template, /smtpUsernames@2025-09-01/u);
+  assert.match(template, /entraApplicationId: entraApplicationId/u);
+});
+
 test("BDD-E2E-301 runs the complete G5 evidence pack with ephemeral secret material", async () => {
   const workflow = await readFile(
     new URL("../.github/workflows/g5-evidence.yml", import.meta.url),
