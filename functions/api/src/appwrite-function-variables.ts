@@ -48,6 +48,20 @@ export function resolveAppwriteFunctionTarget(
   throw new Error("APPWRITE_FUNCTION_DEPLOYMENT_ENVIRONMENT_INVALID");
 }
 
+export function resolveAuthoritativeCommitEvent(
+  input: Readonly<Record<string, string | undefined>>,
+): string | undefined {
+  const databaseId = input.APPWRITE_DATABASE_ID?.trim();
+  if (databaseId === undefined || databaseId === "") return undefined;
+  const tableId =
+    input.APPWRITE_AUTHORITATIVE_COMMITS_TABLE_ID?.trim() || "authoritative_commits";
+  const identifier = /^[A-Za-z0-9][A-Za-z0-9._-]{0,35}$/u;
+  if (!identifier.test(databaseId) || !identifier.test(tableId)) {
+    throw new Error("APPWRITE_AUTHORITATIVE_COMMIT_EVENT_INVALID");
+  }
+  return `tablesdb.${databaseId}.tables.${tableId}.rows.*.create`;
+}
+
 export const appwriteFunctionVariableKeys = [
   "Y7_ENVIRONMENT",
   "APPWRITE_ENVIRONMENT",

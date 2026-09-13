@@ -25,6 +25,7 @@ export interface AppwriteAuthoritativeCommitTablesPort {
 }
 
 export interface AuthoritativeCommitStore {
+  find(commitId: string): Promise<AuthoritativeCommit | null>;
   accept(commit: AuthoritativeCommit): Promise<{
     readonly status: "applied" | "replayed";
     readonly commit: AuthoritativeCommit;
@@ -41,11 +42,11 @@ function conflict(error: unknown): boolean {
   return object(error) && error.code === 409;
 }
 
-function canonicalRow(
+export function parseAuthoritativeCommitRow(
   value: unknown,
-  expected: AuthoritativeCommit,
+  expectedId: string,
 ): AuthoritativeCommit | null {
-  if (!object(value) || value.$id !== expected.id) return null;
+  if (!object(value) || value.$id !== expectedId) return null;
   let candidate: AuthoritativeCommit;
   try {
     const acceptedAt = new Date(value.acceptedAt as string).toISOString();
@@ -64,7 +65,7 @@ function canonicalRow(
         sealedPayload: value.sealedPayload as string,
         acceptedAt,
       },
-      () => expected.id,
+      () => expectedId,
     );
   } catch {
     return null;
@@ -102,6 +103,20 @@ export function createAppwriteAuthoritativeCommitStore(
     throw new Error("AUTHORITATIVE_COMMIT_SCHEMA_INVALID");
   }
   return {
+    async find(commitId) {
+      if (!appwriteId.test(commitId)) return null;
+      try {
+        const existing = await tables.getRow({
+          databaseId: schema.databaseId,
+          tableId: schema.authoritativeCommitsTableId,
+          rowId: commitId,
+        });
+        return parseAuthoritativeCommitRow(existing, commitId);
+      } catch (error: unknown) {
+        if (object(error) && error.code === 404) return null;
+        throw error;
+      }
+    },
     async accept(commit) {
       try {
         const created = await tables.createRow({
@@ -111,7 +126,7 @@ export function createAppwriteAuthoritativeCommitStore(
           data: data(commit),
           permissions: [],
         });
-        const canonical = canonicalRow(created, commit);
+        const canonical = parseAuthoritativeCommitRow(created, commit.id);
         if (canonical === null) {
           throw new Error("AUTHORITATIVE_COMMIT_WRITE_INVALID");
         }
@@ -123,7 +138,7 @@ export function createAppwriteAuthoritativeCommitStore(
           tableId: schema.authoritativeCommitsTableId,
           rowId: commit.id,
         });
-        const canonical = canonicalRow(existing, commit);
+        const canonical = parseAuthoritativeCommitRow(existing, commit.id);
         if (canonical === null) {
           throw new Error("AUTHORITATIVE_COMMIT_REPLAY_INVALID");
         }

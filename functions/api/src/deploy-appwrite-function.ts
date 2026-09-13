@@ -18,6 +18,7 @@ import type { ApplicationEnvironment } from "@y7-feedback/config/public";
 import {
   resolveAppwriteFunctionDeploymentAuthority,
   resolveAppwriteFunctionTarget,
+  resolveAuthoritativeCommitEvent,
 } from "./appwrite-function-variables.js";
 
 const buildCommands =
@@ -39,12 +40,13 @@ async function ensureFunction(
   environment: ApplicationEnvironment,
 ): Promise<"created" | "updated"> {
   const target = resolveAppwriteFunctionTarget(environment);
+  const authoritativeCommitEvent = resolveAuthoritativeCommitEvent(process.env);
   const settings = {
     functionId: target.id,
     name: target.name,
     runtime: Runtime.Node22,
     execute: ["any"],
-    events: [],
+    events: authoritativeCommitEvent === undefined ? [] : [authoritativeCommitEvent],
     schedule: "*/5 * * * *",
     timeout: 60,
     enabled: true,

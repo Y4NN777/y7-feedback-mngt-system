@@ -84,7 +84,7 @@ describe("Appwrite infrastructure manifest", () => {
       [schema.authoritativeCommitsTableId, ["projectionState", "availableAt"]],
       [
         schema.authoritativeCommitsTableId,
-        ["aggregateKind", "aggregateId", "acceptedAt"],
+        ["aggregateKind", "aggregateId", "projectionState", "acceptedAt"],
       ],
       [schema.authoritativeCommitsTableId, ["workspaceId", "projectId"]],
     ] as const;

@@ -68,6 +68,18 @@ jobs:
             >> .env.appwrite-preview
           unset ANTIVIRUS_SCANNER_HMAC_KEY
           pnpm provision:appwrite
-          pnpm configure:appwrite:function:preview
-          pnpm deploy:appwrite:function:preview
+          if node --env-file=.env.appwrite-preview --input-type=module <<'NODE'
+          const response = await fetch(new URL("/health", process.env.Y7_FUNCTION_DOMAIN_URL), {
+            redirect: "error",
+            signal: AbortSignal.timeout(30_000),
+          });
+          const body = await response.json();
+          process.exitCode = response.ok && body.release === process.env.RELEASE ? 0 : 1;
+          NODE
+          then
+            echo '{"result":"PREVIEW_RELEASE_ALREADY_ACTIVE"}'
+          else
+            pnpm configure:appwrite:function:preview
+            pnpm deploy:appwrite:function:preview
+          fi
           pnpm verify:slo:g5

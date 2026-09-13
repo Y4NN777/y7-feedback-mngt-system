@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   appwriteFunctionVariableKeys,
   planAppwriteFunctionVariables,
+  resolveAuthoritativeCommitEvent,
   resolveAppwriteFunctionDeploymentAuthority,
   resolveAppwriteFunctionTarget,
 } from "./appwrite-function-variables";
@@ -12,6 +13,26 @@ const environment = Object.fromEntries(
 );
 
 describe("Appwrite Function variable policy", () => {
+  it("ADR-015 triggers projection when an authoritative commit row is created", () => {
+    expect(
+      resolveAuthoritativeCommitEvent({
+        INTAKE_PERSISTENCE_MODE: "authoritative",
+        APPWRITE_DATABASE_ID: "feedback",
+        APPWRITE_AUTHORITATIVE_COMMITS_TABLE_ID: "authoritative_commits",
+      }),
+    ).toBe("tablesdb.feedback.tables.authoritative_commits.rows.*.create");
+    expect(resolveAuthoritativeCommitEvent({})).toBeUndefined();
+    expect(resolveAuthoritativeCommitEvent({ APPWRITE_DATABASE_ID: "feedback" })).toBe(
+      "tablesdb.feedback.tables.authoritative_commits.rows.*.create",
+    );
+    expect(() =>
+      resolveAuthoritativeCommitEvent({
+        INTAKE_PERSISTENCE_MODE: "authoritative",
+        APPWRITE_DATABASE_ID: "bad/id",
+        APPWRITE_AUTHORITATIVE_COMMITS_TABLE_ID: "commits",
+      }),
+    ).toThrow("APPWRITE_AUTHORITATIVE_COMMIT_EVENT_INVALID");
+  });
   it("BDD-DEL-DEPLOY-001 requires only deployment authority", () => {
     expect(
       resolveAppwriteFunctionDeploymentAuthority({
