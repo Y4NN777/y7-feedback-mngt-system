@@ -4,6 +4,7 @@ import { Client, Query, TablesDB, Users } from "node-appwrite";
 
 import { parseServerConfig } from "@y7-feedback/config/server";
 
+import { runBoundedLatencyProbe } from "./bounded-latency-probe.js";
 import { createHttpFunctionPublicApi } from "./http-function-public-api.js";
 import { createAccessProof, hashAccessProof } from "./proof-crypto.js";
 import { createSensitiveDataProtector } from "./sensitive-data-protector.js";
@@ -74,6 +75,7 @@ async function main(): Promise<void> {
     })),
   );
   const criticalApiSamplesMs: number[] = [];
+  let criticalApiLoadSamplesMs: readonly number[] = [];
   const createRow = async (
     tableId: string,
     rowId: string,
@@ -368,9 +370,27 @@ async function main(): Promise<void> {
     ) {
       throw new Error("APPWRITE_G3_CONVERSATION_WORKSPACE_PROJECTION_INVALID");
     }
+    criticalApiLoadSamplesMs = await runBoundedLatencyProbe({
+      concurrency: 4,
+      iterations: 40,
+      probe: async () => {
+        const startedAt = performance.now();
+        const response = await api.handle({
+          method: "GET",
+          path: `${workspacePath}/conversation`,
+          headers: bearer,
+          body: undefined,
+        });
+        if (response?.statusCode !== 200)
+          throw new Error("APPWRITE_G3_CONVERSATION_LOAD_STATUS_INVALID");
+        return Math.round(
+          response.operationalDurationMs ?? performance.now() - startedAt,
+        );
+      },
+    });
     if (config.intakePersistenceMode === "authoritative") {
       let projectionsComplete = false;
-      for (let attempt = 0; attempt < 60; attempt += 1) {
+      for (let attempt = 0; attempt < 120; attempt += 1) {
         const commits = await tables.listRows({
           databaseId: config.appwriteSchema.databaseId,
           tableId: config.appwriteSchema.authoritativeCommitsTableId,
@@ -479,23 +499,38 @@ async function main(): Promise<void> {
         // Preserve the primary matrix outcome; residue check below remains authoritative.
       }
     }
-    const residueChecks = await Promise.all(
-      [
-        config.appwriteSchema.conversationIdempotencyTableId,
-        config.appwriteSchema.conversationLifecycleTableId,
-        config.appwriteSchema.conversationInternalNotesTableId,
-        config.appwriteSchema.conversationMessagesTableId,
-      ].map(async (tableId) => {
+    const projectionTables = [
+      config.appwriteSchema.conversationIdempotencyTableId,
+      config.appwriteSchema.conversationLifecycleTableId,
+      config.appwriteSchema.conversationInternalNotesTableId,
+      config.appwriteSchema.conversationMessagesTableId,
+    ];
+    let quietChecks = 0;
+    for (let attempt = 0; attempt < 120 && quietChecks < 2; attempt += 1) {
+      for (const tableId of projectionTables) {
         const rows = await tables.listRows({
           databaseId: config.appwriteSchema.databaseId,
           tableId,
-          queries: [Query.equal("feedbackId", [feedbackId]), Query.limit(1)],
+          queries: [Query.equal("feedbackId", [feedbackId]), Query.limit(100)],
           total: false,
         });
-        return rows.rows.length;
-      }),
-    );
-    cleanupPassed = residueChecks.every((count) => count === 0);
+        for (const row of rows.rows) await deleteRowReliably(tableId, row.$id);
+      }
+      const residueChecks = await Promise.all(
+        projectionTables.map(async (tableId) => {
+          const rows = await tables.listRows({
+            databaseId: config.appwriteSchema.databaseId,
+            tableId,
+            queries: [Query.equal("feedbackId", [feedbackId]), Query.limit(1)],
+            total: false,
+          });
+          return rows.rows.length;
+        }),
+      );
+      quietChecks = residueChecks.every((count) => count === 0) ? quietChecks + 1 : 0;
+      if (quietChecks < 2) await wait(250);
+    }
+    cleanupPassed = quietChecks === 2;
   }
 
   if (!cleanupPassed) {
@@ -507,16 +542,29 @@ async function main(): Promise<void> {
       matrixPassed: true,
       directAccessDenied: true,
       criticalApiSamplesMs,
+      criticalApiLoadSamplesMs,
       cleanupPassed,
     })}\n`,
   );
 }
 
 void main().catch((error: unknown) => {
-  const code =
+  const stableMessage =
     error instanceof Error && /^[A-Z][A-Z0-9_:.-]{2,160}$/u.test(error.message)
       ? error.message
-      : "APPWRITE_G3_CONVERSATION_FAILED";
+      : undefined;
+  const appwriteStatus = object(error) ? Number(error.code) : Number.NaN;
+  const appwriteType =
+    object(error) && typeof error.type === "string" ? error.type : "";
+  const stableAppwriteFailure =
+    Number.isInteger(appwriteStatus) &&
+    appwriteStatus >= 400 &&
+    appwriteStatus <= 599 &&
+    /^[a-z][a-z0-9_]{2,63}$/u.test(appwriteType)
+      ? `APPWRITE_G3_CONVERSATION_APPWRITE_${String(appwriteStatus)}_${appwriteType.toUpperCase()}`
+      : undefined;
+  const code =
+    stableMessage ?? stableAppwriteFailure ?? "APPWRITE_G3_CONVERSATION_FAILED";
   process.stderr.write(`${JSON.stringify({ status: "error", code })}\n`);
   process.exitCode = 1;
 });

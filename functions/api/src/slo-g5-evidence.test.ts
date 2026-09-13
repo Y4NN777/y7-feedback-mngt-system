@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { collectSloEvidenceSamples } from "./slo-g5-evidence";
+import {
+  collectCriticalApiLoadSamples,
+  collectSloEvidenceSamples,
+} from "./slo-g5-evidence";
 
 describe("G5 SLO evidence boundary", () => {
   it("BDD-SLO-206 accepts only finite non-negative operational durations", () => {
@@ -32,6 +35,18 @@ describe("G5 SLO evidence boundary", () => {
   ])("BDD-SLO-207 rejects missing or unsafe evidence %#", (candidate) => {
     expect(() => collectSloEvidenceSamples(candidate)).toThrow(
       "SLO_G5_EVIDENCE_INVALID",
+    );
+  });
+});
+
+describe("dedicated critical API load evidence", () => {
+  it("BDD-SLO-215 accepts only a non-empty bounded latency series", () => {
+    expect(
+      collectCriticalApiLoadSamples({ criticalApiLoadSamplesMs: [12, 20] }),
+    ).toEqual([12, 20]);
+    expect(collectCriticalApiLoadSamples({ criticalApiLoadSamplesMs: [] })).toEqual([]);
+    expect(collectCriticalApiLoadSamples({ criticalApiLoadSamplesMs: [-1] })).toEqual(
+      [],
     );
   });
 });
