@@ -109,6 +109,17 @@ describe("trusted accountless access coordination", () => {
     ).resolves.toEqual({ status: "denied", code: "ACCESS_DENIED" });
   });
 
+  it("BDD-SLO-211 denies an unknown reference from the grant-only authorization path", async () => {
+    const coordinator = createAccountlessAccessCoordinator(
+      new MemoryAccessRepository(null),
+      { matchesProof, rotation: { createProof: () => proofB, hashProof } },
+    );
+
+    await expect(
+      coordinator.authorize({ reference: "Y7-2026-999999", proof: proofA }),
+    ).resolves.toEqual({ status: "denied", code: "ACCESS_DENIED" });
+  });
+
   it("retrieves only the Reporter-safe projection with a valid Feedback proof", async () => {
     const { coordinator } = setup();
 
