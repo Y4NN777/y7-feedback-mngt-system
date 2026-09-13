@@ -463,6 +463,11 @@ test("BDD-REL-406 stages, promotes, rolls back and restores Production", async (
   assert.match(workflow, /pnpm deploy:appwrite:function:production/u);
   assert.match(workflow, /printf '\\nRELEASE=%s\\n' "\$GITHUB_SHA"/u);
   assert.match(workflow, /vercel@50\.35\.0 deploy --prod --skip-domain/u);
+  assert.match(workflow, /vercel@50\.35\.0 curl \/ --deployment "\$NEW_WEB_URL"/u);
+  assert.doesNotMatch(
+    workflow,
+    /vercel@50\.35\.0 curl[^\n]*\n(?:[^\n]*\n){0,2}[^\n]*--fail/u,
+  );
   assert.match(workflow, /--build-env VITE_RELEASE="\$GITHUB_SHA"/u);
   assert.match(workflow, /vercel@50\.35\.0 promote/u);
   assert.match(workflow, /vercel@50\.35\.0 rollback/u);
