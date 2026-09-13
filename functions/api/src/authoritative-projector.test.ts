@@ -98,6 +98,40 @@ describe("ADR-015 authoritative projector", () => {
     expect(target.projected).not.toHaveBeenCalled();
   });
 
+  it("BDD-SLO-423A drains due commits until the store becomes idle", async () => {
+    const target = setup();
+    target.claim.mockResolvedValueOnce({
+      commit,
+      attempt: 1,
+      leaseToken: "lease_a",
+    });
+    target.claim.mockResolvedValueOnce(null);
+    await expect(target.projector.runBatch("worker_a", 25)).resolves.toEqual({
+      status: "completed",
+      processed: 1,
+      projected: 1,
+      retryScheduled: 0,
+    });
+    expect(target.claim).toHaveBeenCalledTimes(2);
+  });
+
+  it("BDD-SLO-423B bounds each drain and validates its maximum", async () => {
+    const target = setup();
+    await expect(target.projector.runBatch("worker_a", 2)).resolves.toEqual({
+      status: "completed",
+      processed: 2,
+      projected: 2,
+      retryScheduled: 0,
+    });
+    expect(target.claim).toHaveBeenCalledTimes(2);
+    await expect(target.projector.runBatch("worker_a", 0)).rejects.toThrow(
+      "AUTHORITATIVE_PROJECTOR_BATCH_INVALID",
+    );
+    await expect(target.projector.runBatch("worker_a", 101)).rejects.toThrow(
+      "AUTHORITATIVE_PROJECTOR_BATCH_INVALID",
+    );
+  });
+
   it.each([
     ["worker", "bad/worker", {}],
     ["commit", "worker_a", { commit: { ...commit, id: "bad/id" } }],

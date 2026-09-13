@@ -1103,7 +1103,7 @@ export function createHttpApplication(
     );
     const authoritativeProjections = {
       runOnce: () =>
-        authoritativeProjector.runOnce(`${config.environment}-intake-projector`),
+        authoritativeProjector.runBatch(`${config.environment}-intake-projector`, 25),
     };
     if (
       config.providers &&

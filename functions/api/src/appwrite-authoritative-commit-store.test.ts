@@ -74,6 +74,17 @@ describe("ADR-015 Appwrite authoritative commit store", () => {
     });
   });
 
+  it("BDD-SLO-411A accepts Appwrite's equivalent UTC datetime representation", async () => {
+    const target = setup();
+    target.createRow.mockResolvedValueOnce(
+      row({ acceptedAt: "2026-09-13T02:00:00.000+00:00" }),
+    );
+    await expect(target.store.accept(commit)).resolves.toEqual({
+      status: "applied",
+      commit,
+    });
+  });
+
   it("BDD-SLO-412 returns the original commit after a duplicate write", async () => {
     const target = setup();
     target.createRow.mockRejectedValueOnce({ code: 409 });
