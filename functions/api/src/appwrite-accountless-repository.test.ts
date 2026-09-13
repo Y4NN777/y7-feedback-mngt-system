@@ -233,6 +233,18 @@ describe("Appwrite accountless access repository", () => {
     });
   });
 
+  it("BDD-ACC-APPWRITE-001A authorizes from the grant without loading Feedback", async () => {
+    const { repository, getRow } = setup();
+    await expect(repository.loadGrantByReference("Y7-2026-000001")).resolves.toEqual({
+      feedbackId: "feedback-1",
+      reference: "Y7-2026-000001",
+      verifier: "sha256:verifier",
+      generation: 1,
+      status: "active",
+    });
+    expect(getRow).not.toHaveBeenCalled();
+  });
+
   it("returns null for an absent reference and fails closed for duplicates", async () => {
     await expect(setup([]).repository.loadByReference("unknown")).resolves.toBeNull();
     await expect(

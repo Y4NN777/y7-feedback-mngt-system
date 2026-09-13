@@ -19,6 +19,7 @@ export interface AccountlessResource {
 }
 
 export interface AccountlessAccessRepository {
+  loadGrantByReference(reference: string): Promise<AccessGrant | null>;
   loadByReference(reference: string): Promise<AccountlessResource | null>;
   saveGrant(grant: AccessGrant): Promise<void>;
   saveRecord(record: ReporterFeedbackRecord): Promise<void>;
@@ -88,8 +89,15 @@ export function createAccountlessAccessCoordinator(
   return {
     async authorize(request) {
       try {
-        const resource = await loadAuthorized(request);
-        return { status: "ok", feedbackId: resource.grant.feedbackId };
+        const grant = await repository.loadGrantByReference(request.reference);
+        return {
+          status: "ok",
+          feedbackId: authorizeAccess(
+            grant ?? undefined,
+            request,
+            dependencies.matchesProof,
+          ),
+        };
       } catch (error: unknown) {
         return failure(error);
       }
