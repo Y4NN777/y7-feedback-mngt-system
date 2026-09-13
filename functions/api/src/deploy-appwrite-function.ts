@@ -62,7 +62,7 @@ async function ensureFunction(
       ProjectKeyScopes.UsersRead,
       ProjectKeyScopes.TeamsRead,
     ],
-    runtimeSpecification: "s-1vcpu-1gb",
+    runtimeSpecification: "s-2vcpu-2gb",
     deploymentRetention: 3,
   };
   try {

@@ -62,6 +62,7 @@ test("BDD-DEL-APPWRITE-005 defines one reproducible Preview Function", async () 
   );
   assert.equal(api.logging, true);
   assert.equal(api.timeout, 60);
+  assert.equal(api.runtimeSpecification, "s-2vcpu-2gb");
   assert.equal(api.deploymentRetention, 3);
 });
 
