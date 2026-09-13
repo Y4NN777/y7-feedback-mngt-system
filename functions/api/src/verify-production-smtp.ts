@@ -1,7 +1,10 @@
 /* v8 ignore file -- live SMTP authority is exercised only by protected Production CI. */
 import { parseServerConfig } from "@y7-feedback/config/server";
 
-import { proveProductionSmtpEvidence } from "./production-smtp-evidence.js";
+import {
+  ProductionSmtpEvidenceError,
+  proveProductionSmtpEvidence,
+} from "./production-smtp-evidence.js";
 import { createSmtpNotificationSender } from "./smtp-mail-catcher-sender.js";
 import { createNodeSmtpNotificationSender } from "./smtp-notification-node.js";
 
@@ -55,7 +58,11 @@ async function main(): Promise<void> {
   );
 }
 
-main().catch(() => {
-  process.stderr.write('{"error":"PRODUCTION_SMTP_EVIDENCE_FAILED"}\n');
+main().catch((error: unknown) => {
+  const handoff =
+    error instanceof ProductionSmtpEvidenceError ? error.handoff : "unclassified";
+  process.stderr.write(
+    `${JSON.stringify({ error: "PRODUCTION_SMTP_EVIDENCE_FAILED", handoff })}\n`,
+  );
   process.exitCode = 1;
 });
