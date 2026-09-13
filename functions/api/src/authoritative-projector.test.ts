@@ -130,6 +130,21 @@ describe("ADR-015 authoritative projector", () => {
     await expect(target.projector.runBatch("worker_a", 101)).rejects.toThrow(
       "AUTHORITATIVE_PROJECTOR_BATCH_INVALID",
     );
+    await expect(target.projector.runBatch("worker_a", 1.5)).rejects.toThrow(
+      "AUTHORITATIVE_PROJECTOR_BATCH_INVALID",
+    );
+  });
+
+  it("BDD-SLO-423C counts retryable projections in a bounded drain", async () => {
+    const target = setup();
+    target.project.mockRejectedValueOnce(new Error("projection unavailable"));
+
+    await expect(target.projector.runBatch("worker_a", 1)).resolves.toEqual({
+      status: "completed",
+      processed: 1,
+      projected: 0,
+      retryScheduled: 1,
+    });
   });
 
   it.each([

@@ -11,6 +11,7 @@ import {
 
 import { buildMeasurementSeriesIndex } from "./slo-series.js";
 import { collectSloEvidenceSamples } from "./slo-g5-evidence.js";
+import { stableProbeFailureCode } from "./slo-probe-failure.js";
 import { routeSloAlerts } from "./slo-telemetry.js";
 
 const concurrency = 4;
@@ -19,25 +20,6 @@ const commands = [
   "verify-appwrite-g3-conversation-lifecycle.js",
   "verify-appwrite-g3-workbench.js",
 ] as const;
-
-export function stableProbeFailureCode(output: string): string {
-  for (const line of output.trim().split("\n").reverse()) {
-    try {
-      const parsed = JSON.parse(line) as Readonly<Record<string, unknown>>;
-      const value =
-        typeof parsed.code === "string"
-          ? parsed.code
-          : typeof parsed.error === "string"
-            ? parsed.error
-            : undefined;
-      const code = value?.match(/^[A-Z][A-Z0-9_]{2,80}/u)?.[0];
-      if (code !== undefined) return code;
-    } catch {
-      // Ignore non-JSON diagnostics and continue toward the stable final error.
-    }
-  }
-  return "UNKNOWN";
-}
 
 function required(name: string): string {
   const value = process.env[name]?.trim();
