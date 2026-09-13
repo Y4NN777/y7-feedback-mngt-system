@@ -14,6 +14,7 @@ import { retryAppwriteAdminCall } from "./appwrite-admin-retry.js";
 import { createClamAvHttpScanner } from "./clamav-http-scanner.js";
 import { parseClamAvHttpScannerConfig } from "./clamav-http-scanner-config.js";
 import { proveProductionDeletionContinuity } from "./production-deletion-continuity.js";
+import { isNondisclosingProviderDenial } from "./production-denial-evidence.js";
 import { assertProductionReleaseReady } from "./production-release-policy.js";
 import {
   assertProductionFunctionRelease,
@@ -66,15 +67,7 @@ async function safelyDenied(url: URL, method: "GET" | "POST"): Promise<boolean> 
       ...(method === "POST" ? { body: "{}" } : {}),
       signal: AbortSignal.timeout(30_000),
     });
-    if (![400, 401, 403].includes(response.status)) return false;
-    const body = (await response.json()) as unknown;
-    return (
-      typeof body === "object" &&
-      body !== null &&
-      "error" in body &&
-      typeof body.error === "string" &&
-      /^ERR-[A-Z0-9-]+$/u.test(body.error)
-    );
+    return await isNondisclosingProviderDenial(response);
   } catch {
     return false;
   }
