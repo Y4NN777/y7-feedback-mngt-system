@@ -65,7 +65,10 @@ describe("accountless access experience", () => {
         privacyGateway={{ requestDeletion }}
       />,
     );
-    await user.type(screen.getByRole("textbox", { name: "Référence" }), view.reference);
+    await user.type(
+      await screen.findByRole("textbox", { name: "Référence" }),
+      view.reference,
+    );
     await user.type(screen.getByLabelText("Preuve d’accès"), proof);
     await user.click(screen.getByRole("button", { name: "Retrouver le retour" }));
 
@@ -117,7 +120,10 @@ describe("accountless access experience", () => {
         }}
       />,
     );
-    await user.type(screen.getByRole("textbox", { name: "Référence" }), view.reference);
+    await user.type(
+      await screen.findByRole("textbox", { name: "Référence" }),
+      view.reference,
+    );
     await user.type(screen.getByLabelText("Preuve d’accès"), proof);
     await user.click(screen.getByRole("button", { name: "Retrouver le retour" }));
     await user.click(screen.getByRole("checkbox", { name: /Je comprends/i }));

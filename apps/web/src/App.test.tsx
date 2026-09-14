@@ -51,7 +51,7 @@ describe("root orientation", () => {
       },
     });
     expect(
-      screen.getByRole("heading", { name: "Administration des projets" }),
+      await screen.findByRole("heading", { name: "Administration des projets" }),
     ).toBeVisible();
     expect(await screen.findByLabelText("Adresse e-mail")).toBeVisible();
   });
@@ -74,7 +74,9 @@ describe("root orientation", () => {
         disconnect: () => Promise.resolve({ status: "retryable" }),
       },
     });
-    expect(screen.getByRole("heading", { name: "Sources du projet" })).toBeVisible();
+    expect(
+      await screen.findByRole("heading", { name: "Sources du projet" }),
+    ).toBeVisible();
     await user.click(screen.getByRole("button", { name: "English" }));
     expect(screen.getByRole("heading", { name: "Project sources" })).toBeVisible();
     expect(document.documentElement.lang).toBe("en");
@@ -95,7 +97,7 @@ describe("root orientation", () => {
         mutate: () => Promise.resolve({ status: "retryable" }),
       },
     });
-    expect(screen.getByRole("heading", { name: "Intelligence" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Intelligence" })).toBeVisible();
     await user.click(screen.getByRole("button", { name: "English" }));
     expect(document.documentElement.lang).toBe("en");
     expect(screen.getByText(/Analyze feedback inside one Project/u)).toBeVisible();
@@ -115,7 +117,9 @@ describe("root orientation", () => {
         execute: () => Promise.resolve({ status: "retryable" }),
       },
     });
-    expect(screen.getByRole("heading", { name: "Accès exceptionnel" })).toBeVisible();
+    expect(
+      await screen.findByRole("heading", { name: "Accès exceptionnel" }),
+    ).toBeVisible();
     await user.click(screen.getByRole("button", { name: "English" }));
     expect(screen.getByRole("heading", { name: "Exceptional access" })).toBeVisible();
     expect(document.documentElement.lang).toBe("en");

@@ -18,7 +18,7 @@
     "workbox-window": "7.4.1"
   },
   "scripts": {
-    "build": "pnpm typecheck && vite build",
+    "build": "pnpm typecheck && vite build && node ../../scripts/check-web-bundle-budget.mjs",
     "dev": "vite",
     "preview": "vite preview",
     "test": "vitest run",
