@@ -109,6 +109,24 @@ test("BDD-UX-001 has no serious accessibility issue or horizontal overflow", asy
   expect(hasHorizontalOverflow).toBe(false);
 });
 
+test("BDD-UX-REGRESSION-001 preserves the approved root identity in FR and EN", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Donner un avis" })).toBeVisible();
+  await expect(page).toHaveScreenshot("root-fr.png", {
+    animations: "disabled",
+    fullPage: true,
+  });
+
+  await page.getByRole("button", { name: "English" }).click();
+  await expect(page.getByRole("heading", { name: "Give feedback" })).toBeVisible();
+  await expect(page).toHaveScreenshot("root-en.png", {
+    animations: "disabled",
+    fullPage: true,
+  });
+});
+
 test("BDD-PWA-001 emits a manifest and a public-only service worker", async ({
   request,
 }) => {

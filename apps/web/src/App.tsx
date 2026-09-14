@@ -1,31 +1,60 @@
-import { useEffect, useState } from "react";
+import { lazy, useEffect, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import type { Locale } from "@y7-feedback/domain";
 
-import { AdministrationPage } from "./AdministrationPage";
 import type { AdministrationGateway } from "./AdministrationGateway";
 import type { AdministrationSession } from "./AdministrationSession";
 import type { ConversationGateway } from "./ConversationGateway";
 import type { ExternalIssueGateway } from "./ExternalIssueGateway";
-import { FeedbackIntake } from "./FeedbackIntake";
 import type { OfflineIntakePersistence } from "./FeedbackIntakeContracts";
+import { resolveApplicationRoute } from "./ApplicationRoute";
 import { messages } from "./i18n/messages";
 import type { IntakeGateway } from "./IntakeGateway";
 import type { IntelligenceGateway } from "./IntelligenceGateway";
-import { IntelligencePage } from "./IntelligencePage";
 import type { NotificationInvalidation } from "./NotificationInvalidation";
 import type { OfflineIntakeReplay } from "./OfflineIntakeReplay";
 import type { ProjectGateway } from "./ProjectGateway";
 import type { PublicationConsentGateway } from "./PublicationConsentGateway";
 import type { PrivacyGateway } from "./PrivacyGateway";
 import type { PlatformAccessGateway } from "./PlatformAccessGateway";
-import { PlatformAccessPage } from "./PlatformAccessPage";
-import { RetrieveFeedback, type AccountlessGateway } from "./RetrieveFeedback";
+import type { AccountlessGateway } from "./RetrieveFeedback";
+import { RouteBoundary } from "./RouteBoundary";
 import type { WorkbenchGateway } from "./WorkbenchGateway";
-import { WorkbenchPage } from "./WorkbenchPage";
 import type { SourceManagementGateway } from "./SourceManagementGateway";
-import { SourceManagementPage } from "./SourceManagementPage";
+const AdministrationPage = lazy(() =>
+  import("./AdministrationPage").then(({ AdministrationPage }) => ({
+    default: AdministrationPage,
+  })),
+);
+const FeedbackIntake = lazy(() =>
+  import("./FeedbackIntake").then(({ FeedbackIntake }) => ({
+    default: FeedbackIntake,
+  })),
+);
+const IntelligencePage = lazy(() =>
+  import("./IntelligencePage").then(({ IntelligencePage }) => ({
+    default: IntelligencePage,
+  })),
+);
+const PlatformAccessPage = lazy(() =>
+  import("./PlatformAccessPage").then(({ PlatformAccessPage }) => ({
+    default: PlatformAccessPage,
+  })),
+);
+const RetrieveFeedback = lazy(() =>
+  import("./RetrieveFeedback").then(({ RetrieveFeedback }) => ({
+    default: RetrieveFeedback,
+  })),
+);
+const SourceManagementPage = lazy(() =>
+  import("./SourceManagementPage").then(({ SourceManagementPage }) => ({
+    default: SourceManagementPage,
+  })),
+);
+const WorkbenchPage = lazy(() =>
+  import("./WorkbenchPage").then(({ WorkbenchPage }) => ({ default: WorkbenchPage })),
+);
 
 const unavailableGateway: AccountlessGateway = {
   retrieve: () => Promise.resolve({ status: "retryable" }),
@@ -86,7 +115,6 @@ const unavailableSourceManagementGateway: SourceManagementGateway = {
   refresh: () => Promise.resolve({ status: "retryable" }),
   disconnect: () => Promise.resolve({ status: "retryable" }),
 };
-const projectSlugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 
 function ProjectRoute({
   createOperationId,
@@ -174,6 +202,27 @@ function ProjectRoute({
   );
 }
 
+export type AppProps = {
+  readonly accountlessGateway?: AccountlessGateway;
+  readonly administrationGateway?: AdministrationGateway;
+  readonly administrationSession?: AdministrationSession;
+  readonly conversationGateway?: ConversationGateway;
+  readonly externalIssueGateway?: ExternalIssueGateway;
+  readonly createOperationId?: () => string;
+  readonly intakeGateway?: IntakeGateway;
+  readonly offlinePersistence?: OfflineIntakePersistence;
+  readonly offlineReplay?: OfflineIntakeReplay;
+  readonly intelligenceGateway?: IntelligenceGateway;
+  readonly projectGateway?: ProjectGateway;
+  readonly publicationConsentGateway?: PublicationConsentGateway;
+  readonly privacyGateway?: PrivacyGateway;
+  readonly platformAccessGateway?: PlatformAccessGateway;
+  readonly redirectProject?: (canonicalSlug: string) => void;
+  readonly workbenchGateway?: WorkbenchGateway;
+  readonly notificationInvalidation?: NotificationInvalidation;
+  readonly sourceManagementGateway?: SourceManagementGateway;
+};
+
 export function App({
   accountlessGateway = unavailableGateway,
   administrationGateway = unavailableAdministrationGateway,
@@ -195,26 +244,7 @@ export function App({
   workbenchGateway = unavailableWorkbenchGateway,
   notificationInvalidation = unavailableNotificationInvalidation,
   sourceManagementGateway = unavailableSourceManagementGateway,
-}: {
-  readonly accountlessGateway?: AccountlessGateway;
-  readonly administrationGateway?: AdministrationGateway;
-  readonly administrationSession?: AdministrationSession;
-  readonly conversationGateway?: ConversationGateway;
-  readonly externalIssueGateway?: ExternalIssueGateway;
-  readonly createOperationId?: () => string;
-  readonly intakeGateway?: IntakeGateway;
-  readonly offlinePersistence?: OfflineIntakePersistence;
-  readonly offlineReplay?: OfflineIntakeReplay;
-  readonly intelligenceGateway?: IntelligenceGateway;
-  readonly projectGateway?: ProjectGateway;
-  readonly publicationConsentGateway?: PublicationConsentGateway;
-  readonly privacyGateway?: PrivacyGateway;
-  readonly platformAccessGateway?: PlatformAccessGateway;
-  readonly redirectProject?: (canonicalSlug: string) => void;
-  readonly workbenchGateway?: WorkbenchGateway;
-  readonly notificationInvalidation?: NotificationInvalidation;
-  readonly sourceManagementGateway?: SourceManagementGateway;
-}) {
+}: AppProps) {
   const [locale, setLocale] = useState<Locale>("fr");
   const copy = messages[locale];
 
@@ -223,8 +253,11 @@ export function App({
     setLocale(nextLocale);
   }
 
-  if (window.location.pathname === "/retrieve") {
-    return (
+  const route = resolveApplicationRoute(window.location.pathname);
+  let feature: ReactNode;
+
+  if (route.kind === "retrieve") {
+    feature = (
       <RetrieveFeedback
         conversationGateway={conversationGateway}
         createOperationId={createOperationId}
@@ -235,9 +268,8 @@ export function App({
         privacyGateway={privacyGateway}
       />
     );
-  }
-  if (window.location.pathname === "/manage") {
-    return (
+  } else if (route.kind === "administration") {
+    feature = (
       <AdministrationPage
         gateway={administrationGateway}
         locale={locale}
@@ -245,9 +277,8 @@ export function App({
         session={administrationSession}
       />
     );
-  }
-  if (window.location.pathname === "/workbench") {
-    return (
+  } else if (route.kind === "workbench") {
+    feature = (
       <WorkbenchPage
         createOperationId={createOperationId}
         externalIssueGateway={externalIssueGateway}
@@ -258,9 +289,8 @@ export function App({
         session={administrationSession}
       />
     );
-  }
-  if (window.location.pathname === "/intelligence") {
-    return (
+  } else if (route.kind === "intelligence") {
+    feature = (
       <IntelligencePage
         gateway={intelligenceGateway}
         locale={locale}
@@ -268,9 +298,8 @@ export function App({
         session={administrationSession}
       />
     );
-  }
-  if (window.location.pathname === "/manage/sources") {
-    return (
+  } else if (route.kind === "sources") {
+    feature = (
       <SourceManagementPage
         gateway={sourceManagementGateway}
         locale={locale}
@@ -278,9 +307,8 @@ export function App({
         session={administrationSession}
       />
     );
-  }
-  if (window.location.pathname === "/platform/access") {
-    return (
+  } else if (route.kind === "platform-access") {
+    feature = (
       <PlatformAccessPage
         gateway={platformAccessGateway}
         locale={locale}
@@ -288,10 +316,8 @@ export function App({
         session={administrationSession}
       />
     );
-  }
-  const candidateSlug = window.location.pathname.slice(1);
-  if (projectSlugPattern.test(candidateSlug)) {
-    return (
+  } else if (route.kind === "project") {
+    feature = (
       <ProjectRoute
         createOperationId={createOperationId}
         gateway={projectGateway}
@@ -299,11 +325,17 @@ export function App({
         locale={locale}
         onLocaleChange={selectLocale}
         redirect={redirectProject}
-        slug={candidateSlug}
+        slug={route.slug}
         {...(offlinePersistence ? { offlinePersistence } : {})}
         {...(offlineReplay ? { offlineReplay } : {})}
       />
     );
+  } else {
+    feature = null;
+  }
+
+  if (feature) {
+    return <RouteBoundary locale={locale}>{feature}</RouteBoundary>;
   }
 
   return (

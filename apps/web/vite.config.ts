@@ -7,6 +7,9 @@ import { parseWebReleaseIdentity } from "./src/releaseIdentity.ts";
 const release = parseWebReleaseIdentity(process.env.VITE_RELEASE);
 
 export default defineConfig({
+  build: {
+    manifest: true,
+  },
   plugins: [
     {
       name: "y7-release-identity",
