@@ -10,6 +10,7 @@ import {
 } from "@y7-feedback/domain";
 
 import { intakeMessages } from "./i18n/intake";
+import { AccessMaterial } from "./AccessMaterial";
 import type {
   IntakeGateway,
   IntakeGatewayCommand,
@@ -368,17 +369,12 @@ function Confirmation({
       <p className="eyebrow">{projectSlug} · Y7 Feedback</p>
       <h1 id="confirmation-title">{copy.confirmationTitle}</h1>
       <p>{copy.confirmationHint}</p>
-      <dl className="review-facts">
-        <div>
-          <dt>{copy.reference}</dt>
-          <dd>{outcome.reference}</dd>
-        </div>
-        <div>
-          <dt>{copy.accessProof}</dt>
-          <dd className="access-material">{outcome.accessProof}</dd>
-        </div>
-      </dl>
-      <p className="disclosure">{copy.accessProofWarning}</p>
+      <AccessMaterial
+        accessProof={outcome.accessProof}
+        locale={locale}
+        preservationNote={copy.accessProofWarning}
+        reference={outcome.reference}
+      />
     </section>
   );
 }

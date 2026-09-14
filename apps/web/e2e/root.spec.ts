@@ -226,6 +226,17 @@ test("UC-03/ERR-009/BDD-ATT-UC03-011 stages validated evidence and finalizes one
   await page.getByRole("button", { name: "Send feedback" }).click();
 
   await expect(page.getByRole("heading", { name: "Feedback sent" })).toBeVisible();
+  const proofField = page.getByLabel("Confidential access proof");
+  await expect(proofField).toHaveAttribute("type", "password");
+  await expect(
+    page.getByText("proof_attachment_abcdefghijklmnopqrstuvwxyz_0123456789", {
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "Show proof" }).click();
+  await expect(proofField).toHaveAttribute("type", "text");
+  await page.getByRole("button", { name: "Hide proof" }).click();
+  await expect(proofField).toHaveAttribute("type", "password");
   expect(stagedBodies.map((bytes) => bytes.toString("utf8"))).toEqual(["evidence"]);
   expect(finalBodies).toHaveLength(1);
   expect(finalBodies[0]).toMatchObject({

@@ -625,8 +625,7 @@ h1 {
 .intake-introduction,
 .review-panel,
 .retrieve-shell,
-.retrieved-view,
-.access-material {
+.retrieved-view {
   position: relative;
   border-bottom: 1px solid #111111;
   padding: clamp(5rem, 11vw, 9rem) 0 clamp(3rem, 7vw, 5rem);
@@ -890,15 +889,13 @@ h1 {
 
 .review-panel,
 .retrieve-shell,
-.retrieved-view,
-.access-material {
+.retrieved-view {
   max-width: none;
   margin: 0;
 }
 .review-panel > h1,
 .retrieve-shell > h1,
-.retrieved-view > h1,
-.access-material > h1 {
+.retrieved-view > h1 {
   max-width: 12ch;
 }
 
@@ -1066,7 +1063,7 @@ h1 {
   display: block;
   margin: 1.25rem 0 0 auto;
 }
-.access-material {
+.access-material-fields {
   overflow-wrap: anywhere;
 }
 
