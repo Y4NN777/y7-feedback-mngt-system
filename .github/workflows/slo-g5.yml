@@ -36,6 +36,8 @@ jobs:
           node-version: 24
           cache: pnpm
           package-manager-cache: false
+      - name: Preflight the real Preview antivirus authority
+        run: node scripts/antivirus-authority-probe.mjs
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Run real Preview SLO evidence matrix
