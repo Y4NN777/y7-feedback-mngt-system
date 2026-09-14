@@ -171,7 +171,7 @@ jobs:
                  [ -f .env.appwrite-production ]; then
                 export Y7_PREVIOUS_FUNCTION_DEPLOYMENT_ID="$PREVIOUS_FUNCTION_DEPLOYMENT_ID"
                 if ! node --env-file=.env.appwrite-production \
-                  functions/api/dist/production-function-rollback.js restore \
+                  functions/api/dist/tooling/production-function-rollback.js restore \
                   >/dev/null; then
                   status=1
                 fi
@@ -278,7 +278,7 @@ jobs:
           pnpm --filter @y7-feedback/api build
           PREVIOUS_FUNCTION_DEPLOYMENT_ID="$(
             node --env-file=.env.appwrite-production \
-              functions/api/dist/production-function-rollback.js capture
+              functions/api/dist/tooling/production-function-rollback.js capture
           )"
           RESTORE_PREVIOUS_ON_FAILURE=1
 
