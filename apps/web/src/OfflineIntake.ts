@@ -1,6 +1,6 @@
 import type { ApplicationEnvironment } from "@y7-feedback/config/public";
 
-import type { DraftFields, OfflineIntakePersistence } from "./FeedbackIntake";
+import type { DraftFields, OfflineIntakePersistence } from "./FeedbackIntakeContracts";
 import type { OfflineOperationInput, OfflineScope } from "./OfflineStore";
 
 interface OfflineIntakeStore {

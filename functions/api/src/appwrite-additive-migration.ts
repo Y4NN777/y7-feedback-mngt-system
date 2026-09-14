@@ -1,4 +1,4 @@
-import type { AppwriteTableDefinition } from "./appwrite-schema.js";
+import type { AppwriteTableDefinition } from "./appwrite-schema-contract.js";
 
 export interface AdditiveTableMigration {
   readonly version: string;

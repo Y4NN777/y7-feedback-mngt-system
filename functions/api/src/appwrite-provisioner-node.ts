@@ -6,7 +6,7 @@ import type {
   ExistingAppwriteDatabase,
   ExistingAppwriteTable,
 } from "./appwrite-provisioner.js";
-import type { AppwriteColumn, AppwriteIndex } from "./appwrite-schema.js";
+import type { AppwriteColumn, AppwriteIndex } from "./appwrite-schema-contract.js";
 
 interface TablesAdminClient {
   get(input: { readonly databaseId: string }): Promise<unknown>;
