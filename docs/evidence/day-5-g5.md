@@ -1,7 +1,7 @@
 # Day 5 — G5 release evidence index
 
-Status: `IN_PROGRESS`
-Candidate: `main` at `25c7035`
+Status: `DONE`
+Candidate: `main` at `029175e471b263955e689c4e42d31e1cc7aaec6e`
 Authoritative progress ledger:
 [`2026-08-27-day-3-day-5.md`](../sessions/plans/2026-08-27-day-3-day-5.md)
 
@@ -30,13 +30,13 @@ the reviewable candidate is merged.
 | `TASK-PLAT-001`                                | D4.6, FR-OPS-008..014                              | `pnpm verify:appwrite:g4:platform-access`; commit chain through `3df866f` in `main`                                                                                                                                                                                                                                                                  | `DONE`                                                                                                                                                                                        |
 | `G4`                                           | all D4 slices                                      | Both real provider message commands plus retained D4 evidence                                                                                                                                                                                                                                                                                        | `DONE`                                                                                                                                                                                        |
 | `TASK-REC-001`                                 | D5.1, recovery/RPO/RTO/deletion replay             | `pnpm verify:recovery:g5`; [`day-5-recovery.md`](day-5-recovery.md)                                                                                                                                                                                                                                                                                  | `DONE`                                                                                                                                                                                        |
-| `TASK-SLO-001`                                 | D5.2, SLO-005..010                                 | `pnpm verify:slo:g5`; PR [#96](https://github.com/Y4NN777/y7-feedback-mngt-system/pull/96); protected run [34742466360](https://github.com/Y4NN777/y7-feedback-mngt-system/actions/runs/34742466360)                                                                                                                                                 | `IN_PROGRESS`: local real Preview passed at critical API P95 435/500 ms; protected exact-release evidence passed SLO-006..010 but retained cross-region SLO-005 at 1,074/500 ms               |
+| `TASK-SLO-001`                                 | D5.2, SLO-005..010                                 | `pnpm verify:slo:g5`; PR [#132](https://github.com/Y4NN777/y7-feedback-mngt-system/pull/132); protected runs [34780509193](https://github.com/Y4NN777/y7-feedback-mngt-system/actions/runs/34780509193) and [34793991069](https://github.com/Y4NN777/y7-feedback-mngt-system/actions/runs/34793991069)                                                                                                                     | `DONE`: the frozen 116-observation/concurrency-4 envelope passed every SLO on the exact final `main` candidate; monthly history remains truthfully `insufficient_data`                         |
 | `TASK-E2E-001`                                 | D5.3, UC-01..12, ERR-001..019                      | `pnpm verify:e2e:g5:matrix`, `pnpm verify:e2e:g5:browser`; protected run [34729440154](https://github.com/Y4NN777/y7-feedback-mngt-system/actions/runs/34729440154)                                                                                                                                                                                  | `DONE`: hosted traceability matrix and all 38 browser scenarios passed                                                                                                                        |
 | `TASK-SEC-001`                                 | D5.4 security/isolation regression                 | `pnpm security:scan` plus every denial and environment-isolation command in protected run [34729440154](https://github.com/Y4NN777/y7-feedback-mngt-system/actions/runs/34729440154)                                                                                                                                                                 | `DONE`: 286 files scanned with zero findings; deployed denial/isolation/privacy matrices passed                                                                                               |
 | `TASK-UX-001`                                  | D5.4 accessibility/320 px regression               | `pnpm verify:e2e:g5:browser` on desktop and `mobile-320`; protected run [34729440154](https://github.com/Y4NN777/y7-feedback-mngt-system/actions/runs/34729440154)                                                                                                                                                                                   | `DONE`: 38/38 hosted scenarios passed across both projects                                                                                                                                    |
-| `TASK-REL-001`                                 | D5.5 permanent dependencies and reversible release | [Production antivirus run 34746437124](https://github.com/Y4NN777/y7-feedback-mngt-system/actions/runs/34746437124), [Production backup run 34731029856](https://github.com/Y4NN777/y7-feedback-mngt-system/actions/runs/34731029856), PR [#101](https://github.com/Y4NN777/y7-feedback-mngt-system/pull/101), then `pnpm verify:release:production` | `IN_PROGRESS`: permanent monitored scanner, encrypted backup and isolated release-authority composition are proven; GitHub Production authority, SMTP authority and reversible release remain |
-| `TASK-GHDP-001`                                | D5.6 GitHub Developer Program prerequisites        | `pnpm verify:providers:production:github`, public metadata, release proof and submission receipt                                                                                                                                                                                                                                                     | `BLOCKED` by `TASK-REL-001` and unfinalized public metadata                                                                                                                                   |
-| `G5`                                           | Gate G5 criteria 1–7                               | protected G5 workflow, Production dependency workflows, reversible release and this index                                                                                                                                                                                                                                                            | `IN_PROGRESS`                                                                                                                                                                                 |
+| `TASK-REL-001`                                 | D5.5 permanent dependencies and reversible release | [Production antivirus run 34746437124](https://github.com/Y4NN777/y7-feedback-mngt-system/actions/runs/34746437124), [Production backup run 34731029856](https://github.com/Y4NN777/y7-feedback-mngt-system/actions/runs/34731029856), [Production release run 34769873808](https://github.com/Y4NN777/y7-feedback-mngt-system/actions/runs/34769873808) | `DONE`: permanent dependencies, 27 readiness checks, real GitHub and SMTP authorities, staged smoke, promotion, rollback, non-resurrection, roll-forward and final smoke passed                 |
+| `TASK-GHDP-001`                                | D5.6 GitHub Developer Program prerequisites        | real Production GitHub API evidence, publisher-owned App metadata, reachable product URL, configured support contact and receipt `https://github.com/developer/thanks?account=Y4NN777`                                                                                                                                                                  | `DONE`: the publisher accepted the Registered Developer Agreement and GitHub displayed `Thanks for joining! You're in!` on 2026-09-14; no acceptance or endorsement beyond registration is claimed |
+| `G5`                                           | Gate G5 criteria 1–7                               | protected [G5 run 34793991069](https://github.com/Y4NN777/y7-feedback-mngt-system/actions/runs/34793991069), Production dependency workflows, reversible release, Developer Program receipt, Azure cleanup and this index                                                                                                                                      | `DONE`: all seven criteria pass; the empty France Central and Norway East verification groups were deleted while permanent Preview, Production and recovery authorities were retained             |
 
 Operational authority and rotation procedure:
 [`production-release.md`](../runbooks/production-release.md).
@@ -126,8 +126,9 @@ findings; Playwright passed 38/38 scenarios.
 The run stopped only at the truthful SLO gate. SLO-007..010 passed. SLO-005
 measured 1,740 ms against 500 ms, and SLO-006 measured 1,386 ms against 1,000
 ms. This result is retained rather than hidden by a blind rerun or weaker
-threshold. `TASK-SLO-001`, `TASK-REL-001` and Gate G5 therefore remain
-`IN_PROGRESS`.
+threshold. At that point, `TASK-SLO-001`, `TASK-REL-001` and Gate G5 therefore
+remained `IN_PROGRESS`; the final result below supersedes that intermediate
+state without erasing it from the audit trail.
 
 PR [#96](https://github.com/Y4NN777/y7-feedback-mngt-system/pull/96)
 subsequently merged the ADR-015 authoritative intake and conversation commit
@@ -138,6 +139,37 @@ with critical API P95 435 ms and Feedback commit 315 ms. Protected run
 verified the exact active release without redeploying it and passed
 SLO-006..010, but measured critical API P95 1,074 ms against 500 ms. No
 unchanged blind rerun is accepted as stronger evidence.
+
+## Protected final G5 result — 2026-09-14
+
+[Run 34793991069](https://github.com/Y4NN777/y7-feedback-mngt-system/actions/runs/34793991069)
+passed in 18 minutes 37 seconds against exact merged `main` SHA
+`029175e471b263955e689c4e42d31e1cc7aaec6e`. Its fail-fast scanner preflight
+proved a real signed clean scan before the destructive matrix began. The run
+then passed:
+
+- private encrypted recovery with RPO 4 seconds and RTO 2 seconds, deletion
+  replay before exposure, exact expiry and isolated-environment destruction;
+- deployed G1–G4 domain, intake, atomicity, outbox, attachment, administration,
+  conversation, notification, abuse, intelligence, privacy and exceptional
+  access behavior, including every recorded denial and cleanup oracle;
+- all 38 hosted browser scenarios across desktop and 320 px projects;
+- mail capture plus real GitHub and GitLab message/state synchronization and
+  reconciliation;
+- the frozen 116-observation/concurrency-4 SLO envelope: critical API P95
+  400/500 ms, Feedback commit 330/1,000 ms, dashboard 237/1,000 ms,
+  attachment processing 102/2,000 ms, notification visibility 3,569/5,000 ms
+  and email handoff 2,169/30,000 ms;
+- synthetic uptime, the Web RUM origin, redacted alert routing and a
+  ten-series measurement index. Monthly history remains `insufficient_data`,
+  as required, rather than claiming an elapsed month.
+
+The earlier failed measurements remain part of the audit trail. This final run
+is stronger evidence because PRs
+[#132](https://github.com/Y4NN777/y7-feedback-mngt-system/pull/132) and
+[#133](https://github.com/Y4NN777/y7-feedback-mngt-system/pull/133) changed the
+authoritative measurement origin and added a signed real-scanner preflight;
+it is not an unchanged retry.
 
 ## Production recovery backup — 2026-09-13
 
@@ -158,15 +190,10 @@ value. These authorities are ready and are not reasons to rerun Preview gates;
 the remaining release dependency is the permanent Azure scanner and its alert
 route.
 
-## Exact remaining release sequence
+## Closure
 
-1. Establish a stable release capacity and measurement origin that reproduces
-   the already-passing local SLO-005 result in protected evidence; do not rerun
-   unchanged infrastructure.
-2. Deploy and verify the permanent Production antivirus service and its routed
-   alerts.
-3. Run one encrypted Production backup and verify the scheduled configuration.
-4. Run `Production release`; require staged smoke, promotion, Vercel rollback,
-   Function rollback, roll-forward, scanner matrix and final smoke to pass.
-5. Reconcile this index with the progress ledger, remove all temporary
-   verification resources/secrets and only then mark G5 `DONE`.
+Azure confirmed deletion of the empty failed-provisioning resource groups
+`rg-y7-feedback-preview-frc` and `rg-y7-feedback-preview-neu` on 2026-09-14.
+The permanent Central US Preview scanner, Production and recovery groups were
+retained. The progress ledger and this index therefore agree that every Day
+3–5 task and all seven G5 criteria are `DONE`.
