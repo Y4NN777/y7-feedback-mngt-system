@@ -59,6 +59,8 @@ jobs:
           node-version: 24
           cache: pnpm
           package-manager-cache: false
+      - name: Preflight the real Preview antivirus authority
+        run: node scripts/antivirus-authority-probe.mjs
       - name: Authenticate the isolated recovery drill with Azure workload identity
         if: env.G5_EVIDENCE_SCOPE == 'full' || env.G5_EVIDENCE_SCOPE == 'recovery'
         uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
