@@ -5,10 +5,7 @@ import test from "node:test";
 const expectedBuildCommand = [
   "corepack enable",
   "corepack prepare pnpm@10.32.1 --activate",
-  "pnpm install --frozen-lockfile",
-  "pnpm --filter @y7-feedback/config build",
-  "pnpm --filter @y7-feedback/domain build",
-  "pnpm --filter @y7-feedback/api build",
+  "pnpm install --frozen-lockfile --prod",
 ].join(" && ");
 
 async function readManifest() {
@@ -56,7 +53,7 @@ test("BDD-DEL-APPWRITE-005 defines one reproducible Preview Function", async () 
       events: [],
       schedule: "*/5 * * * *",
       path: ".",
-      entrypoint: "functions/api/dist/main.js",
+      entrypoint: "functions/api/dist/runtime/main.js",
       commands: expectedBuildCommand,
     },
   );
@@ -101,7 +98,7 @@ test("BDD-DEL-APPWRITE-007 exposes an explicit API-key deployment command", asyn
 
   assert.equal(
     rootPackage.scripts["deploy:appwrite:function:preview"],
-    "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build && node --env-file=.env.appwrite-preview functions/api/dist/deploy-appwrite-function.js --apply",
+    "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build && node --env-file=.env.appwrite-preview functions/api/dist/tooling/deploy-appwrite-function.js --apply",
   );
   assert.doesNotMatch(
     rootPackage.scripts["deploy:appwrite:function:preview"],

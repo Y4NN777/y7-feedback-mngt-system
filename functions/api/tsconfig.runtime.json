@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "dist/runtime",
+    "rootDir": "src",
+    "types": ["node"]
+  },
+  "include": ["src/main.ts"]
+}

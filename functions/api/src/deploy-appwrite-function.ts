@@ -16,6 +16,7 @@ import { InputFile } from "node-appwrite/file";
 import type { ApplicationEnvironment } from "@y7-feedback/config/public";
 
 import { retryAppwriteAdminCall } from "./appwrite-admin-retry.js";
+import { stageAppwriteRuntimeArtifact } from "./appwrite-runtime-artifact.js";
 import {
   resolveAppwriteFunctionDeploymentAuthority,
   resolveAppwriteFunctionTarget,
@@ -23,11 +24,15 @@ import {
 } from "./appwrite-function-variables.js";
 
 const buildCommands =
-  "corepack enable && corepack prepare pnpm@10.32.1 --activate && pnpm install --frozen-lockfile && pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build";
+  "corepack enable && corepack prepare pnpm@10.32.1 --activate && pnpm install --frozen-lockfile --prod";
 
-function run(command: string, args: readonly string[]): Promise<void> {
+function run(
+  command: string,
+  args: readonly string[],
+  cwd = process.cwd(),
+): Promise<void> {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { cwd: process.cwd(), stdio: "inherit" });
+    const child = spawn(command, args, { cwd, stdio: "inherit" });
     child.once("error", reject);
     child.once("exit", (code) => {
       if (code === 0) resolve();
@@ -52,7 +57,7 @@ async function ensureFunction(
     timeout: 60,
     enabled: true,
     logging: true,
-    entrypoint: "functions/api/dist/main.js",
+    entrypoint: "functions/api/dist/runtime/main.js",
     commands: buildCommands,
     scopes: [
       ProjectKeyScopes.RowsRead,
@@ -110,29 +115,16 @@ async function main(): Promise<void> {
     join(tmpdir(), `y7-appwrite-${authority.environment}-`),
   );
   const archivePath = join(temporaryDirectory, "function.tar.gz");
+  const stagingDirectory = join(temporaryDirectory, "runtime");
   try {
-    await run("tar", [
-      "--exclude=.git",
-      "--exclude=.github",
-      "--exclude=.env*",
-      "--exclude=node_modules",
-      "--exclude=dist",
-      "--exclude=docs",
-      "--exclude=apps",
-      "--exclude=coverage",
-      "--exclude=playwright-report",
-      "--exclude=test-results",
-      "--exclude=*.tsbuildinfo",
-      "-czf",
-      archivePath,
-      ".",
-    ]);
+    await stageAppwriteRuntimeArtifact(process.cwd(), stagingDirectory);
+    await run("tar", ["-czf", archivePath, "."], stagingDirectory);
     const functionChange = await ensureFunction(functions, authority.environment);
     const deployment = await functions.createDeployment({
       functionId: target.id,
       code: InputFile.fromPath(archivePath),
       activate: true,
-      entrypoint: "functions/api/dist/main.js",
+      entrypoint: "functions/api/dist/runtime/main.js",
       commands: buildCommands,
     });
     const status = await waitUntilReady(functions, target.id, deployment.$id);
