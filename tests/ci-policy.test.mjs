@@ -38,7 +38,12 @@ test("BDD-CI-001 runs the complete pull-request gate with pinned least-privilege
     assert.ok(workflow.includes(command), `missing CI command: ${command}`);
   }
 
-  assert.doesNotMatch(workflow, /\$\{\{\s*secrets\./u);
+  assert.deepEqual(
+    [...workflow.matchAll(/\$\{\{\s*secrets\.([A-Z0-9_]+)\s*\}\}/gu)].map(
+      (match) => match[1],
+    ),
+    ["Y7_PREVIEW_APPWRITE_API_KEY", "Y7_PREVIEW_EVIDENCE_ENV"],
+  );
 });
 
 test("BDD-CI-002 builds runtime workspace dependencies before the E2E server", async () => {
