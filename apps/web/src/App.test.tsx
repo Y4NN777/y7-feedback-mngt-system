@@ -5,7 +5,7 @@ import type { ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "./App";
-import type { OfflineIntakePersistence } from "./FeedbackIntake";
+import type { OfflineIntakePersistence } from "./FeedbackIntakeContracts";
 import type { IntakeGateway } from "./IntakeGateway";
 
 const projectGateway = {

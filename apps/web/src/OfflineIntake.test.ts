@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { DraftFields } from "./FeedbackIntake";
+import type { DraftFields } from "./FeedbackIntakeContracts";
 import { createOfflineIntakePersistence } from "./OfflineIntake";
 import type { OfflineOperationInput, OfflineScope } from "./OfflineStore";
 

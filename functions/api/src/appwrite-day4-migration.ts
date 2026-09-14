@@ -6,7 +6,7 @@ import type {
   AppwriteColumn,
   AppwriteIndex,
   AppwriteTableDefinition,
-} from "./appwrite-schema.js";
+} from "./appwrite-schema-contract.js";
 
 export const day4TableIds = [
   "provider_event_inbox",

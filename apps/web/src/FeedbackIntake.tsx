@@ -16,14 +16,10 @@ import type {
   IntakeGatewayCommand,
   IntakeGatewayOutcome,
 } from "./IntakeGateway";
+import type { DraftFields, OfflineIntakePersistence } from "./FeedbackIntakeContracts";
 import type { OfflineIntakeReplay } from "./OfflineIntakeReplay";
 
-export interface OfflineIntakePersistence {
-  restore(projectSlug: string): Promise<DraftFields | null>;
-  save(projectSlug: string, draft: DraftFields): Promise<void>;
-  clear(projectSlug: string): Promise<void>;
-  queue(command: IntakeGatewayCommand): Promise<void>;
-}
+export type { DraftFields, OfflineIntakePersistence } from "./FeedbackIntakeContracts";
 
 interface FeedbackIntakeProps {
   readonly createOperationId: () => string;
@@ -34,21 +30,6 @@ interface FeedbackIntakeProps {
   readonly offlineReplay?: OfflineIntakeReplay;
   readonly projectPurpose?: Readonly<Record<Locale, string>>;
   readonly projectSlug?: string;
-}
-
-export interface DraftFields {
-  readonly appreciation: string;
-  readonly contact: string;
-  readonly expected: string;
-  readonly experience: string;
-  readonly observed: string;
-  readonly problem: string;
-  readonly proposal: string;
-  readonly rationale: string;
-  readonly reproduction: string;
-  readonly type: FeedbackType;
-  readonly usageContext: string;
-  readonly version: string;
 }
 
 const initialDraft: DraftFields = {
