@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  deployments: read
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -60,6 +61,7 @@ jobs:
     needs: quality
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    environment: g5-preview
     steps:
       - name: Check out repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -80,3 +82,50 @@ jobs:
         run: pnpm --filter @y7-feedback/web exec playwright install --with-deps chromium
       - name: Run browser scenarios
         run: pnpm test:e2e
+      - name: Resolve the exact Vercel Preview deployment
+        env:
+          DEPLOYMENT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          for attempt in $(seq 1 30); do
+            deployment_id="$(
+              gh api --method GET "repos/$GITHUB_REPOSITORY/deployments" \
+                -f ref="$DEPLOYMENT_SHA" \
+                -f environment=Preview \
+                -f per_page=20 \
+                --jq 'map(select(.creator.login == "vercel[bot]")) | first | .id // empty'
+            )"
+            if [ -n "$deployment_id" ]; then
+              preview_url="$(
+                gh api --method GET "repos/$GITHUB_REPOSITORY/deployments/$deployment_id/statuses" \
+                  -f per_page=20 \
+                  --jq 'map(select(.state == "success" and (.environment_url // "") != "")) | first | .environment_url // empty'
+              )"
+              if [[ "$preview_url" =~ ^https://[A-Za-z0-9.-]+\.vercel\.app/?$ ]]; then
+                echo "Y7_DEPLOYED_PREVIEW_URL=$preview_url" >>"$GITHUB_ENV"
+                exit 0
+              fi
+            fi
+            sleep 10
+          done
+          echo '{"error":"VERCEL_PREVIEW_DEPLOYMENT_TIMEOUT"}' >&2
+          exit 1
+      - name: Run deployed Vercel to Appwrite Preview smoke
+        env:
+          Y7_PREVIEW_EVIDENCE_ENV: ${{ secrets.Y7_PREVIEW_EVIDENCE_ENV }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          set +x
+          umask 077
+          install -m 600 /dev/null .env.appwrite-preview
+          trap 'rm -f .env.appwrite-preview' EXIT
+          if [ -z "$Y7_PREVIEW_EVIDENCE_ENV" ] || [ -z "$Y7_DEPLOYED_PREVIEW_URL" ]; then
+            echo '{"error":"DEPLOYED_PREVIEW_AUTHORITY_MISSING"}' >&2
+            exit 1
+          fi
+          printf '%s\n' "$Y7_PREVIEW_EVIDENCE_ENV" >.env.appwrite-preview
+          unset Y7_PREVIEW_EVIDENCE_ENV
+          pnpm test:e2e:deployed-preview

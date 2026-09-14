@@ -59,6 +59,7 @@
     "test": "pnpm test:runtime-deps && node --test tests/*.test.mjs scripts/*.test.mjs && pnpm -r --if-present test",
     "test:coverage": "pnpm test:runtime-deps && node --test tests/*.test.mjs scripts/*.test.mjs && pnpm -r --if-present test:coverage",
     "test:e2e": "pnpm --filter @y7-feedback/web test:e2e",
+    "test:e2e:deployed-preview": "pnpm --filter @y7-feedback/web test:e2e:deployed-preview",
     "test:e2e:offline": "pnpm --filter @y7-feedback/web test:e2e:offline",
     "verify:e2e:g5:browser": "pnpm test:e2e",
     "verify:e2e:g5:matrix": "pnpm --filter @y7-feedback/api build && node functions/api/dist/tooling/verify-e2e-g5-matrix.js --apply",
