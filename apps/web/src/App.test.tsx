@@ -280,10 +280,10 @@ describe("WiseMoney feedback intake", () => {
     });
     window.dispatchEvent(new Event("online"));
     expect(await screen.findByRole("heading", { name: "Retour envoyé" })).toBeVisible();
-    expect(screen.getByText("Y7-2026-OFFLINE")).toBeVisible();
-    expect(
-      screen.getByText("proof_offline_abcdefghijklmnopqrstuvwxyz_0123456789"),
-    ).toBeVisible();
+    expect(screen.getByDisplayValue("Y7-2026-OFFLINE")).toBeVisible();
+    expect(screen.getByLabelText("Preuve d’accès confidentielle")).toHaveValue(
+      "proof_offline_abcdefghijklmnopqrstuvwxyz_0123456789",
+    );
     expect(clear).toHaveBeenCalledWith("wisemoney");
   });
 
@@ -548,10 +548,19 @@ describe("WiseMoney feedback intake", () => {
       "data-step",
       "03",
     );
-    expect(screen.getByText("Y7-2026-000001")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Y7-2026-000001")).toBeInTheDocument();
+    const proofField = screen.getByLabelText("Preuve d’accès confidentielle");
+    expect(proofField).toHaveAttribute("type", "password");
+    expect(proofField).toHaveValue(
+      "proof_abcdefghijklmnopqrstuvwxyz_0123456789ABCDEFG",
+    );
     expect(
-      screen.getByText("proof_abcdefghijklmnopqrstuvwxyz_0123456789ABCDEFG"),
-    ).toBeInTheDocument();
+      screen.queryByText("proof_abcdefghijklmnopqrstuvwxyz_0123456789ABCDEFG"),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Afficher la preuve" }));
+    expect(proofField).toHaveAttribute("type", "text");
+    await user.click(screen.getByRole("button", { name: "Masquer la preuve" }));
+    expect(proofField).toHaveAttribute("type", "password");
     expect(screen.getByText(/conservez cette preuve séparément/i)).toBeInTheDocument();
     expect(accept).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -591,7 +600,7 @@ describe("WiseMoney feedback intake", () => {
       /réessayer sans créer de doublon/i,
     );
     await user.click(screen.getByRole("button", { name: "Envoyer le retour" }));
-    expect(await screen.findByText("Y7-2026-000002")).toBeInTheDocument();
+    expect(await screen.findByDisplayValue("Y7-2026-000002")).toBeInTheDocument();
     expect(accept).toHaveBeenCalledTimes(2);
     expect(accept.mock.calls[0]?.[0].clientOperationId).toBe(
       accept.mock.calls[1]?.[0].clientOperationId,

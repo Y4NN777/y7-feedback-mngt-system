@@ -137,7 +137,6 @@ describe("accountless access experience", () => {
       <AccessMaterial locale="fr" reference="Y7-2026-000001" accessProof={proof} />,
     );
 
-    expect(screen.getByRole("heading", { name: "Retour accepté" })).toBeInTheDocument();
     expect(screen.getByDisplayValue("Y7-2026-000001")).toHaveAttribute("readonly");
     const proofField = screen.getByLabelText("Preuve d’accès confidentielle");
     expect(proofField).toHaveAttribute("type", "password");
@@ -148,6 +147,26 @@ describe("accountless access experience", () => {
     expect(proofField).toHaveAttribute("type", "text");
     await user.click(screen.getByRole("button", { name: "Masquer la preuve" }));
     expect(proofField).toHaveAttribute("type", "password");
+    await user.click(screen.getByRole("button", { name: "Copier la preuve" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("Preuve copiée.");
+    expect(await navigator.clipboard.readText()).toBe(proof);
+  });
+
+  it("keeps the proof selectable when clipboard access fails", async () => {
+    const user = userEvent.setup();
+    render(
+      <AccessMaterial locale="en" reference="Y7-2026-000001" accessProof={proof} />,
+    );
+    vi.spyOn(navigator.clipboard, "writeText").mockRejectedValueOnce(
+      new Error("CLIPBOARD_DENIED"),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Copy proof" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "The proof could not be copied. Select it manually.",
+    );
+    expect(screen.getByLabelText("Confidential access proof")).toHaveValue(proof);
   });
 
   it("preserves retrieval input across locales and gives one denial without existence disclosure", async () => {

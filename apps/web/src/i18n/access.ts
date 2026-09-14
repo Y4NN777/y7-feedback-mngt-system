@@ -20,6 +20,9 @@ interface AccessMessages {
   readonly revokePublicationConsent: string;
   readonly consentActive: string;
   readonly consentRevoked: string;
+  readonly copiedProof: string;
+  readonly copyFailed: string;
+  readonly copyProof: string;
   readonly consentConflict: string;
   readonly deletionAcknowledge: string;
   readonly deletionComplete: string;
@@ -64,6 +67,9 @@ export const accessMessages = {
     consentActive: "Autorisation active, version {version}.",
     consentRevoked:
       "Autorisation révoquée, version {version}. Les nouvelles publications sont bloquées ; le retrait externe est tenté sans garantie d’effacement des copies publiques.",
+    copiedProof: "Preuve copiée.",
+    copyFailed: "La preuve n’a pas pu être copiée. Sélectionnez-la manuellement.",
+    copyProof: "Copier la preuve",
     consentConflict: "Cette demande entre en conflit avec une tentative précédente.",
     deletionAcknowledge:
       "Je comprends que l’accès sera révoqué immédiatement et que la purge définitive aura lieu après 30 jours.",
@@ -116,6 +122,9 @@ export const accessMessages = {
     consentActive: "Authorization active, version {version}.",
     consentRevoked:
       "Authorization revoked, version {version}. New publication is blocked; external removal is attempted without guaranteeing erasure of public copies.",
+    copiedProof: "Proof copied.",
+    copyFailed: "The proof could not be copied. Select it manually.",
+    copyProof: "Copy proof",
     consentConflict: "This request conflicts with an earlier attempt.",
     deletionAcknowledge:
       "I understand that access is revoked immediately and permanent purge occurs after 30 days.",
