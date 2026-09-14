@@ -7,6 +7,7 @@ import type { IntelligenceGateway } from "./IntelligenceGateway";
 import { IntelligencePage } from "./IntelligencePage";
 
 const session: AdministrationSession = {
+  current: () => Promise.resolve("anonymous"),
   signIn: vi.fn(() => Promise.resolve("authenticated" as const)),
   signOut: vi.fn(() => Promise.resolve()),
   createJwt: vi.fn(() => Promise.resolve("jwt")),
@@ -28,7 +29,10 @@ describe("Intelligence experience", () => {
         session={session}
       />,
     );
-    await user.type(screen.getByLabelText("Adresse e-mail"), "owner@example.test");
+    await user.type(
+      await screen.findByLabelText("Adresse e-mail"),
+      "owner@example.test",
+    );
     await user.type(screen.getByLabelText("Mot de passe"), "secret-value");
     await user.click(screen.getByRole("button", { name: "Se connecter" }));
     const workspace = await screen.findByLabelText("Workspace");
@@ -82,7 +86,10 @@ describe("Intelligence experience", () => {
         session={session}
       />,
     );
-    await user.type(screen.getByLabelText("Email address"), "owner@example.test");
+    await user.type(
+      await screen.findByLabelText("Email address"),
+      "owner@example.test",
+    );
     await user.type(screen.getByLabelText("Password"), "secret-value");
     await user.click(screen.getByRole("button", { name: "Sign in" }));
     await user.type(await screen.findByLabelText("Workspace"), "workspace_1");
@@ -149,12 +156,13 @@ describe("Intelligence experience", () => {
         session={{ ...session, signIn: () => Promise.resolve("denied") }}
       />,
     );
-    await user.type(screen.getByLabelText("Email address"), "owner@example.test");
+    await user.type(
+      await screen.findByLabelText("Email address"),
+      "owner@example.test",
+    );
     await user.type(screen.getByLabelText("Password"), "wrong-value");
     await user.click(screen.getByRole("button", { name: "Sign in" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "This scope is not accessible.",
-    );
+    expect(await screen.findByRole("alert")).toHaveTextContent("Access denied.");
   }, 15_000);
 
   it("BDD-INT-215 exposes stable analysis failures after authentication", async () => {
@@ -170,7 +178,10 @@ describe("Intelligence experience", () => {
         session={session}
       />,
     );
-    await user.type(screen.getByLabelText("Email address"), "owner@example.test");
+    await user.type(
+      await screen.findByLabelText("Email address"),
+      "owner@example.test",
+    );
     await user.type(screen.getByLabelText("Password"), "secret-value");
     await user.click(screen.getByRole("button", { name: "Sign in" }));
     await user.type(await screen.findByLabelText("Workspace"), "workspace_1");
@@ -203,7 +214,10 @@ describe("Intelligence experience", () => {
         session={session}
       />,
     );
-    await user.type(screen.getByLabelText("Adresse e-mail"), "owner@example.test");
+    await user.type(
+      await screen.findByLabelText("Adresse e-mail"),
+      "owner@example.test",
+    );
     await user.type(screen.getByLabelText("Mot de passe"), "secret-value");
     await user.click(screen.getByRole("button", { name: "Se connecter" }));
     await user.type(screen.getByLabelText("Workspace"), "workspace_1");

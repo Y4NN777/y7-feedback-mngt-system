@@ -70,6 +70,7 @@ function setup(view: SourceManagementView = managed) {
   };
   const session = {
     createJwt: vi.fn(() => Promise.resolve("jwt")),
+    current: vi.fn(() => Promise.resolve("anonymous" as const)),
     signIn: vi.fn(() => Promise.resolve("authenticated" as const)),
     signOut: vi.fn(() => Promise.resolve()),
   };
@@ -92,7 +93,7 @@ function setup(view: SourceManagementView = managed) {
 
 async function authenticateAndLoad() {
   const user = userEvent.setup();
-  await user.type(screen.getByLabelText("Adresse e-mail"), "owner@example.test");
+  await user.type(await screen.findByLabelText("Adresse e-mail"), "owner@example.test");
   await user.type(screen.getByLabelText("Mot de passe"), "secret");
   await user.click(screen.getByRole("button", { name: "Se connecter" }));
   await user.type(screen.getByLabelText("Workspace ID"), "workspace_1");
@@ -168,10 +169,13 @@ describe("source management page", () => {
     const { gateway, onLocaleChange, session } = setup();
     const user = userEvent.setup();
     session.signIn.mockResolvedValueOnce("denied" as never);
-    await user.type(screen.getByLabelText("Adresse e-mail"), "wrong@example.test");
+    await user.type(
+      await screen.findByLabelText("Adresse e-mail"),
+      "wrong@example.test",
+    );
     await user.type(screen.getByLabelText("Mot de passe"), "wrong");
     await user.click(screen.getByRole("button", { name: "Se connecter" }));
-    expect(screen.getByRole("alert")).toHaveTextContent("pas autorisée");
+    expect(screen.getByRole("alert")).toHaveTextContent("Accès refusé");
 
     await user.type(screen.getByLabelText("Mot de passe"), "right");
     await user.click(screen.getByRole("button", { name: "Se connecter" }));

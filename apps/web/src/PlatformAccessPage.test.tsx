@@ -27,14 +27,19 @@ function setup(
       gateway={{ execute }}
       locale="fr"
       onLocaleChange={onLocaleChange}
-      session={{ createJwt: vi.fn(), signIn, signOut }}
+      session={{
+        createJwt: vi.fn(),
+        current: () => Promise.resolve("anonymous"),
+        signIn,
+        signOut,
+      }}
     />,
   );
   return { execute, onLocaleChange, signIn, signOut, view };
 }
 
 async function authenticate() {
-  fireEvent.change(screen.getByLabelText("Adresse e-mail"), {
+  fireEvent.change(await screen.findByLabelText("Adresse e-mail"), {
     target: { value: "operator@example.test" },
   });
   fireEvent.change(screen.getByLabelText("Mot de passe"), {
@@ -43,7 +48,7 @@ async function authenticate() {
   const form = screen.getByRole("button", { name: "Se connecter" }).closest("form");
   if (!form) throw new Error("form unavailable");
   fireEvent.submit(form);
-  await screen.findByText("Session Platform active.");
+  await screen.findByText("Session active.");
 }
 
 describe("Platform exceptional access screen", () => {

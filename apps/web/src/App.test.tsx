@@ -37,7 +37,7 @@ afterEach(() => {
 });
 
 describe("root orientation", () => {
-  it("routes /manage to first-party administration instead of a public Project", () => {
+  it("routes /manage to first-party administration instead of a public Project", async () => {
     window.history.replaceState({}, "", "/manage");
     renderApp({
       administrationGateway: {
@@ -45,6 +45,7 @@ describe("root orientation", () => {
       },
       administrationSession: {
         createJwt: () => Promise.resolve("jwt"),
+        current: () => Promise.resolve("anonymous"),
         signIn: () => Promise.resolve("authenticated"),
         signOut: () => Promise.resolve(),
       },
@@ -52,7 +53,7 @@ describe("root orientation", () => {
     expect(
       screen.getByRole("heading", { name: "Administration des projets" }),
     ).toBeVisible();
-    expect(screen.getByLabelText("Adresse e-mail")).toBeVisible();
+    expect(await screen.findByLabelText("Adresse e-mail")).toBeVisible();
   });
 
   it("routes /manage/sources to bilingual first-party source management", async () => {
@@ -61,6 +62,7 @@ describe("root orientation", () => {
     renderApp({
       administrationSession: {
         createJwt: () => Promise.resolve("jwt"),
+        current: () => Promise.resolve("anonymous"),
         signIn: () => Promise.resolve("authenticated"),
         signOut: () => Promise.resolve(),
       },
@@ -84,6 +86,7 @@ describe("root orientation", () => {
     renderApp({
       administrationSession: {
         createJwt: () => Promise.resolve("jwt"),
+        current: () => Promise.resolve("anonymous"),
         signIn: () => Promise.resolve("authenticated"),
         signOut: () => Promise.resolve(),
       },
@@ -104,6 +107,7 @@ describe("root orientation", () => {
     renderApp({
       administrationSession: {
         createJwt: () => Promise.resolve("jwt"),
+        current: () => Promise.resolve("anonymous"),
         signIn: () => Promise.resolve("authenticated"),
         signOut: () => Promise.resolve(),
       },
