@@ -7,6 +7,7 @@ import type {
 } from "@y7-feedback/domain";
 
 import type { AdministrationSession } from "./AdministrationSession";
+import { TeamSessionBoundary } from "./TeamSession";
 import type {
   IntelligenceGateway,
   IntelligenceGatewayOutcome,
@@ -43,9 +44,6 @@ export function IntelligencePage({
   readonly session: AdministrationSession;
 }) {
   const copy = intelligenceMessages[locale];
-  const [authenticated, setAuthenticated] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [workspaceId, setWorkspaceId] = useState("");
   const [projectId, setProjectId] = useState("");
   const [types, setTypes] = useState("");
@@ -80,13 +78,6 @@ export function IntelligencePage({
     "idle" | "loading" | "denied" | "invalid" | "conflict" | "retryable"
   >("idle");
   const [receipt, setReceipt] = useState<ProvenanceReceipt>();
-
-  async function signIn(event: SyntheticEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const outcome = await session.signIn(email, password);
-    setAuthenticated(outcome === "authenticated");
-    if (outcome !== "authenticated") setStatus("denied");
-  }
 
   async function analyze(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -230,40 +221,7 @@ export function IntelligencePage({
         </div>
         <p className="lede">{copy.intro}</p>
       </section>
-      {!authenticated ? (
-        <form
-          className="administration-form"
-          onSubmit={(event) => {
-            void signIn(event);
-          }}
-        >
-          <label>
-            {copy.email}
-            <input
-              type="email"
-              autoComplete="username"
-              required
-              value={email}
-              onChange={(event) => {
-                setEmail(event.target.value);
-              }}
-            />
-          </label>
-          <label>
-            {copy.password}
-            <input
-              type="password"
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(event) => {
-                setPassword(event.target.value);
-              }}
-            />
-          </label>
-          <button type="submit">{copy.signIn}</button>
-        </form>
-      ) : (
+      <TeamSessionBoundary locale={locale} session={session}>
         <form
           className="intelligence-form"
           onSubmit={(event) => {
@@ -299,70 +257,68 @@ export function IntelligencePage({
             {status === "loading" ? copy.loading : copy.analyze}
           </button>
         </form>
-      )}
-      {status !== "idle" && status !== "loading" ? (
-        <p role="alert">{copy[status]}</p>
-      ) : null}
-      {result ? (
-        <section
-          className="intelligence-results"
-          aria-labelledby="intelligence-results-title"
-          aria-live="polite"
-        >
-          <h2 id="intelligence-results-title">{copy.results}</h2>
-          <p className="intelligence-total">
-            <strong>{copy.total}</strong>
-            <span>{result.aggregate.total}</span>
-          </p>
-          {result.aggregate.total === 0 ? <p>{copy.empty}</p> : null}
-          <div className="intelligence-breakdowns">
+        {status !== "idle" && status !== "loading" ? (
+          <p role="alert">{copy[status]}</p>
+        ) : null}
+        {result ? (
+          <section
+            className="intelligence-results"
+            aria-labelledby="intelligence-results-title"
+            aria-live="polite"
+          >
+            <h2 id="intelligence-results-title">{copy.results}</h2>
+            <p className="intelligence-total">
+              <strong>{copy.total}</strong>
+              <span>{result.aggregate.total}</span>
+            </p>
+            {result.aggregate.total === 0 ? <p>{copy.empty}</p> : null}
+            <div className="intelligence-breakdowns">
+              <section>
+                <h3>{copy.byType}</h3>
+                <dl>
+                  {Object.entries(result.aggregate.byType).map(([key, value]) => (
+                    <div key={key}>
+                      <dt>{key}</dt>
+                      <dd>{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </section>
+              <section>
+                <h3>{copy.byState}</h3>
+                <dl>
+                  {Object.entries(result.aggregate.byState).map(([key, value]) => (
+                    <div key={key}>
+                      <dt>{key}</dt>
+                      <dd>{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </section>
+            </div>
             <section>
-              <h3>{copy.byType}</h3>
-              <dl>
-                {Object.entries(result.aggregate.byType).map(([key, value]) => (
-                  <div key={key}>
-                    <dt>{key}</dt>
-                    <dd>{value}</dd>
+              <h3>{copy.trendResult}</h3>
+              {result.trend ? (
+                <dl>
+                  <div>
+                    <dt>current</dt>
+                    <dd>{result.trend.currentCount}</dd>
                   </div>
-                ))}
-              </dl>
-            </section>
-            <section>
-              <h3>{copy.byState}</h3>
-              <dl>
-                {Object.entries(result.aggregate.byState).map(([key, value]) => (
-                  <div key={key}>
-                    <dt>{key}</dt>
-                    <dd>{value}</dd>
+                  <div>
+                    <dt>baseline</dt>
+                    <dd>{result.trend.baselineCount}</dd>
                   </div>
-                ))}
-              </dl>
+                  <div>
+                    <dt>direction</dt>
+                    <dd>{result.trend.direction}</dd>
+                  </div>
+                </dl>
+              ) : (
+                <p>{copy.noTrend}</p>
+              )}
             </section>
-          </div>
-          <section>
-            <h3>{copy.trendResult}</h3>
-            {result.trend ? (
-              <dl>
-                <div>
-                  <dt>current</dt>
-                  <dd>{result.trend.currentCount}</dd>
-                </div>
-                <div>
-                  <dt>baseline</dt>
-                  <dd>{result.trend.baselineCount}</dd>
-                </div>
-                <div>
-                  <dt>direction</dt>
-                  <dd>{result.trend.direction}</dd>
-                </div>
-              </dl>
-            ) : (
-              <p>{copy.noTrend}</p>
-            )}
           </section>
-        </section>
-      ) : null}
-      {authenticated ? (
+        ) : null}
         <section className="intelligence-results" aria-labelledby="provenance-title">
           <h2 id="provenance-title">{copy.provenance}</h2>
           <p>{copy.provenanceIntro}</p>
@@ -456,7 +412,7 @@ export function IntelligencePage({
             </dl>
           ) : null}
         </section>
-      ) : null}
+      </TeamSessionBoundary>
     </main>
   );
 }

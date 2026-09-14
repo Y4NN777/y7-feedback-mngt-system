@@ -28,7 +28,12 @@ function setup(options?: {
         gateway={{ execute }}
         locale={locale}
         onLocaleChange={setLocale}
-        session={{ createJwt: () => Promise.resolve("jwt"), signIn, signOut }}
+        session={{
+          createJwt: () => Promise.resolve("jwt"),
+          current: () => Promise.resolve("anonymous"),
+          signIn,
+          signOut,
+        }}
       />
     );
   }
@@ -37,7 +42,7 @@ function setup(options?: {
 }
 
 async function authenticate(user: ReturnType<typeof userEvent.setup>) {
-  await user.type(screen.getByLabelText("Adresse e-mail"), "owner@example.test");
+  await user.type(await screen.findByLabelText("Adresse e-mail"), "owner@example.test");
   await user.type(screen.getByLabelText("Mot de passe"), "password");
   await user.click(screen.getByRole("button", { name: "Se connecter" }));
   await screen.findByText(/Session active/u);
@@ -47,10 +52,13 @@ describe("Project administration experience", () => {
   it("BDD-ADMIN-002 denies invalid credentials without exposing SDK detail", async () => {
     const user = userEvent.setup();
     const target = setup({ signIn: () => Promise.resolve("denied") });
-    await user.type(screen.getByLabelText("Adresse e-mail"), "owner@example.test");
+    await user.type(
+      await screen.findByLabelText("Adresse e-mail"),
+      "owner@example.test",
+    );
     await user.type(screen.getByLabelText("Mot de passe"), "incorrect");
     await user.click(screen.getByRole("button", { name: "Se connecter" }));
-    expect(await screen.findByRole("status")).toHaveTextContent("Accès refusé");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Accès refusé");
     expect(target.execute).not.toHaveBeenCalled();
     expect(screen.getByLabelText("Mot de passe")).toHaveValue("");
   });
@@ -58,7 +66,7 @@ describe("Project administration experience", () => {
   it("preserves sign-in input while switching FR/EN", async () => {
     const user = userEvent.setup();
     setup();
-    const email = screen.getByLabelText("Adresse e-mail");
+    const email = await screen.findByLabelText("Adresse e-mail");
     await user.type(email, "owner@example.test");
     await user.click(screen.getByRole("button", { name: "English" }));
     expect(screen.getByLabelText("Email address")).toHaveValue("owner@example.test");

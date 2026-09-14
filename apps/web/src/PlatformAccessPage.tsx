@@ -3,6 +3,7 @@ import { useState, type SyntheticEvent } from "react";
 import type { ExceptionalAccessAction, Locale } from "@y7-feedback/domain";
 
 import type { AdministrationSession } from "./AdministrationSession";
+import { TeamSessionBoundary } from "./TeamSession";
 import type {
   PlatformAccessGateway,
   PlatformAccessOutcome,
@@ -37,9 +38,6 @@ export function PlatformAccessPage({
   readonly session: AdministrationSession;
 }) {
   const copy = platformAccessMessages[locale];
-  const [authenticated, setAuthenticated] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [action, setAction] = useState<Action>("request");
   const [grantId, setGrantId] = useState("");
   const [workspaceId, setWorkspaceId] = useState("");
@@ -54,14 +52,6 @@ export function PlatformAccessPage({
   const [expectedRevision, setExpectedRevision] = useState("0");
   const [expiresAt, setExpiresAt] = useState("");
   const [outcome, setOutcome] = useState<PlatformAccessOutcome>();
-
-  async function signIn(event: SyntheticEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const result = await session.signIn(email, password);
-    setAuthenticated(result === "authenticated");
-    setOutcome(result === "authenticated" ? undefined : { status: "denied" });
-    setPassword("");
-  }
 
   async function execute(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -141,209 +131,168 @@ export function PlatformAccessPage({
         <p className="lede">{copy.intro}</p>
       </section>
 
-      {!authenticated ? (
-        <form className="administration-form" onSubmit={(event) => void signIn(event)}>
+      <TeamSessionBoundary
+        locale={locale}
+        session={session}
+        onSignedOut={() => {
+          setOutcome(undefined);
+        }}
+      >
+        <form className="administration-form" onSubmit={(event) => void execute(event)}>
           <label>
-            {copy.email}
-            <input
-              type="email"
-              autoComplete="username"
-              required
-              value={email}
+            {copy.action}
+            <select
+              value={action}
               onChange={(event) => {
-                setEmail(event.target.value);
+                setAction(event.target.value as Action);
+                setOutcome(undefined);
               }}
-            />
-          </label>
-          <label>
-            {copy.password}
-            <input
-              type="password"
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(event) => {
-                setPassword(event.target.value);
-              }}
-            />
-          </label>
-          <button type="submit">{copy.signIn}</button>
-        </form>
-      ) : (
-        <>
-          <div className="session-banner">
-            <p role="status">{copy.authenticated}</p>
-            <button
-              type="button"
-              onClick={() =>
-                void session.signOut().then(() => {
-                  setAuthenticated(false);
-                  setOutcome(undefined);
-                })
-              }
             >
-              {copy.signOut}
-            </button>
-          </div>
-          <form
-            className="administration-form"
-            onSubmit={(event) => void execute(event)}
-          >
+              {(Object.keys(actionLabels) as Action[]).map((value) => (
+                <option value={value} key={value}>
+                  {actionLabels[value][locale]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            {copy.grantId}
+            <input
+              required
+              value={grantId}
+              onChange={(e) => {
+                setGrantId(e.target.value);
+              }}
+            />
+          </label>
+          {action !== "request" && (
             <label>
-              {copy.action}
-              <select
-                value={action}
-                onChange={(event) => {
-                  setAction(event.target.value as Action);
-                  setOutcome(undefined);
-                }}
-              >
-                {(Object.keys(actionLabels) as Action[]).map((value) => (
-                  <option value={value} key={value}>
-                    {actionLabels[value][locale]}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              {copy.grantId}
+              {copy.expectedRevision}
               <input
+                type="number"
+                min="0"
+                step="1"
                 required
-                value={grantId}
+                value={expectedRevision}
                 onChange={(e) => {
-                  setGrantId(e.target.value);
+                  setExpectedRevision(e.target.value);
                 }}
               />
             </label>
-            {action !== "request" && (
+          )}
+          {(action === "request" || action === "use") && (
+            <>
               <label>
-                {copy.expectedRevision}
+                {copy.workspaceId}
                 <input
-                  type="number"
-                  min="0"
-                  step="1"
                   required
-                  value={expectedRevision}
+                  value={workspaceId}
                   onChange={(e) => {
-                    setExpectedRevision(e.target.value);
+                    setWorkspaceId(e.target.value);
                   }}
                 />
               </label>
-            )}
-            {(action === "request" || action === "use") && (
-              <>
-                <label>
-                  {copy.workspaceId}
-                  <input
-                    required
-                    value={workspaceId}
-                    onChange={(e) => {
-                      setWorkspaceId(e.target.value);
-                    }}
-                  />
-                </label>
-                <label>
-                  {copy.projectId}
-                  <input
-                    required={action === "use"}
-                    value={projectId}
-                    onChange={(e) => {
-                      setProjectId(e.target.value);
-                    }}
-                  />
-                </label>
-                <label>
-                  {copy.feedbackId}
-                  <input
-                    required={action === "use"}
-                    value={feedbackId}
-                    onChange={(e) => {
-                      setFeedbackId(e.target.value);
-                    }}
-                  />
-                </label>
-                <label>
-                  {copy.capability}
-                  <select
-                    value={capability}
-                    onChange={(e) => {
-                      setCapability(e.target.value as ExceptionalAccessAction);
-                    }}
-                  >
-                    {capabilities.map((value) => (
-                      <option value={value} key={value}>
-                        {value}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </>
-            )}
-            {action === "request" && (
-              <>
-                <label>
-                  {copy.reasonCode}
-                  <input
-                    required
-                    value={reasonCode}
-                    onChange={(e) => {
-                      setReasonCode(e.target.value);
-                    }}
-                  />
-                </label>
-                <label>
-                  {copy.justification}
-                  <textarea
-                    minLength={10}
-                    maxLength={1000}
-                    required
-                    value={justification}
-                    onChange={(e) => {
-                      setJustification(e.target.value);
-                    }}
-                  />
-                </label>
-                <label>
-                  {copy.severity}
-                  <select
-                    value={severity}
-                    onChange={(e) => {
-                      setSeverity(e.target.value as "ordinary" | "critical");
-                    }}
-                  >
-                    <option value="ordinary">{copy.ordinary}</option>
-                    <option value="critical">{copy.critical}</option>
-                  </select>
-                </label>
-                <label className="checkbox-row">
-                  <input
-                    type="checkbox"
-                    checked={breakGlass}
-                    onChange={(e) => {
-                      setBreakGlass(e.target.checked);
-                    }}
-                  />
-                  {copy.breakGlass}
-                </label>
-              </>
-            )}
-            {action === "approve" && (
               <label>
-                {copy.expiresAt}
+                {copy.projectId}
                 <input
-                  type="datetime-local"
-                  required
-                  value={expiresAt}
+                  required={action === "use"}
+                  value={projectId}
                   onChange={(e) => {
-                    setExpiresAt(e.target.value);
+                    setProjectId(e.target.value);
                   }}
                 />
               </label>
-            )}
-            <button type="submit">{copy.execute}</button>
-          </form>
-        </>
-      )}
+              <label>
+                {copy.feedbackId}
+                <input
+                  required={action === "use"}
+                  value={feedbackId}
+                  onChange={(e) => {
+                    setFeedbackId(e.target.value);
+                  }}
+                />
+              </label>
+              <label>
+                {copy.capability}
+                <select
+                  value={capability}
+                  onChange={(e) => {
+                    setCapability(e.target.value as ExceptionalAccessAction);
+                  }}
+                >
+                  {capabilities.map((value) => (
+                    <option value={value} key={value}>
+                      {value}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </>
+          )}
+          {action === "request" && (
+            <>
+              <label>
+                {copy.reasonCode}
+                <input
+                  required
+                  value={reasonCode}
+                  onChange={(e) => {
+                    setReasonCode(e.target.value);
+                  }}
+                />
+              </label>
+              <label>
+                {copy.justification}
+                <textarea
+                  minLength={10}
+                  maxLength={1000}
+                  required
+                  value={justification}
+                  onChange={(e) => {
+                    setJustification(e.target.value);
+                  }}
+                />
+              </label>
+              <label>
+                {copy.severity}
+                <select
+                  value={severity}
+                  onChange={(e) => {
+                    setSeverity(e.target.value as "ordinary" | "critical");
+                  }}
+                >
+                  <option value="ordinary">{copy.ordinary}</option>
+                  <option value="critical">{copy.critical}</option>
+                </select>
+              </label>
+              <label className="checkbox-row">
+                <input
+                  type="checkbox"
+                  checked={breakGlass}
+                  onChange={(e) => {
+                    setBreakGlass(e.target.checked);
+                  }}
+                />
+                {copy.breakGlass}
+              </label>
+            </>
+          )}
+          {action === "approve" && (
+            <label>
+              {copy.expiresAt}
+              <input
+                type="datetime-local"
+                required
+                value={expiresAt}
+                onChange={(e) => {
+                  setExpiresAt(e.target.value);
+                }}
+              />
+            </label>
+          )}
+          <button type="submit">{copy.execute}</button>
+        </form>
+      </TeamSessionBoundary>
       {outcomeText && <p role="status">{outcomeText}</p>}
       {outcome?.status === "ok" && outcome.result.content && (
         <section aria-labelledby="platform-protected-result">

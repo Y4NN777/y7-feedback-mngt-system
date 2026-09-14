@@ -55,6 +55,7 @@ const unavailableAdministrationGateway: AdministrationGateway = {
 };
 const unavailableAdministrationSession: AdministrationSession = {
   createJwt: () => Promise.reject(new Error("SESSION_UNAVAILABLE")),
+  current: () => Promise.resolve("anonymous"),
   signIn: () => Promise.resolve("denied"),
   signOut: () => Promise.resolve(),
 };

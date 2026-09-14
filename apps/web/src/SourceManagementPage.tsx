@@ -1,4 +1,4 @@
-import { useState, type SyntheticEvent } from "react";
+import { useState } from "react";
 
 import {
   createProjectBadge,
@@ -7,6 +7,7 @@ import {
 } from "@y7-feedback/domain";
 
 import type { AdministrationSession } from "./AdministrationSession";
+import { TeamSessionBoundary } from "./TeamSession";
 import { sourceMessages } from "./i18n/sources";
 import type {
   SourceManagementGateway,
@@ -33,9 +34,6 @@ export function SourceManagementPage({
   readonly session: AdministrationSession;
 }) {
   const copy = sourceMessages[locale];
-  const [authenticated, setAuthenticated] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [workspaceId, setWorkspaceId] = useState("");
   const [projectId, setProjectId] = useState("");
   const [view, setView] = useState<SourceManagementView>();
@@ -52,14 +50,6 @@ export function SourceManagementPage({
         label: "Feedback",
       })
     : undefined;
-
-  async function signIn(event: SyntheticEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const result = await session.signIn(email, password);
-    setAuthenticated(result === "authenticated");
-    setNotice(result === "authenticated" ? undefined : "denied");
-    setPassword("");
-  }
 
   async function load() {
     setLoading(true);
@@ -128,279 +118,236 @@ export function SourceManagementPage({
         </p>
       )}
 
-      {!authenticated ? (
+      <TeamSessionBoundary
+        locale={locale}
+        session={session}
+        onSignedOut={() => {
+          setView(undefined);
+        }}
+      >
         <form
-          className="administration-form"
+          className="source-scope"
           onSubmit={(event) => {
-            void signIn(event);
+            event.preventDefault();
+            void load();
           }}
         >
           <label>
-            {copy.email}
+            {copy.workspaceId}
             <input
-              type="email"
-              autoComplete="username"
               required
-              value={email}
+              value={workspaceId}
               onChange={(event) => {
-                setEmail(event.target.value);
+                setWorkspaceId(event.target.value);
               }}
             />
           </label>
           <label>
-            {copy.password}
+            {copy.projectId}
             <input
-              type="password"
-              autoComplete="current-password"
               required
-              value={password}
+              value={projectId}
               onChange={(event) => {
-                setPassword(event.target.value);
+                setProjectId(event.target.value);
               }}
             />
           </label>
-          <button type="submit">{copy.signIn}</button>
+          <button type="submit">{copy.load}</button>
         </form>
-      ) : (
-        <>
-          <div className="session-banner">
-            <p role="status">{copy.authenticated}</p>
+        <p className="source-policy">{copy.metadataOnly}</p>
+        {view && (
+          <div className="source-provider-actions">
             <button
               type="button"
               onClick={() => {
-                void session.signOut().then(() => {
-                  setAuthenticated(false);
-                  setView(undefined);
-                });
+                void begin("github");
               }}
             >
-              {copy.signOut}
+              {copy.connectGithub}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                void begin("gitlab");
+              }}
+            >
+              {copy.connectGitlab}
             </button>
           </div>
-          <form
-            className="source-scope"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void load();
-            }}
+        )}
+        {loading && <p role="status">{copy.loading}</p>}
+
+        {view?.pendingSelections.map((pending, index) => (
+          <section
+            className="source-card source-selection"
+            aria-labelledby={`selection-${pending.id}`}
+            key={pending.id}
           >
-            <label>
-              {copy.workspaceId}
-              <input
-                required
-                value={workspaceId}
-                onChange={(event) => {
-                  setWorkspaceId(event.target.value);
-                }}
-              />
-            </label>
-            <label>
-              {copy.projectId}
-              <input
-                required
-                value={projectId}
-                onChange={(event) => {
-                  setProjectId(event.target.value);
-                }}
-              />
-            </label>
-            <button type="submit">{copy.load}</button>
-          </form>
-          <p className="source-policy">{copy.metadataOnly}</p>
-          {view && (
-            <div className="source-provider-actions">
+            <span className="source-index" aria-hidden="true">
+              {String(index + 1).padStart(2, "0")}
+            </span>
+            <div>
+              <p className="source-provider">{pending.provider}</p>
+              <h2 id={`selection-${pending.id}`}>{copy.pending}</h2>
+              <fieldset>
+                <legend>{copy.selectedRepositories}</legend>
+                {pending.authorizedRepositories.map((repository) => (
+                  <label key={repository.id}>
+                    <input
+                      type="checkbox"
+                      checked={(selected[pending.id] ?? []).includes(repository.id)}
+                      onChange={(event) => {
+                        const current = selected[pending.id] ?? [];
+                        setSelected({
+                          ...selected,
+                          [pending.id]: event.target.checked
+                            ? [...current, repository.id]
+                            : current.filter((id) => id !== repository.id),
+                        });
+                      }}
+                    />
+                    {repository.id}
+                  </label>
+                ))}
+              </fieldset>
               <button
                 type="button"
+                disabled={(selected[pending.id] ?? []).length === 0}
                 onClick={() => {
-                  void begin("github");
+                  void mutate(() =>
+                    gateway.select({
+                      workspaceId,
+                      projectId,
+                      connectionId: pending.id,
+                      repositoryIds: selected[pending.id] ?? [],
+                    }),
+                  );
                 }}
               >
-                {copy.connectGithub}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  void begin("gitlab");
-                }}
-              >
-                {copy.connectGitlab}
+                {copy.select}
               </button>
             </div>
-          )}
-          {loading && <p role="status">{copy.loading}</p>}
+          </section>
+        ))}
 
-          {view?.pendingSelections.map((pending, index) => (
-            <section
-              className="source-card source-selection"
-              aria-labelledby={`selection-${pending.id}`}
-              key={pending.id}
-            >
-              <span className="source-index" aria-hidden="true">
-                {String(index + 1).padStart(2, "0")}
-              </span>
-              <div>
-                <p className="source-provider">{pending.provider}</p>
-                <h2 id={`selection-${pending.id}`}>{copy.pending}</h2>
-                <fieldset>
-                  <legend>{copy.selectedRepositories}</legend>
-                  {pending.authorizedRepositories.map((repository) => (
-                    <label key={repository.id}>
-                      <input
-                        type="checkbox"
-                        checked={(selected[pending.id] ?? []).includes(repository.id)}
-                        onChange={(event) => {
-                          const current = selected[pending.id] ?? [];
-                          setSelected({
-                            ...selected,
-                            [pending.id]: event.target.checked
-                              ? [...current, repository.id]
-                              : current.filter((id) => id !== repository.id),
-                          });
-                        }}
-                      />
-                      {repository.id}
-                    </label>
-                  ))}
-                </fieldset>
+        {view &&
+          view.connections.length === 0 &&
+          view.pendingSelections.length === 0 && <p>{copy.empty}</p>}
+        {view?.connections.map((connection, index) => (
+          <article className="source-card" key={connection.id}>
+            <span className="source-index" aria-hidden="true">
+              {String(index + view.pendingSelections.length + 1).padStart(2, "0")}
+            </span>
+            <div className="source-card-body">
+              <header>
+                <div>
+                  <p className="source-provider">{connection.provider}</p>
+                  <h2>{copy[connection.state]}</h2>
+                </div>
+                <time dateTime={connection.updatedAt}>{connection.updatedAt}</time>
+              </header>
+              <h3>{copy.selectedRepositories}</h3>
+              <ul>
+                {connection.selectedRepositories.map((repository) => {
+                  const importedRepository = connection.importedRepositories.find(
+                    (item) => item.repositoryId === repository.id,
+                  );
+                  return (
+                    <li key={repository.id}>
+                      <div>
+                        <strong>
+                          {importedRepository
+                            ? `${importedRepository.owner}/${importedRepository.name}`
+                            : repository.id}
+                        </strong>
+                        {importedRepository && (
+                          <>
+                            <span>
+                              {copy.repositoryOwner}: {importedRepository.owner}
+                            </span>
+                            <span>
+                              {copy.observedAt}: {importedRepository.observedAt}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                      {connection.state === "active" && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void mutate(() =>
+                              gateway.refresh({
+                                workspaceId,
+                                projectId,
+                                connectionId: connection.id,
+                                repositoryId: repository.id,
+                              }),
+                            );
+                          }}
+                        >
+                          {copy.refresh}
+                        </button>
+                      )}
+                      {importedRepository && (
+                        <div className="source-releases">
+                          <h4>{copy.releases}</h4>
+                          {importedRepository.releases.length === 0 ? (
+                            <p>{copy.noReleases}</p>
+                          ) : (
+                            <ul>
+                              {importedRepository.releases.map((release) => (
+                                <li key={release.providerReleaseId}>
+                                  <a href={release.webUrl}>{release.name}</a>
+                                  <span>{release.tag}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+              {connection.state === "active" && (
                 <button
+                  className="source-disconnect"
                   type="button"
-                  disabled={(selected[pending.id] ?? []).length === 0}
                   onClick={() => {
                     void mutate(() =>
-                      gateway.select({
+                      gateway.disconnect({
                         workspaceId,
                         projectId,
-                        connectionId: pending.id,
-                        repositoryIds: selected[pending.id] ?? [],
+                        connectionId: connection.id,
                       }),
                     );
                   }}
                 >
-                  {copy.select}
+                  {copy.disconnect}
                 </button>
-              </div>
-            </section>
-          ))}
-
-          {view &&
-            view.connections.length === 0 &&
-            view.pendingSelections.length === 0 && <p>{copy.empty}</p>}
-          {view?.connections.map((connection, index) => (
-            <article className="source-card" key={connection.id}>
-              <span className="source-index" aria-hidden="true">
-                {String(index + view.pendingSelections.length + 1).padStart(2, "0")}
-              </span>
-              <div className="source-card-body">
-                <header>
-                  <div>
-                    <p className="source-provider">{connection.provider}</p>
-                    <h2>{copy[connection.state]}</h2>
-                  </div>
-                  <time dateTime={connection.updatedAt}>{connection.updatedAt}</time>
-                </header>
-                <h3>{copy.selectedRepositories}</h3>
-                <ul>
-                  {connection.selectedRepositories.map((repository) => {
-                    const importedRepository = connection.importedRepositories.find(
-                      (item) => item.repositoryId === repository.id,
-                    );
-                    return (
-                      <li key={repository.id}>
-                        <div>
-                          <strong>
-                            {importedRepository
-                              ? `${importedRepository.owner}/${importedRepository.name}`
-                              : repository.id}
-                          </strong>
-                          {importedRepository && (
-                            <>
-                              <span>
-                                {copy.repositoryOwner}: {importedRepository.owner}
-                              </span>
-                              <span>
-                                {copy.observedAt}: {importedRepository.observedAt}
-                              </span>
-                            </>
-                          )}
-                        </div>
-                        {connection.state === "active" && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              void mutate(() =>
-                                gateway.refresh({
-                                  workspaceId,
-                                  projectId,
-                                  connectionId: connection.id,
-                                  repositoryId: repository.id,
-                                }),
-                              );
-                            }}
-                          >
-                            {copy.refresh}
-                          </button>
-                        )}
-                        {importedRepository && (
-                          <div className="source-releases">
-                            <h4>{copy.releases}</h4>
-                            {importedRepository.releases.length === 0 ? (
-                              <p>{copy.noReleases}</p>
-                            ) : (
-                              <ul>
-                                {importedRepository.releases.map((release) => (
-                                  <li key={release.providerReleaseId}>
-                                    <a href={release.webUrl}>{release.name}</a>
-                                    <span>{release.tag}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
-                          </div>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-                {connection.state === "active" && (
-                  <button
-                    className="source-disconnect"
-                    type="button"
-                    onClick={() => {
-                      void mutate(() =>
-                        gateway.disconnect({
-                          workspaceId,
-                          projectId,
-                          connectionId: connection.id,
-                        }),
-                      );
-                    }}
-                  >
-                    {copy.disconnect}
-                  </button>
-                )}
-              </div>
-            </article>
-          ))}
-          {badge && (
-            <section className="source-badge">
-              <div>
-                <p className="eyebrow">{copy.badge}</p>
-                <a href={badge.destination}>{badge.destination}</a>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  void copyText(badge.markdown).then(() => {
-                    setNotice("copied");
-                  });
-                }}
-              >
-                {copy.copyBadge}
-              </button>
-            </section>
-          )}
-        </>
-      )}
+              )}
+            </div>
+          </article>
+        ))}
+        {badge && (
+          <section className="source-badge">
+            <div>
+              <p className="eyebrow">{copy.badge}</p>
+              <a href={badge.destination}>{badge.destination}</a>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                void copyText(badge.markdown).then(() => {
+                  setNotice("copied");
+                });
+              }}
+            >
+              {copy.copyBadge}
+            </button>
+          </section>
+        )}
+      </TeamSessionBoundary>
     </main>
   );
 }

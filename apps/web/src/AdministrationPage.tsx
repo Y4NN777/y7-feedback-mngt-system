@@ -7,6 +7,7 @@ import type {
   AdministrationOutcome,
 } from "./AdministrationGateway";
 import type { AdministrationSession } from "./AdministrationSession";
+import { TeamSessionBoundary } from "./TeamSession";
 import { administrationMessages } from "./i18n/administration";
 
 type Action =
@@ -53,9 +54,6 @@ export function AdministrationPage({
   readonly session: AdministrationSession;
 }) {
   const copy = administrationMessages[locale];
-  const [authenticated, setAuthenticated] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [action, setAction] = useState<Action>("create_project");
   const [workspaceId, setWorkspaceId] = useState("");
   const [projectId, setProjectId] = useState("");
@@ -67,14 +65,6 @@ export function AdministrationPage({
   const [maintainerId, setMaintainerId] = useState("");
   const [active, setActive] = useState(true);
   const [outcome, setOutcome] = useState<AdministrationOutcome["status"]>();
-
-  async function signIn(event: SyntheticEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const result = await session.signIn(email, password);
-    setAuthenticated(result === "authenticated");
-    setOutcome(result === "authenticated" ? undefined : "denied");
-    setPassword("");
-  }
 
   async function execute(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -139,167 +129,124 @@ export function AdministrationPage({
         <p className="lede">{copy.intro}</p>
       </section>
 
-      {!authenticated ? (
+      <TeamSessionBoundary
+        locale={locale}
+        session={session}
+        onSignedOut={() => {
+          setOutcome(undefined);
+        }}
+      >
         <form
           className="administration-form"
           onSubmit={(event) => {
-            void signIn(event);
+            void execute(event);
           }}
         >
           <label>
-            {copy.email}
-            <input
-              type="email"
-              autoComplete="username"
-              required
-              value={email}
+            {copy.action}
+            <select
+              value={action}
               onChange={(event) => {
-                setEmail(event.target.value);
-              }}
-            />
-          </label>
-          <label>
-            {copy.password}
-            <input
-              type="password"
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(event) => {
-                setPassword(event.target.value);
-              }}
-            />
-          </label>
-          <button type="submit">{copy.signIn}</button>
-        </form>
-      ) : (
-        <>
-          <div className="session-banner">
-            <p role="status">{copy.authenticated}</p>
-            <button
-              type="button"
-              onClick={() => {
-                void session.signOut().then(() => {
-                  setAuthenticated(false);
-                  setOutcome(undefined);
-                });
+                setAction(event.target.value as Action);
+                setOutcome(undefined);
               }}
             >
-              {copy.signOut}
-            </button>
-          </div>
-          <form
-            className="administration-form"
-            onSubmit={(event) => {
-              void execute(event);
-            }}
-          >
-            <label>
-              {copy.action}
-              <select
-                value={action}
+              {(Object.keys(actionLabels) as Action[]).map((value) => (
+                <option value={value} key={value}>
+                  {actionLabels[value][locale]}
+                </option>
+              ))}
+            </select>
+          </label>
+          {[
+            [copy.workspaceId, workspaceId, setWorkspaceId],
+            [copy.projectId, projectId, setProjectId],
+            [copy.operationId, operationId, setOperationId],
+          ].map(([label, value, setter]) => (
+            <label key={label as string}>
+              {label as string}
+              <input
+                required
+                value={value as string}
                 onChange={(event) => {
-                  setAction(event.target.value as Action);
-                  setOutcome(undefined);
+                  (setter as (value: string) => void)(event.target.value);
                 }}
-              >
-                {(Object.keys(actionLabels) as Action[]).map((value) => (
-                  <option value={value} key={value}>
-                    {actionLabels[value][locale]}
-                  </option>
-                ))}
-              </select>
+              />
             </label>
-            {[
-              [copy.workspaceId, workspaceId, setWorkspaceId],
-              [copy.projectId, projectId, setProjectId],
-              [copy.operationId, operationId, setOperationId],
-            ].map(([label, value, setter]) => (
-              <label key={label as string}>
-                {label as string}
-                <input
-                  required
-                  value={value as string}
-                  onChange={(event) => {
-                    (setter as (value: string) => void)(event.target.value);
-                  }}
-                />
-              </label>
-            ))}
-            {(action === "create_project" || action === "rename_project") && (
+          ))}
+          {(action === "create_project" || action === "rename_project") && (
+            <label>
+              {copy.slug}
+              <input
+                required
+                value={slug}
+                onChange={(e) => {
+                  setSlug(e.target.value);
+                }}
+              />
+            </label>
+          )}
+          {(action === "create_project" || action === "configure_project") && (
+            <>
               <label>
-                {copy.slug}
+                {copy.enabledTypes}
                 <input
                   required
-                  value={slug}
+                  value={enabledTypes}
                   onChange={(e) => {
-                    setSlug(e.target.value);
+                    setEnabledTypes(e.target.value);
                   }}
                 />
               </label>
-            )}
-            {(action === "create_project" || action === "configure_project") && (
-              <>
-                <label>
-                  {copy.enabledTypes}
-                  <input
-                    required
-                    value={enabledTypes}
-                    onChange={(e) => {
-                      setEnabledTypes(e.target.value);
-                    }}
-                  />
-                </label>
-                <label>
-                  {copy.purposeFr}
-                  <textarea
-                    required
-                    value={purposeFr}
-                    onChange={(e) => {
-                      setPurposeFr(e.target.value);
-                    }}
-                  />
-                </label>
-                <label>
-                  {copy.purposeEn}
-                  <textarea
-                    required
-                    value={purposeEn}
-                    onChange={(e) => {
-                      setPurposeEn(e.target.value);
-                    }}
-                  />
-                </label>
-              </>
-            )}
-            {action === "set_project_activation" && (
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={active}
-                  onChange={(e) => {
-                    setActive(e.target.checked);
-                  }}
-                />
-                {copy.active}
-              </label>
-            )}
-            {(action === "assign_maintainer" || action === "remove_maintainer") && (
               <label>
-                {copy.maintainerId}
-                <input
+                {copy.purposeFr}
+                <textarea
                   required
-                  value={maintainerId}
+                  value={purposeFr}
                   onChange={(e) => {
-                    setMaintainerId(e.target.value);
+                    setPurposeFr(e.target.value);
                   }}
                 />
               </label>
-            )}
-            <button type="submit">{copy.submit}</button>
-          </form>
-        </>
-      )}
+              <label>
+                {copy.purposeEn}
+                <textarea
+                  required
+                  value={purposeEn}
+                  onChange={(e) => {
+                    setPurposeEn(e.target.value);
+                  }}
+                />
+              </label>
+            </>
+          )}
+          {action === "set_project_activation" && (
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={active}
+                onChange={(e) => {
+                  setActive(e.target.checked);
+                }}
+              />
+              {copy.active}
+            </label>
+          )}
+          {(action === "assign_maintainer" || action === "remove_maintainer") && (
+            <label>
+              {copy.maintainerId}
+              <input
+                required
+                value={maintainerId}
+                onChange={(e) => {
+                  setMaintainerId(e.target.value);
+                }}
+              />
+            </label>
+          )}
+          <button type="submit">{copy.submit}</button>
+        </form>
+      </TeamSessionBoundary>
       {outcome && (
         <p className={`administration-outcome outcome-${outcome}`} role="status">
           {outcome === "ok" ? copy.success : copy[outcome]}

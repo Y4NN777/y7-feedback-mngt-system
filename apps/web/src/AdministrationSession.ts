@@ -2,11 +2,13 @@ import { Account, Client } from "appwrite";
 
 export interface AdministrationSession {
   createJwt(): Promise<string>;
+  current(): Promise<"authenticated" | "anonymous">;
   signIn(email: string, password: string): Promise<"authenticated" | "denied">;
   signOut(): Promise<void>;
 }
 
 interface AccountPort {
+  get(): Promise<unknown>;
   createEmailPasswordSession(input: {
     readonly email: string;
     readonly password: string;
@@ -23,6 +25,14 @@ export function createAdministrationSession(
       const result = await account.createJWT();
       if (!result.jwt || result.jwt.length > 4096) throw new Error("SESSION_DENIED");
       return result.jwt;
+    },
+    async current() {
+      try {
+        await account.get();
+        return "authenticated";
+      } catch {
+        return "anonymous";
+      }
     },
     async signIn(email, password) {
       if (!email.trim() || !password) return "denied";

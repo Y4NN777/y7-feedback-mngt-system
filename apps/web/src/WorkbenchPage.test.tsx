@@ -171,6 +171,7 @@ function setup(
   };
   const signOutMock = vi.fn(() => Promise.resolve());
   const session: AdministrationSession = {
+    current: () => Promise.resolve("anonymous"),
     createJwt: () => Promise.resolve("jwt_1"),
     signIn: vi.fn(() => Promise.resolve("authenticated" as const)),
     signOut: signOutMock,
@@ -207,7 +208,7 @@ function setup(
 }
 
 async function open(user: ReturnType<typeof userEvent.setup>) {
-  await user.type(screen.getByLabelText("Adresse e-mail"), "owner@example.test");
+  await user.type(await screen.findByLabelText("Adresse e-mail"), "owner@example.test");
   await user.type(screen.getByLabelText("Mot de passe"), "password");
   await user.click(screen.getByRole("button", { name: "Se connecter" }));
   await user.type(screen.getByLabelText("Identifiant du Workspace"), "workspace_1");
@@ -219,7 +220,10 @@ describe("Workbench experience", () => {
   it("BDD-WORK-WEB-003 preserves credentials across FR/EN", async () => {
     const user = userEvent.setup();
     setup();
-    await user.type(screen.getByLabelText("Adresse e-mail"), "owner@example.test");
+    await user.type(
+      await screen.findByLabelText("Adresse e-mail"),
+      "owner@example.test",
+    );
     await user.click(screen.getByRole("button", { name: "English" }));
     expect(screen.getByLabelText("Email address")).toHaveValue("owner@example.test");
   });

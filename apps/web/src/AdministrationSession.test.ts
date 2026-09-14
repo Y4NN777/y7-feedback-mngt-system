@@ -6,6 +6,7 @@ import {
 } from "./AdministrationSession";
 
 function setup() {
+  const get = vi.fn(() => Promise.resolve({ $id: "session_1" }));
   const createEmailPasswordSession = vi.fn(() => Promise.resolve({}));
   const createJWT = vi.fn(() => Promise.resolve({ jwt: "short-lived-jwt" }));
   const deleteSession = vi.fn(() => Promise.resolve({}));
@@ -13,10 +14,12 @@ function setup() {
     createEmailPasswordSession,
     createJWT,
     deleteSession,
+    get,
     session: createAdministrationSession({
       createEmailPasswordSession,
       createJWT,
       deleteSession,
+      get,
     }),
   };
 }
@@ -28,8 +31,16 @@ describe("Appwrite administration session", () => {
       "project_1",
     );
     expect(typeof session.createJwt).toBe("function");
+    expect(typeof session.current).toBe("function");
     expect(typeof session.signIn).toBe("function");
     expect(typeof session.signOut).toBe("function");
+  });
+
+  it("restores only a session confirmed by Appwrite and fails closed on expiry", async () => {
+    const target = setup();
+    await expect(target.session.current()).resolves.toBe("authenticated");
+    target.get.mockRejectedValueOnce(new Error("expired"));
+    await expect(target.session.current()).resolves.toBe("anonymous");
   });
 
   it("creates a session and obtains a bounded JWT without persisting it", async () => {
