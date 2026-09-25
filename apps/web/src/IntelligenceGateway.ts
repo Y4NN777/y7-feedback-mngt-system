@@ -3,7 +3,6 @@ import type {
   FeedbackType,
   IntelligenceAggregate,
   IntelligenceFilter,
-  IntelligenceReporterKind,
   IntelligenceRelationType,
   IntelligenceTrend,
   IntelligenceTrendWindow,
@@ -245,19 +244,3 @@ export function createHttpIntelligenceGateway(
     },
   };
 }
-
-export const intelligenceFilterKinds = {
-  types: ["bug", "suggestion", "review"] as readonly FeedbackType[],
-  states: [
-    "received",
-    "under_review",
-    "awaiting_reporter",
-    "resolved",
-    "closed",
-  ] as readonly FeedbackLifecycleState[],
-  reporters: [
-    "unidentified",
-    "contact",
-    "external",
-  ] as readonly IntelligenceReporterKind[],
-};

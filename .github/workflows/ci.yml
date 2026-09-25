@@ -43,6 +43,8 @@ jobs:
         run: pnpm format:check
       - name: Lint
         run: pnpm lint
+      - name: Detect dead code
+        run: pnpm dead-code:check
       - name: Typecheck
         run: pnpm typecheck
       - name: Test
