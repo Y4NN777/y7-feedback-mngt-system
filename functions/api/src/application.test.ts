@@ -213,6 +213,39 @@ class FakeTables {
 }
 
 describe("trusted Function composition root", () => {
+  it("composes configured GitHub and GitLab source routes without starting network work", () => {
+    expect(() =>
+      createHttpApplication(
+        {
+          ...config,
+          providers: {
+            github: {
+              callbackUrl: "https://api.example.test/providers/github/callback",
+              clientId: "github-client",
+              clientSecret: "github-secret",
+            },
+            gitlab: {
+              callbackUrl: "https://api.example.test/providers/gitlab/callback",
+              clientId: "gitlab-client",
+              clientSecret: "gitlab-secret",
+              origin: "https://gitlab.example.test",
+            },
+          },
+        },
+        {
+          tables: new FakeTables() as unknown as import("node-appwrite").TablesDB,
+          storage: {} as import("node-appwrite").Storage,
+          createId: () => "generated-id",
+          createReference: () => "Y7-2026-000001",
+          createCorrelationId: () => "correlation-1",
+          nowIso: () => "2026-09-25T00:00:00.000Z",
+          nowMs: () => 42,
+          startedAt: () => 40,
+        },
+      ),
+    ).not.toThrow();
+  });
+
   it("BDD-SLO-486 composes authoritative persistence for Production", () => {
     expect(() =>
       createHttpApplication(

@@ -250,7 +250,7 @@ export function createHttpApplication(
         .update("\0")
         .update(
           JSON.stringify(
-            /* v8 ignore next -- canonical fields are asserted at the intake boundary. */
+            /* v8 ignore next -- attachment grants are normalized before canonical serialization */
             grants.map(({ attachmentId, objectId, sha256 }) => ({
               attachmentId,
               objectId,
@@ -561,7 +561,6 @@ export function createHttpApplication(
         sensitive,
       ),
       {
-        /* v8 ignore next -- composition callback is exercised by deployed mutations */
         digest: (command) =>
           createHash("sha256").update(JSON.stringify(command)).digest("base64url"),
         now: runtime.nowIso,
@@ -630,7 +629,6 @@ export function createHttpApplication(
     {
       ...workspaceProjectPorts,
       notifications: {
-        /* v8 ignore next -- composition callback is exercised by deployed feed matrix */
         list: (scope, actor) =>
           translateNotificationDenial(() =>
             notificationFeed.list({
@@ -639,7 +637,6 @@ export function createHttpApplication(
               projectId: scope.projectId,
             }),
           ),
-        /* v8 ignore next -- composition callback is exercised by deployed read matrix */
         markRead: (scope, actor, notificationId) =>
           translateNotificationDenial(() =>
             notificationFeed.markRead({
@@ -785,7 +782,6 @@ export function createHttpApplication(
       ),
     }),
   );
-  /* v8 ignore start -- provider composition is exercised by real Preview OAuth */
   const sourceConnections = config.providers
     ? createProviderSourceHttp({
         config: { ...config, providers: config.providers },
@@ -795,6 +791,7 @@ export function createHttpApplication(
         sensitive,
       })
     : undefined;
+  /* v8 ignore start -- provider workers require live grants; source wiring is contract-tested separately */
   const providerIssueOutboxWorker =
     config.providers && config.providerOutboxTriggerSecret
       ? (() => {
@@ -1242,15 +1239,12 @@ export function createHttpApplication(
     conversationLifecycle,
     externalIssue,
     now: runtime.nowMs,
-    /* v8 ignore next -- optional composition is covered by config and Preview. */
     ...(platformAccess === undefined ? {} : { platformAccess }),
     projectAdministration,
     providerWebhook,
-    /* v8 ignore next -- optional composition is covered by configuration parsing. */
     ...(providerEventInbox === undefined ? {} : { providerEventInbox }),
     providerMaintenance,
     authoritativeProjection,
-    /* v8 ignore next -- optional composition is covered by the HTTP contract. */
     ...(!config.providerOutboxTriggerSecret
       ? {}
       : {
@@ -1269,9 +1263,7 @@ export function createHttpApplication(
       attachmentStaging,
       attachmentStagingTokens,
     ),
-    /* v8 ignore next -- both compositions are exercised by deployed environments */
     ...(sourceConnections === undefined ? {} : { sourceConnections }),
-    /* v8 ignore next -- provider worker composition requires deployed provider authority */
     ...(providerIssueOutbox === undefined ? {} : { providerIssueOutbox }),
     release: config.release,
     startedAt: runtime.startedAt,
