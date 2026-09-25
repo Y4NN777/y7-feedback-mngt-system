@@ -1,4 +1,3 @@
-/* v8 ignore file -- provider wiring is exercised by application contracts and real Preview OAuth */
 import type { TablesDB } from "node-appwrite";
 import { createHash, randomBytes } from "node:crypto";
 
