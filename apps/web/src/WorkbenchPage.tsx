@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type {
   FeedbackLifecycleState,
@@ -11,6 +11,10 @@ import type {
 import type { AdministrationSession } from "./AdministrationSession";
 import { TeamSessionBoundary } from "./TeamSession";
 import type { NotificationInvalidation } from "./NotificationInvalidation";
+import {
+  initialNotificationPollingDelay,
+  nextNotificationPollingDelay,
+} from "./NotificationRefreshPolicy";
 import type { ExternalIssueGateway } from "./ExternalIssueGateway";
 import type { WorkbenchGateway } from "./WorkbenchGateway";
 import { workbenchMessages, workbenchNotificationMessages } from "./i18n/workbench";
@@ -65,6 +69,9 @@ export function WorkbenchPage({
   const [mutationStatus, setMutationStatus] = useState<
     "ok" | "invalid" | "denied" | "conflict" | "retryable"
   >();
+  const [notificationRealtimeConnected, setNotificationRealtimeConnected] =
+    useState(false);
+  const notificationPollingDelay = useRef(initialNotificationPollingDelay);
   const filter: WorkbenchFilter = {
     types: type === "all" ? [] : [type],
     states: state === "all" ? [] : [state],
@@ -99,33 +106,77 @@ export function WorkbenchPage({
   });
   const notifications = useQuery({
     queryKey: ["workbench-notifications", scope],
-    queryFn: () =>
-      scope === undefined
-        ? Promise.resolve({ status: "denied" as const })
-        : gateway.notifications(scope),
+    queryFn: async () => {
+      const outcome =
+        scope === undefined
+          ? ({ status: "denied" } as const)
+          : await gateway.notifications(scope);
+      if (outcome.status === "ok" || outcome.status === "retryable") {
+        notificationPollingDelay.current = nextNotificationPollingDelay(
+          notificationPollingDelay.current,
+          outcome.status,
+        );
+      }
+      return outcome;
+    },
     enabled: scope !== undefined,
     retry: false,
-    refetchInterval: 5_000,
+    staleTime: initialNotificationPollingDelay,
+    refetchInterval: () =>
+      notificationRealtimeConnected ? false : notificationPollingDelay.current,
+    refetchIntervalInBackground: false,
   });
   useEffect(() => {
     if (scope === undefined) return;
+    notificationPollingDelay.current = initialNotificationPollingDelay;
     let cancelled = false;
     let unsubscribe: (() => Promise<void>) | undefined;
-    void gateway.authorizeNotificationRealtime(scope).then(async (outcome) => {
-      if (outcome.status !== "ok") return;
-      const close = await notificationInvalidation.subscribe(outcome.result, () => {
-        void queryClient.invalidateQueries({
-          queryKey: ["workbench-notifications", scope],
+    void gateway
+      .authorizeNotificationRealtime(scope)
+      .then(async (outcome) => {
+        if (outcome.status !== "ok") return;
+        const invalidate = () =>
+          queryClient.invalidateQueries({
+            queryKey: ["workbench-notifications", scope],
+          });
+        const close = await notificationInvalidation.subscribe(outcome.result, {
+          connected: () => {
+            setNotificationRealtimeConnected(true);
+            void invalidate();
+          },
+          disconnected: () => {
+            notificationPollingDelay.current = initialNotificationPollingDelay;
+            setNotificationRealtimeConnected(false);
+            void invalidate();
+          },
+          invalidate: () => {
+            void invalidate();
+          },
         });
+        if (cancelled) await close();
+        else unsubscribe = close;
+      })
+      .catch(() => {
+        if (cancelled) return;
+        notificationPollingDelay.current = initialNotificationPollingDelay;
+        setNotificationRealtimeConnected(false);
       });
-      if (cancelled) await close();
-      else unsubscribe = close;
-    });
     return () => {
       cancelled = true;
       if (unsubscribe !== undefined) void unsubscribe();
     };
   }, [gateway, notificationInvalidation, queryClient, scope]);
+  useEffect(() => {
+    if (scope === undefined || notificationRealtimeConnected) return;
+    const refreshStaleNotifications = () => {
+      if (document.visibilityState !== "visible") return;
+      void notifications.refetch();
+    };
+    document.addEventListener("visibilitychange", refreshStaleNotifications);
+    return () => {
+      document.removeEventListener("visibilitychange", refreshStaleNotifications);
+    };
+  }, [notificationRealtimeConnected, notifications, scope]);
   const repositories = useQuery({
     queryKey: ["external-issue-repositories", scope, selectedId],
     queryFn: () =>
