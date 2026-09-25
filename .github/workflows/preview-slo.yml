@@ -1,4 +1,4 @@
-name: Preview G5 SLO evidence
+name: Preview SLO evidence
 
 on:
   workflow_dispatch:
@@ -7,11 +7,11 @@ permissions:
   contents: read
 
 concurrency:
-  group: slo-g5-preview
+  group: preview-slo-preview
   cancel-in-progress: false
 
 jobs:
-  slo-g5:
+  preview-slo:
     name: Exercise the declared Preview load envelope
     runs-on: ubuntu-latest
     timeout-minutes: 90
@@ -49,14 +49,14 @@ jobs:
           install -m 600 /dev/null .env.appwrite-preview
           trap 'rm -f .env.appwrite-preview' EXIT
           if [ -z "$Y7_PREVIEW_EVIDENCE_ENV" ]; then
-            echo '{"error":"G5_PREVIEW_EVIDENCE_ENV_MISSING"}' >&2
+            echo '{"error":"PREVIEW_EVIDENCE_ENV_MISSING"}' >&2
             exit 1
           fi
           if [ -z "$ANTIVIRUS_SCANNER_ENDPOINT" ] || \
              [ -z "$ANTIVIRUS_SCANNER_KEY_ID" ] || \
              [ -z "$ANTIVIRUS_SCANNER_HMAC_KEY" ] || \
              [ -z "$ANTIVIRUS_SCANNER_TIMEOUT_MS" ]; then
-            echo '{"error":"G5_PREVIEW_ANTIVIRUS_AUTHORITY_MISSING"}' >&2
+            echo '{"error":"PREVIEW_ANTIVIRUS_AUTHORITY_MISSING"}' >&2
             exit 1
           fi
           printf '%s\n' "$Y7_PREVIEW_EVIDENCE_ENV" > .env.appwrite-preview
@@ -84,4 +84,4 @@ jobs:
             pnpm configure:appwrite:function:preview
             pnpm deploy:appwrite:function:preview
           fi
-          pnpm verify:slo:g5
+          pnpm verify:slo:preview

@@ -84,7 +84,7 @@ with the same ID is a conflict and must not replace the completed generation.
 Run the non-sensitive Preview exercise with:
 
 ```bash
-pnpm verify:recovery:g5
+pnpm verify:recovery:preview
 ```
 
 The verifier creates disabled, permission-empty source and recovery databases and

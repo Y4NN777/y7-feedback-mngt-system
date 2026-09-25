@@ -5,7 +5,7 @@ import {
   runAppwriteG1Matrix,
   runAppwriteG1RollbackMatrix,
   type AppwriteG1MatrixTables,
-} from "./appwrite-g1-matrix";
+} from "./intake-evidence";
 import type { PublicApi, PublicApiResponse } from "./public-api";
 
 const schema = {

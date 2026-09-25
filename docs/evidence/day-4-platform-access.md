@@ -11,7 +11,7 @@
 ## Real-service command
 
 ```bash
-pnpm verify:appwrite:g4:platform-access
+pnpm verify:appwrite:platform-access
 ```
 
 Result:

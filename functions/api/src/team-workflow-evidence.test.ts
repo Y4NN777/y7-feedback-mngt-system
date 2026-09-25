@@ -5,7 +5,7 @@ import {
   g3ComposedSteps,
   g3ResidueKinds,
   type G3ComposedEvidence,
-} from "./g3-composed-gate";
+} from "./team-workflow-evidence";
 
 const fixtureId = "g3c_0123456789abcd";
 

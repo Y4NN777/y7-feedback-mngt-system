@@ -10,7 +10,7 @@ import {
   evaluateG3ComposedEvidence,
   type G3ComposedStep,
   type G3ResidueKind,
-} from "./g3-composed-gate.js";
+} from "./team-workflow-evidence.js";
 import { createOutboxWorker } from "./outbox.js";
 import { closeProviderIssue } from "./provider-issue-cleanup.js";
 import { createSensitiveDataProtector } from "./sensitive-data-protector.js";

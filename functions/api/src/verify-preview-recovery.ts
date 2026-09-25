@@ -15,7 +15,7 @@ import {
 } from "./recovery-artifact.js";
 import { restoreRecoveryArtifact } from "./recovery-restore.js";
 import { collectRecoveryEntries } from "./recovery-source.js";
-import { recoveryDeletionFixtures } from "./recovery-g5-fixtures.js";
+import { recoveryDeletionFixtures } from "./recovery-fixtures.js";
 
 function required(name: string): string {
   const value = process.env[name]?.trim();
@@ -50,7 +50,7 @@ const digest = (value: Uint8Array) =>
 async function main() {
   if (!process.argv.includes("--apply")) throw new Error("RECOVERY_G5_APPLY_REQUIRED");
   if ((process.env.Y7_ENVIRONMENT?.trim() || "preview") !== "preview")
-    throw new Error("RECOVERY_G5_PREVIEW_REQUIRED");
+    throw new Error("RECOVERY_PREVIEW_REQUIRED");
   const suffix = randomBytes(5).toString("hex");
   const sourceDatabaseId = `rec_src_${suffix}`;
   const targetDatabaseId = `rec_dst_${suffix}`;

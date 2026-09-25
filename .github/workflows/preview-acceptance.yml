@@ -1,4 +1,4 @@
-name: Complete G5 evidence
+name: Complete Preview acceptance
 
 on:
   workflow_dispatch:
@@ -23,18 +23,18 @@ permissions:
   issues: write
 
 concurrency:
-  group: g5-evidence-preview
+  group: preview-acceptance-preview
   cancel-in-progress: false
 
 jobs:
-  g5-evidence:
+  preview-acceptance:
     name: Run browser, Preview, provider, SLO and recovery evidence
     runs-on: ubuntu-latest
     timeout-minutes: 180
     environment: g5-preview
     env:
       CI: true
-      G5_EVIDENCE_SCOPE: ${{ inputs.scope || 'full' }}
+      ACCEPTANCE_SCOPE: ${{ inputs.scope || 'full' }}
       GH_TOKEN: ${{ github.token }}
       Y7_GITHUB_VERIFICATION_TOKEN: ${{ secrets.Y7_GITHUB_VERIFICATION_TOKEN }}
       Y7_GITLAB_VERIFICATION_TOKEN: ${{ secrets.Y7_GITLAB_VERIFICATION_TOKEN }}
@@ -62,7 +62,7 @@ jobs:
       - name: Preflight the real Preview antivirus authority
         run: node scripts/antivirus-authority-probe.mjs
       - name: Authenticate the isolated recovery drill with Azure workload identity
-        if: env.G5_EVIDENCE_SCOPE == 'full' || env.G5_EVIDENCE_SCOPE == 'recovery'
+        if: env.ACCEPTANCE_SCOPE == 'full' || env.ACCEPTANCE_SCOPE == 'recovery'
         uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
         with:
           client-id: ${{ vars.AZURE_RECOVERY_DRILL_CLIENT_ID }}
@@ -71,9 +71,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Install Chromium and browser dependencies
-        if: env.G5_EVIDENCE_SCOPE == 'full'
+        if: env.ACCEPTANCE_SCOPE == 'full'
         run: pnpm --filter @y7-feedback/web exec playwright install --with-deps chromium
-      - name: Run the complete destructive G5 evidence matrix
+      - name: Run the complete destructive Preview acceptance matrix
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -82,14 +82,14 @@ jobs:
           install -m 600 /dev/null .env.appwrite-preview
           trap 'rm -f .env.appwrite-preview' EXIT
           if [ -z "$Y7_PREVIEW_EVIDENCE_ENV" ]; then
-            echo '{"error":"G5_PREVIEW_EVIDENCE_ENV_MISSING"}' >&2
+            echo '{"error":"PREVIEW_EVIDENCE_ENV_MISSING"}' >&2
             exit 1
           fi
           if [ -z "$ANTIVIRUS_SCANNER_ENDPOINT" ] || \
              [ -z "$ANTIVIRUS_SCANNER_KEY_ID" ] || \
              [ -z "$ANTIVIRUS_SCANNER_HMAC_KEY" ] || \
              [ -z "$ANTIVIRUS_SCANNER_TIMEOUT_MS" ]; then
-            echo '{"error":"G5_PREVIEW_ANTIVIRUS_AUTHORITY_MISSING"}' >&2
+            echo '{"error":"PREVIEW_ANTIVIRUS_AUTHORITY_MISSING"}' >&2
             exit 1
           fi
           PROVIDER_OUTBOX_TRIGGER_SECRET="$(openssl rand -base64 48 | tr -d '\n')"
@@ -108,16 +108,16 @@ jobs:
           pnpm provision:appwrite
           pnpm configure:appwrite:function:preview
           pnpm deploy:appwrite:function:preview
-          case "$G5_EVIDENCE_SCOPE" in
-            full) pnpm verify:e2e:g5 ;;
-            attachments) pnpm verify:appwrite:g2:attachments ;;
+          case "$ACCEPTANCE_SCOPE" in
+            full) pnpm verify:acceptance:full ;;
+            attachments) pnpm verify:appwrite:attachments ;;
             providers)
-              pnpm verify:providers:g4:message-sync:github
-              pnpm verify:providers:g4:message-sync:gitlab
+              pnpm verify:providers:message-sync:github
+              pnpm verify:providers:message-sync:gitlab
               ;;
-            reconciliation) pnpm verify:providers:g4:reconciliation ;;
-            state-sync) pnpm verify:providers:g4:state-sync ;;
-            recovery) pnpm verify:recovery:g5 ;;
-            slo) pnpm verify:slo:g5 ;;
-            *) echo '{"error":"G5_EVIDENCE_SCOPE_INVALID"}' >&2; exit 1 ;;
+            reconciliation) pnpm verify:providers:reconciliation ;;
+            state-sync) pnpm verify:providers:state-sync ;;
+            recovery) pnpm verify:recovery:preview ;;
+            slo) pnpm verify:slo:preview ;;
+            *) echo '{"error":"ACCEPTANCE_SCOPE_INVALID"}' >&2; exit 1 ;;
           esac

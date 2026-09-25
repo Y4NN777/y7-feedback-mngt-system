@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createNodeAppwriteG1FixtureStore } from "./appwrite-g1-fixtures-node";
+import { createNodeAppwriteG1FixtureStore } from "./intake-fixture-store";
 
 function client() {
   return {

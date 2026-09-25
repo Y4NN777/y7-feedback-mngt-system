@@ -8,7 +8,7 @@ import { createHttpApplication } from "./application.js";
 import {
   appwriteG1SyntheticRows,
   type AppwriteG1MatrixIds,
-} from "./appwrite-g1-matrix.js";
+} from "./intake-evidence.js";
 import { createNodeAppwritePrivacyCleanup } from "./appwrite-privacy-cleanup.js";
 import { createNodeAppwritePrivacyPurgeRepository } from "./appwrite-privacy-purge-repository.js";
 import { createNodeAppwriteProviderIssueStateStore } from "./appwrite-provider-issue-state-store.js";

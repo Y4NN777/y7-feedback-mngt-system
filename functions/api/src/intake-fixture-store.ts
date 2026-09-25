@@ -1,4 +1,4 @@
-import type { G1FixtureStore } from "./appwrite-g1-fixtures.js";
+import type { G1FixtureStore } from "./intake-fixtures.js";
 
 interface TablesFixtureClient {
   getRow(input: {

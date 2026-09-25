@@ -2,7 +2,7 @@
 
 Task: `TASK-REC-001`  
 Requirements: `NFR-REC-001`, `NFR-REC-002`, `NFR-REC-003`, `ADR-009`  
-Command: `pnpm verify:recovery:g5`
+Command: `pnpm verify:recovery:preview`
 
 ## Automated coverage
 

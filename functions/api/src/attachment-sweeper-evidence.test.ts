@@ -6,7 +6,7 @@ import type { PrivateAttachmentStorage } from "./attachment-saga";
 import {
   runAppwriteG2SweeperMatrix,
   type AppwriteG2SweeperArtifacts,
-} from "./appwrite-g2-sweeper-matrix";
+} from "./attachment-sweeper-evidence";
 import type { AttachmentSaga } from "./attachment-saga";
 
 const schema = {

@@ -23,7 +23,7 @@ composed scenario because they were produced from independent fixtures.
 
 ## Composed scenario contract
 
-`pnpm verify:appwrite:g3:composed -- --state-file=<temporary-state-file>` must
+`pnpm verify:appwrite:team-workflows -- --state-file=<temporary-state-file>` must
 return `APPWRITE_G3_COMPOSED_PASSED` for one `g3c_*` fixture after proving all
 nine Goal steps:
 

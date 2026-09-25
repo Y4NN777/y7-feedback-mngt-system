@@ -10,12 +10,12 @@ import { createNodeAppwriteAttachmentLifecycleStore } from "./appwrite-attachmen
 import {
   runAppwriteG2AttachmentMatrix,
   type AppwriteG2DeployedAttachmentFixture,
-} from "./appwrite-g2-attachment-matrix.js";
-import { runAppwriteG2SweeperMatrix } from "./appwrite-g2-sweeper-matrix.js";
+} from "./attachment-evidence.js";
+import { runAppwriteG2SweeperMatrix } from "./attachment-sweeper-evidence.js";
 import {
   appwriteG1SyntheticRows,
   type AppwriteG1MatrixIds,
-} from "./appwrite-g1-matrix.js";
+} from "./intake-evidence.js";
 import { createNodeAppwritePrivateAttachmentStorage } from "./appwrite-private-attachment-storage.js";
 import { createAttachmentDownload } from "./attachment-download.js";
 import { createAttachmentLifecycleCoordinator } from "./attachment-lifecycle.js";
