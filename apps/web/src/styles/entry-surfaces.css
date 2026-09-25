@@ -1,0 +1,196 @@
+.intent-status {
+  align-self: center;
+  justify-self: end;
+  max-width: 18rem;
+  color: var(--color-text-primary);
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: right;
+}
+
+[data-visual-anchor="organic"].entry-surface {
+  width: min(100% - (2 * var(--space-page-inline)), 88rem);
+  min-height: 100vh;
+  margin-inline: auto;
+  padding: 1rem 0 5rem;
+  color: var(--color-text-primary);
+}
+
+[data-visual-anchor="organic"].entry-surface .masthead {
+  margin-bottom: 0;
+}
+
+[data-visual-anchor="organic"].entry-surface .back-link {
+  color: var(--color-text-primary);
+}
+
+[data-visual-anchor="organic"].entry-surface .introduction,
+[data-visual-anchor="organic"].entry-surface .retrieve-shell {
+  display: block;
+  max-width: 72rem;
+  border: 0;
+  padding: clamp(2.25rem, 6vw, 5rem) 0 clamp(1.75rem, 4vw, 3rem);
+}
+
+[data-visual-anchor="organic"].entry-surface .introduction h1,
+[data-visual-anchor="organic"].entry-surface .retrieve-shell h1 {
+  max-width: 12ch;
+  margin-bottom: 1rem;
+  font-family: var(--font-display);
+  font-size: clamp(3rem, 7vw, 6.5rem);
+  font-variation-settings:
+    "SOFT" 80,
+    "WONK" 1;
+  font-weight: 590;
+  line-height: 0.92;
+  letter-spacing: -0.05em;
+  overflow-wrap: normal;
+}
+
+[data-visual-anchor="organic"].entry-surface .introduction .lede,
+[data-visual-anchor="organic"].entry-surface .retrieve-shell > p {
+  max-width: 46rem;
+  color: var(--color-text-muted);
+}
+
+[data-visual-anchor="organic"].entry-surface .retrieve-shell::before {
+  position: static;
+  display: inline-flex;
+  width: max-content;
+  margin-bottom: 1.25rem;
+  border-radius: var(--radius-control);
+  padding: 0.4rem 0.7rem;
+  color: var(--color-text-inverse);
+  background: var(--color-action-primary);
+  content: attr(data-step);
+  font-family: var(--font-interface);
+  font-size: 0.875rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
+[data-visual-anchor="organic"].entry-surface .administration-form,
+[data-visual-anchor="organic"].entry-surface .retrieve-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  max-width: 64rem;
+  margin: 0;
+  border: 0;
+  border-radius: var(--radius-panel);
+  padding: clamp(1rem, 3vw, 2rem);
+  background: var(--color-surface-raised);
+}
+
+[data-visual-anchor="organic"].entry-surface .administration-form label,
+[data-visual-anchor="organic"].entry-surface .retrieve-form .field {
+  padding: 0;
+  background: transparent;
+}
+
+[data-visual-anchor="organic"].entry-surface .administration-form input,
+[data-visual-anchor="organic"].entry-surface .administration-form textarea,
+[data-visual-anchor="organic"].entry-surface .administration-form select,
+[data-visual-anchor="organic"].entry-surface .retrieve-form input,
+[data-visual-anchor="organic"].entry-surface .retrieve-form textarea {
+  min-height: 3.25rem;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-control);
+  padding: 0.85rem 1rem;
+  color: var(--color-text-primary);
+  background: var(--color-surface-canvas);
+}
+
+[data-visual-anchor="organic"].entry-surface .administration-form button,
+[data-visual-anchor="organic"].entry-surface .primary-action,
+[data-visual-anchor="organic"].entry-surface .primary-link,
+[data-visual-anchor="organic"].entry-surface .secondary-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 3.25rem;
+  border: 1px solid var(--color-action-primary);
+  border-radius: var(--radius-control);
+  padding: 0.8rem 1.25rem;
+  color: var(--color-text-inverse);
+  background: var(--color-action-primary);
+  font-weight: 700;
+  text-decoration: none;
+  transition:
+    background var(--motion-gentle) var(--ease-organic),
+    transform var(--motion-gentle) var(--ease-organic);
+}
+
+[data-visual-anchor="organic"].entry-surface .administration-form button:hover,
+[data-visual-anchor="organic"].entry-surface .primary-action:hover,
+[data-visual-anchor="organic"].entry-surface .primary-link:hover {
+  background: var(--color-action-primary-hover);
+  transform: translateY(-1px);
+}
+
+[data-visual-anchor="organic"].entry-surface .secondary-link {
+  color: var(--color-text-primary);
+  background: transparent;
+}
+
+[data-visual-anchor="organic"].entry-surface .retrieve-form .form-error,
+[data-visual-anchor="organic"].entry-surface .retrieve-form .primary-action {
+  grid-column: 1 / -1;
+}
+
+[data-visual-anchor="organic"].entry-surface .retrieve-form .primary-action {
+  justify-self: end;
+  margin: 0.25rem 0 0;
+}
+
+.entry-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-control);
+  margin-top: 2rem;
+}
+
+[data-visual-anchor="organic"].entry-surface-team .introduction {
+  padding-bottom: 1.5rem;
+}
+
+[data-visual-anchor="organic"].entry-surface-team .introduction h1 {
+  font-size: clamp(2.75rem, 6vw, 5.5rem);
+}
+
+@media (max-width: 46rem) {
+  .intent-status {
+    grid-column: 2;
+    justify-self: start;
+    text-align: left;
+  }
+
+  [data-visual-anchor="organic"].entry-surface .introduction,
+  [data-visual-anchor="organic"].entry-surface .retrieve-shell {
+    padding-top: 2.5rem;
+  }
+
+  [data-visual-anchor="organic"].entry-surface .administration-form,
+  [data-visual-anchor="organic"].entry-surface .retrieve-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  [data-visual-anchor="organic"].entry-surface .retrieve-form .form-error,
+  [data-visual-anchor="organic"].entry-surface .retrieve-form .primary-action {
+    grid-column: 1;
+  }
+}
+
+@media (max-width: 25rem) {
+  [data-visual-anchor="organic"].entry-surface .intake-header {
+    flex-wrap: wrap;
+  }
+
+  [data-visual-anchor="organic"].entry-surface .intake-header .back-link {
+    order: 3;
+    width: 100%;
+    margin: 0;
+    padding: 0.25rem 0 0.5rem;
+  }
+}

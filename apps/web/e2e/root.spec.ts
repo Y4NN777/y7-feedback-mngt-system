@@ -307,14 +307,32 @@ test("UC-01/ERR-001/BDD-PROJ-003 keeps unavailable Project routes neutral in FR/
 }) => {
   await page.goto("/unknown-project");
 
+  await expect(page.getByRole("main")).toHaveAttribute("data-visual-anchor", "organic");
   await expect(
     page.getByRole("heading", { name: "Ce projet n’est pas disponible" }),
   ).toBeVisible();
   await expect(page.getByText(/unknown-project/iu)).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Retour à l’accueil" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Retrouver un avis" })).toBeVisible();
   await page.getByRole("button", { name: "English" }).click();
   await expect(
     page.getByRole("heading", { name: "This project is unavailable" }),
   ).toBeVisible();
+  await expect(page.getByRole("link", { name: "Back to Home" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Retrieve feedback" })).toBeVisible();
+});
+
+test("BDD-UX-ENTRY-001 presents unavailable intake as guidance rather than an action", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  const unavailable = page.getByText("Lien du produit requis", { exact: true });
+  await expect(unavailable).toBeVisible();
+  await expect(unavailable).not.toHaveRole("link");
+  await expect(unavailable).not.toHaveRole("button");
+  await expect(unavailable).toHaveCSS("border-top-width", "0px");
+  await expect(unavailable).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
 });
 
 test("BDD-UX-INTAKE-001 is accessible without overflow at 320 px", async ({ page }) => {
@@ -363,7 +381,7 @@ test("UC-04/BDD-ACC-UX-001 preserves private retrieval input and fails honestly 
 }) => {
   await page.goto("/retrieve");
 
-  await expect(page.getByRole("main")).toHaveAttribute("data-visual-anchor", "swiss");
+  await expect(page.getByRole("main")).toHaveAttribute("data-visual-anchor", "organic");
   await expect(
     page.getByRole("region", { name: "Retrouver un retour" }),
   ).toHaveAttribute("data-step", "01");
@@ -668,6 +686,67 @@ test("UC-07/BDD-ADMIN-001 administration sign-in preserves input and is accessib
       () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
     ),
   ).toBe(false);
+});
+
+test("BDD-UX-ENTRY-002 keeps protected-route context and sign-in action in the operational viewport", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 768, height: 768 });
+
+  await page.goto("/retrieve");
+  await expect(
+    page.getByRole("heading", { name: "Retrouver un retour" }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Référence")).toBeInViewport();
+  await expect(
+    page.getByRole("button", { name: "Retrouver le retour" }),
+  ).toBeInViewport();
+
+  for (const route of [
+    { path: "/manage", heading: "Administration des projets" },
+    { path: "/manage/sources", heading: "Sources du projet" },
+    { path: "/workbench", heading: "Boîte de traitement" },
+    { path: "/intelligence", heading: "Intelligence" },
+    { path: "/platform/access", heading: "Accès exceptionnel" },
+  ]) {
+    await page.goto(route.path);
+    await expect(page.getByRole("main")).toHaveAttribute(
+      "data-visual-anchor",
+      "organic",
+    );
+    await expect(page.getByRole("heading", { name: route.heading })).toBeVisible();
+    await expect(page.getByLabel("Adresse e-mail")).toBeInViewport();
+    await expect(page.getByRole("button", { name: "Se connecter" })).toBeInViewport();
+  }
+});
+
+test("BDD-UX-ENTRY-003 keeps entry surfaces accessible without overflow at target widths", async ({
+  page,
+}) => {
+  for (const viewport of [
+    { width: 375, height: 812 },
+    { width: 768, height: 1024 },
+    { width: 1280, height: 720 },
+  ]) {
+    await page.setViewportSize(viewport);
+    for (const path of ["/", "/retrieve", "/manage", "/unknown-project"]) {
+      await page.goto(path);
+      const accessibility = await new AxeBuilder({ page })
+        .withTags(["wcag2a", "wcag2aa"])
+        .analyze();
+      expect(
+        accessibility.violations.filter(
+          ({ impact }) => impact === "serious" || impact === "critical",
+        ),
+      ).toEqual([]);
+      expect(
+        await page.evaluate(
+          () =>
+            document.documentElement.scrollWidth > document.documentElement.clientWidth,
+        ),
+      ).toBe(false);
+    }
+  }
 });
 
 test("UC-08/UC-09/BDD-WORK-001/BDD-NOT-WEB-001 Workbench detail and notifications are keyboard-complete at 320 px", async ({

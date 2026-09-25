@@ -183,7 +183,7 @@ describe("accountless access experience", () => {
     );
     renderApp(<App accountlessGateway={{ retrieve }} />);
 
-    expect(screen.getByRole("main")).toHaveAttribute("data-visual-anchor", "swiss");
+    expect(screen.getByRole("main")).toHaveAttribute("data-visual-anchor", "organic");
     expect(screen.getByRole("region", { name: "Retrouver un retour" })).toHaveAttribute(
       "data-step",
       "01",

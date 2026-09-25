@@ -190,7 +190,10 @@ export function RetrieveFeedback({
   }
 
   return (
-    <main className="intake-page retrieve-page" data-visual-anchor="swiss">
+    <main
+      className="intake-page retrieve-page entry-surface"
+      data-visual-anchor="organic"
+    >
       <header className="masthead intake-header">
         <a className="brand" href="/" aria-label={copy.brandLabel}>
           Y7

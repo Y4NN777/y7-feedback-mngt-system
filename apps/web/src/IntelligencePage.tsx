@@ -193,7 +193,10 @@ export function IntelligencePage({
   );
 
   return (
-    <main className="root-page intelligence-page">
+    <main
+      className="root-page intelligence-page entry-surface entry-surface-team"
+      data-visual-anchor="organic"
+    >
       <header className="masthead">
         <a className="brand" href="/" aria-label="Y7 Feedback">
           Y7
