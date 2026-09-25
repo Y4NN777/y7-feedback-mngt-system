@@ -55,6 +55,13 @@ The `TASK-UX-002` baseline renders are stored outside Git under
 `~/.gstack/projects/Y4NN777-y7-feedback-mngt-system/designs/milestone-a/task-ux-002/`.
 All three inspected widths reported zero horizontal overflow and no browser console errors.
 
+The `TASK-UX-003` Home, Retrieve, team sign-in, and unavailable-Project renders are
+stored under
+`~/.gstack/projects/Y4NN777-y7-feedback-mngt-system/designs/milestone-a/task-ux-003/`.
+All twelve route/viewport combinations reported zero horizontal overflow. The
+Playwright matrix additionally checks WCAG A/AA serious and critical violations,
+FR/EN continuity, protected-route context, and first-screen action visibility.
+
 ## Content rules
 
 - Standard actions keep standard labels.

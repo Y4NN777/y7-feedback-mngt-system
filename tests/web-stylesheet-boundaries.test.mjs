@@ -15,6 +15,7 @@ test("web styles keep an explicit product-boundary cascade", async () => {
       '@import "./styles/team-shell.css";',
       '@import "./styles/reporter-features.css";',
       '@import "./styles/source-management.css";',
+      '@import "./styles/entry-surfaces.css";',
       "",
     ].join("\n"),
   );
@@ -26,6 +27,7 @@ test("web styles keep an explicit product-boundary cascade", async () => {
       "team-shell.css",
       "reporter-features.css",
       "source-management.css",
+      "entry-surfaces.css",
     ].map((name) => readFile(new URL(`apps/web/src/styles/${name}`, root), "utf8")),
   );
   assert.equal(styles.join("\n").match(/:root\s*\{/gu)?.length, 1);

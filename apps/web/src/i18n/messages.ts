@@ -19,6 +19,8 @@ interface RootMessages {
   readonly projectLoading: string;
   readonly projectUnavailable: string;
   readonly projectUnavailableHint: string;
+  readonly projectUnavailableHome: string;
+  readonly projectUnavailableRetrieve: string;
 }
 
 export const messages = {
@@ -30,6 +32,8 @@ export const messages = {
     projectUnavailable: "Ce projet n’est pas disponible",
     projectUnavailableHint:
       "Vérifiez le lien transmis par l’équipe du produit ou revenez à l’accueil.",
+    projectUnavailableHome: "Retour à l’accueil",
+    projectUnavailableRetrieve: "Retrouver un avis",
     intro:
       "Utilisez le lien transmis par l’équipe du produit pour envoyer un retour, ou retrouvez un retour déjà envoyé.",
     languageLabel: "Langue",
@@ -66,6 +70,8 @@ export const messages = {
     projectUnavailable: "This project is unavailable",
     projectUnavailableHint:
       "Check the link shared by the product team or return to the home page.",
+    projectUnavailableHome: "Back to Home",
+    projectUnavailableRetrieve: "Retrieve feedback",
     intro:
       "Use the link shared by the product team to send feedback, or return to feedback you already submitted.",
     languageLabel: "Language",

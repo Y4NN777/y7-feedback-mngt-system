@@ -188,11 +188,6 @@
   text-decoration: none;
 }
 
-.intent-action-disabled {
-  color: #55555c;
-  background: #f7f7f8;
-}
-
 .intake-form {
   display: grid;
   grid-template-columns: minmax(4rem, 0.5fr) minmax(0, 3fr) minmax(12rem, 1fr);

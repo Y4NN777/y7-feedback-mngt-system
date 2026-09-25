@@ -27,7 +27,7 @@ Make Y7 Feedback feel like one finished product and reduce the concentrated stru
 | Order | Task | Priority | Outcome | Depends on | Validation |
 |---:|---|---|---|---|---|
 | 1 | `TASK-UX-002` | P1 | Document the current visual tokens and approve one product shell with public and operational density variants | none | `DONE` — BDD matrix, semantic tokens, Organic direction, green accessibility/token contract, and rendered 375/768/1280 evidence |
-| 2 | `TASK-UX-003` | P1 | Apply the shared shell to Home, Retrieve, sign-in, and invalid-project recovery | UX-002 | Playwright visual/semantic assertions; no horizontal loss; first action visible at 768 px height |
+| 2 | `TASK-UX-003` | P1 | Apply the shared shell to Home, Retrieve, sign-in, and invalid-project recovery | UX-002 | `DONE` — shared Organic shell, explicit recovery, guidance state, route context, FR/EN continuity, accessibility and 375/768/1280 evidence |
 | 3 | `TASK-UX-004` | P1 | Redesign the complete Reporter journey from project entry through intake, success, retrieval, and conversation | UX-003 | UC Reporter matrix in FR/EN, desktop/320 px, offline/retry/error states |
 | 4 | `TASK-ARCH-001` | P1 | Decompose API composition by stable capabilities while keeping one Appwrite Function | none | composition contract tests; all route registries exhaustive; API coverage and Preview smoke unchanged |
 | 5 | `TASK-ARCH-002` | P1 | Split `FeedbackIntake` by form, attachments, offline/replay, and accepted-result ownership | UX-002 | component tests per state owner; intake E2E and accessibility gates unchanged |

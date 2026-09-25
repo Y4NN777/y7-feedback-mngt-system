@@ -158,32 +158,48 @@ function ProjectRoute({
   }
   if (!query.data || query.data.status === "unavailable") {
     return (
-      <main className="root-page" data-visual-anchor="organic">
-        <fieldset className="language-switcher">
-          <legend>{copy.languageLabel}</legend>
-          <button
-            type="button"
-            aria-pressed={locale === "fr"}
-            onClick={() => {
-              onLocaleChange("fr");
-            }}
-          >
-            Français
-          </button>
-          <button
-            type="button"
-            aria-pressed={locale === "en"}
-            onClick={() => {
-              onLocaleChange("en");
-            }}
-          >
-            English
-          </button>
-        </fieldset>
+      <main
+        className="root-page entry-surface unavailable-project-page"
+        data-visual-anchor="organic"
+      >
+        <header className="masthead">
+          <a className="brand" href="/" aria-label={copy.brandLabel}>
+            Y7
+          </a>
+          <fieldset className="language-switcher">
+            <legend>{copy.languageLabel}</legend>
+            <button
+              type="button"
+              aria-pressed={locale === "fr"}
+              onClick={() => {
+                onLocaleChange("fr");
+              }}
+            >
+              Français
+            </button>
+            <button
+              type="button"
+              aria-pressed={locale === "en"}
+              onClick={() => {
+                onLocaleChange("en");
+              }}
+            >
+              English
+            </button>
+          </fieldset>
+        </header>
         <section className="introduction" aria-labelledby="project-unavailable-title">
+          <p className="eyebrow">Y7 Feedback</p>
           <h1 id="project-unavailable-title">{copy.projectUnavailable}</h1>
-          <p>{copy.projectUnavailableHint}</p>
-          <a href="/">{copy.brandLabel}</a>
+          <p className="lede">{copy.projectUnavailableHint}</p>
+          <div className="entry-actions">
+            <a className="primary-link" href="/">
+              {copy.projectUnavailableHome}
+            </a>
+            <a className="secondary-link" href="/retrieve">
+              {copy.projectUnavailableRetrieve}
+            </a>
+          </div>
         </section>
       </main>
     );
@@ -388,9 +404,7 @@ export function App({
                 {intent.action}
               </a>
             ) : (
-              <span className="intent-action intent-action-disabled">
-                {intent.action}
-              </span>
+              <span className="intent-status">{intent.action}</span>
             )}
           </article>
         ))}

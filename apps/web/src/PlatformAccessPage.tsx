@@ -102,7 +102,10 @@ export function PlatformAccessPage({
     : undefined;
 
   return (
-    <main className="root-page administration-page">
+    <main
+      className="root-page administration-page entry-surface entry-surface-team"
+      data-visual-anchor="organic"
+    >
       <header className="masthead">
         <a className="brand" href="/" aria-label="Y7 Feedback">
           Y7
