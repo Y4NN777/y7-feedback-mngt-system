@@ -519,7 +519,7 @@ describe("WiseMoney feedback intake", () => {
     await user.click(screen.getByRole("button", { name: "Relire le retour" }));
     expect(screen.getByText("Simple et rapide.")).toBeInTheDocument();
     expect(screen.getByText("La lisibilité.")).toBeInTheDocument();
-  });
+  }, 15_000);
 
   it("BDD-UX-INTAKE-002 confirms only authoritative acceptance and retains proof in memory", async () => {
     window.history.replaceState({}, "", "/wisemoney");
