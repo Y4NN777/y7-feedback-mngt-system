@@ -21,6 +21,12 @@ import type { ProviderWebhookHttpResponse } from "./provider-webhook-http.js";
 import type { SourceConnectionHttp } from "./source-connection-http.js";
 import type { WorkbenchHttp } from "./workbench-http.js";
 import type { AbuseGateOutcome, AbuseRequest, AbuseReservation } from "./abuse.js";
+import { composeHttpRouteRegistry } from "./http-route-composition.js";
+import {
+  dispatchHttpRouteRegistry,
+  emitHttpRouteResponse,
+  type HttpRouteRequest,
+} from "./http-route-registry.js";
 
 export interface FunctionRequest {
   readonly method: string;
@@ -240,257 +246,31 @@ export async function routeRequest(
           };
         })
     : null;
-  const providerWebhookResponse =
-    isHealth || isIngressProbe || isProviderMaintenance
-      ? null
-      : await dependencies.providerWebhook?.handle({
-          method,
-          path: req.path,
-          headers: requestHeaders,
-          ...(req.bodyBinary === undefined ? {} : { body: req.bodyBinary }),
-        });
-  const providerMaintenanceHttpResponse =
-    isHealth || isIngressProbe || isProviderMaintenance || providerWebhookResponse
-      ? null
-      : await dependencies.providerMaintenanceHttp?.handle({
-          method,
-          path: req.path,
-          headers: requestHeaders,
-          body:
-            method === "POST" && !contentType.startsWith("multipart/form-data")
-              ? req.bodyJson
-              : undefined,
-        });
-  const providerOutboxResponse =
-    isHealth ||
-    isIngressProbe ||
-    maintenanceResponse ||
-    providerWebhookResponse ||
-    providerMaintenanceHttpResponse
-      ? null
-      : await dependencies.providerEventInbox?.handle({
-          method,
-          path: req.path,
-          headers: requestHeaders,
-          body:
-            method === "POST" && !contentType.startsWith("multipart/form-data")
-              ? req.bodyJson
-              : undefined,
-        });
-  const providerIssueOutboxResponse =
-    isHealth ||
-    isIngressProbe ||
-    maintenanceResponse ||
-    providerWebhookResponse ||
-    providerMaintenanceHttpResponse ||
-    providerOutboxResponse
-      ? null
-      : await dependencies.providerIssueOutbox?.handle({
-          method,
-          path: req.path,
-          headers: requestHeaders,
-          body:
-            method === "POST" && !contentType.startsWith("multipart/form-data")
-              ? req.bodyJson
-              : undefined,
-        });
-  const sourceResponse =
-    isHealth ||
-    isIngressProbe ||
-    maintenanceResponse ||
-    providerWebhookResponse ||
-    providerMaintenanceHttpResponse ||
-    providerOutboxResponse ||
-    providerIssueOutboxResponse
-      ? null
-      : await dependencies.sourceConnections?.handle({
-          method,
-          path: req.path,
-          headers: requestHeaders,
-          query: req.query ?? {},
-          body:
-            method === "POST" && !contentType.startsWith("multipart/form-data")
-              ? req.bodyJson
-              : undefined,
-        });
-  const administrationResponse =
-    isHealth ||
-    isIngressProbe ||
-    maintenanceResponse ||
-    providerWebhookResponse ||
-    providerMaintenanceHttpResponse ||
-    providerOutboxResponse ||
-    providerIssueOutboxResponse ||
-    sourceResponse
-      ? null
-      : await dependencies.projectAdministration?.handle({
-          method,
-          path: req.path,
-          headers: requestHeaders,
-          body:
-            method === "POST" && !contentType.startsWith("multipart/form-data")
-              ? req.bodyJson
-              : undefined,
-        });
-  const platformAccessResponse =
-    isHealth ||
-    isIngressProbe ||
-    maintenanceResponse ||
-    providerWebhookResponse ||
-    providerOutboxResponse ||
-    providerIssueOutboxResponse ||
-    sourceResponse ||
-    administrationResponse
-      ? null
-      : await dependencies.platformAccess?.handle({
-          method,
-          path: req.path,
-          headers: requestHeaders,
-          body:
-            method === "POST" && !contentType.startsWith("multipart/form-data")
-              ? req.bodyJson
-              : undefined,
-        });
-  const conversationResponse =
-    isHealth ||
-    isIngressProbe ||
-    maintenanceResponse ||
-    providerWebhookResponse ||
-    providerMaintenanceHttpResponse ||
-    providerOutboxResponse ||
-    sourceResponse ||
-    administrationResponse ||
-    platformAccessResponse
-      ? null
-      : await dependencies.conversationLifecycle?.handle({
-          method,
-          path: req.path,
-          headers: requestHeaders,
-          body:
-            method === "POST" && !contentType.startsWith("multipart/form-data")
-              ? req.bodyJson
-              : undefined,
-        });
-  const workbenchResponse =
-    isHealth ||
-    isIngressProbe ||
-    maintenanceResponse ||
-    providerWebhookResponse ||
-    providerMaintenanceHttpResponse ||
-    providerOutboxResponse ||
-    sourceResponse ||
-    administrationResponse ||
-    platformAccessResponse ||
-    conversationResponse
-      ? null
-      : await dependencies.workbench?.handle({
-          method,
-          path: req.path,
-          headers: requestHeaders,
-          query: req.query ?? {},
-          body:
-            method === "POST" && !contentType.startsWith("multipart/form-data")
-              ? req.bodyJson
-              : undefined,
-        });
-  const externalIssueResponse =
-    isHealth ||
-    isIngressProbe ||
-    maintenanceResponse ||
-    providerWebhookResponse ||
-    providerOutboxResponse ||
-    sourceResponse ||
-    administrationResponse ||
-    platformAccessResponse ||
-    conversationResponse ||
-    workbenchResponse
-      ? null
-      : await dependencies.externalIssue?.handle({
-          method,
-          path: req.path,
-          headers: requestHeaders,
-          body:
-            method === "POST" && !contentType.startsWith("multipart/form-data")
-              ? req.bodyJson
-              : undefined,
-        });
-  const intelligenceResponse =
-    isHealth ||
-    isIngressProbe ||
-    maintenanceResponse ||
-    providerWebhookResponse ||
-    providerOutboxResponse ||
-    sourceResponse ||
-    administrationResponse ||
-    platformAccessResponse ||
-    conversationResponse ||
-    workbenchResponse ||
-    externalIssueResponse
-      ? null
-      : await dependencies.intelligence?.handle({
-          method,
-          path: req.path,
-          headers: requestHeaders,
-          body:
-            method === "POST" && !contentType.startsWith("multipart/form-data")
-              ? req.bodyJson
-              : undefined,
-        });
-  const privacyResponse =
-    isHealth ||
-    isIngressProbe ||
-    maintenanceResponse ||
-    providerWebhookResponse ||
-    providerOutboxResponse ||
-    sourceResponse ||
-    administrationResponse ||
-    platformAccessResponse ||
-    conversationResponse ||
-    workbenchResponse ||
-    externalIssueResponse ||
-    intelligenceResponse
-      ? null
-      : await dependencies.privacy?.handle({
-          method,
-          path: req.path,
-          headers: requestHeaders,
-          body:
-            method === "POST" && !contentType.startsWith("multipart/form-data")
-              ? req.bodyJson
-              : undefined,
-        });
-  const publicResponse =
-    isHealth ||
-    isIngressProbe ||
-    maintenanceResponse ||
-    providerWebhookResponse ||
-    providerOutboxResponse ||
-    providerIssueOutboxResponse
-      ? null
-      : sourceResponse ||
-          administrationResponse ||
-          platformAccessResponse ||
-          conversationResponse ||
-          workbenchResponse ||
-          externalIssueResponse ||
-          intelligenceResponse ||
-          privacyResponse
-        ? null
-        : await dependencies.publicApi?.handle({
-            method,
-            path: req.path,
-            headers: requestHeaders,
-            body:
-              method === "POST" && !contentType.startsWith("multipart/form-data")
-                ? req.bodyJson
-                : undefined,
-            ...(req.bodyBinary === undefined ? {} : { bodyBinary: req.bodyBinary }),
-          });
+  const routeRequest: HttpRouteRequest = {
+    method,
+    path: req.path,
+    headers: requestHeaders,
+    query: req.query ?? {},
+    ...(req.bodyBinary === undefined ? {} : { bodyBinary: req.bodyBinary }),
+  };
+  if (method === "POST" && !contentType.startsWith("multipart/form-data"))
+    Object.defineProperty(routeRequest, "body", {
+      enumerable: true,
+      get: () => req.bodyJson,
+    });
+  const routedResponse =
+    isHealth || isIngressProbe || isProviderMaintenance || maintenanceResponse
+      ? undefined
+      : await dispatchHttpRouteRegistry(
+          composeHttpRouteRegistry(dependencies),
+          routeRequest,
+        );
   if (abuseOutcome?.status === "allowed") {
     try {
       await dependencies.abuse?.settle(
         abuseOutcome.reservation,
-        publicResponse?.statusCode === 201,
+        routedResponse?.operation === "public_api" &&
+          routedResponse.response.statusCode === 201,
         new Date(dependencies.now()).toISOString(),
       );
     } catch {
@@ -512,19 +292,7 @@ export async function routeRequest(
     ? 200
     : (probeResponse?.statusCode ??
       maintenanceResponse?.statusCode ??
-      providerWebhookResponse?.statusCode ??
-      providerMaintenanceHttpResponse?.statusCode ??
-      providerOutboxResponse?.statusCode ??
-      providerIssueOutboxResponse?.statusCode ??
-      sourceResponse?.statusCode ??
-      administrationResponse?.statusCode ??
-      platformAccessResponse?.statusCode ??
-      conversationResponse?.statusCode ??
-      workbenchResponse?.statusCode ??
-      externalIssueResponse?.statusCode ??
-      intelligenceResponse?.statusCode ??
-      privacyResponse?.statusCode ??
-      publicResponse?.statusCode ??
+      routedResponse?.response.statusCode ??
       404);
   const operation = isHealth
     ? "health"
@@ -532,50 +300,10 @@ export async function routeRequest(
       ? "ingress_probe"
       : maintenanceResponse
         ? "provider_maintenance"
-        : providerWebhookResponse
-          ? "provider_webhook"
-          : providerMaintenanceHttpResponse
-            ? "provider_maintenance"
-            : providerOutboxResponse
-              ? "provider_event_inbox"
-              : providerIssueOutboxResponse
-                ? "provider_issue_outbox"
-                : sourceResponse
-                  ? "source_connection"
-                  : administrationResponse
-                    ? "project_administration"
-                    : platformAccessResponse
-                      ? "platform_access"
-                      : conversationResponse
-                        ? "conversation_lifecycle"
-                        : workbenchResponse
-                          ? "workbench"
-                          : externalIssueResponse
-                            ? "external_issue"
-                            : intelligenceResponse
-                              ? "intelligence"
-                              : privacyResponse
-                                ? "privacy"
-                                : publicResponse
-                                  ? "public_api"
-                                  : "unknown";
+        : (routedResponse?.operation ?? "unknown");
   const outcome = isHealth
     ? "success"
-    : (probeResponse ??
-        maintenanceResponse ??
-        providerWebhookResponse ??
-        providerMaintenanceHttpResponse ??
-        providerOutboxResponse ??
-        providerIssueOutboxResponse ??
-        sourceResponse ??
-        administrationResponse ??
-        platformAccessResponse ??
-        conversationResponse ??
-        workbenchResponse ??
-        externalIssueResponse ??
-        intelligenceResponse ??
-        privacyResponse ??
-        publicResponse)
+    : (probeResponse ?? maintenanceResponse ?? routedResponse?.response)
       ? statusCode < 400
         ? "success"
         : "rejected"
@@ -634,111 +362,8 @@ export async function routeRequest(
     );
   }
 
-  if (providerWebhookResponse) {
-    return res.json(
-      providerWebhookResponse.body,
-      providerWebhookResponse.statusCode,
-      responseHeaders,
-    );
-  }
-
-  if (providerMaintenanceHttpResponse) {
-    return res.json(
-      providerMaintenanceHttpResponse.body,
-      providerMaintenanceHttpResponse.statusCode,
-      headers,
-    );
-  }
-
-  if (providerOutboxResponse) {
-    return res.json(
-      providerOutboxResponse.body,
-      providerOutboxResponse.statusCode,
-      responseHeaders,
-    );
-  }
-
-  if (providerIssueOutboxResponse) {
-    return res.json(
-      providerIssueOutboxResponse.body,
-      providerIssueOutboxResponse.statusCode,
-      responseHeaders,
-    );
-  }
-
-  if (sourceResponse) {
-    return res.json(sourceResponse.body, sourceResponse.statusCode, responseHeaders);
-  }
-
-  if (administrationResponse) {
-    return res.json(
-      administrationResponse.body,
-      administrationResponse.statusCode,
-      responseHeaders,
-    );
-  }
-
-  if (platformAccessResponse) {
-    return res.json(
-      platformAccessResponse.body,
-      platformAccessResponse.statusCode,
-      responseHeaders,
-    );
-  }
-
-  if (conversationResponse) {
-    return res.json(
-      conversationResponse.body,
-      conversationResponse.statusCode,
-      responseHeaders,
-    );
-  }
-
-  if (workbenchResponse) {
-    return res.json(
-      workbenchResponse.body,
-      workbenchResponse.statusCode,
-      responseHeaders,
-    );
-  }
-
-  if (externalIssueResponse) {
-    return res.json(
-      externalIssueResponse.body,
-      externalIssueResponse.statusCode,
-      responseHeaders,
-    );
-  }
-
-  if (intelligenceResponse) {
-    return res.json(
-      intelligenceResponse.body,
-      intelligenceResponse.statusCode,
-      responseHeaders,
-    );
-  }
-
-  if (privacyResponse) {
-    return res.json(privacyResponse.body, privacyResponse.statusCode, responseHeaders);
-  }
-
-  if (publicResponse) {
-    if (publicResponse.binary) {
-      if (!res.binary) {
-        return res.json({ error: "ERR-ATTACHMENT-UNAVAILABLE" }, 503, responseHeaders);
-      }
-      return res.binary(
-        Buffer.from(publicResponse.binary.bytes),
-        publicResponse.statusCode,
-        {
-          ...responseHeaders,
-          "content-disposition": `attachment; filename*=UTF-8''${encodeURIComponent(publicResponse.binary.displayName)}`,
-          "content-length": String(publicResponse.binary.bytes.byteLength),
-          "content-type": publicResponse.binary.mediaType,
-        },
-      );
-    }
-    return res.json(publicResponse.body, publicResponse.statusCode, responseHeaders);
+  if (routedResponse) {
+    return emitHttpRouteResponse(res, routedResponse.response, responseHeaders);
   }
 
   return res.json({ error: "not_found" }, statusCode, responseHeaders);

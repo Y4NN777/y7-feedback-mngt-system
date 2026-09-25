@@ -69,12 +69,7 @@ import { createNodeAppwriteProviderMessageFanout } from "./appwrite-provider-mes
 import { createNodeAppwriteProviderConsentCleanup } from "./appwrite-provider-consent-cleanup.js";
 import { createNodeAppwriteReporterConsentVerifier } from "./appwrite-reporter-consent-verifier.js";
 import { createNodeAppwriteProviderGrantVault } from "./appwrite-provider-grant-vault.js";
-import { createNodeAppwriteSourceConnectionStore } from "./appwrite-source-connection-store.js";
 import { createNodeAppwriteActiveSourceGrantReader } from "./appwrite-active-source-grant-reader.js";
-import {
-  createAppwriteSourceProjectSlugPort,
-  createNodeAppwriteSourceManagementStore,
-} from "./appwrite-source-management-store.js";
 import type { HttpDependencies } from "./http.js";
 import { createIntakeCoordinator } from "./intake.js";
 import { createIntelligenceCoordinator } from "./intelligence.js";
@@ -88,8 +83,6 @@ import { createPrivacyPurgeWorker } from "./privacy-cleanup.js";
 import { createPrivacyProviderCleanup } from "./privacy-provider-cleanup.js";
 import { createConversationLifecycleCoordinator } from "./conversation-lifecycle.js";
 import { createConversationLifecycleHttp } from "./conversation-lifecycle-http.js";
-import { createGitHubSourceProvider } from "./github-source-provider.js";
-import { createGitLabSourceProvider } from "./gitlab-source-provider.js";
 import { createGitHubIssueProvider } from "./github-issue-provider.js";
 import { createGitLabIssueProvider } from "./gitlab-issue-provider.js";
 import { createAttachmentDownload } from "./attachment-download.js";
@@ -105,9 +98,7 @@ import { createProjectAdministration } from "./project-administration.js";
 import { createProjectAdministrationHttp } from "./project-administration-http.js";
 import { createReporterAttachmentDownload } from "./reporter-attachment-download.js";
 import { createSensitiveDataProtector } from "./sensitive-data-protector.js";
-import { createSourceConnectionCoordinator } from "./source-connection-coordinator.js";
-import { createSourceConnectionHttp } from "./source-connection-http.js";
-import { createSourceManagementCoordinator } from "./source-management.js";
+import { createProviderSourceHttp } from "./provider-source-composition.js";
 import {
   createWorkspaceAttachmentDownload,
   type AppwritePrincipalVerifier,
@@ -796,95 +787,13 @@ export function createHttpApplication(
   );
   /* v8 ignore start -- provider composition is exercised by real Preview OAuth */
   const sourceConnections = config.providers
-    ? (() => {
-        const vault = createNodeAppwriteProviderGrantVault(
-          runtime.tables,
-          {
-            databaseId: config.appwriteSchema.databaseId,
-            providerGrantsTableId: config.appwriteSchema.providerGrantsTableId,
-          },
-          Buffer.from(config.providerGrantEnvelopeKey, "base64url"),
-        );
-        const providers = [
-          createGitHubSourceProvider(
-            config.providers.github,
-            vault,
-            globalThis.fetch,
-            Date.now,
-            100,
-            (event) => runtime.providerDiagnostic?.({ provider: "github", ...event }),
-          ),
-          createGitLabSourceProvider(config.providers.gitlab, vault),
-        ] as const;
-        const webhookAuthority = createAppwriteProviderWebhookAuthorityStore(
-          runtime.tables,
-          {
-            databaseId: config.appwriteSchema.databaseId,
-            sourceConnectionsTableId: config.appwriteSchema.sourceConnectionsTableId,
-            providerGrantsTableId: config.appwriteSchema.providerGrantsTableId,
-          },
-          sensitive,
-        );
-        const webhookBase = (callbackUrl: string, provider: "github" | "gitlab") => {
-          const origin = new URL(callbackUrl).origin;
-          return `${origin}/providers/${provider}/webhooks/`;
-        };
-        return createSourceConnectionHttp(
-          createSourceConnectionCoordinator({
-            principalVerifier,
-            scopeResolver: workspaceScope,
-            store: createNodeAppwriteSourceConnectionStore(runtime.tables, {
-              databaseId: config.appwriteSchema.databaseId,
-              sourceConnectionsTableId: config.appwriteSchema.sourceConnectionsTableId,
-            }),
-            providers,
-            webhooks: createProviderWebhookProvisioner(
-              {
-                githubApiOrigin: "https://api.github.com/",
-                gitlabOrigin: config.providers.gitlab.origin,
-                callbackBaseUrls: {
-                  github: webhookBase(config.providers.github.callbackUrl, "github"),
-                  gitlab: webhookBase(config.providers.gitlab.callbackUrl, "gitlab"),
-                },
-              },
-              vault,
-              webhookAuthority,
-              () => randomBytes(32).toString("base64url"),
-            ),
-            createStateId: runtime.createId,
-            createNonce:
-              runtime.createProviderNonce ??
-              (() => randomBytes(24).toString("base64url")),
-            digestNonce:
-              runtime.digestProviderNonce ??
-              ((nonce) => createHash("sha256").update(nonce).digest("base64url")),
-            now: runtime.nowMs,
-            nowIso: runtime.nowIso,
-            ttlMs: 5 * 60 * 1_000,
-          }),
-          {
-            github: config.providers.github.callbackUrl,
-            gitlab: config.providers.gitlab.callbackUrl,
-          },
-          createSourceManagementCoordinator({
-            principalVerifier,
-            scopeResolver: workspaceScope,
-            store: createNodeAppwriteSourceManagementStore(runtime.tables, {
-              databaseId: config.appwriteSchema.databaseId,
-              sourceConnectionsTableId: config.appwriteSchema.sourceConnectionsTableId,
-            }),
-            providers,
-            projectSlug: createAppwriteSourceProjectSlugPort(
-              (input) => runtime.tables.getRow(input),
-              {
-                databaseId: config.appwriteSchema.databaseId,
-                projectsTableId: config.appwriteSchema.projectsTableId,
-              },
-            ),
-            nowIso: runtime.nowIso,
-          }),
-        );
-      })()
+    ? createProviderSourceHttp({
+        config: { ...config, providers: config.providers },
+        runtime,
+        principalVerifier,
+        scopeResolver: workspaceScope,
+        sensitive,
+      })
     : undefined;
   const providerIssueOutboxWorker =
     config.providers && config.providerOutboxTriggerSecret
