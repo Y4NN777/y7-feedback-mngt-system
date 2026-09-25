@@ -86,6 +86,13 @@ test("BDD-UX-001 has no serious accessibility issue or horizontal overflow", asy
       radius: brand.borderRadius,
       surface: root.backgroundColor,
       typeface: root.fontFamily,
+      semanticTokens: {
+        action: root.getPropertyValue("--color-action-primary").trim(),
+        canvas: root.getPropertyValue("--color-surface-canvas").trim(),
+        focus: root.getPropertyValue("--color-focus-ring").trim(),
+        radius: root.getPropertyValue("--radius-panel").trim(),
+        spacing: root.getPropertyValue("--space-page-inline").trim(),
+      },
     };
   });
   expect(visualTokens).toEqual({
@@ -93,6 +100,13 @@ test("BDD-UX-001 has no serious accessibility issue or horizontal overflow", asy
     radius: "50%",
     surface: "rgb(232, 220, 199)",
     typeface: '"Epilogue Variable", sans-serif',
+    semanticTokens: {
+      action: "#4f5a2e",
+      canvas: "#e8dcc7",
+      focus: "#606c38",
+      radius: "2rem",
+      spacing: "clamp(.625rem, 2vw, 1rem)",
+    },
   });
 
   const accessibility = await new AxeBuilder({ page })
