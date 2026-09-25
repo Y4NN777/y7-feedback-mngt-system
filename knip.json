@@ -1,0 +1,35 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "include": ["files", "dependencies", "unlisted", "binaries", "exports"],
+  "workspaces": {
+    ".": {
+      "entry": ["scripts/*.mjs", "tests/*.test.mjs"],
+      "project": ["scripts/**/*.mjs", "tests/**/*.mjs", "*.js"]
+    },
+    "apps/web": {
+      "entry": ["e2e/**/*.ts", "playwright.deployed.config.ts"],
+      "project": ["src/**/*.{ts,tsx}", "e2e/**/*.ts", "*.ts"]
+    },
+    "functions/api": {
+      "entry": [
+        "src/main.ts",
+        "src/configure-*.ts",
+        "src/deploy-*.ts",
+        "src/provision-*.ts",
+        "src/run-*.ts",
+        "src/verify-*.ts"
+      ],
+      "project": ["src/**/*.ts"]
+    },
+    "packages/config": {
+      "project": ["src/**/*.ts"]
+    },
+    "packages/domain": {
+      "project": ["src/**/*.ts"]
+    },
+    "services/antivirus": {
+      "entry": ["src/main.ts"],
+      "project": ["src/**/*.ts", "*.ts"]
+    }
+  }
+}

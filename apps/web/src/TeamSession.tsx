@@ -25,7 +25,7 @@ interface TeamSessionValue {
 
 const TeamSessionContext = createContext<TeamSessionValue | undefined>(undefined);
 
-export function TeamSessionProvider({
+function TeamSessionProvider({
   children,
   session,
 }: {

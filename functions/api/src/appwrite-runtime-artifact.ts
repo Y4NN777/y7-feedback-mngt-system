@@ -30,7 +30,3 @@ export async function stageAppwriteRuntimeArtifact(
     }),
   );
 }
-
-export function listAppwriteRuntimeArtifactEntries(): readonly string[] {
-  return runtimeArtifactEntries;
-}
