@@ -9,7 +9,7 @@ GitHub environment secret or an Appwrite secret Function variable.
 
 - G3 and G4 are `DONE`, including distinct real GitHub and GitLab message-sync
   evidence.
-- The protected `G5 evidence` workflow passes for the exact candidate commit.
+- The protected `Preview acceptance` workflow passes for the exact candidate commit.
 - GitHub environments `production` and `production-recovery-backup` require the
   configured human approval policy and expose only their dedicated authority.
 - Azure workload identities trust the exact repository/environment OIDC

@@ -3,7 +3,7 @@ import {
   type AppwriteG1MatrixIds,
   type AppwriteG1MatrixSchema,
   type AppwriteG1MatrixTables,
-} from "./appwrite-g1-matrix.js";
+} from "./intake-evidence.js";
 import type { OutboxRunResult } from "./outbox.js";
 import type { PublicApi } from "./public-api.js";
 

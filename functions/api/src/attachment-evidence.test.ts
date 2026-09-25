@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   runAppwriteG2AttachmentMatrix,
   type AppwriteG2AttachmentArtifacts,
-} from "./appwrite-g2-attachment-matrix";
+} from "./attachment-evidence";
 import type { AttachmentSaga } from "./attachment-saga";
 import type { AttachmentDownload } from "./attachment-download";
 import type { PublicApi, PublicApiResponse } from "./public-api";

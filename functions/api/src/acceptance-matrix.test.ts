@@ -4,11 +4,11 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
-  buildE2eG5Commands,
-  buildE2eG5Index,
-  buildE2eG5Matrix,
-  parseE2eG5Command,
-} from "./e2e-g5-matrix";
+  buildAcceptanceCommands,
+  buildAcceptanceIndex,
+  buildAcceptanceMatrix,
+  parseAcceptanceCommand,
+} from "./acceptance-matrix";
 
 const expectedScenarioIds = [
   ...Array.from(
@@ -21,9 +21,9 @@ const expectedScenarioIds = [
   ),
 ];
 
-describe("G5 end-to-end traceability matrix", () => {
+describe("Preview acceptance traceability matrix", () => {
   it("BDD-E2E-201 defines one complete executable row for UC-01..12 and ERR-001..019", () => {
-    const matrix = buildE2eG5Matrix();
+    const matrix = buildAcceptanceMatrix();
 
     expect(matrix.map(({ id }) => id)).toEqual(expectedScenarioIds);
     expect(new Set(matrix.map(({ id }) => id)).size).toBe(31);
@@ -36,12 +36,14 @@ describe("G5 end-to-end traceability matrix", () => {
       expect(scenario.positiveOracle.length).toBeGreaterThan(0);
       expect(scenario.negativeOracle.length).toBeGreaterThan(0);
       expect(scenario.cleanupOracle.length).toBeGreaterThan(0);
-      expect(scenario.evidenceCommand).toMatch(/^pnpm verify:/u);
+      expect(scenario.evidenceCommand).toMatch(
+        /^pnpm (?:verify:[a-z0-9:-]+|test:e2e)$/u,
+      );
     }
   });
 
   it("BDD-E2E-202 assigns real Preview evidence to every trust-boundary failure", () => {
-    const matrix = buildE2eG5Matrix();
+    const matrix = buildAcceptanceMatrix();
     const trustBoundaryErrors = new Set([
       "ERR-006",
       "ERR-007",
@@ -73,34 +75,35 @@ describe("G5 end-to-end traceability matrix", () => {
       typeof packageJson.scripts !== "object" ||
       packageJson.scripts === null
     ) {
-      throw new Error("E2E_G5_PACKAGE_SCRIPTS_INVALID");
+      throw new Error("ACCEPTANCE_PACKAGE_SCRIPTS_INVALID");
     }
     const scripts = packageJson.scripts as Readonly<Record<string, unknown>>;
 
-    for (const scenario of buildE2eG5Matrix()) {
+    for (const scenario of buildAcceptanceMatrix()) {
       expect(existsSync(resolve(repositoryRoot, scenario.fixtureOwner))).toBe(true);
-      const command = /^pnpm (?<script>verify:[^\s]+)$/u.exec(scenario.evidenceCommand)
-        ?.groups?.script;
+      const command = /^pnpm (?<script>verify:[^\s]+|test:e2e)$/u.exec(
+        scenario.evidenceCommand,
+      )?.groups?.script;
       expect(command).toBeDefined();
       expect(scripts[command ?? ""]).toEqual(expect.any(String));
     }
   });
 
   it("BDD-E2E-204 emits a complete non-sensitive execution index", () => {
-    const matrix = buildE2eG5Matrix();
-    const index = buildE2eG5Index();
+    const matrix = buildAcceptanceMatrix();
+    const index = buildAcceptanceIndex();
 
     expect(index).toEqual({
-      result: "E2E_G5_MATRIX_READY",
+      result: "ACCEPTANCE_MATRIX_READY",
       scenarioCount: 31,
       useCaseCount: 12,
       errorCount: 19,
       environments: ["appwrite_preview", "local_browser"],
-      evidenceCommands: buildE2eG5Commands().map((command) => `pnpm ${command}`),
+      evidenceCommands: buildAcceptanceCommands().map((command) => `pnpm ${command}`),
       retainedEvidenceCommands: [
-        "pnpm verify:appwrite:g3:composed",
-        "pnpm verify:providers:g3:issue-link",
-        "pnpm verify:providers:g3:sources",
+        "pnpm verify:appwrite:team-workflows",
+        "pnpm verify:providers:issue-link",
+        "pnpm verify:providers:sources",
       ],
       scenarios: matrix.map(({ id, requirementIds, environment }) => ({
         id,
@@ -114,46 +117,48 @@ describe("G5 end-to-end traceability matrix", () => {
   });
 
   it("BDD-E2E-206 produces one safe executable command for every evidence family", () => {
-    const commands = buildE2eG5Commands();
+    const commands = buildAcceptanceCommands();
     expect(commands.length).toBeGreaterThan(10);
     expect(new Set(commands).size).toBe(commands.length);
-    expect(commands).toContain("verify:e2e:g5:browser");
-    expect(commands).toContain("verify:recovery:g5");
-    expect(commands).toContain("verify:providers:g4:reconciliation");
-    expect(commands).toContain("verify:providers:g4:message-sync:github");
-    expect(commands).toContain("verify:providers:g4:message-sync:gitlab");
-    expect(commands).toContain("verify:slo:g5");
+    expect(commands).toContain("test:e2e");
+    expect(commands).toContain("verify:recovery:preview");
+    expect(commands).toContain("verify:providers:reconciliation");
+    expect(commands).toContain("verify:providers:message-sync:github");
+    expect(commands).toContain("verify:providers:message-sync:gitlab");
+    expect(commands).toContain("verify:slo:preview");
     expect(commands).toContain("security:scan");
-    expect(commands[0]).toBe("verify:recovery:g5");
-    expect(commands).not.toContain("verify:appwrite:g3:composed");
-    expect(commands).not.toContain("verify:providers:g3:issue-link");
-    expect(commands).not.toContain("verify:providers:g3:sources");
+    expect(commands[0]).toBe("verify:recovery:preview");
+    expect(commands).not.toContain("verify:appwrite:team-workflows");
+    expect(commands).not.toContain("verify:providers:issue-link");
+    expect(commands).not.toContain("verify:providers:sources");
     expect(
       commands.every(
         (command) =>
-          command === "security:scan" || /^verify:[a-z0-9:-]+$/u.test(command),
+          command === "security:scan" ||
+          command === "test:e2e" ||
+          /^verify:[a-z0-9:-]+$/u.test(command),
       ),
     ).toBe(true);
   });
 
   it("BDD-E2E-207 does not execute OAuth-state evidence without its temporary fixture", () => {
-    expect(buildE2eG5Index().retainedEvidenceCommands).toEqual([
-      "pnpm verify:appwrite:g3:composed",
-      "pnpm verify:providers:g3:issue-link",
-      "pnpm verify:providers:g3:sources",
+    expect(buildAcceptanceIndex().retainedEvidenceCommands).toEqual([
+      "pnpm verify:appwrite:team-workflows",
+      "pnpm verify:providers:issue-link",
+      "pnpm verify:providers:sources",
     ]);
   });
 
   it("rejects an evidence command outside the root verify surface", () => {
-    expect(() => parseE2eG5Command("pnpm test && echo unsafe")).toThrow(
-      "E2E_G5_COMMAND_INVALID",
+    expect(() => parseAcceptanceCommand("pnpm test && echo unsafe")).toThrow(
+      "ACCEPTANCE_COMMAND_INVALID",
     );
   });
 
   it("accepts only the exact non-verifier security gate", () => {
-    expect(parseE2eG5Command("pnpm security:scan")).toBe("security:scan");
-    expect(() => parseE2eG5Command("pnpm security:scan:unsafe")).toThrow(
-      "E2E_G5_COMMAND_INVALID",
+    expect(parseAcceptanceCommand("pnpm security:scan")).toBe("security:scan");
+    expect(() => parseAcceptanceCommand("pnpm security:scan:unsafe")).toThrow(
+      "ACCEPTANCE_COMMAND_INVALID",
     );
   });
 

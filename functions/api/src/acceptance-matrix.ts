@@ -1,4 +1,4 @@
-export interface E2eG5Scenario {
+export interface AcceptanceScenario {
   readonly id: string;
   readonly requirementIds: readonly string[];
   readonly actor: string;
@@ -15,7 +15,7 @@ const previewCleanup =
 const browserCleanup =
   "Playwright closes the isolated browser context and leaves no protected cache or persisted proof.";
 
-const useCases: readonly E2eG5Scenario[] = [
+const useCases: readonly AcceptanceScenario[] = [
   {
     id: "UC-01",
     requirementIds: ["UC-01", "FR-PROJ-002", "FR-PROJ-003"],
@@ -27,131 +27,131 @@ const useCases: readonly E2eG5Scenario[] = [
     negativeOracle:
       "An unavailable route reveals neither another Project nor the requested slug.",
     cleanupOracle: browserCleanup,
-    evidenceCommand: "pnpm verify:e2e:g5:browser",
+    evidenceCommand: "pnpm test:e2e",
   },
   {
     id: "UC-02",
     requirementIds: ["UC-02", "FR-FDB-001", "FR-CTX-001"],
     actor: "Reporter",
-    fixtureOwner: "functions/api/src/verify-appwrite-deployed-g1.ts",
+    fixtureOwner: "functions/api/src/verify-appwrite-deployed-intake.ts",
     environment: "appwrite_preview",
     positiveOracle: "A valid Bug, Suggestion or Review is durably accepted once.",
     negativeOracle: "Invalid type or Context input creates no acceptance fact.",
     cleanupOracle: previewCleanup,
-    evidenceCommand: "pnpm verify:appwrite:deployed:g1:domain",
+    evidenceCommand: "pnpm verify:appwrite:deployed-intake:domain",
   },
   {
     id: "UC-03",
     requirementIds: ["UC-03", "FR-ATT-001", "FR-ATT-009"],
     actor: "Reporter",
-    fixtureOwner: "functions/api/src/verify-appwrite-g2-attachment.ts",
+    fixtureOwner: "functions/api/src/verify-appwrite-attachments.ts",
     environment: "appwrite_preview",
     positiveOracle:
       "Permitted evidence is scanned, accepted and retrievable by its authorized audience.",
     negativeOracle: "Rejected evidence produces no accepted Feedback or Attachment.",
     cleanupOracle: previewCleanup,
-    evidenceCommand: "pnpm verify:appwrite:g2:attachments",
+    evidenceCommand: "pnpm verify:appwrite:attachments",
   },
   {
     id: "UC-04",
     requirementIds: ["UC-04", "FR-ACC-001", "FR-ACC-004"],
     actor: "Reporter",
-    fixtureOwner: "functions/api/src/verify-appwrite-deployed-g1.ts",
+    fixtureOwner: "functions/api/src/verify-appwrite-deployed-intake.ts",
     environment: "appwrite_preview",
     positiveOracle:
       "Durable acceptance returns a reference and an independent accountless Access Proof.",
     negativeOracle: "A reference alone never authorizes protected retrieval.",
     cleanupOracle: previewCleanup,
-    evidenceCommand: "pnpm verify:appwrite:deployed:g1:domain",
+    evidenceCommand: "pnpm verify:appwrite:deployed-intake:domain",
   },
   {
     id: "UC-05",
     requirementIds: ["UC-05", "FR-CONV-001", "FR-LIFE-001"],
     actor: "Reporter and Project Maintainer",
-    fixtureOwner: "functions/api/src/verify-appwrite-g3-conversation-lifecycle.ts",
+    fixtureOwner: "functions/api/src/verify-appwrite-conversation-lifecycle.ts",
     environment: "appwrite_preview",
     positiveOracle:
       "Reporter-visible conversation and lifecycle changes preserve original submission history.",
     negativeOracle: "Internal Notes never enter the Reporter projection.",
     cleanupOracle: previewCleanup,
-    evidenceCommand: "pnpm verify:appwrite:g3:conversation-lifecycle",
+    evidenceCommand: "pnpm verify:appwrite:conversation-lifecycle",
   },
   {
     id: "UC-06",
     requirementIds: ["UC-06", "FR-PRIV-001", "FR-PRIV-004"],
     actor: "Reporter",
-    fixtureOwner: "functions/api/src/verify-appwrite-g4-privacy.ts",
+    fixtureOwner: "functions/api/src/verify-appwrite-privacy.ts",
     environment: "appwrite_preview",
     positiveOracle:
       "An authorized deletion request applies the documented deletion lifecycle.",
     negativeOracle:
       "Deleted identity and content remain unavailable and cannot be resurrected by restore.",
     cleanupOracle: previewCleanup,
-    evidenceCommand: "pnpm verify:appwrite:g4:privacy",
+    evidenceCommand: "pnpm verify:appwrite:privacy",
   },
   {
     id: "UC-07",
     requirementIds: ["UC-07", "FR-OPS-002", "FR-OPS-010"],
     actor: "Workspace Owner",
-    fixtureOwner: "functions/api/src/verify-appwrite-g3-admin.ts",
+    fixtureOwner: "functions/api/src/verify-appwrite-administration.ts",
     environment: "appwrite_preview",
     positiveOracle:
       "The Owner manages Projects, slugs, activation and Maintainer assignments through Y7.",
     negativeOracle: "A non-Owner cannot perform an administrative mutation.",
     cleanupOracle: previewCleanup,
-    evidenceCommand: "pnpm verify:appwrite:g3:admin",
+    evidenceCommand: "pnpm verify:appwrite:administration",
   },
   {
     id: "UC-08",
     requirementIds: ["UC-08", "FR-OPS-004", "FR-LIFE-003"],
     actor: "Project Maintainer",
-    fixtureOwner: "functions/api/src/verify-appwrite-g3-workbench.ts",
+    fixtureOwner: "functions/api/src/verify-appwrite-workbench.ts",
     environment: "appwrite_preview",
     positiveOracle:
       "An assigned Maintainer can work Feedback through the authorized Workbench actions.",
     negativeOracle:
       "Unassigned and cross-Project actors receive a non-disclosing denial.",
     cleanupOracle: previewCleanup,
-    evidenceCommand: "pnpm verify:appwrite:g3:workbench",
+    evidenceCommand: "pnpm verify:appwrite:workbench",
   },
   {
     id: "UC-09",
     requirementIds: ["UC-09", "FR-NOT-001", "FR-NOT-005"],
     actor: "Reporter and authorized workspace actor",
-    fixtureOwner: "functions/api/src/verify-appwrite-g3-workbench.ts",
+    fixtureOwner: "functions/api/src/verify-appwrite-workbench.ts",
     environment: "appwrite_preview",
     positiveOracle:
       "A source event becomes visible to each eligible in-product and email recipient.",
     negativeOracle:
       "An ineligible or foreign audience receives no notification content.",
     cleanupOracle: previewCleanup,
-    evidenceCommand: "pnpm verify:appwrite:g3:notifications",
+    evidenceCommand: "pnpm verify:appwrite:workbench",
   },
   {
     id: "UC-10",
     requirementIds: ["UC-10", "FR-INT-001", "FR-INT-009"],
     actor: "Authorized workspace actor",
-    fixtureOwner: "functions/api/src/verify-appwrite-g4-intelligence.ts",
+    fixtureOwner: "functions/api/src/verify-appwrite-intelligence.ts",
     environment: "appwrite_preview",
     positiveOracle:
       "Authorized actors filter, relate and compare only current in-scope source Feedback.",
     negativeOracle:
       "Cross-Workspace and deleted facts never enter intelligence results.",
     cleanupOracle: previewCleanup,
-    evidenceCommand: "pnpm verify:appwrite:g4:intelligence",
+    evidenceCommand: "pnpm verify:appwrite:intelligence",
   },
   {
     id: "UC-11",
     requirementIds: ["UC-11", "FR-OPS-011", "FR-SEC-009"],
     actor: "Platform Operator",
-    fixtureOwner: "functions/api/src/verify-appwrite-g4-platform-access.ts",
+    fixtureOwner: "functions/api/src/verify-appwrite-platform-access.ts",
     environment: "appwrite_preview",
     positiveOracle:
       "A justified, approved, scoped and time-bounded grant permits only the requested operation.",
     negativeOracle:
       "Standing, self-approved, expired or out-of-scope business-content access is denied and audited.",
     cleanupOracle: previewCleanup,
-    evidenceCommand: "pnpm verify:appwrite:g4:platform-access",
+    evidenceCommand: "pnpm verify:appwrite:platform-access",
   },
   {
     id: "UC-12",
@@ -164,7 +164,7 @@ const useCases: readonly E2eG5Scenario[] = [
     negativeOracle:
       "Internal Notes, Access Proofs, Attachments and Reporter identifiers never reach the provider.",
     cleanupOracle: previewCleanup,
-    evidenceCommand: "pnpm verify:providers:g4:state-sync",
+    evidenceCommand: "pnpm verify:providers:state-sync",
   },
 ];
 
@@ -175,108 +175,108 @@ type ErrorScenarioSeed = readonly [
   fixture: string,
   outcome: string,
   evidenceCommand: string,
-  environment: E2eG5Scenario["environment"],
+  environment: AcceptanceScenario["environment"],
 ];
 
-const errors: readonly E2eG5Scenario[] = (
+const errors: readonly AcceptanceScenario[] = (
   [
     [
       "ERR-001",
       "FR-PROJ-002",
       "Reporter",
-      "verify-appwrite-deployed-g1.ts",
+      "verify-appwrite-deployed-intake.ts",
       "Project resolution is rejected without disclosure or writes.",
-      "pnpm verify:appwrite:deployed:g1:domain",
+      "pnpm verify:appwrite:deployed-intake:domain",
       "appwrite_preview",
     ],
     [
       "ERR-002",
       "FR-PROJ-004",
       "Reporter",
-      "verify-appwrite-deployed-g1.ts",
+      "verify-appwrite-deployed-intake.ts",
       "Inactive Project intake is rejected while history remains intact.",
-      "pnpm verify:appwrite:deployed:g1:domain",
+      "pnpm verify:appwrite:deployed-intake:domain",
       "appwrite_preview",
     ],
     [
       "ERR-003",
       "FR-PROJ-009",
       "Workspace Owner",
-      "verify-appwrite-g3-admin.ts",
+      "verify-appwrite-administration.ts",
       "A colliding current or historical slug is rejected with routes unchanged.",
-      "pnpm verify:appwrite:g3:admin",
+      "pnpm verify:appwrite:administration",
       "appwrite_preview",
     ],
     [
       "ERR-004",
       "FR-FDB-002",
       "Reporter",
-      "verify-appwrite-deployed-g1.ts",
+      "verify-appwrite-deployed-intake.ts",
       "Invalid type or Context fields receive actionable errors and create nothing.",
-      "pnpm verify:appwrite:deployed:g1:domain",
+      "pnpm verify:appwrite:deployed-intake:domain",
       "appwrite_preview",
     ],
     [
       "ERR-005",
       "FR-REP-006",
       "Reporter",
-      "verify-appwrite-deployed-g1.ts",
+      "verify-appwrite-deployed-intake.ts",
       "Untrusted attribution remains unverified and grants no authority.",
-      "pnpm verify:appwrite:deployed:g1:domain",
+      "pnpm verify:appwrite:deployed-intake:domain",
       "appwrite_preview",
     ],
     [
       "ERR-006",
       "FR-ACC-005",
       "Reporter",
-      "verify-appwrite-deployed-g1.ts",
+      "verify-appwrite-deployed-intake.ts",
       "Invalid, expired and revoked proofs disclose no protected Feedback.",
-      "pnpm verify:appwrite:deployed:g1:domain",
+      "pnpm verify:appwrite:deployed-intake:domain",
       "appwrite_preview",
     ],
     [
       "ERR-007",
       "FR-OWN-003",
       "Workspace actor",
-      "verify-appwrite-g3-composed.ts",
+      "verify-appwrite-team-workflows.ts",
       "Cross-scope or wrong-role access is denied without existence disclosure.",
-      "pnpm verify:appwrite:g3:composed",
+      "pnpm verify:appwrite:team-workflows",
       "appwrite_preview",
     ],
     [
       "ERR-008",
       "FR-LIFE-006",
       "Project Maintainer",
-      "verify-appwrite-g3-conversation-lifecycle.ts",
+      "verify-appwrite-conversation-lifecycle.ts",
       "Invalid lifecycle transition preserves state and history.",
-      "pnpm verify:appwrite:g3:conversation-lifecycle",
+      "pnpm verify:appwrite:conversation-lifecycle",
       "appwrite_preview",
     ],
     [
       "ERR-009",
       "FR-ATT-009",
       "Reporter",
-      "verify-appwrite-g2-attachment.ts",
+      "verify-appwrite-attachments.ts",
       "A policy-invalid Attachment rejects the logical submission atomically.",
-      "pnpm verify:appwrite:g2:attachments",
+      "pnpm verify:appwrite:attachments",
       "appwrite_preview",
     ],
     [
       "ERR-010",
       "FR-FDB-007",
       "Reporter",
-      "verify-appwrite-g1.ts",
+      "verify-appwrite-intake.ts",
       "Forced persistence failure confirms nothing and removes staged data.",
-      "pnpm verify:appwrite:g1",
+      "pnpm verify:appwrite:intake",
       "appwrite_preview",
     ],
     [
       "ERR-011",
       "FR-FDB-008",
       "Reporter",
-      "verify-appwrite-deployed-g1.ts",
+      "verify-appwrite-deployed-intake.ts",
       "Retry returns the original result with exactly one domain effect.",
-      "pnpm verify:appwrite:deployed:g1:domain",
+      "pnpm verify:appwrite:deployed-intake:domain",
       "appwrite_preview",
     ],
     [
@@ -285,43 +285,43 @@ const errors: readonly E2eG5Scenario[] = (
       "Notification recipient",
       "verify-preview-mail-catcher.ts",
       "Delivery failure preserves the event and records a non-success outcome.",
-      "pnpm verify:mail:g3",
+      "pnpm verify:mail:preview",
       "appwrite_preview",
     ],
     [
       "ERR-013",
       "FR-OPS-013",
       "Platform Operator",
-      "verify-appwrite-g4-platform-access.ts",
+      "verify-appwrite-platform-access.ts",
       "Missing, expired or out-of-scope grant is denied and audited.",
-      "pnpm verify:appwrite:g4:platform-access",
+      "pnpm verify:appwrite:platform-access",
       "appwrite_preview",
     ],
     [
       "ERR-014",
       "FR-OPS-009",
       "Any API actor",
-      "verify-appwrite-g3-composed.ts",
+      "verify-appwrite-team-workflows.ts",
       "Unavailable dependency returns a safe retryable result without duplicate effects.",
-      "pnpm verify:appwrite:g3:composed",
+      "pnpm verify:appwrite:team-workflows",
       "appwrite_preview",
     ],
     [
       "ERR-015",
       "FR-SEC-004",
       "Public caller",
-      "verify-appwrite-g4-abuse.ts",
+      "verify-appwrite-abuse.ts",
       "Exceeded abuse bound returns safe HTTP 429 and creates no excess effect.",
-      "pnpm verify:appwrite:g4:abuse",
+      "pnpm verify:appwrite:abuse",
       "appwrite_preview",
     ],
     [
       "ERR-016",
       "FR-PRIV-008",
       "Reporter or restore operator",
-      "verify-recovery-g5.ts",
+      "verify-preview-recovery.ts",
       "Unauthorized or post-purge restore is rejected without resurrection.",
-      "pnpm verify:recovery:g5",
+      "pnpm verify:recovery:preview",
       "appwrite_preview",
     ],
     [
@@ -330,7 +330,7 @@ const errors: readonly E2eG5Scenario[] = (
       "Provider callback caller",
       "verify-preview-source-provider.ts",
       "Invalid authorization, selection or signature changes no authoritative state.",
-      "pnpm verify:providers:g3:sources",
+      "pnpm verify:providers:sources",
       "appwrite_preview",
     ],
     [
@@ -339,7 +339,7 @@ const errors: readonly E2eG5Scenario[] = (
       "Project Maintainer",
       "verify-preview-provider-issue.ts",
       "Missing active consent blocks public Reporter content while retaining the Y7 action.",
-      "pnpm verify:providers:g3:issue-link",
+      "pnpm verify:providers:issue-link",
       "appwrite_preview",
     ],
     [
@@ -348,7 +348,7 @@ const errors: readonly E2eG5Scenario[] = (
       "Provider webhook caller",
       "verify-preview-provider-reconciliation.ts",
       "Conflicting, stale or unverifiable events are quarantined and reconciled once.",
-      "pnpm verify:providers:g4:reconciliation",
+      "pnpm verify:providers:reconciliation",
       "appwrite_preview",
     ],
   ] as const satisfies readonly ErrorScenarioSeed[]
@@ -365,56 +365,56 @@ const errors: readonly E2eG5Scenario[] = (
   evidenceCommand,
 }));
 
-export function buildE2eG5Matrix(): readonly E2eG5Scenario[] {
+export function buildAcceptanceMatrix(): readonly AcceptanceScenario[] {
   return [...useCases, ...errors];
 }
 
-export function parseE2eG5Command(command: string): string {
-  const match = /^pnpm (verify:[a-z0-9:-]+|security:scan)$/u.exec(command);
-  if (!match?.[1]) throw new Error("E2E_G5_COMMAND_INVALID");
+export function parseAcceptanceCommand(command: string): string {
+  const match = /^pnpm (verify:[a-z0-9:-]+|test:e2e|security:scan)$/u.exec(command);
+  if (!match?.[1]) throw new Error("ACCEPTANCE_COMMAND_INVALID");
   return match[1];
 }
 
 const crossScenarioEvidenceCommands = [
   "pnpm security:scan",
-  "pnpm verify:providers:g4:message-sync:github",
-  "pnpm verify:providers:g4:message-sync:gitlab",
-  "pnpm verify:slo:g5",
+  "pnpm verify:providers:message-sync:github",
+  "pnpm verify:providers:message-sync:gitlab",
+  "pnpm verify:slo:preview",
 ] as const;
 
 const retainedEvidenceCommands = [
-  "pnpm verify:appwrite:g3:composed",
-  "pnpm verify:providers:g3:issue-link",
-  "pnpm verify:providers:g3:sources",
+  "pnpm verify:appwrite:team-workflows",
+  "pnpm verify:providers:issue-link",
+  "pnpm verify:providers:sources",
 ] as const;
 
 const retainedEvidence = new Set<string>(retainedEvidenceCommands);
 
-export function buildE2eG5Commands(): readonly string[] {
+export function buildAcceptanceCommands(): readonly string[] {
   return [
     ...new Set([
-      ...buildE2eG5Matrix().map(({ evidenceCommand }) => evidenceCommand),
+      ...buildAcceptanceMatrix().map(({ evidenceCommand }) => evidenceCommand),
       ...crossScenarioEvidenceCommands,
     ]),
   ]
     .filter((command) => !retainedEvidence.has(command))
-    .map(parseE2eG5Command)
+    .map(parseAcceptanceCommand)
     .sort((left, right) => {
-      if (left === "verify:recovery:g5") return -1;
-      if (right === "verify:recovery:g5") return 1;
+      if (left === "verify:recovery:preview") return -1;
+      if (right === "verify:recovery:preview") return 1;
       return left.localeCompare(right);
     });
 }
 
-export function buildE2eG5Index() {
-  const matrix = buildE2eG5Matrix();
+export function buildAcceptanceIndex() {
+  const matrix = buildAcceptanceMatrix();
   return {
-    result: "E2E_G5_MATRIX_READY" as const,
+    result: "ACCEPTANCE_MATRIX_READY" as const,
     scenarioCount: matrix.length,
     useCaseCount: matrix.filter(({ id }) => id.startsWith("UC-")).length,
     errorCount: matrix.filter(({ id }) => id.startsWith("ERR-")).length,
     environments: [...new Set(matrix.map(({ environment }) => environment))].sort(),
-    evidenceCommands: buildE2eG5Commands().map((command) => `pnpm ${command}`),
+    evidenceCommands: buildAcceptanceCommands().map((command) => `pnpm ${command}`),
     retainedEvidenceCommands,
     scenarios: matrix.map(({ id, requirementIds, environment }) => ({
       id,

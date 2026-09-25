@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { recoveryDeletionFixtures } from "./recovery-g5-fixtures";
+import { recoveryDeletionFixtures } from "./recovery-fixtures";
 
 describe("Recovery G5 fixtures", () => {
   it("BDD-REC-302 emits deletion events accepted by the restore contract", () => {

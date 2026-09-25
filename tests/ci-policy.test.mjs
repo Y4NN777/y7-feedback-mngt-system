@@ -91,8 +91,8 @@ test("BDD-CI-004 loads ignored Appwrite credentials without shell export", async
     "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build && node --env-file=.env.appwrite-preview functions/api/dist/tooling/provision-appwrite.js --apply",
   );
   assert.equal(
-    rootPackage.scripts["verify:appwrite:g1"],
-    "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build && node --env-file=.env.appwrite-preview functions/api/dist/tooling/verify-appwrite-g1.js --apply",
+    rootPackage.scripts["verify:appwrite:intake"],
+    "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build && node --env-file=.env.appwrite-preview functions/api/dist/tooling/verify-appwrite-intake.js --apply",
   );
 });
 
@@ -113,7 +113,7 @@ test("BDD-REC-301 runs the real recovery drill with isolated OIDC authority", as
     workflow,
     /APPWRITE_API_KEY: \$\{\{ secrets\.Y7_RECOVERY_APPWRITE_API_KEY \}\}/u,
   );
-  assert.match(workflow, /run: pnpm verify:recovery:g5/u);
+  assert.match(workflow, /run: pnpm verify:recovery:preview/u);
   assert.doesNotMatch(workflow, /AZURE_(?:CLIENT_)?SECRET/u);
 
   const actionReferences = [...workflow.matchAll(/^\s+(?:- )?uses: ([^\s#]+)/gmu)].map(
@@ -127,7 +127,7 @@ test("BDD-REC-301 runs the real recovery drill with isolated OIDC authority", as
     await readFile(new URL("../package.json", import.meta.url), "utf8"),
   );
   assert.match(
-    rootPackage.scripts["verify:recovery:g5"],
+    rootPackage.scripts["verify:recovery:preview"],
     /node --env-file-if-exists=\.env\.appwrite-preview .* --apply$/u,
   );
 
@@ -215,16 +215,16 @@ test("BDD-REL-304 provisions Production SMTP through protected OIDC authority", 
   assert.match(template, /entraApplicationId: entraApplicationId/u);
 });
 
-test("BDD-E2E-301 runs the complete G5 evidence pack with ephemeral secret material", async () => {
+test("BDD-E2E-301 runs the complete Preview acceptance pack with ephemeral secret material", async () => {
   const workflow = await readFile(
-    new URL("../.github/workflows/g5-evidence.yml", import.meta.url),
+    new URL("../.github/workflows/preview-acceptance.yml", import.meta.url),
     "utf8",
   );
 
   assert.match(workflow, /workflow_dispatch:/u);
-  assert.match(workflow, /G5_EVIDENCE_SCOPE: \$\{\{ inputs\.scope \|\| 'full' \}\}/u);
-  assert.match(workflow, /reconciliation\) pnpm verify:providers:g4:reconciliation/u);
-  assert.match(workflow, /state-sync\) pnpm verify:providers:g4:state-sync/u);
+  assert.match(workflow, /ACCEPTANCE_SCOPE: \$\{\{ inputs\.scope \|\| 'full' \}\}/u);
+  assert.match(workflow, /reconciliation\) pnpm verify:providers:reconciliation/u);
+  assert.match(workflow, /state-sync\) pnpm verify:providers:state-sync/u);
   assert.match(
     workflow,
     /permissions:\s+contents: read\s+id-token: write\s+issues: write/u,
@@ -237,11 +237,11 @@ test("BDD-E2E-301 runs the complete G5 evidence pack with ephemeral secret mater
   );
   assert.match(
     workflow,
-    /if: env\.G5_EVIDENCE_SCOPE == 'full' \|\| env\.G5_EVIDENCE_SCOPE == 'recovery'/u,
+    /if: env\.ACCEPTANCE_SCOPE == 'full' \|\| env\.ACCEPTANCE_SCOPE == 'recovery'/u,
   );
   assert.match(
     workflow,
-    /if: env\.G5_EVIDENCE_SCOPE == 'full'\s+run: pnpm --filter @y7-feedback\/web exec playwright install/u,
+    /if: env\.ACCEPTANCE_SCOPE == 'full'\s+run: pnpm --filter @y7-feedback\/web exec playwright install/u,
   );
   assert.match(
     workflow,
@@ -259,7 +259,7 @@ test("BDD-E2E-301 runs the complete G5 evidence pack with ephemeral secret mater
   assert.match(workflow, /pnpm provision:appwrite(?:\s|$)/u);
   assert.match(workflow, /pnpm configure:appwrite:function:preview/u);
   assert.match(workflow, /pnpm deploy:appwrite:function:preview/u);
-  assert.match(workflow, /pnpm verify:e2e:g5/u);
+  assert.match(workflow, /pnpm verify:acceptance:full/u);
   assert.doesNotMatch(workflow, /AZURE_(?:CLIENT_)?SECRET/u);
   assert.doesNotMatch(workflow, /upload-artifact/u);
 
@@ -275,14 +275,14 @@ test("BDD-E2E-301 runs the complete G5 evidence pack with ephemeral secret mater
   );
   assert.equal(typeof rootPackage.scripts["provision:appwrite"], "string");
   assert.match(
-    rootPackage.scripts["verify:providers:g4:message-sync"],
+    rootPackage.scripts["verify:providers:message-sync"],
     /node --env-file-if-exists=\.env\.appwrite-preview/u,
   );
 });
 
 test("BDD-SLO-301 runs the real Preview SLO gate with protected least-privilege configuration", async () => {
   const workflow = await readFile(
-    new URL("../.github/workflows/slo-g5.yml", import.meta.url),
+    new URL("../.github/workflows/preview-slo.yml", import.meta.url),
     "utf8",
   );
 
@@ -303,7 +303,7 @@ test("BDD-SLO-301 runs the real Preview SLO gate with protected least-privilege 
   assert.match(workflow, /pnpm provision:appwrite(?:\s|$)/u);
   assert.match(workflow, /pnpm configure:appwrite:function:preview/u);
   assert.match(workflow, /pnpm deploy:appwrite:function:preview/u);
-  assert.match(workflow, /pnpm verify:slo:g5/u);
+  assert.match(workflow, /pnpm verify:slo:preview/u);
 
   const actionReferences = [...workflow.matchAll(/^\s+(?:- )?uses: ([^\s#]+)/gmu)].map(
     (match) => match[1],

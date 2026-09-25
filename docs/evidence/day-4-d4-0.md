@@ -26,7 +26,7 @@ contract while giving each Day 4 queue one cohesive responsibility.
 
 ## Preview migration evidence
 
-`pnpm verify:appwrite:d4:migration` passed against Preview on 2026-09-01:
+`pnpm verify:appwrite:migration` passed against Preview on 2026-09-01:
 
 - eight permanent tables created;
 - additive replay created zero resources;

@@ -15,7 +15,7 @@ import {
   collectCriticalApiLoadSamples,
   collectDashboardLoadSamples,
   collectSloEvidenceSamples,
-} from "./slo-g5-evidence.js";
+} from "./slo-evidence.js";
 import { stableProbeFailureCode } from "./slo-probe-failure.js";
 import { routeSloAlerts } from "./slo-telemetry.js";
 import {
@@ -25,9 +25,9 @@ import {
 
 const concurrency = declaredSloConcurrency;
 const commands = [
-  "verify-appwrite-deployed-g1.js",
-  "verify-appwrite-g3-conversation-lifecycle.js",
-  "verify-appwrite-g3-workbench.js",
+  "verify-appwrite-deployed-intake.js",
+  "verify-appwrite-conversation-lifecycle.js",
+  "verify-appwrite-workbench.js",
 ] as const;
 
 function required(name: string): string {
@@ -116,7 +116,7 @@ function runPnpmScript(script: string): Promise<unknown> {
 export async function verifySloG5() {
   if (!process.argv.includes("--apply")) throw new Error("SLO_G5_APPLY_REQUIRED");
   if ((process.env.Y7_ENVIRONMENT?.trim() || "preview") !== "preview")
-    throw new Error("SLO_G5_PREVIEW_REQUIRED");
+    throw new Error("SLO_PREVIEW_REQUIRED");
   const release = required("RELEASE");
   const healthUrl = new URL("/health", required("Y7_FUNCTION_DOMAIN_URL")).toString();
   const rootUrl = required("Y7_WEB_ORIGIN");

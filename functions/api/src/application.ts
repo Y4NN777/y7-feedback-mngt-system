@@ -495,7 +495,7 @@ export function createHttpApplication(
       ),
     ),
   );
-  /* v8 ignore start -- privacy composition is exercised by verify:appwrite:g4:privacy. */
+  /* v8 ignore start -- privacy composition is exercised by verify:appwrite:privacy. */
   const privacy = createPrivacyHttp(
     createPrivacyCoordinator(
       principalVerifier,

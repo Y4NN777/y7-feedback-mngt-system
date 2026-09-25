@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   runAppwriteG1OutboxMatrix,
   type AppwriteG1OutboxWorker,
-} from "./appwrite-g1-outbox-matrix";
-import type { AppwriteG1MatrixTables } from "./appwrite-g1-matrix";
+} from "./intake-outbox-evidence";
+import type { AppwriteG1MatrixTables } from "./intake-evidence";
 import type { OutboxRunResult } from "./outbox";
 import type { PublicApi, PublicApiResponse } from "./public-api";
 

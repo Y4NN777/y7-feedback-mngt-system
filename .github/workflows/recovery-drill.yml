@@ -48,4 +48,4 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Run destructive isolated recovery exercise
-        run: pnpm verify:recovery:g5
+        run: pnpm verify:recovery:preview

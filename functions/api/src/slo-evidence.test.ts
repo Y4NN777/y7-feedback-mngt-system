@@ -4,9 +4,9 @@ import {
   collectCriticalApiLoadSamples,
   collectDashboardLoadSamples,
   collectSloEvidenceSamples,
-} from "./slo-g5-evidence";
+} from "./slo-evidence";
 
-describe("G5 SLO evidence boundary", () => {
+describe("Preview SLO evidence boundary", () => {
   it("BDD-SLO-206 accepts only finite non-negative operational durations", () => {
     expect(
       collectSloEvidenceSamples({
