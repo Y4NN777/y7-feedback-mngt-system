@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { Locale } from "@y7-feedback/domain";
 
@@ -12,11 +12,16 @@ import type { ExternalIssueGateway } from "./ExternalIssueGateway";
 import type { WorkbenchGateway } from "./WorkbenchGateway";
 import { WorkbenchPage } from "./WorkbenchPage";
 
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 function setup(
   list?: WorkbenchGateway["list"],
   externalIssueOverride?: Partial<ExternalIssueGateway>,
   notifications?: WorkbenchGateway["notifications"],
   authorizeRealtime?: WorkbenchGateway["authorizeNotificationRealtime"],
+  subscribe?: NotificationInvalidation["subscribe"],
 ) {
   const listMock = vi.fn<WorkbenchGateway["list"]>(
     list ??
@@ -65,8 +70,8 @@ function setup(
       result: { status: "read" as const },
     }),
   );
-  const subscribeMock = vi.fn<NotificationInvalidation["subscribe"]>(() =>
-    Promise.resolve(() => Promise.resolve()),
+  const subscribeMock = vi.fn<NotificationInvalidation["subscribe"]>(
+    subscribe ?? (() => Promise.resolve(() => Promise.resolve())),
   );
   const gateway: WorkbenchGateway = {
     list: listMock,
@@ -176,10 +181,11 @@ function setup(
     signIn: vi.fn(() => Promise.resolve("authenticated" as const)),
     signOut: signOutMock,
   };
+  const queryClient = new QueryClient();
   function Harness() {
     const [locale, setLocale] = useState<Locale>("fr");
     return (
-      <QueryClientProvider client={new QueryClient()}>
+      <QueryClientProvider client={queryClient}>
         <WorkbenchPage
           createOperationId={() => "operation_1"}
           externalIssueGateway={externalIssueGateway}
@@ -199,6 +205,7 @@ function setup(
     listMock,
     markNotificationReadMock,
     notificationsMock,
+    queryClient,
     session,
     signOutMock,
     subscribeMock,
@@ -271,11 +278,15 @@ describe("Workbench experience", () => {
       notificationId: "notification_1",
     });
     expect(target.notificationsMock).toHaveBeenCalledTimes(2);
-    expect(target.subscribeMock).toHaveBeenCalledWith(
-      { databaseId: "feedback", tableId: "notification_signals" },
-      expect.any(Function),
-    );
-    target.subscribeMock.mock.calls[0]?.[1]();
+    const subscription = target.subscribeMock.mock.calls[0];
+    expect(subscription?.[0]).toEqual({
+      databaseId: "feedback",
+      tableId: "notification_signals",
+    });
+    expect(typeof subscription?.[1].connected).toBe("function");
+    expect(typeof subscription?.[1].disconnected).toBe("function");
+    expect(typeof subscription?.[1].invalidate).toBe("function");
+    target.subscribeMock.mock.calls[0]?.[1].invalidate();
     expect(target.notificationsMock).toHaveBeenCalledTimes(3);
     target.unmount();
   });
@@ -309,6 +320,107 @@ describe("Workbench experience", () => {
     await open(user);
     expect(await screen.findByText("Retour résolu")).toBeVisible();
     expect(target.subscribeMock).not.toHaveBeenCalled();
+  });
+
+  it("TASK-DX-009 keeps fallback polling after a Realtime subscription failure", async () => {
+    const user = userEvent.setup();
+    const target = setup(undefined, undefined, undefined, undefined, () =>
+      Promise.reject(new Error("realtime unavailable")),
+    );
+    await open(user);
+    expect(await screen.findByText("Retour résolu")).toBeVisible();
+    await waitFor(() => {
+      expect(target.subscribeMock).toHaveBeenCalledOnce();
+    });
+  });
+
+  it("TASK-DX-009 disables polling while Realtime is connected and restores it after disconnect", async () => {
+    const user = userEvent.setup();
+    const target = setup();
+    await open(user);
+    await screen.findByText("Retour résolu");
+    const observer = target.subscribeMock.mock.calls[0]?.[1];
+    expect(observer).toBeDefined();
+    const initialCalls = target.notificationsMock.mock.calls.length;
+    vi.useFakeTimers();
+
+    act(() => {
+      observer?.connected();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(6_000);
+    });
+    expect(target.notificationsMock).toHaveBeenCalledTimes(initialCalls + 1);
+
+    act(() => {
+      observer?.disconnected();
+    });
+    const disconnectedCalls = target.notificationsMock.mock.calls.length;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+    expect(target.notificationsMock.mock.calls.length).toBeGreaterThan(
+      disconnectedCalls,
+    );
+
+    act(() => {
+      observer?.connected();
+    });
+    const reconnectedCalls = target.notificationsMock.mock.calls.length;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(6_000);
+    });
+    expect(target.notificationsMock).toHaveBeenCalledTimes(reconnectedCalls);
+    vi.useRealTimers();
+  });
+
+  it("TASK-DX-009 refreshes stale fallback data only when the page becomes visible", async () => {
+    const user = userEvent.setup();
+    const target = setup(undefined, undefined, undefined, () =>
+      Promise.resolve({ status: "retryable" }),
+    );
+    await open(user);
+    await screen.findByText("Retour résolu");
+    await target.queryClient.invalidateQueries({
+      queryKey: [
+        "workbench-notifications",
+        { workspaceId: "workspace_1", projectId: "project_1" },
+      ],
+      refetchType: "none",
+    });
+    await waitFor(() => {
+      expect(
+        target.queryClient.getQueryCache().find({
+          queryKey: [
+            "workbench-notifications",
+            { workspaceId: "workspace_1", projectId: "project_1" },
+          ],
+        })?.state.isInvalidated,
+      ).toBe(true);
+    });
+    const initialCalls = target.notificationsMock.mock.calls.length;
+    const visibility = Object.getOwnPropertyDescriptor(document, "visibilityState");
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "hidden",
+    });
+    act(() => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    expect(target.notificationsMock).toHaveBeenCalledTimes(initialCalls);
+
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "visible",
+    });
+    act(() => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    await waitFor(() => {
+      expect(target.notificationsMock).toHaveBeenCalledTimes(initialCalls + 1);
+    });
+    if (visibility === undefined) Reflect.deleteProperty(document, "visibilityState");
+    else Object.defineProperty(document, "visibilityState", visibility);
   });
 
   it("BDD-WORK-WEB-006 executes classification only through the trusted gateway", async () => {
