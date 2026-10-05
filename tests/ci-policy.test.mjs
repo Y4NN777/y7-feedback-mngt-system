@@ -247,10 +247,19 @@ test("BDD-E2E-301 runs the complete Preview acceptance pack with ephemeral secre
   );
   assert.match(
     workflow,
+    /Y7_PREVIEW_APPWRITE_API_KEY: \$\{\{ secrets\.Y7_PREVIEW_APPWRITE_API_KEY \}\}/u,
+  );
+  assert.match(
+    workflow,
     /Y7_PREVIEW_EVIDENCE_ENV: \$\{\{ secrets\.Y7_PREVIEW_EVIDENCE_ENV \}\}/u,
   );
   assert.match(workflow, /install -m 600 \/dev\/null \.env\.appwrite-preview/u);
   assert.match(workflow, /trap 'rm -f \.env\.appwrite-preview' EXIT/u);
+  assert.match(workflow, /sed -i '\/\^APPWRITE_API_KEY=\/d' \.env\.appwrite-preview/u);
+  assert.match(
+    workflow,
+    /printf 'APPWRITE_API_KEY=%s\\n' "\$Y7_PREVIEW_APPWRITE_API_KEY" >> \.env\.appwrite-preview/u,
+  );
   assert.match(
     workflow,
     /PROVIDER_OUTBOX_TRIGGER_SECRET="\$\(openssl rand -base64 48/u,

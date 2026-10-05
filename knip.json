@@ -15,7 +15,8 @@
         "src/main.ts",
         "src/configure-*.ts",
         "src/deploy-*.ts",
-        "src/provision-*.ts",
+        "src/tooling/provisioning/provision-*.ts",
+        "src/tooling/provisioning/verify-*.ts",
         "src/run-*.ts",
         "src/verify-*.ts"
       ],
