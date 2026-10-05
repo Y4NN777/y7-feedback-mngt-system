@@ -1,7 +1,7 @@
 import type {
   createPlatformAccessCoordinator,
   PlatformAccessOutcome,
-} from "./platform-access.js";
+} from "../../capabilities/platform-access/platform-access.js";
 
 export interface PlatformAccessHttpRequest {
   readonly method: string;

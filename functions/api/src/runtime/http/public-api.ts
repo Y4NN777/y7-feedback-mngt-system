@@ -28,7 +28,7 @@ import type { WorkspaceAttachmentDownload } from "../../capabilities/attachments
 import type {
   WorkspaceOperationOutcome,
   WorkspaceProjectOperations,
-} from "../../workspace-project-operations.js";
+} from "../../capabilities/administration/workspace-project-operations.js";
 
 export interface PublicApiRequest {
   readonly method: string;

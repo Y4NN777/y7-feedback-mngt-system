@@ -14,7 +14,7 @@ import {
   declaredSloSamplesPerReadMetric,
 } from "./slo-capacity-envelope.js";
 import { createNodeAppwriteWorkbenchStore } from "./infrastructure/appwrite/workbench/appwrite-workbench-store.js";
-import { createNodeAppwriteWorkspaceCapabilityScopeResolver } from "./appwrite-workspace-capability-scope.js";
+import { createNodeAppwriteWorkspaceCapabilityScopeResolver } from "./infrastructure/appwrite/platform-access/appwrite-workspace-capability-scope.js";
 
 function object(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

@@ -13,8 +13,8 @@ import {
 
 import { parseServerConfig } from "@y7-feedback/config/server";
 
-import { createNodeAppwritePlatformAccessExpiryWorker } from "./appwrite-platform-access-store.js";
-import { createPlatformAccessAuditId } from "./platform-access-audit-id.js";
+import { createNodeAppwritePlatformAccessExpiryWorker } from "./infrastructure/appwrite/platform-access/appwrite-platform-access-store.js";
+import { createPlatformAccessAuditId } from "./capabilities/platform-access/platform-access-audit-id.js";
 import { createSensitiveDataProtector } from "./sensitive-data-protector.js";
 import { retryVerificationOperation } from "./verification-poll.js";
 

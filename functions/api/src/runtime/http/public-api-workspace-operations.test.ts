@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createPublicApi } from "./public-api";
-import type { WorkspaceProjectOperations } from "../../workspace-project-operations";
+import type { WorkspaceProjectOperations } from "../../capabilities/administration/workspace-project-operations";
 
 const unavailable = () =>
   Promise.resolve({

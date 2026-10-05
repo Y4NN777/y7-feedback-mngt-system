@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import type { Storage, TablesDB, Users } from "node-appwrite";
 
 import type { OutboxSafeEvent } from "../../outbox.js";
-import type { AppwritePrincipalVerifier } from "../../capabilities/attachments/workspace-attachment-download.js";
+import type { AppwritePrincipalVerifier } from "../../capabilities/platform-access/access-contracts.js";
 
 export interface ApplicationRuntime {
   readonly tables: TablesDB;

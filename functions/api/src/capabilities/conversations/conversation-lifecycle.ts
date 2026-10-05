@@ -14,8 +14,8 @@ import {
   type WorkspaceConversationProjection,
 } from "./conversation-contracts.js";
 import type { AccountlessAccessCoordinator } from "../../accountless-access.js";
-import type { WorkspaceCapabilityScopeResolver } from "../../appwrite-workspace-capability-scope.js";
-import type { AppwritePrincipalVerifier } from "../attachments/workspace-attachment-download.js";
+import type { WorkspaceCapabilityScopeResolver } from "../platform-access/access-contracts.js";
+import type { AppwritePrincipalVerifier } from "../platform-access/access-contracts.js";
 
 type Command = AppendConversationCommand | LifecycleTransitionCommand;
 

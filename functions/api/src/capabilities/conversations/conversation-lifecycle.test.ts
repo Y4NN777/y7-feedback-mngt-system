@@ -11,9 +11,9 @@ import {
   AppwriteConversationLifecycleError,
   type ConversationLifecycleStore,
 } from "./conversation-contracts";
-import type { WorkspaceCapabilityScopeResolver } from "../../appwrite-workspace-capability-scope";
+import type { WorkspaceCapabilityScopeResolver } from "../platform-access/access-contracts";
 import { createConversationLifecycleCoordinator } from "./conversation-lifecycle";
-import type { AppwritePrincipalVerifier } from "../attachments/workspace-attachment-download";
+import type { AppwritePrincipalVerifier } from "../platform-access/access-contracts";
 
 const message = {
   kind: "append_message",

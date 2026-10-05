@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createPlatformAccessHttp } from "./platform-access-http";
-import type { PlatformAccessOutcome } from "./platform-access";
+import type { PlatformAccessOutcome } from "../../capabilities/platform-access/platform-access";
 
 function setup(outcome: PlatformAccessOutcome) {
   const execute = vi.fn(

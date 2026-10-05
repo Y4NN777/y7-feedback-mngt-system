@@ -8,8 +8,8 @@ import {
   type WorkbenchMutationResult,
   type WorkbenchMutationStore,
 } from "./workbench-contracts.js";
-import type { WorkspaceCapabilityScopeResolver } from "../../appwrite-workspace-capability-scope.js";
-import type { AppwritePrincipalVerifier } from "../attachments/workspace-attachment-download.js";
+import type { WorkspaceCapabilityScopeResolver } from "../platform-access/access-contracts.js";
+import type { AppwritePrincipalVerifier } from "../platform-access/access-contracts.js";
 
 export type WorkbenchOutcome =
   | {

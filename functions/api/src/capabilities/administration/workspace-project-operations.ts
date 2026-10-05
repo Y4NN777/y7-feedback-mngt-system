@@ -1,7 +1,9 @@
 import type { ActorAccess, ProjectCapability } from "@y7-feedback/domain";
 
-import type { WorkspaceCapabilityScopeResolver } from "./appwrite-workspace-capability-scope.js";
-import type { AppwritePrincipalVerifier } from "./capabilities/attachments/workspace-attachment-download.js";
+import type {
+  AppwritePrincipalVerifier,
+  WorkspaceCapabilityScopeResolver,
+} from "../platform-access/access-contracts.js";
 
 export interface WorkspaceProjectRequest {
   readonly jwt: string;

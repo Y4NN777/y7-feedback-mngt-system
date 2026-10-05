@@ -1,4 +1,4 @@
-import type { ProjectAdministration } from "./project-administration.js";
+import type { ProjectAdministration } from "../../capabilities/administration/project-administration.js";
 
 export interface ProjectAdministrationHttpRequest {
   readonly method: string;

@@ -8,8 +8,8 @@ import {
   type IntelligenceTrendWindow,
 } from "@y7-feedback/domain";
 
-import type { WorkspaceCapabilityScopeResolver } from "./appwrite-workspace-capability-scope.js";
-import type { AppwritePrincipalVerifier } from "./capabilities/attachments/workspace-attachment-download.js";
+import type { WorkspaceCapabilityScopeResolver } from "./infrastructure/appwrite/platform-access/appwrite-workspace-capability-scope.js";
+import type { AppwritePrincipalVerifier } from "./capabilities/platform-access/access-contracts.js";
 
 export interface IntelligenceStore {
   list(input: {

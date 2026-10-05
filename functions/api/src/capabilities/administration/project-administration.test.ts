@@ -2,11 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   AppwriteProjectAdministrationError,
-  type AppwriteProjectAdministrationStore,
-} from "./appwrite-project-administration-store";
-import type { WorkspaceOwnerScopeResolver } from "./appwrite-workspace-owner-scope";
+  type ProjectAdministrationStore,
+} from "./administration-contracts";
+import type { WorkspaceOwnerScopeResolver } from "./administration-contracts";
 import { createProjectAdministration } from "./project-administration";
-import type { AppwritePrincipalVerifier } from "./capabilities/attachments/workspace-attachment-download";
+import type { AppwritePrincipalVerifier } from "../platform-access/access-contracts";
 
 const command = {
   kind: "create_project",
@@ -30,14 +30,14 @@ function setup() {
       workspaceId: "workspace_1",
     }),
   );
-  const create = vi.fn<AppwriteProjectAdministrationStore["create"]>(() =>
+  const create = vi.fn<ProjectAdministrationStore["create"]>(() =>
     Promise.resolve({
       status: "created",
       projectId: "project_1",
       slug: "wise-money",
     }),
   );
-  const mutate = vi.fn<AppwriteProjectAdministrationStore["mutate"]>();
+  const mutate = vi.fn<ProjectAdministrationStore["mutate"]>();
   return {
     verify,
     resolve,

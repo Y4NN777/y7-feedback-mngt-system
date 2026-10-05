@@ -4,7 +4,7 @@ import {
   WorkspaceOperationDeniedError,
   type ScopedProjectIdentity,
   type WorkspaceProjectOperationPorts,
-} from "./workspace-project-operations.js";
+} from "../../../capabilities/administration/workspace-project-operations.js";
 
 export interface AppwriteWorkspaceProjectOperationSchema {
   readonly databaseId: string;
