@@ -6,7 +6,7 @@ import {
   runAppwriteG1RollbackMatrix,
   type AppwriteG1MatrixTables,
 } from "./intake-evidence";
-import type { PublicApi, PublicApiResponse } from "./public-api";
+import type { PublicApi, PublicApiResponse } from "./runtime/http/public-api";
 
 const schema = {
   databaseId: "feedback",

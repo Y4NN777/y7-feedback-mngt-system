@@ -161,4 +161,24 @@ test("TASK-ARCH-001D colocates intake and attachment capabilities with their App
       assert.equal(files.has(`${module}.test.ts`), false);
     }
   }
+
+  for (const target of [
+    "capabilities/intake/public-project.ts",
+    "infrastructure/appwrite/intake/appwrite-public-project-reader.ts",
+    "infrastructure/appwrite/intake/appwrite-public-project-reader.test.ts",
+    "runtime/http/public-api.ts",
+    "runtime/http/public-api.test.ts",
+    "runtime/http/public-api-workspace-operations.test.ts",
+  ]) {
+    assert.equal(files.has(target), true);
+  }
+  for (const legacy of [
+    "appwrite-public-project-reader.ts",
+    "appwrite-public-project-reader.test.ts",
+    "public-api.ts",
+    "public-api.test.ts",
+    "public-api-workspace-operations.test.ts",
+  ]) {
+    assert.equal(files.has(legacy), false);
+  }
 });

@@ -7,7 +7,7 @@ import type { ExternalIssueHttp } from "../../external-issue-http.js";
 import type { IntelligenceHttp } from "../../intelligence-http.js";
 import type { PrivacyHttp } from "../../privacy-http.js";
 import type { PlatformAccessHttp } from "../../platform-access-http.js";
-import type { PublicApi } from "../../public-api.js";
+import type { PublicApi } from "./public-api.js";
 import type { ProjectAdministrationHttp } from "../../project-administration-http.js";
 import type { ProviderIssueOutboxHttp } from "../../provider-issue-outbox-http.js";
 import type { ProviderEventInboxHttp } from "../../provider-event-inbox-http.js";

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 import type { AccountlessAccessCoordinator } from "./accountless-access.js";
-import type { PublicApi, PublicApiResponse } from "./public-api.js";
+import type { PublicApi, PublicApiResponse } from "./runtime/http/public-api.js";
 
 export interface AppwriteG1MatrixSchema {
   readonly databaseId: string;

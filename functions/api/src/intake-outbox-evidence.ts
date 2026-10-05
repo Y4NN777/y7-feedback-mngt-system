@@ -5,7 +5,7 @@ import {
   type AppwriteG1MatrixTables,
 } from "./intake-evidence.js";
 import type { OutboxRunResult } from "./outbox.js";
-import type { PublicApi } from "./public-api.js";
+import type { PublicApi } from "./runtime/http/public-api.js";
 
 export interface AppwriteG1OutboxMatrixInput {
   readonly retryIds: AppwriteG1MatrixIds;

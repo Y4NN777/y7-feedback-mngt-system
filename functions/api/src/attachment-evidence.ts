@@ -8,7 +8,7 @@ import {
   type AppwriteG1MatrixSchema,
   type AppwriteG1MatrixTables,
 } from "./intake-evidence.js";
-import type { PublicApi } from "./public-api.js";
+import type { PublicApi } from "./runtime/http/public-api.js";
 import { acceptAttachmentEvidence } from "./attachment-evidence-retry.js";
 
 export interface AppwriteG2AttachmentSchema extends AppwriteG1MatrixSchema {

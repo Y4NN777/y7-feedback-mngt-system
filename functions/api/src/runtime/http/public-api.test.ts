@@ -6,17 +6,20 @@ import type {
   ValidatedFeedbackDraft,
 } from "@y7-feedback/domain";
 
-import type { AccountlessAccessCoordinator } from "./accountless-access";
-import type { AttachmentStaging } from "./capabilities/attachments/attachment-staging";
-import type { AttachmentStagingGrant } from "./capabilities/attachments/attachment-staging-token";
-import type { IntakeCommand, IntakeCoordinator } from "./capabilities/intake/intake";
-import type { ReporterAttachmentDownload } from "./capabilities/attachments/reporter-attachment-download";
-import type { WorkspaceAttachmentDownload } from "./capabilities/attachments/workspace-attachment-download";
-import {
-  createPublicApi,
-  type PublicProject,
-  type PublicProjectReader,
-} from "./public-api";
+import type { AccountlessAccessCoordinator } from "../../accountless-access";
+import type { AttachmentStaging } from "../../capabilities/attachments/attachment-staging";
+import type { AttachmentStagingGrant } from "../../capabilities/attachments/attachment-staging-token";
+import type {
+  IntakeCommand,
+  IntakeCoordinator,
+} from "../../capabilities/intake/intake";
+import type {
+  PublicProject,
+  PublicProjectReader,
+} from "../../capabilities/intake/public-project";
+import type { ReporterAttachmentDownload } from "../../capabilities/attachments/reporter-attachment-download";
+import type { WorkspaceAttachmentDownload } from "../../capabilities/attachments/workspace-attachment-download";
+import { createPublicApi } from "./public-api";
 
 const projectConfig: ProjectFeedbackConfig = {
   projectId: "project-authoritative",
