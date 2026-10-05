@@ -42,7 +42,7 @@ test("BDD-CI-001 runs the complete pull-request gate with pinned least-privilege
     [...workflow.matchAll(/\$\{\{\s*secrets\.([A-Z0-9_]+)\s*\}\}/gu)].map(
       (match) => match[1],
     ),
-    ["Y7_PREVIEW_APPWRITE_API_KEY", "Y7_PREVIEW_EVIDENCE_ENV"],
+    ["Y7_PREVIEW_SMOKE_API_KEY", "Y7_PREVIEW_EVIDENCE_ENV"],
   );
 });
 

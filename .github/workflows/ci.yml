@@ -116,7 +116,7 @@ jobs:
           exit 1
       - name: Run deployed Vercel to Appwrite Preview smoke
         env:
-          Y7_PREVIEW_APPWRITE_API_KEY: ${{ secrets.Y7_PREVIEW_APPWRITE_API_KEY }}
+          Y7_PREVIEW_SMOKE_API_KEY: ${{ secrets.Y7_PREVIEW_SMOKE_API_KEY }}
           Y7_PREVIEW_EVIDENCE_ENV: ${{ secrets.Y7_PREVIEW_EVIDENCE_ENV }}
         shell: bash
         run: |
@@ -125,12 +125,12 @@ jobs:
           umask 077
           install -m 600 /dev/null .env.appwrite-preview
           trap 'rm -f .env.appwrite-preview' EXIT
-          if [ -z "$Y7_PREVIEW_APPWRITE_API_KEY" ] || [ -z "$Y7_PREVIEW_EVIDENCE_ENV" ] || [ -z "$Y7_DEPLOYED_PREVIEW_URL" ]; then
+          if [ -z "$Y7_PREVIEW_SMOKE_API_KEY" ] || [ -z "$Y7_PREVIEW_EVIDENCE_ENV" ] || [ -z "$Y7_DEPLOYED_PREVIEW_URL" ]; then
             echo '{"error":"DEPLOYED_PREVIEW_AUTHORITY_MISSING"}' >&2
             exit 1
           fi
           printf '%s\n' "$Y7_PREVIEW_EVIDENCE_ENV" >.env.appwrite-preview
           sed -i '/^APPWRITE_API_KEY=/d' .env.appwrite-preview
-          printf 'APPWRITE_API_KEY=%s\n' "$Y7_PREVIEW_APPWRITE_API_KEY" >>.env.appwrite-preview
-          unset Y7_PREVIEW_APPWRITE_API_KEY Y7_PREVIEW_EVIDENCE_ENV
+          printf 'APPWRITE_API_KEY=%s\n' "$Y7_PREVIEW_SMOKE_API_KEY" >>.env.appwrite-preview
+          unset Y7_PREVIEW_SMOKE_API_KEY Y7_PREVIEW_EVIDENCE_ENV
           pnpm test:e2e:deployed-preview
