@@ -11,7 +11,7 @@ import {
 } from "./intake-evidence.js";
 import { createNodeAppwritePrivacyCleanup } from "./appwrite-privacy-cleanup.js";
 import { createNodeAppwritePrivacyPurgeRepository } from "./appwrite-privacy-purge-repository.js";
-import { createNodeAppwriteProviderIssueStateStore } from "./appwrite-provider-issue-state-store.js";
+import { createNodeAppwriteProviderIssueStateStore } from "./infrastructure/appwrite/providers/appwrite-provider-issue-state-store.js";
 import { createPrivacyPurgeWorker } from "./privacy-cleanup.js";
 import { createSensitiveDataProtector } from "./sensitive-data-protector.js";
 

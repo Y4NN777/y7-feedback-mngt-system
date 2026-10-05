@@ -10,7 +10,7 @@ import {
 import { parseServerConfig } from "@y7-feedback/config/server";
 
 import { resolveAppwriteFunctionTarget } from "./appwrite-function-variables.js";
-import { createNodeAppwriteProviderGrantVault } from "./appwrite-provider-grant-vault.js";
+import { createNodeAppwriteProviderGrantVault } from "./infrastructure/appwrite/providers/appwrite-provider-grant-vault.js";
 import { hasHealthyScheduledReconciliation } from "./provider-reconciliation-evidence.js";
 
 async function absentDelete(

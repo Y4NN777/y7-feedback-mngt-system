@@ -2,9 +2,11 @@ import type { TablesDB } from "node-appwrite";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createNodeAppwritePrivacyProviderCleanup } from "./appwrite-privacy-provider-cleanup";
-import { closeProviderIssue } from "./provider-issue-cleanup";
+import { closeProviderIssue } from "./infrastructure/appwrite/providers/provider-issue-cleanup";
 
-vi.mock("./provider-issue-cleanup", () => ({ closeProviderIssue: vi.fn() }));
+vi.mock("./infrastructure/appwrite/providers/provider-issue-cleanup", () => ({
+  closeProviderIssue: vi.fn(),
+}));
 
 const schema = {
   databaseId: "feedback",

@@ -2,7 +2,7 @@ import type { ServerConfig } from "@y7-feedback/config/server";
 
 import type { HttpDependencies } from "../http/http.js";
 import { createPublicApi } from "../http/public-api.js";
-import { createProviderMaintenanceHttp } from "../../provider-maintenance-http.js";
+import { createProviderMaintenanceHttp } from "../http/provider-maintenance-http.js";
 import type { ApplicationRuntime } from "./application-runtime.js";
 import { composeAdministrationCapability } from "./compose-administration-capability.js";
 import { composeApplicationSecurity } from "./compose-application-security.js";

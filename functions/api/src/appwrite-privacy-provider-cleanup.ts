@@ -1,6 +1,6 @@
 import { Query, type TablesDB } from "node-appwrite";
 
-import { closeProviderIssue } from "./provider-issue-cleanup.js";
+import { closeProviderIssue } from "./infrastructure/appwrite/providers/provider-issue-cleanup.js";
 import type {
   PrivacyProviderCleanupCandidate,
   PrivacyProviderCleanupStore,

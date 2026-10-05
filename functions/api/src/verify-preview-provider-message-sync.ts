@@ -5,17 +5,17 @@ import { Client, DeploymentStatus, Functions, Query, TablesDB } from "node-appwr
 
 import { parseServerConfig } from "@y7-feedback/config/server";
 
-import { createAppwriteProviderGrantVault } from "./appwrite-provider-grant-vault.js";
-import { createNodeAppwriteProviderConsentCleanup } from "./appwrite-provider-consent-cleanup.js";
-import { createNodeAppwriteProviderMessageFanout } from "./appwrite-provider-message-fanout.js";
+import { createAppwriteProviderGrantVault } from "./infrastructure/appwrite/providers/appwrite-provider-grant-vault.js";
+import { createNodeAppwriteProviderConsentCleanup } from "./infrastructure/appwrite/providers/appwrite-provider-consent-cleanup.js";
+import { createNodeAppwriteProviderMessageFanout } from "./infrastructure/appwrite/providers/appwrite-provider-message-fanout.js";
 import { pollVerification } from "./verification-poll.js";
-import { createGitHubMessageProvider } from "./github-message-provider.js";
-import { createGitLabMessageProvider } from "./gitlab-message-provider.js";
+import { createGitHubMessageProvider } from "./capabilities/providers/github/github-message-provider.js";
+import { createGitLabMessageProvider } from "./capabilities/providers/gitlab/gitlab-message-provider.js";
 import { resolveProviderMessageSyncEvidenceTarget } from "./provider-message-sync-evidence-target.js";
 import { resolveProviderVerificationToken } from "./provider-verification-token.js";
 import { removeProviderVerificationWebhooks } from "./provider-verification-webhook-cleanup.js";
 import { createSensitiveDataProtector } from "./sensitive-data-protector.js";
-import type { ProviderGrantVault } from "./source-provider.js";
+import type { ProviderGrantVault } from "./capabilities/providers/shared/source-provider.js";
 
 type Provider = "github" | "gitlab";
 
