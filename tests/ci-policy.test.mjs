@@ -88,7 +88,7 @@ test("BDD-CI-004 loads ignored Appwrite credentials without shell export", async
 
   assert.equal(
     rootPackage.scripts["provision:appwrite"],
-    "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build && node --env-file=.env.appwrite-preview functions/api/dist/tooling/provision-appwrite.js --apply",
+    "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm --filter @y7-feedback/api build && node --env-file=.env.appwrite-preview functions/api/dist/tooling/tooling/provisioning/provision-appwrite.js --apply",
   );
   assert.equal(
     rootPackage.scripts["verify:appwrite:intake"],

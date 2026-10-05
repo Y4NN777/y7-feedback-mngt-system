@@ -8,10 +8,10 @@ import {
   type G1FixtureRow,
   type G1FixtureStore,
 } from "./intake-fixtures";
-import { canonicalDay4SchemaIds } from "./appwrite-day4-migration";
+import { canonicalControlPlaneSchemaIds } from "./migrations/control-plane/control-plane-schema";
 
 const schema: ServerConfig["appwriteSchema"] = {
-  ...canonicalDay4SchemaIds,
+  ...canonicalControlPlaneSchemaIds,
   authoritativeCommitsTableId: "authoritative_commits",
   databaseId: "feedback",
   workspacesTableId: "workspaces",

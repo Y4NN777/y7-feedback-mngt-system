@@ -1,17 +1,17 @@
 import type { ServerConfig } from "@y7-feedback/config/server";
 
-import { createDay4TableDefinitions } from "./appwrite-day4-migration.js";
+import { createControlPlaneTableDefinitions } from "../control-plane/control-plane-schema.js";
 import type {
   AppwriteColumn,
   AppwriteIndex,
   AppwriteTableDefinition,
-} from "./appwrite-schema-contract.js";
+} from "./schema-contract.js";
 
 export type {
   AppwriteColumn,
   AppwriteIndex,
   AppwriteTableDefinition,
-} from "./appwrite-schema-contract.js";
+} from "./schema-contract.js";
 
 export interface AppwriteInfrastructureManifest {
   readonly database: {
@@ -614,7 +614,7 @@ export function createAppwriteInfrastructureManifest(
           index("workspace_project", ["workspaceId", "projectId"]),
         ],
       ),
-      ...createDay4TableDefinitions(schema),
+      ...createControlPlaneTableDefinitions(schema),
     ],
     attachmentBucket: {
       id: schema.attachmentBucketId,

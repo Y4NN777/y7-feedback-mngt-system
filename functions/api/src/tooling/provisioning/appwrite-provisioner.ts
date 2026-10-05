@@ -1,5 +1,8 @@
-import type { AppwriteColumn, AppwriteIndex } from "./appwrite-schema-contract.js";
-import type { AppwriteInfrastructureManifest } from "./appwrite-schema.js";
+import type {
+  AppwriteColumn,
+  AppwriteIndex,
+} from "../../migrations/schema/schema-contract.js";
+import type { AppwriteInfrastructureManifest } from "../../migrations/schema/schema.js";
 
 export interface ExistingAppwriteDatabase {
   readonly id: string;

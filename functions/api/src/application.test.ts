@@ -8,7 +8,7 @@ import {
   deriveReporterActorId,
   digestExternalIssueCommand,
 } from "./runtime/composition/application.js";
-import { canonicalDay4SchemaIds } from "./appwrite-day4-migration";
+import { canonicalControlPlaneSchemaIds } from "./migrations/control-plane/control-plane-schema";
 import { routeRequest, type FunctionContext } from "./runtime/http/http.js";
 import { createSensitiveDataProtector } from "./sensitive-data-protector";
 
@@ -25,7 +25,7 @@ const config: ServerConfig = {
   webOrigin: "https://y7-feedback.vercel.app",
   intakePersistenceMode: "normalized",
   appwriteSchema: {
-    ...canonicalDay4SchemaIds,
+    ...canonicalControlPlaneSchemaIds,
     authoritativeCommitsTableId: "authoritative_commits",
     databaseId: "feedback",
     workspacesTableId: "workspaces",

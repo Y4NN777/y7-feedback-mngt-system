@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { createAppwriteInfrastructureManifest } from "./appwrite-schema";
-import { schema } from "./appwrite-schema.test-fixture";
+import { createAppwriteInfrastructureManifest } from "./schema";
+import { schema } from "./schema.test-fixture";
 
 function table(id: string) {
   const found = createAppwriteInfrastructureManifest(schema).tables.find(

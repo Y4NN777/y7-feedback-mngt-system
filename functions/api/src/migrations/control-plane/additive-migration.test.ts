@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import type { AppwriteTableDefinition } from "./appwrite-schema";
+import type { AppwriteTableDefinition } from "../schema/schema-contract";
 import {
   assertAdditiveRollbackSafe,
   planAdditiveTableMigration,
-} from "./appwrite-additive-migration";
+} from "./additive-migration";
 
 function table(id: string): AppwriteTableDefinition {
   return {
