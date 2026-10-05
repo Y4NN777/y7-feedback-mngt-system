@@ -62,6 +62,7 @@ jobs:
           cache: pnpm
           package-manager-cache: false
       - name: Preflight the real Preview antivirus authority
+        if: env.ACCEPTANCE_SCOPE == 'full' || env.ACCEPTANCE_SCOPE == 'attachments'
         run: node scripts/antivirus-authority-probe.mjs
       - name: Authenticate the isolated recovery drill with Azure workload identity
         if: env.ACCEPTANCE_SCOPE == 'full' || env.ACCEPTANCE_SCOPE == 'recovery'

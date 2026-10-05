@@ -2,8 +2,8 @@ import { createHmac, randomBytes } from "node:crypto";
 
 import { Client, Query, TablesDB } from "node-appwrite";
 
-import { createAppwriteAbuseCounterStore } from "./appwrite-abuse-counter-store.js";
-import type { AbuseCounterRequest } from "./abuse.js";
+import { createAppwriteAbuseCounterStore } from "./infrastructure/appwrite/intake/appwrite-abuse-counter-store.js";
+import type { AbuseCounterRequest } from "./capabilities/intake/abuse.js";
 
 if (!process.argv.includes("--apply")) throw new Error("ABUSE_VERIFY_REQUIRES_APPLY");
 

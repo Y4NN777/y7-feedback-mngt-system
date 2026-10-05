@@ -1,6 +1,9 @@
 import { Query, type Storage, type TablesDB } from "node-appwrite";
 
-import type { PrivacyCleanupPort, PrivacyPurgeCandidate } from "./privacy-cleanup.js";
+import type {
+  PrivacyCleanupPort,
+  PrivacyPurgeCandidate,
+} from "../../../capabilities/privacy/privacy-cleanup.js";
 
 export interface AppwritePrivacyCleanupTables {
   listRows(input: {

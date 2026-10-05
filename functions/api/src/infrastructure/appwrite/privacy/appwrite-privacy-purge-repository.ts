@@ -9,8 +9,8 @@ import {
 import type {
   PrivacyPurgeCandidate,
   PrivacyPurgeRepository,
-} from "./privacy-cleanup.js";
-import type { AppwriteSensitivePersistence } from "./sensitive-data-protector.js";
+} from "../../../capabilities/privacy/privacy-cleanup.js";
+import type { AppwriteSensitivePersistence } from "../../../sensitive-data-protector.js";
 
 export interface AppwritePrivacyPurgeTables {
   createTransaction(input: { readonly ttl: number }): Promise<{ readonly $id: string }>;

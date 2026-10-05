@@ -132,6 +132,27 @@ const appwriteProviderModules = [
   "provider-issue-cleanup",
 ];
 
+const intelligenceCapabilityModules = ["intelligence", "intelligence-provenance"];
+
+const privacyCapabilityModules = [
+  "privacy",
+  "privacy-cleanup",
+  "privacy-provider-cleanup",
+];
+
+const appwriteIntelligenceModules = [
+  "appwrite-intelligence-store",
+  "appwrite-intelligence-provenance-store",
+];
+
+const appwritePrivacyModules = [
+  "appwrite-privacy-store",
+  "appwrite-privacy-cleanup",
+  "appwrite-privacy-provider-cleanup",
+  "appwrite-privacy-purge-repository",
+  "appwrite-reporter-consent-verifier",
+];
+
 async function sourceFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
   const nested = await Promise.all(
@@ -357,4 +378,44 @@ test("TASK-ARCH-001G isolates shared, GitHub, GitLab and Appwrite provider bound
 
   assert.equal(files.has("runtime/composition/provider-source-composition.ts"), true);
   assert.equal(files.has("provider-source-composition.ts"), false);
+});
+
+test("TASK-ARCH-001H isolates intelligence, privacy and intake-owned abuse boundaries", async () => {
+  const files = new Set(
+    (await sourceFiles(apiSourceRoot)).map((absolute) => relativeSourcePath(absolute)),
+  );
+
+  for (const [directory, modules] of [
+    ["capabilities/intelligence", intelligenceCapabilityModules],
+    ["capabilities/privacy", privacyCapabilityModules],
+    ["infrastructure/appwrite/intelligence", appwriteIntelligenceModules],
+    ["infrastructure/appwrite/privacy", appwritePrivacyModules],
+  ]) {
+    for (const module of modules) {
+      assert.equal(files.has(`${directory}/${module}.ts`), true);
+      assert.equal(files.has(`${directory}/${module}.test.ts`), true);
+      assert.equal(files.has(`${module}.ts`), false);
+      assert.equal(files.has(`${module}.test.ts`), false);
+    }
+  }
+
+  for (const handler of ["intelligence-http", "privacy-http"]) {
+    assert.equal(files.has(`runtime/http/${handler}.ts`), true);
+    assert.equal(files.has(`runtime/http/${handler}.test.ts`), true);
+    assert.equal(files.has(`${handler}.ts`), false);
+    assert.equal(files.has(`${handler}.test.ts`), false);
+  }
+
+  assert.equal(files.has("capabilities/intake/abuse.ts"), true);
+  assert.equal(files.has("capabilities/intake/abuse.test.ts"), true);
+  assert.equal(
+    files.has("infrastructure/appwrite/intake/appwrite-abuse-counter-store.ts"),
+    true,
+  );
+  assert.equal(
+    files.has("infrastructure/appwrite/intake/appwrite-abuse-counter-store.test.ts"),
+    true,
+  );
+  assert.equal(files.has("abuse.ts"), false);
+  assert.equal(files.has("abuse.test.ts"), false);
 });
