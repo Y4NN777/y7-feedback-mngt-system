@@ -4,7 +4,7 @@ import {
   createAppwriteAbuseCounterStore,
   type AppwriteAbuseCounterTables,
 } from "./appwrite-abuse-counter-store";
-import type { AbuseCounterRequest } from "./abuse";
+import type { AbuseCounterRequest } from "../../../capabilities/intake/abuse";
 
 const schema = { databaseId: "feedback", abuseCountersTableId: "abuse_counters" };
 const queries = {

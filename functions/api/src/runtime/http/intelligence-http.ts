@@ -1,11 +1,11 @@
 import type {
   createIntelligenceCoordinator,
   IntelligenceOutcome,
-} from "./intelligence.js";
+} from "../../capabilities/intelligence/intelligence.js";
 import type {
   createIntelligenceProvenanceCoordinator,
   IntelligenceProvenanceOutcome,
-} from "./intelligence-provenance.js";
+} from "../../capabilities/intelligence/intelligence-provenance.js";
 
 export interface IntelligenceHttpRequest {
   readonly method: string;

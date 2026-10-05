@@ -14,9 +14,9 @@ import { drainAuthoritativeProjectionEvent } from "../../authoritative-projectio
 import { createAuthoritativeProjectionRouter } from "../../authoritative-projection-router.js";
 import { createNodeAppwriteOutboxStore } from "../../appwrite-outbox-store.js";
 import { createNodeAppwriteNotificationRecipientResolver } from "../../appwrite-notification-recipient-resolver.js";
-import { createNodeAppwritePrivacyPurgeRepository } from "../../appwrite-privacy-purge-repository.js";
-import { createNodeAppwritePrivacyCleanup } from "../../appwrite-privacy-cleanup.js";
-import { createNodeAppwritePrivacyProviderCleanup } from "../../appwrite-privacy-provider-cleanup.js";
+import { createNodeAppwritePrivacyPurgeRepository } from "../../infrastructure/appwrite/privacy/appwrite-privacy-purge-repository.js";
+import { createNodeAppwritePrivacyCleanup } from "../../infrastructure/appwrite/privacy/appwrite-privacy-cleanup.js";
+import { createNodeAppwritePrivacyProviderCleanup } from "../../infrastructure/appwrite/privacy/appwrite-privacy-provider-cleanup.js";
 import { createNodeAppwriteConversationLifecycleStore } from "../../infrastructure/appwrite/conversations/appwrite-conversation-lifecycle-store.js";
 import { createNodeAppwriteExternalIssueStore } from "../../infrastructure/appwrite/providers/appwrite-external-issue-store.js";
 import { createNodeAppwriteProviderIssueOutboxStore } from "../../infrastructure/appwrite/providers/appwrite-provider-issue-outbox-store.js";
@@ -26,11 +26,11 @@ import { createNodeAppwriteProviderIssueStateStore } from "../../infrastructure/
 import { createNodeAppwriteProviderMessageStore } from "../../infrastructure/appwrite/providers/appwrite-provider-message-store.js";
 import { createNodeAppwriteProviderMessageFanout } from "../../infrastructure/appwrite/providers/appwrite-provider-message-fanout.js";
 import { createNodeAppwriteProviderConsentCleanup } from "../../infrastructure/appwrite/providers/appwrite-provider-consent-cleanup.js";
-import { createNodeAppwriteReporterConsentVerifier } from "../../appwrite-reporter-consent-verifier.js";
+import { createNodeAppwriteReporterConsentVerifier } from "../../infrastructure/appwrite/privacy/appwrite-reporter-consent-verifier.js";
 import { createNodeAppwriteProviderGrantVault } from "../../infrastructure/appwrite/providers/appwrite-provider-grant-vault.js";
 import { createNodeAppwriteActiveSourceGrantReader } from "../../infrastructure/appwrite/providers/appwrite-active-source-grant-reader.js";
-import { createPrivacyPurgeWorker } from "../../privacy-cleanup.js";
-import { createPrivacyProviderCleanup } from "../../privacy-provider-cleanup.js";
+import { createPrivacyPurgeWorker } from "../../capabilities/privacy/privacy-cleanup.js";
+import { createPrivacyProviderCleanup } from "../../capabilities/privacy/privacy-provider-cleanup.js";
 import { createGitHubIssueProvider } from "../../capabilities/providers/github/github-issue-provider.js";
 import { createGitLabIssueProvider } from "../../capabilities/providers/gitlab/gitlab-issue-provider.js";
 import { createProviderSourceHttp } from "./provider-source-composition.js";

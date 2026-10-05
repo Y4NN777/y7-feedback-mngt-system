@@ -2,9 +2,9 @@ import { createHash } from "node:crypto";
 
 import type { ServerConfig } from "@y7-feedback/config/server";
 
-import { createAbuseGate } from "../../abuse.js";
+import { createAbuseGate } from "../../capabilities/intake/abuse.js";
 import { createAccountlessAccessCoordinator } from "../../accountless-access.js";
-import { createNodeAppwriteAbuseCounterStore } from "../../appwrite-abuse-counter-store.js";
+import { createNodeAppwriteAbuseCounterStore } from "../../infrastructure/appwrite/intake/appwrite-abuse-counter-store.js";
 import { createNodeAppwriteAccountlessRepository } from "../../appwrite-accountless-repository.js";
 import { createAppwriteAuthoritativeCommitStore } from "../../appwrite-authoritative-commit-store.js";
 import { createNodeAppwriteIntakeStore } from "../../infrastructure/appwrite/intake/appwrite-intake-store.js";

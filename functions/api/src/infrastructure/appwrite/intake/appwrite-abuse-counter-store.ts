@@ -6,7 +6,7 @@ import type {
   AbuseCounterReceipt,
   AbuseCounterRequest,
   AbuseCounterStore,
-} from "./abuse.js";
+} from "../../../capabilities/intake/abuse.js";
 
 export interface AppwriteAbuseCounterSchema {
   readonly databaseId: string;

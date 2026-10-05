@@ -1,7 +1,7 @@
 import type { TablesDB } from "node-appwrite";
 
-import type { AccountlessAccessCoordinator } from "./accountless-access.js";
-import type { ReporterConsentProofVerifier } from "./capabilities/providers/shared/external-issue-coordination.js";
+import type { AccountlessAccessCoordinator } from "../../../accountless-access.js";
+import type { ReporterConsentProofVerifier } from "../../../capabilities/providers/shared/external-issue-coordination.js";
 
 export interface AppwriteReporterConsentTablesPort {
   getRow(input: {

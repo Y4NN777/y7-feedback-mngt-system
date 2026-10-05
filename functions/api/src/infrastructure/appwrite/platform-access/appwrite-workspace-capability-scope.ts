@@ -4,8 +4,14 @@ import {
   createAuthorizationPolicy,
   type ActorAccess,
   type Project,
-  type ProjectCapability,
 } from "@y7-feedback/domain";
+
+import type { WorkspaceCapabilityScopeResolver } from "../../../capabilities/platform-access/access-contracts.js";
+
+export type {
+  WorkspaceCapabilityScopeOutcome,
+  WorkspaceCapabilityScopeResolver,
+} from "../../../capabilities/platform-access/access-contracts.js";
 
 export interface AppwriteWorkspaceCapabilityScopeSchema {
   readonly databaseId: string;
@@ -32,23 +38,6 @@ export interface AppwriteWorkspaceScopeTablesPort {
 export interface AppwriteWorkspaceScopeQueryPort {
   equal(attribute: string, values: readonly string[]): string;
   limit(limit: number): string;
-}
-
-export type WorkspaceCapabilityScopeOutcome =
-  | {
-      readonly status: "authorized";
-      readonly actor: ActorAccess;
-      readonly project: Project;
-    }
-  | { readonly status: "denied" | "retryable" };
-
-export interface WorkspaceCapabilityScopeResolver {
-  resolve(input: {
-    readonly principalId: string;
-    readonly workspaceId: string;
-    readonly projectId: string;
-    readonly capability: ProjectCapability;
-  }): Promise<WorkspaceCapabilityScopeOutcome>;
 }
 
 const appwriteId = /^[A-Za-z0-9][A-Za-z0-9._-]{0,35}$/u;

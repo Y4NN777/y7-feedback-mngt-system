@@ -6,8 +6,11 @@ import {
   type PrivacyDeletionRecord,
 } from "@y7-feedback/domain";
 
-import type { PrivacyStore, TrustedPrivacyCommand } from "./privacy.js";
-import type { AppwriteSensitivePersistence } from "./sensitive-data-protector.js";
+import type {
+  PrivacyStore,
+  TrustedPrivacyCommand,
+} from "../../../capabilities/privacy/privacy.js";
+import type { AppwriteSensitivePersistence } from "../../../sensitive-data-protector.js";
 
 export interface AppwritePrivacySchema {
   readonly databaseId: string;

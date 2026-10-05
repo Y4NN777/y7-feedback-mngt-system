@@ -1,4 +1,7 @@
-import type { createPrivacyCoordinator, PrivacyOutcome } from "./privacy.js";
+import type {
+  createPrivacyCoordinator,
+  PrivacyOutcome,
+} from "../../capabilities/privacy/privacy.js";
 
 export interface PrivacyHttpRequest {
   readonly method: string;

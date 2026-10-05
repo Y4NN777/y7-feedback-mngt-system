@@ -8,8 +8,8 @@ import type {
   IntelligenceReporterKind,
 } from "@y7-feedback/domain";
 
-import type { IntelligenceStore } from "./intelligence.js";
-import type { AppwriteSensitivePersistence } from "./sensitive-data-protector.js";
+import type { IntelligenceStore } from "../../../capabilities/intelligence/intelligence.js";
+import type { AppwriteSensitivePersistence } from "../../../sensitive-data-protector.js";
 
 export interface AppwriteIntelligenceSchema {
   readonly databaseId: string;

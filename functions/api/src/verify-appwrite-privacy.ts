@@ -9,10 +9,10 @@ import {
   appwriteG1SyntheticRows,
   type AppwriteG1MatrixIds,
 } from "./intake-evidence.js";
-import { createNodeAppwritePrivacyCleanup } from "./appwrite-privacy-cleanup.js";
-import { createNodeAppwritePrivacyPurgeRepository } from "./appwrite-privacy-purge-repository.js";
+import { createNodeAppwritePrivacyCleanup } from "./infrastructure/appwrite/privacy/appwrite-privacy-cleanup.js";
+import { createNodeAppwritePrivacyPurgeRepository } from "./infrastructure/appwrite/privacy/appwrite-privacy-purge-repository.js";
 import { createNodeAppwriteProviderIssueStateStore } from "./infrastructure/appwrite/providers/appwrite-provider-issue-state-store.js";
-import { createPrivacyPurgeWorker } from "./privacy-cleanup.js";
+import { createPrivacyPurgeWorker } from "./capabilities/privacy/privacy-cleanup.js";
 import { createSensitiveDataProtector } from "./sensitive-data-protector.js";
 
 function object(value: unknown): value is Readonly<Record<string, unknown>> {

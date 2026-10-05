@@ -11,8 +11,8 @@ import {
 import type {
   TrustedIntelligenceProvenanceCommand,
   IntelligenceProvenanceStore,
-} from "./intelligence-provenance.js";
-import type { AppwriteSensitivePersistence } from "./sensitive-data-protector.js";
+} from "../../../capabilities/intelligence/intelligence-provenance.js";
+import type { AppwriteSensitivePersistence } from "../../../sensitive-data-protector.js";
 
 export interface AppwriteIntelligenceProvenanceSchema {
   readonly databaseId: string;

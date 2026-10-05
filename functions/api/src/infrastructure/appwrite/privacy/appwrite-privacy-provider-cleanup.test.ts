@@ -2,9 +2,9 @@ import type { TablesDB } from "node-appwrite";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createNodeAppwritePrivacyProviderCleanup } from "./appwrite-privacy-provider-cleanup";
-import { closeProviderIssue } from "./infrastructure/appwrite/providers/provider-issue-cleanup";
+import { closeProviderIssue } from "../providers/provider-issue-cleanup";
 
-vi.mock("./infrastructure/appwrite/providers/provider-issue-cleanup", () => ({
+vi.mock("../providers/provider-issue-cleanup", () => ({
   closeProviderIssue: vi.fn(),
 }));
 

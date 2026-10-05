@@ -1,11 +1,11 @@
 import { Query, type TablesDB } from "node-appwrite";
 
-import { closeProviderIssue } from "./infrastructure/appwrite/providers/provider-issue-cleanup.js";
+import { closeProviderIssue } from "../providers/provider-issue-cleanup.js";
 import type {
   PrivacyProviderCleanupCandidate,
   PrivacyProviderCleanupStore,
   PrivacyProviderIssueCloser,
-} from "./privacy-provider-cleanup.js";
+} from "../../../capabilities/privacy/privacy-provider-cleanup.js";
 
 export interface AppwritePrivacyProviderCleanupSchema {
   readonly databaseId: string;
