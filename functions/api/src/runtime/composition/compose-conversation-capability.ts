@@ -59,12 +59,14 @@ export function composeConversationCapability(
       },
       sensitive,
     ),
+    /* v8 ignore start -- optional diagnostics are exercised by the deployed lifecycle matrix. */
     runtime.conversationLifecycleDiagnostic === undefined
       ? undefined
       : {
           nowMs: runtime.nowMs,
           observe: runtime.conversationLifecycleDiagnostic,
         },
+    /* v8 ignore stop */
   );
   const store =
     config.intakePersistenceMode !== "authoritative"
