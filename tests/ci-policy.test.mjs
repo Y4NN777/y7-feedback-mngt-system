@@ -46,7 +46,7 @@ test("BDD-CI-001 runs the complete pull-request gate with pinned least-privilege
   );
 });
 
-test("BDD-CI-002 builds runtime workspace dependencies before the E2E server", async () => {
+test("BDD-CI-002 builds dependencies and keeps the E2E server port consistent", async () => {
   const playwrightConfig = await readFile(
     new URL("../apps/web/playwright.config.ts", import.meta.url),
     "utf8",
@@ -54,8 +54,13 @@ test("BDD-CI-002 builds runtime workspace dependencies before the E2E server", a
 
   assert.match(
     playwrightConfig,
-    /command:\s*"pnpm --filter @y7-feedback\/config build && pnpm --filter @y7-feedback\/domain build && pnpm build && pnpm preview --host 127\.0\.0\.1"/u,
+    /const e2ePort = process\.env\.E2E_PORT \?\? "4173";/u,
   );
+  assert.match(
+    playwrightConfig,
+    /command:\s*`pnpm --filter @y7-feedback\/config build && pnpm --filter @y7-feedback\/domain build && pnpm build && pnpm preview --host 127\.0\.0\.1 --port \$\{e2ePort\} --strictPort`/u,
+  );
+  assert.match(playwrightConfig, /url: e2eBaseUrl/u);
 });
 
 test("BDD-CI-005 publishes the antivirus image with least privilege and immutable provenance", async () => {
