@@ -8,8 +8,8 @@ import { createHttpApplication } from "./application.js";
 import {
   resolveAppwriteFunctionEnvironment,
   resolveAppwriteFunctionPrincipal,
-} from "./appwrite-function-runtime.js";
-import { routeRequest, type FunctionContext } from "./http.js";
+} from "./runtime/config/appwrite-function-runtime.js";
+import { routeRequest, type FunctionContext } from "./runtime/http/http.js";
 
 export default function handler(context: FunctionContext): Promise<unknown> {
   const requestHeaders = context.req.headers ?? {};

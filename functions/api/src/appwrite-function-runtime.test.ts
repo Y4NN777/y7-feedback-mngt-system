@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   resolveAppwriteFunctionEnvironment,
   resolveAppwriteFunctionPrincipal,
-} from "./appwrite-function-runtime";
+} from "./runtime/config/appwrite-function-runtime.js";
 
 const local = {
   Y7_ENVIRONMENT: "development",

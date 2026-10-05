@@ -8,7 +8,7 @@ import { createSensitiveDataProtector } from "./sensitive-data-protector.js";
 import { createAppwriteFunctionExecutionPublicApi } from "./appwrite-function-execution-public-api.js";
 import { resolveAppwriteFunctionTarget } from "./appwrite-function-variables.js";
 import { readOperationalDuration } from "./http-function-public-api.js";
-import { runBoundedLatencyProbe } from "./bounded-latency-probe.js";
+import { runBoundedLatencyProbe } from "./runtime/observability/bounded-latency-probe.js";
 import {
   declaredSloConcurrency,
   declaredSloSamplesPerReadMetric,

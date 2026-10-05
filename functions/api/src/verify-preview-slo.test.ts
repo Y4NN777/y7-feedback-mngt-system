@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { probeUrl } from "./availability-probe.js";
+import { probeUrl } from "./runtime/observability/availability-probe.js";
 import { stableProbeFailureCode } from "./slo-probe-failure.js";
 
 describe("G5 probe diagnostics", () => {

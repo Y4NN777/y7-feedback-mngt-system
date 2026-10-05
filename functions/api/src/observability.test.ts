@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { serializeOperationalEvent } from "./observability";
+import { serializeOperationalEvent } from "./runtime/observability/observability.js";
 
 describe("safe operational telemetry", () => {
   it("BDD-OBS-002 retains only allowlisted operational fields", () => {
