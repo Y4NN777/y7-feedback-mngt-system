@@ -9,7 +9,7 @@ import {
   digestExternalIssueCommand,
 } from "./application";
 import { canonicalDay4SchemaIds } from "./appwrite-day4-migration";
-import { routeRequest, type FunctionContext } from "./http";
+import { routeRequest, type FunctionContext } from "./runtime/http/http.js";
 import { createSensitiveDataProtector } from "./sensitive-data-protector";
 
 function isObject(value: unknown): value is Readonly<Record<string, unknown>> {

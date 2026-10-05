@@ -5,7 +5,7 @@ import {
   emitHttpRouteResponse,
   type HttpRoute,
   type HttpRouteRequest,
-} from "./http-route-registry";
+} from "./runtime/http/http-route-registry.js";
 
 const request: HttpRouteRequest = {
   method: "GET",

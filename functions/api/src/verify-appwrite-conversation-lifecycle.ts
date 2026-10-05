@@ -4,7 +4,7 @@ import { Client, Functions, Query, TablesDB, Users } from "node-appwrite";
 
 import { parseServerConfig } from "@y7-feedback/config/server";
 
-import { runBoundedLatencyProbe } from "./bounded-latency-probe.js";
+import { runBoundedLatencyProbe } from "./runtime/observability/bounded-latency-probe.js";
 import { createAppwriteFunctionExecutionPublicApi } from "./appwrite-function-execution-public-api.js";
 import { resolveAppwriteFunctionTarget } from "./appwrite-function-variables.js";
 import { createHttpFunctionPublicApi } from "./http-function-public-api.js";

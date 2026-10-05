@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { classifyHttpSloMeasurements } from "./http-slo";
+import { classifyHttpSloMeasurements } from "./runtime/observability/http-slo.js";
 
 const input = {
   method: "POST",

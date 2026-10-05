@@ -1,26 +1,26 @@
 import { randomUUID } from "node:crypto";
 
-import { classifyHttpSloMeasurements } from "./http-slo.js";
-import { serializeOperationalEvent } from "./observability.js";
-import type { ConversationLifecycleHttp } from "./conversation-lifecycle-http.js";
-import type { ExternalIssueHttp } from "./external-issue-http.js";
-import type { IntelligenceHttp } from "./intelligence-http.js";
-import type { PrivacyHttp } from "./privacy-http.js";
-import type { PlatformAccessHttp } from "./platform-access-http.js";
-import type { PublicApi } from "./public-api.js";
-import type { ProjectAdministrationHttp } from "./project-administration-http.js";
-import type { ProviderIssueOutboxHttp } from "./provider-issue-outbox-http.js";
-import type { ProviderEventInboxHttp } from "./provider-event-inbox-http.js";
+import { classifyHttpSloMeasurements } from "../observability/http-slo.js";
+import { serializeOperationalEvent } from "../observability/observability.js";
+import type { ConversationLifecycleHttp } from "../../conversation-lifecycle-http.js";
+import type { ExternalIssueHttp } from "../../external-issue-http.js";
+import type { IntelligenceHttp } from "../../intelligence-http.js";
+import type { PrivacyHttp } from "../../privacy-http.js";
+import type { PlatformAccessHttp } from "../../platform-access-http.js";
+import type { PublicApi } from "../../public-api.js";
+import type { ProjectAdministrationHttp } from "../../project-administration-http.js";
+import type { ProviderIssueOutboxHttp } from "../../provider-issue-outbox-http.js";
+import type { ProviderEventInboxHttp } from "../../provider-event-inbox-http.js";
 import type {
   ProviderMaintenance,
   ProviderMaintenanceCapability,
-} from "./provider-maintenance.js";
-import { ProviderMaintenanceFailure } from "./provider-maintenance.js";
-import type { ProviderMaintenanceHttp } from "./provider-maintenance-http.js";
-import type { ProviderWebhookHttpResponse } from "./provider-webhook-http.js";
-import type { SourceConnectionHttp } from "./source-connection-http.js";
-import type { WorkbenchHttp } from "./workbench-http.js";
-import type { AbuseGateOutcome, AbuseRequest, AbuseReservation } from "./abuse.js";
+} from "../../provider-maintenance.js";
+import { ProviderMaintenanceFailure } from "../../provider-maintenance.js";
+import type { ProviderMaintenanceHttp } from "../../provider-maintenance-http.js";
+import type { ProviderWebhookHttpResponse } from "../../provider-webhook-http.js";
+import type { SourceConnectionHttp } from "../../source-connection-http.js";
+import type { WorkbenchHttp } from "../../workbench-http.js";
+import type { AbuseGateOutcome, AbuseRequest, AbuseReservation } from "../../abuse.js";
 import { composeHttpRouteRegistry } from "./http-route-composition.js";
 import {
   dispatchHttpRouteRegistry,

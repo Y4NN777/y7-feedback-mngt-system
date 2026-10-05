@@ -9,7 +9,7 @@ import {
   type SloObservation,
 } from "@y7-feedback/domain";
 
-import { probeUrl } from "./availability-probe.js";
+import { probeUrl } from "./runtime/observability/availability-probe.js";
 import { buildMeasurementSeriesIndex } from "./slo-series.js";
 import {
   collectCriticalApiLoadSamples,

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { runBoundedLatencyProbe } from "./bounded-latency-probe.js";
+import { runBoundedLatencyProbe } from "./runtime/observability/bounded-latency-probe.js";
 
 describe("bounded latency probe", () => {
   it("BDD-SLO-213 exercises the declared concurrency and preserves every sample", async () => {

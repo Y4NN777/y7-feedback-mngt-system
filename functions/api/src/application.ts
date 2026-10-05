@@ -70,7 +70,7 @@ import { createNodeAppwriteProviderConsentCleanup } from "./appwrite-provider-co
 import { createNodeAppwriteReporterConsentVerifier } from "./appwrite-reporter-consent-verifier.js";
 import { createNodeAppwriteProviderGrantVault } from "./appwrite-provider-grant-vault.js";
 import { createNodeAppwriteActiveSourceGrantReader } from "./appwrite-active-source-grant-reader.js";
-import type { HttpDependencies } from "./http.js";
+import type { HttpDependencies } from "./runtime/http/http.js";
 import { createIntakeCoordinator } from "./intake.js";
 import { createIntelligenceCoordinator } from "./intelligence.js";
 import { createIntelligenceProvenanceCoordinator } from "./intelligence-provenance.js";

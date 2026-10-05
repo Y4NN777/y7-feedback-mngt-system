@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { routeRequest, type FunctionContext } from "./http";
+import { routeRequest, type FunctionContext } from "./runtime/http/http.js";
 import { createProviderMaintenance } from "./provider-maintenance";
 import type { PublicApi } from "./public-api";
 import type { ProjectAdministrationHttp } from "./project-administration-http";
