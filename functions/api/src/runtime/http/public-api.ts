@@ -6,43 +6,29 @@ import {
   type FeedbackDraft,
   type FeedbackSource,
   type FeedbackType,
-  type ProjectFeedbackConfig,
   type ReporterAttribution,
 } from "@y7-feedback/domain";
 
-import type { AccountlessAccessCoordinator } from "./accountless-access.js";
-import type { AttachmentStaging } from "./capabilities/attachments/attachment-staging.js";
+import type { AccountlessAccessCoordinator } from "../../accountless-access.js";
+import type { AttachmentStaging } from "../../capabilities/attachments/attachment-staging.js";
 import type {
   AttachmentStagingGrant,
   AttachmentStagingTokenCodec,
-} from "./capabilities/attachments/attachment-staging-token.js";
-import type { IntakeCoordinator, IntakeOutcome } from "./capabilities/intake/intake.js";
-import type { ReporterAttachmentDownload } from "./capabilities/attachments/reporter-attachment-download.js";
-import type { WorkspaceAttachmentDownload } from "./capabilities/attachments/workspace-attachment-download.js";
+} from "../../capabilities/attachments/attachment-staging-token.js";
+import type {
+  IntakeCoordinator,
+  IntakeOutcome,
+} from "../../capabilities/intake/intake.js";
+import type {
+  PublicProject,
+  PublicProjectReader,
+} from "../../capabilities/intake/public-project.js";
+import type { ReporterAttachmentDownload } from "../../capabilities/attachments/reporter-attachment-download.js";
+import type { WorkspaceAttachmentDownload } from "../../capabilities/attachments/workspace-attachment-download.js";
 import type {
   WorkspaceOperationOutcome,
   WorkspaceProjectOperations,
-} from "./workspace-project-operations.js";
-
-export interface PublicProject {
-  readonly slug: string;
-  readonly feedbackConfig: ProjectFeedbackConfig;
-  readonly reporterPurpose: {
-    readonly fr: string;
-    readonly en: string;
-  };
-}
-
-export interface PublicProjectReader {
-  findBySlug(slug: string): Promise<PublicProject | null>;
-  resolve(
-    slug: string,
-  ): Promise<
-    | { readonly kind: "current"; readonly project: PublicProject }
-    | { readonly kind: "redirect"; readonly canonicalSlug: string }
-    | { readonly kind: "unavailable" }
-  >;
-}
+} from "../../workspace-project-operations.js";
 
 export interface PublicApiRequest {
   readonly method: string;

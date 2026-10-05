@@ -1,4 +1,4 @@
-import type { PublicApi, PublicApiRequest } from "./public-api.js";
+import type { PublicApi, PublicApiRequest } from "./runtime/http/public-api.js";
 
 const methods = new Set(["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"]);
 

@@ -8,7 +8,7 @@ import { createAppwriteFunctionExecutionPublicApi } from "./appwrite-function-ex
 import { createAppwriteFunctionPublicApi } from "./appwrite-function-public-api.js";
 import { previewFunctionId } from "./appwrite-function-variables.js";
 import { createHttpFunctionPublicApi } from "./http-function-public-api.js";
-import type { PublicApiResponse } from "./public-api.js";
+import type { PublicApiResponse } from "./runtime/http/public-api.js";
 
 const workspaceId = "workspace_alpha";
 const projectId = "project_alpha";

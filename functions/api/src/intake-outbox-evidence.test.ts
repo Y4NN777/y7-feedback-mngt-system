@@ -6,7 +6,7 @@ import {
 } from "./intake-outbox-evidence";
 import type { AppwriteG1MatrixTables } from "./intake-evidence";
 import type { OutboxRunResult } from "./outbox";
-import type { PublicApi, PublicApiResponse } from "./public-api";
+import type { PublicApi, PublicApiResponse } from "./runtime/http/public-api";
 
 const schema = {
   databaseId: "feedback",

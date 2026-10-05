@@ -1,6 +1,6 @@
 import { ExecutionMethod, ExecutionStatus, type Functions } from "node-appwrite";
 
-import type { PublicApi, PublicApiRequest } from "./public-api.js";
+import type { PublicApi, PublicApiRequest } from "./runtime/http/public-api.js";
 
 export interface AppwriteFunctionExecutionPublicApiDependencies {
   readonly functions: Pick<Functions, "createExecution" | "deleteExecution">;

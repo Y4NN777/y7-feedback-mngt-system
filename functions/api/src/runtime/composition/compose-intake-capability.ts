@@ -8,7 +8,7 @@ import { createNodeAppwriteAbuseCounterStore } from "../../appwrite-abuse-counte
 import { createNodeAppwriteAccountlessRepository } from "../../appwrite-accountless-repository.js";
 import { createAppwriteAuthoritativeCommitStore } from "../../appwrite-authoritative-commit-store.js";
 import { createNodeAppwriteIntakeStore } from "../../infrastructure/appwrite/intake/appwrite-intake-store.js";
-import { createNodeAppwritePublicProjectReader } from "../../appwrite-public-project-reader.js";
+import { createNodeAppwritePublicProjectReader } from "../../infrastructure/appwrite/intake/appwrite-public-project-reader.js";
 import { createAuthoritativeIntakeEnvelope } from "../../capabilities/intake/authoritative-intake-envelope.js";
 import { createAuthoritativeIntakeStore } from "../../capabilities/intake/authoritative-intake-store.js";
 import { createIntakeCoordinator } from "../../capabilities/intake/intake.js";

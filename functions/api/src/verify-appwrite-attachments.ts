@@ -25,7 +25,7 @@ import { validateAttachment } from "./capabilities/attachments/attachment-valida
 import { parseClamAvHttpScannerConfig } from "./clamav-http-scanner-config.js";
 import { createClamAvHttpScanner } from "./clamav-http-scanner.js";
 import { createHttpFunctionPublicApi } from "./http-function-public-api.js";
-import type { PublicApi } from "./public-api.js";
+import type { PublicApi } from "./runtime/http/public-api.js";
 import { createSensitiveDataProtector } from "./sensitive-data-protector.js";
 
 function ids(suffix: string): AppwriteG1MatrixIds {
