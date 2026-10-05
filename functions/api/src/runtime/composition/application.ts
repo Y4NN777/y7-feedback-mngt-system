@@ -2,14 +2,8 @@ import { createHash, randomBytes } from "node:crypto";
 
 import type { ServerConfig } from "@y7-feedback/config/server";
 
-import { createAccountlessAccessCoordinator } from "../../accountless-access.js";
-import { createNodeAppwriteAccountlessRepository } from "../../appwrite-accountless-repository.js";
-import { createNodeAppwriteIntakeStore } from "../../appwrite-intake-store.js";
-import { createAppwriteAuthoritativeCommitStore } from "../../appwrite-authoritative-commit-store.js";
 import { createNodeAppwriteAuthoritativeProjectionStore } from "../../appwrite-authoritative-projection-store.js";
-import { createAuthoritativeIntakeEnvelope } from "../../authoritative-intake-envelope.js";
 import { createAuthoritativeIntakeProjectionHandler } from "../../authoritative-intake-projector.js";
-import { createAuthoritativeIntakeStore } from "../../authoritative-intake-store.js";
 import { createAuthoritativeConversationEnvelope } from "../../authoritative-conversation-envelope.js";
 import {
   authoritativeProjectionErrorCode,
@@ -27,7 +21,6 @@ import { createNodeAppwritePrivacyStore } from "../../appwrite-privacy-store.js"
 import { createNodeAppwritePrivacyPurgeRepository } from "../../appwrite-privacy-purge-repository.js";
 import { createNodeAppwritePrivacyCleanup } from "../../appwrite-privacy-cleanup.js";
 import { createNodeAppwritePrivacyProviderCleanup } from "../../appwrite-privacy-provider-cleanup.js";
-import { createNodeAppwriteAbuseCounterStore } from "../../appwrite-abuse-counter-store.js";
 import { createNodeAppwritePrincipalVerifier } from "../../appwrite-principal-verifier.js";
 import { createPlatformAccessAuditId } from "../../platform-access-audit-id.js";
 import {
@@ -41,7 +34,6 @@ import { createNodeAppwriteConversationPendingCommitReader } from "../../appwrit
 import { createNodeAppwriteConversationPreflight } from "../../appwrite-conversation-preflight.js";
 import { createNodeAppwriteConversationProjectionStore } from "../../appwrite-conversation-projection-store.js";
 import { createNodeAppwriteProjectAdministrationStore } from "../../appwrite-project-administration-store.js";
-import { createNodeAppwritePublicProjectReader } from "../../appwrite-public-project-reader.js";
 import { createNodeAppwriteWorkspaceAttachmentScopeResolver } from "../../appwrite-workspace-attachment-scope.js";
 import { createNodeAppwriteWorkspaceCapabilityScopeResolver } from "../../appwrite-workspace-capability-scope.js";
 import { createNodeAppwriteWorkspaceOwnerScopeResolver } from "../../appwrite-workspace-owner-scope.js";
@@ -64,7 +56,6 @@ import { createNodeAppwriteReporterConsentVerifier } from "../../appwrite-report
 import { createNodeAppwriteProviderGrantVault } from "../../appwrite-provider-grant-vault.js";
 import { createNodeAppwriteActiveSourceGrantReader } from "../../appwrite-active-source-grant-reader.js";
 import type { HttpDependencies } from "../http/http.js";
-import { createIntakeCoordinator } from "../../intake.js";
 import { createIntelligenceCoordinator } from "../../intelligence.js";
 import { createIntelligenceProvenanceCoordinator } from "../../intelligence-provenance.js";
 import { createIntelligenceHttp } from "../../intelligence-http.js";
@@ -79,17 +70,9 @@ import { createConversationLifecycleHttp } from "../../conversation-lifecycle-ht
 import { createGitHubIssueProvider } from "../../github-issue-provider.js";
 import { createGitLabIssueProvider } from "../../gitlab-issue-provider.js";
 import { createAttachmentDownload } from "../../attachment-download.js";
-import {
-  createAccessProof,
-  createProofProtector,
-  digestValidatedDraft,
-  hashAccessProof,
-  matchesAccessProof,
-} from "../../proof-crypto.js";
 import { createPublicApi } from "../../public-api.js";
 import { createProjectAdministration } from "../../project-administration.js";
 import { createProjectAdministrationHttp } from "../../project-administration-http.js";
-import { createSensitiveDataProtector } from "../../sensitive-data-protector.js";
 import { createProviderSourceHttp } from "../../provider-source-composition.js";
 import { createWorkspaceAttachmentDownload } from "../../workspace-attachment-download.js";
 import {
@@ -116,7 +99,6 @@ import {
 } from "../../provider-maintenance.js";
 import { createProviderMaintenanceHttp } from "../../provider-maintenance-http.js";
 import { createProviderWebhookReconciliation } from "../../provider-webhook-reconciliation.js";
-import { createAbuseGate } from "../../abuse.js";
 import { createNodeAppwriteProviderMessageOutboxStore } from "../../appwrite-provider-message-outbox-store.js";
 import { createProviderMessageOutboxWorker } from "../../provider-message-outbox.js";
 import { createGitHubMessageProvider } from "../../github-message-provider.js";
@@ -132,6 +114,8 @@ import {
   type ApplicationRuntime,
 } from "./application-runtime.js";
 import { composeAttachmentCapability } from "./compose-attachment-capability.js";
+import { composeApplicationSecurity } from "./compose-application-security.js";
+import { composeIntakeCapability } from "./compose-intake-capability.js";
 
 export {
   createProtectedFeedbackUrl,
@@ -143,131 +127,17 @@ export function createHttpApplication(
   config: ServerConfig,
   runtime: ApplicationRuntime,
 ): HttpDependencies {
-  const protector = createProofProtector(
-    Buffer.from(config.accessProofEnvelopeKey, "base64url"),
-  );
-  const sensitive = {
-    environment: config.environment,
-    protector: createSensitiveDataProtector(
-      config.sensitiveDataActiveKeyId,
-      Object.entries(config.sensitiveDataEnvelopeKeys).map(([id, material]) => ({
-        id,
-        material: Buffer.from(material, "base64url"),
-      })),
-    ),
-  };
-  const normalizedIntakeStore = createNodeAppwriteIntakeStore(
-    runtime.tables,
-    config.appwriteSchema,
-    sensitive,
-  );
-  const authoritativeEnvelope = createAuthoritativeIntakeEnvelope(
-    sensitive,
-    config.appwriteSchema.authoritativeCommitsTableId,
-  );
-  const authoritativeCommitStore = createAppwriteAuthoritativeCommitStore(
-    {
-      createRow: (input) =>
-        runtime.tables.createRow({
-          ...input,
-          permissions: [...input.permissions],
-        }),
-      getRow: (input) => runtime.tables.getRow(input),
-    },
-    config.appwriteSchema,
-  );
-  const intakeStore =
-    config.intakePersistenceMode === "authoritative"
-      ? createAuthoritativeIntakeStore(
-          config.environment === "preview" ? "preview" : "production",
-          authoritativeCommitStore,
-          authoritativeEnvelope,
-        )
-      : normalizedIntakeStore;
-  const intake = createIntakeCoordinator(intakeStore, {
-    createFeedbackId: runtime.createId,
-    createReporterId: runtime.createId,
-    createHistoryId: runtime.createId,
-    createNotificationId: runtime.createId,
-    createOutboxId: runtime.createId,
-    createReference: runtime.createReference,
-    createProof: createAccessProof,
-    hashProof: hashAccessProof,
-    sealProof: protector.sealProof,
-    openProof: protector.openProof,
-    digestPayload: (draft, grants) =>
-      createHash("sha256")
-        .update(digestValidatedDraft(draft))
-        .update("\0")
-        .update(
-          JSON.stringify(
-            /* v8 ignore next -- attachment grants are normalized before canonical serialization */
-            grants.map(({ attachmentId, objectId, sha256 }) => ({
-              attachmentId,
-              objectId,
-              sha256,
-            })),
-          ),
-        )
-        .digest("base64url"),
-    now: runtime.nowIso,
-  });
-  const accountlessRepository = createNodeAppwriteAccountlessRepository(
-    runtime.tables,
-    config.appwriteSchema,
-    sensitive,
-  );
-  const accountless = createAccountlessAccessCoordinator(accountlessRepository, {
-    matchesProof: matchesAccessProof,
-    rotation: {
-      createProof: createAccessProof,
-      hashProof: hashAccessProof,
-    },
-  });
-  const projects = createNodeAppwritePublicProjectReader(
-    runtime.tables,
-    config.appwriteSchema,
-  );
-  /* v8 ignore start -- environment-dependent composition is exercised by Preview. */
-  const abuseKeyEntries = Object.entries(config.abuseHmacKeys);
-  const activeAbuseKey = config.abuseHmacKeys[config.abuseHmacActiveKeyId];
-  if (!activeAbuseKey) throw new Error("ABUSE_KEYRING_INVALID");
-  const previousAbuseKey = abuseKeyEntries.find(
-    ([keyId]) => keyId !== config.abuseHmacActiveKeyId,
-  );
-  const abuse = createAbuseGate(
-    createNodeAppwriteAbuseCounterStore(runtime.tables, {
-      databaseId: config.appwriteSchema.databaseId,
-      abuseCountersTableId: config.appwriteSchema.abuseCountersTableId,
-    }),
-    {
-      active: {
-        id: config.abuseHmacActiveKeyId,
-        material: Buffer.from(activeAbuseKey, "base64url"),
-      },
-      ...(previousAbuseKey
-        ? {
-            previous: {
-              id: previousAbuseKey[0],
-              material: Buffer.from(previousAbuseKey[1], "base64url"),
-            },
-          }
-        : {}),
-    },
-    {
-      /* v8 ignore start -- composition delegates to the separately contract-tested resolver. */
-      async resolve(slug) {
-        const result = await projects.resolve(slug);
-        if (result.kind !== "current") return { status: "denied" } as const;
-        return {
-          workspaceId: result.project.feedbackConfig.workspaceId,
-          projectId: result.project.feedbackConfig.projectId,
-        };
-      },
-      /* v8 ignore stop */
-    },
-  );
-  /* v8 ignore stop */
+  const { proofProtector: protector, sensitivePersistence: sensitive } =
+    composeApplicationSecurity(config);
+  const {
+    abuse,
+    accountless,
+    authoritativeCommitStore,
+    authoritativeEnvelope,
+    intake,
+    normalizedStore: normalizedIntakeStore,
+    projects,
+  } = composeIntakeCapability(config, runtime, sensitive, protector);
   const attachments = composeAttachmentCapability(
     config,
     runtime,
