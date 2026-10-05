@@ -1,5 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const e2ePort = process.env.E2E_PORT ?? "4173";
+const e2eBaseUrl = `http://127.0.0.1:${e2ePort}`;
+
 export default defineConfig({
   testDir: "./e2e",
   testIgnore: "deployed/**",
@@ -8,12 +11,11 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   reporter: "html",
   use: {
-    baseURL: "http://127.0.0.1:4173",
+    baseURL: e2eBaseUrl,
     trace: "on-first-retry",
   },
   webServer: {
-    command:
-      "pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm build && pnpm preview --host 127.0.0.1",
+    command: `pnpm --filter @y7-feedback/config build && pnpm --filter @y7-feedback/domain build && pnpm build && pnpm preview --host 127.0.0.1 --port ${e2ePort} --strictPort`,
     env: {
       VITE_Y7_ENVIRONMENT: "development",
       VITE_APPWRITE_ENVIRONMENT: "development",
@@ -22,7 +24,7 @@ export default defineConfig({
       VITE_API_ENDPOINT: "http://127.0.0.1:8787/",
       VITE_RELEASE: "e2e",
     },
-    url: "http://127.0.0.1:4173",
+    url: e2eBaseUrl,
     reuseExistingServer: !process.env.CI,
   },
   projects: [
