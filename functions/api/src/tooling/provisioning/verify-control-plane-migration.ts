@@ -22,155 +22,169 @@ function absent(error: unknown): boolean {
 }
 
 async function main(): Promise<void> {
-  if (!process.argv.includes("--apply")) {
-    throw new Error("CONTROL_PLANE_MIGRATION_APPLY_REQUIRED");
-  }
-  const config = parseServerConfig(process.env);
-  if (config.environment !== "preview") {
-    throw new Error("CONTROL_PLANE_MIGRATION_PREVIEW_REQUIRED");
-  }
-
-  const client = new Client()
-    .setEndpoint(config.appwriteEndpoint)
-    .setProject(config.appwriteProjectId)
-    .setKey(config.appwriteApiKey);
-  const tables = new TablesDB(client);
-  const port = createNodeAppwriteProvisioningPort(tables, new Storage(client));
-  const manifest = createAppwriteInfrastructureManifest(config.appwriteSchema);
-  const controlPlaneDefinitions = createControlPlaneTableDefinitions(
-    config.appwriteSchema,
-  );
-  const before = await Promise.all(
-    controlPlaneDefinitions.map(({ id }) => port.getTable(manifest.database.id, id)),
-  );
-  const forward = await provisionAppwriteInfrastructure(port, manifest);
-  const replay = await provisionAppwriteInfrastructure(port, manifest);
-  if (replay.created !== 0) throw new Error("CONTROL_PLANE_MIGRATION_REPLAY_MUTATED");
-
-  const suffix = randomBytes(4).toString("hex");
-  const temporary = controlPlaneDefinitions.map((definition, index) => ({
-    ...definition,
-    id: `cpm_${suffix}_${String(index + 1)}`,
-    name: `Control-plane migration proof ${String(index + 1)}`,
-  }));
-  const rollbackPlan = planAdditiveTableMigration({
-    version: "control-plane-rollback-proof-v1",
-    currentTables: manifest.tables,
-    targetTables: [...manifest.tables, ...temporary],
-    additiveTableIds: temporary.map(({ id }) => id),
-  });
-  const createdTemporary: string[] = [];
-  let nonEmptyRollbackDenied = false;
-  let cleanupFailure: unknown;
+  let stage = "configuration";
   try {
-    for (const definition of rollbackPlan.createTables) {
-      await tables.createTable({
-        databaseId: manifest.database.id,
-        tableId: definition.id,
-        name: definition.name,
-        permissions: [...definition.permissions],
-        rowSecurity: definition.rowSecurity,
-        enabled: definition.enabled,
-        columns: definition.columns.map((column) => ({ ...column })),
-        indexes: definition.indexes.map((index) => ({
-          key: index.key,
-          type: index.type,
-          attributes: [...index.columns],
-        })),
-      });
-      createdTemporary.push(definition.id);
+    if (!process.argv.includes("--apply")) {
+      throw new Error("CONTROL_PLANE_MIGRATION_APPLY_REQUIRED");
+    }
+    const config = parseServerConfig(process.env);
+    if (config.environment !== "preview") {
+      throw new Error("CONTROL_PLANE_MIGRATION_PREVIEW_REQUIRED");
     }
 
-    const counter = temporary[5];
-    if (!counter) throw new Error("CONTROL_PLANE_MIGRATION_PROOF_INVALID");
-    const rowId = `proof_${suffix}`;
-    await tables.createRow({
-      databaseId: manifest.database.id,
-      tableId: counter.id,
-      rowId,
-      permissions: [],
-      data: {
-        dimension: "preview-proof",
-        subjectDigest: "0".repeat(64),
-        keyId: "proof",
-        count: 1,
-        windowStartedAt: "2026-09-01T00:00:00.000Z",
-        expiresAt: "2026-09-01T00:01:00.000Z",
-      },
+    const client = new Client()
+      .setEndpoint(config.appwriteEndpoint)
+      .setProject(config.appwriteProjectId)
+      .setKey(config.appwriteApiKey);
+    const tables = new TablesDB(client);
+    const port = createNodeAppwriteProvisioningPort(tables, new Storage(client));
+    const manifest = createAppwriteInfrastructureManifest(config.appwriteSchema);
+    const controlPlaneDefinitions = createControlPlaneTableDefinitions(
+      config.appwriteSchema,
+    );
+    stage = "inspect-existing-tables";
+    const before = await Promise.all(
+      controlPlaneDefinitions.map(({ id }) => port.getTable(manifest.database.id, id)),
+    );
+    stage = "provision-forward";
+    const forward = await provisionAppwriteInfrastructure(port, manifest);
+    stage = "provision-replay";
+    const replay = await provisionAppwriteInfrastructure(port, manifest);
+    if (replay.created !== 0) throw new Error("CONTROL_PLANE_MIGRATION_REPLAY_MUTATED");
+
+    const suffix = randomBytes(4).toString("hex");
+    const temporary = controlPlaneDefinitions.map((definition, index) => ({
+      ...definition,
+      id: `cpm_${suffix}_${String(index + 1)}`,
+      name: `Control-plane migration proof ${String(index + 1)}`,
+    }));
+    const rollbackPlan = planAdditiveTableMigration({
+      version: "control-plane-rollback-proof-v1",
+      currentTables: manifest.tables,
+      targetTables: [...manifest.tables, ...temporary],
+      additiveTableIds: temporary.map(({ id }) => id),
     });
+    const createdTemporary: string[] = [];
+    let nonEmptyRollbackDenied = false;
+    let cleanupFailure: unknown;
     try {
+      stage = "create-temporary-tables";
+      for (const definition of rollbackPlan.createTables) {
+        await tables.createTable({
+          databaseId: manifest.database.id,
+          tableId: definition.id,
+          name: definition.name,
+          permissions: [...definition.permissions],
+          rowSecurity: definition.rowSecurity,
+          enabled: definition.enabled,
+          columns: definition.columns.map((column) => ({ ...column })),
+          indexes: definition.indexes.map((index) => ({
+            key: index.key,
+            type: index.type,
+            attributes: [...index.columns],
+          })),
+        });
+        createdTemporary.push(definition.id);
+      }
+
+      const counter = temporary[5];
+      if (!counter) throw new Error("CONTROL_PLANE_MIGRATION_PROOF_INVALID");
+      const rowId = `proof_${suffix}`;
+      stage = "prove-non-empty-rollback-denial";
+      await tables.createRow({
+        databaseId: manifest.database.id,
+        tableId: counter.id,
+        rowId,
+        permissions: [],
+        data: {
+          dimension: "preview-proof",
+          subjectDigest: "0".repeat(64),
+          keyId: "proof",
+          count: 1,
+          windowStartedAt: "2026-09-01T00:00:00.000Z",
+          expiresAt: "2026-09-01T00:01:00.000Z",
+        },
+      });
+      try {
+        assertAdditiveRollbackSafe(
+          rollbackPlan,
+          Object.fromEntries(
+            rollbackPlan.rollbackTableIds.map((id) => [id, id === counter.id ? 1 : 0]),
+          ),
+        );
+      } catch (error: unknown) {
+        if (
+          !(error instanceof Error) ||
+          error.message !== "APPWRITE_ADDITIVE_ROLLBACK_NON_EMPTY"
+        ) {
+          throw error;
+        }
+        nonEmptyRollbackDenied = true;
+      }
+      await tables.deleteRow({
+        databaseId: manifest.database.id,
+        tableId: counter.id,
+        rowId,
+      });
       assertAdditiveRollbackSafe(
         rollbackPlan,
-        Object.fromEntries(
-          rollbackPlan.rollbackTableIds.map((id) => [id, id === counter.id ? 1 : 0]),
-        ),
+        Object.fromEntries(rollbackPlan.rollbackTableIds.map((id) => [id, 0])),
       );
-    } catch (error: unknown) {
-      if (
-        !(error instanceof Error) ||
-        error.message !== "APPWRITE_ADDITIVE_ROLLBACK_NON_EMPTY"
-      ) {
-        throw error;
+    } finally {
+      for (const tableId of [...createdTemporary].reverse()) {
+        try {
+          await tables.deleteTable({ databaseId: manifest.database.id, tableId });
+        } catch (error: unknown) {
+          if (!absent(error) && cleanupFailure === undefined) cleanupFailure = error;
+        }
       }
-      nonEmptyRollbackDenied = true;
     }
-    await tables.deleteRow({
-      databaseId: manifest.database.id,
-      tableId: counter.id,
-      rowId,
-    });
-    assertAdditiveRollbackSafe(
-      rollbackPlan,
-      Object.fromEntries(rollbackPlan.rollbackTableIds.map((id) => [id, 0])),
+    if (cleanupFailure !== undefined) {
+      throw cleanupFailure instanceof Error
+        ? cleanupFailure
+        : new Error("CONTROL_PLANE_MIGRATION_CLEANUP_FAILED");
+    }
+
+    const residue = await Promise.all(
+      temporary.map(async ({ id }) => {
+        try {
+          await tables.getTable({ databaseId: manifest.database.id, tableId: id });
+          return id;
+        } catch (error: unknown) {
+          if (absent(error)) return null;
+          throw error;
+        }
+      }),
     );
-  } finally {
-    for (const tableId of [...createdTemporary].reverse()) {
-      try {
-        await tables.deleteTable({ databaseId: manifest.database.id, tableId });
-      } catch (error: unknown) {
-        if (!absent(error) && cleanupFailure === undefined) cleanupFailure = error;
-      }
+    if (residue.some((id) => id !== null) || !nonEmptyRollbackDenied) {
+      throw new Error("CONTROL_PLANE_MIGRATION_CLEANUP_FAILED");
     }
-  }
-  if (cleanupFailure !== undefined) {
-    throw cleanupFailure instanceof Error
-      ? cleanupFailure
-      : new Error("CONTROL_PLANE_MIGRATION_CLEANUP_FAILED");
-  }
 
-  const residue = await Promise.all(
-    temporary.map(async ({ id }) => {
-      try {
-        await tables.getTable({ databaseId: manifest.database.id, tableId: id });
-        return id;
-      } catch (error: unknown) {
-        if (absent(error)) return null;
-        throw error;
-      }
-    }),
-  );
-  if (residue.some((id) => id !== null) || !nonEmptyRollbackDenied) {
-    throw new Error("CONTROL_PLANE_MIGRATION_CLEANUP_FAILED");
+    process.stdout.write(
+      `${JSON.stringify({
+        result: "APPWRITE_CONTROL_PLANE_MIGRATION_PASSED",
+        permanentTablesCreated: before.filter((value) => value === null).length,
+        forwardCreatedResources: forward.created,
+        replayCreatedResources: replay.created,
+        rollbackTables: rollbackPlan.rollbackTableIds.length,
+        nonEmptyRollbackDenied,
+        cleanupPassed: true,
+      })}\n`,
+    );
+  } catch (error: unknown) {
+    const code =
+      error instanceof Error && /^[A-Z0-9_]+$/u.test(error.message)
+        ? error.message
+        : "CONTROL_PLANE_MIGRATION_FAILED";
+    const serviceCode =
+      object(error) && typeof error.code === "number" ? error.code : undefined;
+    process.stderr.write(
+      `${JSON.stringify({ error: code, stage, ...(serviceCode === undefined ? {} : { serviceCode }) })}\n`,
+    );
+    throw error;
   }
-
-  process.stdout.write(
-    `${JSON.stringify({
-      result: "APPWRITE_CONTROL_PLANE_MIGRATION_PASSED",
-      permanentTablesCreated: before.filter((value) => value === null).length,
-      forwardCreatedResources: forward.created,
-      replayCreatedResources: replay.created,
-      rollbackTables: rollbackPlan.rollbackTableIds.length,
-      nonEmptyRollbackDenied,
-      cleanupPassed: true,
-    })}\n`,
-  );
 }
 
-main().catch((error: unknown) => {
-  const code =
-    error instanceof Error && /^[A-Z0-9_]+$/u.test(error.message)
-      ? error.message
-      : "CONTROL_PLANE_MIGRATION_FAILED";
-  process.stderr.write(`${JSON.stringify({ error: code })}\n`);
+main().catch(() => {
   process.exitCode = 1;
 });

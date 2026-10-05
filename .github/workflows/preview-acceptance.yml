@@ -10,6 +10,7 @@ on:
         type: choice
         options:
           - full
+          - control-plane
           - attachments
           - providers
           - reconciliation
@@ -105,11 +106,14 @@ jobs:
             >> .env.appwrite-preview
           unset PROVIDER_OUTBOX_TRIGGER_SECRET
           unset ANTIVIRUS_SCANNER_HMAC_KEY
-          pnpm provision:appwrite
-          pnpm configure:appwrite:function:preview
-          pnpm deploy:appwrite:function:preview
+          if [ "$ACCEPTANCE_SCOPE" != "control-plane" ]; then
+            pnpm provision:appwrite
+            pnpm configure:appwrite:function:preview
+            pnpm deploy:appwrite:function:preview
+          fi
           case "$ACCEPTANCE_SCOPE" in
             full) pnpm verify:acceptance:full ;;
+            control-plane) pnpm verify:appwrite:migration ;;
             attachments) pnpm verify:appwrite:attachments ;;
             providers)
               pnpm verify:providers:message-sync:github

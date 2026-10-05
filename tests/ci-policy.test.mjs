@@ -225,6 +225,8 @@ test("BDD-E2E-301 runs the complete Preview acceptance pack with ephemeral secre
   assert.match(workflow, /ACCEPTANCE_SCOPE: \$\{\{ inputs\.scope \|\| 'full' \}\}/u);
   assert.match(workflow, /reconciliation\) pnpm verify:providers:reconciliation/u);
   assert.match(workflow, /state-sync\) pnpm verify:providers:state-sync/u);
+  assert.match(workflow, /- control-plane/u);
+  assert.match(workflow, /control-plane\) pnpm verify:appwrite:migration/u);
   assert.match(
     workflow,
     /permissions:\s+contents: read\s+id-token: write\s+issues: write/u,
