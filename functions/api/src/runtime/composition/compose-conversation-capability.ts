@@ -8,7 +8,7 @@ import { createNodeAppwriteConversationLifecycleStore } from "../../infrastructu
 import { createNodeAppwriteConversationPendingCommitReader } from "../../infrastructure/appwrite/conversations/appwrite-conversation-pending-commits.js";
 import { createNodeAppwriteConversationPreflight } from "../../infrastructure/appwrite/conversations/appwrite-conversation-preflight.js";
 import { createNodeAppwriteConversationProjectionStore } from "../../infrastructure/appwrite/conversations/appwrite-conversation-projection-store.js";
-import { createNodeAppwriteProviderMessageFanout } from "../../appwrite-provider-message-fanout.js";
+import { createNodeAppwriteProviderMessageFanout } from "../../infrastructure/appwrite/providers/appwrite-provider-message-fanout.js";
 import type { WorkspaceCapabilityScopeResolver } from "../../infrastructure/appwrite/platform-access/appwrite-workspace-capability-scope.js";
 import { createAuthoritativeConversationEnvelope } from "../../capabilities/conversations/authoritative-conversation-envelope.js";
 import { createAuthoritativeConversationStore } from "../../capabilities/conversations/authoritative-conversation-store.js";

@@ -12,7 +12,7 @@ import {
   type G3ResidueKind,
 } from "./team-workflow-evidence.js";
 import { createOutboxWorker } from "./outbox.js";
-import { closeProviderIssue } from "./provider-issue-cleanup.js";
+import { closeProviderIssue } from "./infrastructure/appwrite/providers/provider-issue-cleanup.js";
 import { createSensitiveDataProtector } from "./sensitive-data-protector.js";
 
 interface RetainedSourceState {

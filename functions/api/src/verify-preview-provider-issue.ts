@@ -5,7 +5,7 @@ import { Client, Query, TablesDB, Users } from "node-appwrite";
 
 import { parseServerConfig } from "@y7-feedback/config/server";
 
-import { closeProviderIssue } from "./provider-issue-cleanup.js";
+import { closeProviderIssue } from "./infrastructure/appwrite/providers/provider-issue-cleanup.js";
 import { createAccessProof, hashAccessProof } from "./proof-crypto.js";
 import { createSensitiveDataProtector } from "./sensitive-data-protector.js";
 

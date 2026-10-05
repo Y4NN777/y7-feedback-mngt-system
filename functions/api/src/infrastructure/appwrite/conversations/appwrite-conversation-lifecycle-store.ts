@@ -17,7 +17,7 @@ import {
   appendAppwriteNotificationFanout,
   type NotificationFanoutInput,
 } from "../workbench/appwrite-notification-fanout.js";
-import type { ProviderMessageFanout } from "../../../appwrite-provider-message-fanout.js";
+import type { ProviderMessageFanout } from "../providers/appwrite-provider-message-fanout.js";
 import type { AppwriteSensitivePersistence } from "../../../sensitive-data-protector.js";
 
 type Command = AppendConversationCommand | LifecycleTransitionCommand;

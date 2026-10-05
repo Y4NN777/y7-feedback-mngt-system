@@ -93,6 +93,45 @@ const appwritePlatformAccessModules = [
   "appwrite-workspace-capability-scope",
 ];
 
+const providerSharedModules = [
+  "external-issue-coordination",
+  "provider-event-inbox",
+  "provider-issue-event",
+  "provider-issue-outbox",
+  "provider-issue",
+  "provider-maintenance",
+  "provider-message-authority",
+  "provider-message-event",
+  "provider-message-outbox",
+  "provider-message-reconciliation",
+  "provider-message",
+  "provider-webhook-auth",
+  "provider-webhook-ingress",
+  "provider-webhook-provisioner",
+  "provider-webhook-reconciliation",
+  "source-connection-coordinator",
+  "source-management",
+  "source-provider",
+];
+
+const appwriteProviderModules = [
+  "appwrite-active-source-grant-reader",
+  "appwrite-external-issue-store",
+  "appwrite-provider-consent-cleanup",
+  "appwrite-provider-event-inbox-store",
+  "appwrite-provider-grant-vault",
+  "appwrite-provider-issue-outbox-store",
+  "appwrite-provider-issue-state-store",
+  "appwrite-provider-message-fanout",
+  "appwrite-provider-message-outbox-store",
+  "appwrite-provider-message-reconciliation-reader",
+  "appwrite-provider-message-store",
+  "appwrite-provider-webhook-authority-store",
+  "appwrite-source-connection-store",
+  "appwrite-source-management-store",
+  "provider-issue-cleanup",
+];
+
 async function sourceFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
   const nested = await Promise.all(
@@ -279,4 +318,43 @@ test("TASK-ARCH-001F colocates administration and platform-access capabilities w
     assert.equal(files.has(`${handler}.ts`), false);
     assert.equal(files.has(`${handler}.test.ts`), false);
   }
+});
+
+test("TASK-ARCH-001G isolates shared, GitHub, GitLab and Appwrite provider boundaries", async () => {
+  const files = new Set(
+    (await sourceFiles(apiSourceRoot)).map((absolute) => relativeSourcePath(absolute)),
+  );
+
+  for (const module of providerSharedModules) {
+    assert.equal(files.has(`capabilities/providers/shared/${module}.ts`), true);
+    assert.equal(files.has(`${module}.ts`), false);
+  }
+
+  for (const provider of ["github", "gitlab"]) {
+    for (const concern of ["issue", "message", "source"]) {
+      const module = `${provider}-${concern}-provider`;
+      assert.equal(files.has(`capabilities/providers/${provider}/${module}.ts`), true);
+      assert.equal(files.has(`${module}.ts`), false);
+    }
+  }
+
+  for (const module of appwriteProviderModules) {
+    assert.equal(files.has(`infrastructure/appwrite/providers/${module}.ts`), true);
+    assert.equal(files.has(`${module}.ts`), false);
+  }
+
+  for (const handler of [
+    "external-issue-http",
+    "provider-event-inbox-http",
+    "provider-issue-outbox-http",
+    "provider-maintenance-http",
+    "provider-webhook-http",
+    "source-connection-http",
+  ]) {
+    assert.equal(files.has(`runtime/http/${handler}.ts`), true);
+    assert.equal(files.has(`${handler}.ts`), false);
+  }
+
+  assert.equal(files.has("runtime/composition/provider-source-composition.ts"), true);
+  assert.equal(files.has("provider-source-composition.ts"), false);
 });
