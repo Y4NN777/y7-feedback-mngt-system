@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { acceptAttachmentEvidence } from "./attachment-evidence-retry";
-import type { AttachmentAcceptanceCommand, AttachmentSaga } from "./attachment-saga";
+import type {
+  AttachmentAcceptanceCommand,
+  AttachmentSaga,
+} from "./capabilities/attachments/attachment-saga";
 
 const command: AttachmentAcceptanceCommand = {
   operationId: "123e4567-e89b-42d3-a456-426614174011",

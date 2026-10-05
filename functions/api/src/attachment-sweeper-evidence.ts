@@ -6,7 +6,7 @@ import type {
   AttachmentAcceptanceStore,
   AttachmentSaga,
   PrivateAttachmentStorage,
-} from "./attachment-saga.js";
+} from "./capabilities/attachments/attachment-saga.js";
 
 export interface AppwriteG2SweeperSchema {
   readonly databaseId: string;

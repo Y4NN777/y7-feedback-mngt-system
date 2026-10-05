@@ -16,11 +16,11 @@ import { createNodeAppwritePrincipalVerifier } from "../../appwrite-principal-ve
 import { createNodeAppwriteProjectAdministrationStore } from "../../appwrite-project-administration-store.js";
 import { createNodeAppwriteWorkbenchMutationStore } from "../../appwrite-workbench-mutation-store.js";
 import { createNodeAppwriteWorkbenchStore } from "../../appwrite-workbench-store.js";
-import { createNodeAppwriteWorkspaceAttachmentScopeResolver } from "../../appwrite-workspace-attachment-scope.js";
+import { createNodeAppwriteWorkspaceAttachmentScopeResolver } from "../../infrastructure/appwrite/attachments/appwrite-workspace-attachment-scope.js";
 import { createNodeAppwriteWorkspaceCapabilityScopeResolver } from "../../appwrite-workspace-capability-scope.js";
 import { createNodeAppwriteWorkspaceOwnerScopeResolver } from "../../appwrite-workspace-owner-scope.js";
 import { createNodeAppwriteWorkspaceProjectOperationPorts } from "../../appwrite-workspace-project-ports.js";
-import { createAttachmentDownload } from "../../attachment-download.js";
+import { createAttachmentDownload } from "../../capabilities/attachments/attachment-download.js";
 import { createPlatformAccessAuditId } from "../../platform-access-audit-id.js";
 import { createPlatformAccessCoordinator } from "../../platform-access.js";
 import { createPlatformAccessHttp } from "../../platform-access-http.js";
@@ -29,7 +29,7 @@ import { createProjectAdministrationHttp } from "../../project-administration-ht
 import type { AppwriteSensitivePersistence } from "../../sensitive-data-protector.js";
 import { createWorkbenchCoordinator } from "../../workbench.js";
 import { createWorkbenchHttp } from "../../workbench-http.js";
-import { createWorkspaceAttachmentDownload } from "../../workspace-attachment-download.js";
+import { createWorkspaceAttachmentDownload } from "../../capabilities/attachments/workspace-attachment-download.js";
 import {
   WorkspaceOperationDeniedError,
   createWorkspaceProjectOperations,

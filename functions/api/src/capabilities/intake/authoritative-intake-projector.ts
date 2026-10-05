@@ -1,6 +1,6 @@
 import type { AuthoritativeCommit } from "@y7-feedback/domain";
 
-import type { AuthoritativeProjectionHandler } from "./authoritative-projector.js";
+import type { AuthoritativeProjectionHandler } from "../../authoritative-projector.js";
 import type { AcceptanceCommit, IdempotencyRecord, IntakeStore } from "./intake.js";
 
 export interface AuthoritativeIntakeEnvelopeReader {

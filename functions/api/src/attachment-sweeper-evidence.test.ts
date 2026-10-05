@@ -1,13 +1,13 @@
 /* eslint-disable @typescript-eslint/unbound-method -- Vitest replaces capability mocks without invoking detached methods. */
 import { describe, expect, it, vi } from "vitest";
 
-import type { AttachmentAcceptanceStore } from "./attachment-saga";
-import type { PrivateAttachmentStorage } from "./attachment-saga";
+import type { AttachmentAcceptanceStore } from "./capabilities/attachments/attachment-saga";
+import type { PrivateAttachmentStorage } from "./capabilities/attachments/attachment-saga";
 import {
   runAppwriteG2SweeperMatrix,
   type AppwriteG2SweeperArtifacts,
 } from "./attachment-sweeper-evidence";
-import type { AttachmentSaga } from "./attachment-saga";
+import type { AttachmentSaga } from "./capabilities/attachments/attachment-saga";
 
 const schema = {
   databaseId: "feedback",

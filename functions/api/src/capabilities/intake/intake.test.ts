@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { AuthoritativeCommitError } from "@y7-feedback/domain";
 
 import type { ValidatedFeedbackDraft } from "@y7-feedback/domain";
-import type { AttachmentStagingGrant } from "./attachment-staging-token";
+import type { AttachmentStagingGrant } from "../attachments/attachment-staging-token";
 
 import {
   createIntakeCoordinator,

@@ -15,7 +15,7 @@ import { createAuthoritativeConversationStore } from "../../authoritative-conver
 import { createConversationLifecycleCoordinator } from "../../conversation-lifecycle.js";
 import { createConversationLifecycleHttp } from "../../conversation-lifecycle-http.js";
 import type { AppwriteSensitivePersistence } from "../../sensitive-data-protector.js";
-import type { AppwritePrincipalVerifier } from "../../workspace-attachment-download.js";
+import type { AppwritePrincipalVerifier } from "../../capabilities/attachments/workspace-attachment-download.js";
 import {
   deriveReporterActorId,
   type ApplicationRuntime,

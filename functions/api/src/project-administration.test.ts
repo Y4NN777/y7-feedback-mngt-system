@@ -6,7 +6,7 @@ import {
 } from "./appwrite-project-administration-store";
 import type { WorkspaceOwnerScopeResolver } from "./appwrite-workspace-owner-scope";
 import { createProjectAdministration } from "./project-administration";
-import type { AppwritePrincipalVerifier } from "./workspace-attachment-download";
+import type { AppwritePrincipalVerifier } from "./capabilities/attachments/workspace-attachment-download";
 
 const command = {
   kind: "create_project",

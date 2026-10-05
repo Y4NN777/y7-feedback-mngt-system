@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { AccountlessAccessCoordinator } from "./accountless-access";
+import type { AccountlessAccessCoordinator } from "../../accountless-access";
 import type { AttachmentDownload } from "./attachment-download";
 import { createReporterAttachmentDownload } from "./reporter-attachment-download";
 

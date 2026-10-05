@@ -1,6 +1,6 @@
 import { createHash, createHmac, randomBytes } from "node:crypto";
 
-import type { MalwareScanner } from "./attachment-validation.js";
+import type { MalwareScanner } from "./capabilities/attachments/attachment-validation.js";
 
 export interface ClamAvHttpScannerConfig {
   readonly endpoint: string;

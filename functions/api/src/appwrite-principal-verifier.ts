@@ -3,7 +3,7 @@ import { Account, Client } from "node-appwrite";
 import type {
   AppwritePrincipalVerification,
   AppwritePrincipalVerifier,
-} from "./workspace-attachment-download.js";
+} from "./capabilities/attachments/workspace-attachment-download.js";
 
 export interface AppwriteAccountPort {
   get(): Promise<unknown>;

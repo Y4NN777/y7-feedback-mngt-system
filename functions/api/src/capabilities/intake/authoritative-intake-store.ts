@@ -4,7 +4,7 @@ import { planAuthoritativeCommit } from "@y7-feedback/domain";
 
 import type { AuthoritativeIntakeEnvelopeReader } from "./authoritative-intake-projector.js";
 import type { AcceptanceCommit } from "./intake.js";
-import type { AuthoritativeCommitStore } from "./appwrite-authoritative-commit-store.js";
+import type { AuthoritativeCommitStore } from "../../appwrite-authoritative-commit-store.js";
 
 export interface AuthoritativeIntakeEnvelopeCodec extends AuthoritativeIntakeEnvelopeReader {
   seal(commitId: string, value: AcceptanceCommit): string;

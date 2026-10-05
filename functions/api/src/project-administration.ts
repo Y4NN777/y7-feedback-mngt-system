@@ -5,7 +5,7 @@ import {
   type AppwriteProjectAdministrationStore,
 } from "./appwrite-project-administration-store.js";
 import type { WorkspaceOwnerScopeResolver } from "./appwrite-workspace-owner-scope.js";
-import type { AppwritePrincipalVerifier } from "./workspace-attachment-download.js";
+import type { AppwritePrincipalVerifier } from "./capabilities/attachments/workspace-attachment-download.js";
 
 export type ProjectAdministrationOutcome =
   | {

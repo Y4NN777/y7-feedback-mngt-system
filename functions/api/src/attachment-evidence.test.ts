@@ -5,8 +5,8 @@ import {
   runAppwriteG2AttachmentMatrix,
   type AppwriteG2AttachmentArtifacts,
 } from "./attachment-evidence";
-import type { AttachmentSaga } from "./attachment-saga";
-import type { AttachmentDownload } from "./attachment-download";
+import type { AttachmentSaga } from "./capabilities/attachments/attachment-saga";
+import type { AttachmentDownload } from "./capabilities/attachments/attachment-download";
 import type { PublicApi, PublicApiResponse } from "./public-api";
 
 const schema = {

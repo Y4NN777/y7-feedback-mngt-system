@@ -1,14 +1,14 @@
 import type { ServerConfig } from "@y7-feedback/config/server";
 
 import type { AccountlessAccessCoordinator } from "../../accountless-access.js";
-import { createNodeAppwriteAttachmentAcceptanceStore } from "../../appwrite-attachment-acceptance-store.js";
-import { createNodeAppwritePrivateAttachmentStorage } from "../../appwrite-private-attachment-storage.js";
-import { createAttachmentDownload } from "../../attachment-download.js";
-import { createAttachmentStagingTokenCodec } from "../../attachment-staging-token.js";
-import { createAttachmentStaging } from "../../attachment-staging.js";
-import { validateAttachment } from "../../attachment-validation.js";
+import { createNodeAppwriteAttachmentAcceptanceStore } from "../../infrastructure/appwrite/attachments/appwrite-attachment-acceptance-store.js";
+import { createNodeAppwritePrivateAttachmentStorage } from "../../infrastructure/appwrite/attachments/appwrite-private-attachment-storage.js";
+import { createAttachmentDownload } from "../../capabilities/attachments/attachment-download.js";
+import { createAttachmentStagingTokenCodec } from "../../capabilities/attachments/attachment-staging-token.js";
+import { createAttachmentStaging } from "../../capabilities/attachments/attachment-staging.js";
+import { validateAttachment } from "../../capabilities/attachments/attachment-validation.js";
 import { createClamAvHttpScanner } from "../../clamav-http-scanner.js";
-import { createReporterAttachmentDownload } from "../../reporter-attachment-download.js";
+import { createReporterAttachmentDownload } from "../../capabilities/attachments/reporter-attachment-download.js";
 import type { AppwriteSensitivePersistence } from "../../sensitive-data-protector.js";
 import type { ApplicationRuntime } from "./application-runtime.js";
 

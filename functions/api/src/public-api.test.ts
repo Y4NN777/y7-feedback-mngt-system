@@ -7,11 +7,11 @@ import type {
 } from "@y7-feedback/domain";
 
 import type { AccountlessAccessCoordinator } from "./accountless-access";
-import type { AttachmentStaging } from "./attachment-staging";
-import type { AttachmentStagingGrant } from "./attachment-staging-token";
-import type { IntakeCommand, IntakeCoordinator } from "./intake";
-import type { ReporterAttachmentDownload } from "./reporter-attachment-download";
-import type { WorkspaceAttachmentDownload } from "./workspace-attachment-download";
+import type { AttachmentStaging } from "./capabilities/attachments/attachment-staging";
+import type { AttachmentStagingGrant } from "./capabilities/attachments/attachment-staging-token";
+import type { IntakeCommand, IntakeCoordinator } from "./capabilities/intake/intake";
+import type { ReporterAttachmentDownload } from "./capabilities/attachments/reporter-attachment-download";
+import type { WorkspaceAttachmentDownload } from "./capabilities/attachments/workspace-attachment-download";
 import {
   createPublicApi,
   type PublicProject,

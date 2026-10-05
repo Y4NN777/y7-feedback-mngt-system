@@ -22,6 +22,33 @@ const migrationBaseline = {
   verificationPrograms: 27,
 };
 
+const intakeCapabilityModules = [
+  "authoritative-intake-envelope",
+  "authoritative-intake-projector",
+  "authoritative-intake-store",
+  "intake",
+];
+
+const attachmentCapabilityModules = [
+  "attachment-download",
+  "attachment-lifecycle",
+  "attachment-saga",
+  "attachment-staging",
+  "attachment-staging-token",
+  "attachment-validation",
+  "reporter-attachment-download",
+  "workspace-attachment-download",
+];
+
+const appwriteIntakeModules = ["appwrite-intake-store"];
+
+const appwriteAttachmentModules = [
+  "appwrite-attachment-acceptance-store",
+  "appwrite-attachment-lifecycle-store",
+  "appwrite-private-attachment-storage",
+  "appwrite-workspace-attachment-scope",
+];
+
 async function sourceFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
   const nested = await Promise.all(
@@ -112,6 +139,26 @@ test("TASK-ARCH-001A enforces inward dependency direction in migrated modules", 
         false,
         `${relative} imports an Appwrite adapter instead of a capability-owned port`,
       );
+    }
+  }
+});
+
+test("TASK-ARCH-001D colocates intake and attachment capabilities with their Appwrite adapters", async () => {
+  const files = new Set(
+    (await sourceFiles(apiSourceRoot)).map((absolute) => relativeSourcePath(absolute)),
+  );
+
+  for (const [directory, modules] of [
+    ["capabilities/intake", intakeCapabilityModules],
+    ["capabilities/attachments", attachmentCapabilityModules],
+    ["infrastructure/appwrite/intake", appwriteIntakeModules],
+    ["infrastructure/appwrite/attachments", appwriteAttachmentModules],
+  ]) {
+    for (const module of modules) {
+      assert.equal(files.has(`${directory}/${module}.ts`), true);
+      assert.equal(files.has(`${directory}/${module}.test.ts`), true);
+      assert.equal(files.has(`${module}.ts`), false);
+      assert.equal(files.has(`${module}.test.ts`), false);
     }
   }
 });

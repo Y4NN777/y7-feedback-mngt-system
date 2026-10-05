@@ -13,7 +13,7 @@ import {
 } from "./appwrite-conversation-lifecycle-store";
 import type { WorkspaceCapabilityScopeResolver } from "./appwrite-workspace-capability-scope";
 import { createConversationLifecycleCoordinator } from "./conversation-lifecycle";
-import type { AppwritePrincipalVerifier } from "./workspace-attachment-download";
+import type { AppwritePrincipalVerifier } from "./capabilities/attachments/workspace-attachment-download";
 
 const message = {
   kind: "append_message",

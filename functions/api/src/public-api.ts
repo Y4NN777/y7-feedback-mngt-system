@@ -11,14 +11,14 @@ import {
 } from "@y7-feedback/domain";
 
 import type { AccountlessAccessCoordinator } from "./accountless-access.js";
-import type { AttachmentStaging } from "./attachment-staging.js";
+import type { AttachmentStaging } from "./capabilities/attachments/attachment-staging.js";
 import type {
   AttachmentStagingGrant,
   AttachmentStagingTokenCodec,
-} from "./attachment-staging-token.js";
-import type { IntakeCoordinator, IntakeOutcome } from "./intake.js";
-import type { ReporterAttachmentDownload } from "./reporter-attachment-download.js";
-import type { WorkspaceAttachmentDownload } from "./workspace-attachment-download.js";
+} from "./capabilities/attachments/attachment-staging-token.js";
+import type { IntakeCoordinator, IntakeOutcome } from "./capabilities/intake/intake.js";
+import type { ReporterAttachmentDownload } from "./capabilities/attachments/reporter-attachment-download.js";
+import type { WorkspaceAttachmentDownload } from "./capabilities/attachments/workspace-attachment-download.js";
 import type {
   WorkspaceOperationOutcome,
   WorkspaceProjectOperations,
