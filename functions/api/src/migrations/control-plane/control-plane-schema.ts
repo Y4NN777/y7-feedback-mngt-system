@@ -1,14 +1,16 @@
 import {
   planAdditiveTableMigration,
   type AdditiveTableMigration,
-} from "./appwrite-additive-migration.js";
+} from "./additive-migration.js";
 import type {
   AppwriteColumn,
   AppwriteIndex,
   AppwriteTableDefinition,
-} from "./appwrite-schema-contract.js";
+} from "../schema/schema-contract.js";
 
-export const day4TableIds = [
+export const legacyControlPlaneMigrationVersion = "day4-control-plane-v1";
+
+export const controlPlaneTableIds = [
   "provider_event_inbox",
   "provider_sync_outbox",
   "offline_conflict_projections",
@@ -20,7 +22,7 @@ export const day4TableIds = [
   "exceptional_access_operations",
 ] as const;
 
-export interface Day4SchemaIds {
+export interface ControlPlaneSchemaIds {
   readonly providerEventInboxTableId: string;
   readonly providerSyncOutboxTableId: string;
   readonly offlineConflictProjectionsTableId: string;
@@ -32,16 +34,16 @@ export interface Day4SchemaIds {
   readonly exceptionalAccessOperationsTableId: string;
 }
 
-export const canonicalDay4SchemaIds: Day4SchemaIds = {
-  providerEventInboxTableId: day4TableIds[0],
-  providerSyncOutboxTableId: day4TableIds[1],
-  offlineConflictProjectionsTableId: day4TableIds[2],
-  intelligenceProvenanceTableId: day4TableIds[3],
-  deletionRecordsTableId: day4TableIds[4],
-  abuseCountersTableId: day4TableIds[5],
-  exceptionalAccessGrantsTableId: day4TableIds[6],
-  exceptionalAccessAuditTableId: day4TableIds[7],
-  exceptionalAccessOperationsTableId: day4TableIds[8],
+export const canonicalControlPlaneSchemaIds: ControlPlaneSchemaIds = {
+  providerEventInboxTableId: controlPlaneTableIds[0],
+  providerSyncOutboxTableId: controlPlaneTableIds[1],
+  offlineConflictProjectionsTableId: controlPlaneTableIds[2],
+  intelligenceProvenanceTableId: controlPlaneTableIds[3],
+  deletionRecordsTableId: controlPlaneTableIds[4],
+  abuseCountersTableId: controlPlaneTableIds[5],
+  exceptionalAccessGrantsTableId: controlPlaneTableIds[6],
+  exceptionalAccessAuditTableId: controlPlaneTableIds[7],
+  exceptionalAccessOperationsTableId: controlPlaneTableIds[8],
 };
 
 const varchar = (key: string, size: number, required = true): AppwriteColumn => ({
@@ -90,8 +92,8 @@ const table = (
   indexes,
 });
 
-export function createDay4TableDefinitions(
-  ids: Day4SchemaIds = canonicalDay4SchemaIds,
+export function createControlPlaneTableDefinitions(
+  ids: ControlPlaneSchemaIds = canonicalControlPlaneSchemaIds,
 ): readonly AppwriteTableDefinition[] {
   return [
     table(
@@ -333,14 +335,14 @@ export function createDay4TableDefinitions(
   ];
 }
 
-export function createDay4AdditiveMigration(
+export function createControlPlaneAdditiveMigration(
   currentTables: readonly AppwriteTableDefinition[],
-  ids: Day4SchemaIds = canonicalDay4SchemaIds,
+  ids: ControlPlaneSchemaIds = canonicalControlPlaneSchemaIds,
 ): AdditiveTableMigration {
-  const additions = createDay4TableDefinitions(ids);
+  const additions = createControlPlaneTableDefinitions(ids);
   const existing = new Set(currentTables.map(({ id }) => id));
   return planAdditiveTableMigration({
-    version: "day4-control-plane-v1",
+    version: legacyControlPlaneMigrationVersion,
     currentTables,
     targetTables: [
       ...currentTables,

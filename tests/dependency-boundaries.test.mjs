@@ -9,17 +9,17 @@ async function source(path) {
 }
 
 test("Appwrite schema and migration modules depend on a neutral schema contract", async () => {
-  const [schema, day4, migration] = await Promise.all([
-    source("functions/api/src/appwrite-schema.ts"),
-    source("functions/api/src/appwrite-day4-migration.ts"),
-    source("functions/api/src/appwrite-additive-migration.ts"),
+  const [schema, controlPlane, migration] = await Promise.all([
+    source("functions/api/src/migrations/schema/schema.ts"),
+    source("functions/api/src/migrations/control-plane/control-plane-schema.ts"),
+    source("functions/api/src/migrations/control-plane/additive-migration.ts"),
   ]);
 
-  assert.match(schema, /from "\.\/appwrite-schema-contract\.js"/u);
-  assert.match(day4, /from "\.\/appwrite-schema-contract\.js"/u);
-  assert.match(migration, /from "\.\/appwrite-schema-contract\.js"/u);
-  assert.doesNotMatch(day4, /from "\.\/appwrite-schema\.js"/u);
-  assert.doesNotMatch(migration, /from "\.\/appwrite-schema\.js"/u);
+  assert.match(schema, /from "\.\/schema-contract\.js"/u);
+  assert.match(controlPlane, /from "\.\.\/schema\/schema-contract\.js"/u);
+  assert.match(migration, /from "\.\.\/schema\/schema-contract\.js"/u);
+  assert.doesNotMatch(controlPlane, /from "\.\.\/schema\/schema\.js"/u);
+  assert.doesNotMatch(migration, /from "\.\.\/schema\/schema\.js"/u);
 });
 
 test("offline intake depends on component-neutral intake contracts", async () => {

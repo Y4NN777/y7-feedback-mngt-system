@@ -1,23 +1,30 @@
+import { createHash } from "node:crypto";
+
 import { describe, expect, it } from "vitest";
 
-import { assertAdditiveRollbackSafe } from "./appwrite-additive-migration";
-import { createAppwriteInfrastructureManifest } from "./appwrite-schema";
-import { createDay4AdditiveMigration, day4TableIds } from "./appwrite-day4-migration";
-import { schema } from "./appwrite-schema.test-fixture";
+import { assertAdditiveRollbackSafe } from "./additive-migration";
+import {
+  controlPlaneTableIds,
+  createControlPlaneAdditiveMigration,
+  legacyControlPlaneMigrationVersion,
+  createControlPlaneTableDefinitions,
+} from "./control-plane-schema";
+import { createAppwriteInfrastructureManifest } from "../schema/schema";
+import { schema } from "../schema/schema.test-fixture";
 
-describe("Day 4 additive Appwrite migration", () => {
-  const g3Tables = () =>
+describe("Control-plane additive Appwrite migration", () => {
+  const preControlPlaneTables = () =>
     createAppwriteInfrastructureManifest(schema).tables.filter(
-      ({ id }) => !(day4TableIds as readonly string[]).includes(id),
+      ({ id }) => !(controlPlaneTableIds as readonly string[]).includes(id),
     );
 
-  it("BDD-D4-MIG-001 adds every D4 control-plane boundary without changing G3 tables", () => {
-    const current = g3Tables();
-    const migration = createDay4AdditiveMigration(current);
+  it("BDD-CP-MIG-001 adds every control-plane boundary without changing pre-control-plane tables", () => {
+    const current = preControlPlaneTables();
+    const migration = createControlPlaneAdditiveMigration(current);
 
-    expect(migration.version).toBe("day4-control-plane-v1");
-    expect(migration.createTables.map(({ id }) => id)).toEqual(day4TableIds);
-    expect(migration.rollbackTableIds).toEqual([...day4TableIds].reverse());
+    expect(migration.version).toBe(legacyControlPlaneMigrationVersion);
+    expect(migration.createTables.map(({ id }) => id)).toEqual(controlPlaneTableIds);
+    expect(migration.rollbackTableIds).toEqual([...controlPlaneTableIds].reverse());
     expect(
       migration.createTables.map(({ enabled, permissions, rowSecurity }) => ({
         enabled,
@@ -25,7 +32,7 @@ describe("Day 4 additive Appwrite migration", () => {
         rowSecurity,
       })),
     ).toEqual(
-      day4TableIds.map(() => ({
+      controlPlaneTableIds.map(() => ({
         enabled: true,
         permissions: [],
         rowSecurity: true,
@@ -33,18 +40,21 @@ describe("Day 4 additive Appwrite migration", () => {
     );
   });
 
-  it("BDD-D4-MIG-002 is replay-safe and preserves forward compatibility", () => {
-    const current = g3Tables();
-    const first = createDay4AdditiveMigration(current);
-    const replay = createDay4AdditiveMigration([...current, ...first.createTables]);
+  it("BDD-CP-MIG-002 is replay-safe and preserves forward compatibility", () => {
+    const current = preControlPlaneTables();
+    const first = createControlPlaneAdditiveMigration(current);
+    const replay = createControlPlaneAdditiveMigration([
+      ...current,
+      ...first.createTables,
+    ]);
 
     expect(replay.createTables).toEqual([]);
     expect(replay.rollbackTableIds).toEqual([]);
   });
 
-  it("BDD-D4-MIG-003 permits rollback only before any D4 fact exists", () => {
-    const migration = createDay4AdditiveMigration(g3Tables());
-    const empty = Object.fromEntries(day4TableIds.map((id) => [id, 0]));
+  it("BDD-CP-MIG-003 permits rollback only before any control-plane fact exists", () => {
+    const migration = createControlPlaneAdditiveMigration(preControlPlaneTables());
+    const empty = Object.fromEntries(controlPlaneTableIds.map((id) => [id, 0]));
 
     expect(() => {
       assertAdditiveRollbackSafe(migration, empty);
@@ -57,8 +67,8 @@ describe("Day 4 additive Appwrite migration", () => {
     }).toThrow("APPWRITE_ADDITIVE_ROLLBACK_NON_EMPTY");
   });
 
-  it("BDD-D4-MIG-004 gives inbox/outbox durable dedupe, ordering and retry indexes", () => {
-    const migration = createDay4AdditiveMigration(g3Tables());
+  it("BDD-CP-MIG-004 gives inbox/outbox durable dedupe, ordering and retry indexes", () => {
+    const migration = createControlPlaneAdditiveMigration(preControlPlaneTables());
     const byId = new Map(migration.createTables.map((table) => [table.id, table]));
 
     expect(byId.get("provider_event_inbox")?.indexes).toEqual(
@@ -78,9 +88,9 @@ describe("Day 4 additive Appwrite migration", () => {
   });
 
   it("BDD-INT-309 evolves provenance additively for correction history", () => {
-    const provenance = createDay4AdditiveMigration(g3Tables()).createTables.find(
-      ({ id }) => id === "intelligence_provenance",
-    );
+    const provenance = createControlPlaneAdditiveMigration(
+      preControlPlaneTables(),
+    ).createTables.find(({ id }) => id === "intelligence_provenance");
 
     expect(
       provenance?.columns
@@ -110,9 +120,9 @@ describe("Day 4 additive Appwrite migration", () => {
   });
 
   it("BDD-PRIV-009 evolves deletion records additively for immutable audit", () => {
-    const deletion = createDay4AdditiveMigration(g3Tables()).createTables.find(
-      ({ id }) => id === "deletion_records",
-    );
+    const deletion = createControlPlaneAdditiveMigration(
+      preControlPlaneTables(),
+    ).createTables.find(({ id }) => id === "deletion_records");
     expect(
       deletion?.columns
         .filter(({ key }) =>
@@ -139,9 +149,9 @@ describe("Day 4 additive Appwrite migration", () => {
   });
 
   it("BDD-PLAT-101 evolves exceptional grants additively for lifecycle enforcement", () => {
-    const grant = createDay4AdditiveMigration(g3Tables()).createTables.find(
-      ({ id }) => id === "exceptional_access_grants",
-    );
+    const grant = createControlPlaneAdditiveMigration(
+      preControlPlaneTables(),
+    ).createTables.find(({ id }) => id === "exceptional_access_grants");
     expect(
       grant?.columns
         .filter(({ key }) =>
@@ -168,9 +178,9 @@ describe("Day 4 additive Appwrite migration", () => {
   });
 
   it("BDD-PLAT-102 reserves exact idempotent replays for exceptional reads", () => {
-    const operations = createDay4AdditiveMigration(g3Tables()).createTables.find(
-      ({ id }) => id === "exceptional_access_operations",
-    );
+    const operations = createControlPlaneAdditiveMigration(
+      preControlPlaneTables(),
+    ).createTables.find(({ id }) => id === "exceptional_access_operations");
 
     expect(operations?.columns.map(({ key }) => key)).toEqual([
       "grantId",
@@ -191,4 +201,13 @@ describe("Day 4 additive Appwrite migration", () => {
       ]),
     );
   });
+});
+it("BDD-CP-MIG-000 preserves the characterized table contract", () => {
+  const digest = createHash("sha256")
+    .update(JSON.stringify(createControlPlaneTableDefinitions()))
+    .digest("hex");
+
+  expect(digest).toBe(
+    "8c033d5ca64ebde2331751ee682f78af3600856730e58665dbad6ebc62ebbb03",
+  );
 });

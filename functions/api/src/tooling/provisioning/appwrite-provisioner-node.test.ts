@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createNodeAppwriteProvisioningPort } from "./appwrite-provisioner-node";
-import { canonicalDay4SchemaIds } from "./appwrite-day4-migration";
-import { createAppwriteInfrastructureManifest } from "./appwrite-schema";
+import { canonicalControlPlaneSchemaIds } from "../../migrations/control-plane/control-plane-schema";
+import { createAppwriteInfrastructureManifest } from "../../migrations/schema/schema";
 
 const manifest = createAppwriteInfrastructureManifest({
-  ...canonicalDay4SchemaIds,
+  ...canonicalControlPlaneSchemaIds,
   authoritativeCommitsTableId: "authoritative_commits",
   databaseId: "feedback",
   workspacesTableId: "workspaces",

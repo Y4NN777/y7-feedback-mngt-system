@@ -7,9 +7,9 @@ import {
   provisionAppwriteInfrastructure,
   safeAppwriteProvisioningErrorCode,
 } from "./appwrite-provisioner.js";
-import { createAppwriteInfrastructureManifest } from "./appwrite-schema.js";
-import { createNodeAppwriteG1FixtureStore } from "./intake-fixture-store.js";
-import { createG1FixtureRows, seedG1Fixtures } from "./intake-fixtures.js";
+import { createAppwriteInfrastructureManifest } from "../../migrations/schema/schema.js";
+import { createNodeAppwriteG1FixtureStore } from "../../intake-fixture-store.js";
+import { createG1FixtureRows, seedG1Fixtures } from "../../intake-fixtures.js";
 import { resolveAppwriteProvisioningMode } from "./appwrite-provisioning-mode.js";
 
 async function main(): Promise<void> {

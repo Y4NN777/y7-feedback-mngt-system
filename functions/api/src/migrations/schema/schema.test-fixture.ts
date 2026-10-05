@@ -1,6 +1,6 @@
 import type { ServerConfig } from "@y7-feedback/config/server";
 
-import { canonicalDay4SchemaIds } from "./appwrite-day4-migration.js";
+import { canonicalControlPlaneSchemaIds } from "../control-plane/control-plane-schema.js";
 
 export const schema: ServerConfig["appwriteSchema"] = {
   databaseId: "feedback",
@@ -32,5 +32,5 @@ export const schema: ServerConfig["appwriteSchema"] = {
   externalIssueLinksTableId: "external_issue_links",
   providerOutboxTableId: "provider_outbox",
   authoritativeCommitsTableId: "authoritative_commits",
-  ...canonicalDay4SchemaIds,
+  ...canonicalControlPlaneSchemaIds,
 };

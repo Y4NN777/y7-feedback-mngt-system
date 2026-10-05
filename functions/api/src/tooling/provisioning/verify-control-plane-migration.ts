@@ -7,11 +7,11 @@ import { parseServerConfig } from "@y7-feedback/config/server";
 import {
   assertAdditiveRollbackSafe,
   planAdditiveTableMigration,
-} from "./appwrite-additive-migration.js";
-import { createDay4TableDefinitions } from "./appwrite-day4-migration.js";
+} from "../../migrations/control-plane/additive-migration.js";
+import { createControlPlaneTableDefinitions } from "../../migrations/control-plane/control-plane-schema.js";
 import { createNodeAppwriteProvisioningPort } from "./appwrite-provisioner-node.js";
 import { provisionAppwriteInfrastructure } from "./appwrite-provisioner.js";
-import { createAppwriteInfrastructureManifest } from "./appwrite-schema.js";
+import { createAppwriteInfrastructureManifest } from "../../migrations/schema/schema.js";
 
 function object(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -23,11 +23,11 @@ function absent(error: unknown): boolean {
 
 async function main(): Promise<void> {
   if (!process.argv.includes("--apply")) {
-    throw new Error("D4_MIGRATION_APPLY_REQUIRED");
+    throw new Error("CONTROL_PLANE_MIGRATION_APPLY_REQUIRED");
   }
   const config = parseServerConfig(process.env);
   if (config.environment !== "preview") {
-    throw new Error("D4_MIGRATION_PREVIEW_REQUIRED");
+    throw new Error("CONTROL_PLANE_MIGRATION_PREVIEW_REQUIRED");
   }
 
   const client = new Client()
@@ -37,22 +37,24 @@ async function main(): Promise<void> {
   const tables = new TablesDB(client);
   const port = createNodeAppwriteProvisioningPort(tables, new Storage(client));
   const manifest = createAppwriteInfrastructureManifest(config.appwriteSchema);
-  const d4Definitions = createDay4TableDefinitions(config.appwriteSchema);
+  const controlPlaneDefinitions = createControlPlaneTableDefinitions(
+    config.appwriteSchema,
+  );
   const before = await Promise.all(
-    d4Definitions.map(({ id }) => port.getTable(manifest.database.id, id)),
+    controlPlaneDefinitions.map(({ id }) => port.getTable(manifest.database.id, id)),
   );
   const forward = await provisionAppwriteInfrastructure(port, manifest);
   const replay = await provisionAppwriteInfrastructure(port, manifest);
-  if (replay.created !== 0) throw new Error("D4_MIGRATION_REPLAY_MUTATED");
+  if (replay.created !== 0) throw new Error("CONTROL_PLANE_MIGRATION_REPLAY_MUTATED");
 
   const suffix = randomBytes(4).toString("hex");
-  const temporary = d4Definitions.map((definition, index) => ({
+  const temporary = controlPlaneDefinitions.map((definition, index) => ({
     ...definition,
-    id: `d4m_${suffix}_${String(index + 1)}`,
-    name: `D4 migration proof ${String(index + 1)}`,
+    id: `cpm_${suffix}_${String(index + 1)}`,
+    name: `Control-plane migration proof ${String(index + 1)}`,
   }));
   const rollbackPlan = planAdditiveTableMigration({
-    version: "day4-rollback-proof-v1",
+    version: "control-plane-rollback-proof-v1",
     currentTables: manifest.tables,
     targetTables: [...manifest.tables, ...temporary],
     additiveTableIds: temporary.map(({ id }) => id),
@@ -80,7 +82,7 @@ async function main(): Promise<void> {
     }
 
     const counter = temporary[5];
-    if (!counter) throw new Error("D4_MIGRATION_PROOF_INVALID");
+    if (!counter) throw new Error("CONTROL_PLANE_MIGRATION_PROOF_INVALID");
     const rowId = `proof_${suffix}`;
     await tables.createRow({
       databaseId: manifest.database.id,
@@ -133,7 +135,7 @@ async function main(): Promise<void> {
   if (cleanupFailure !== undefined) {
     throw cleanupFailure instanceof Error
       ? cleanupFailure
-      : new Error("D4_MIGRATION_CLEANUP_FAILED");
+      : new Error("CONTROL_PLANE_MIGRATION_CLEANUP_FAILED");
   }
 
   const residue = await Promise.all(
@@ -148,12 +150,12 @@ async function main(): Promise<void> {
     }),
   );
   if (residue.some((id) => id !== null) || !nonEmptyRollbackDenied) {
-    throw new Error("D4_MIGRATION_CLEANUP_FAILED");
+    throw new Error("CONTROL_PLANE_MIGRATION_CLEANUP_FAILED");
   }
 
   process.stdout.write(
     `${JSON.stringify({
-      result: "APPWRITE_D4_MIGRATION_PASSED",
+      result: "APPWRITE_CONTROL_PLANE_MIGRATION_PASSED",
       permanentTablesCreated: before.filter((value) => value === null).length,
       forwardCreatedResources: forward.created,
       replayCreatedResources: replay.created,
@@ -168,7 +170,7 @@ main().catch((error: unknown) => {
   const code =
     error instanceof Error && /^[A-Z0-9_]+$/u.test(error.message)
       ? error.message
-      : "D4_MIGRATION_FAILED";
+      : "CONTROL_PLANE_MIGRATION_FAILED";
   process.stderr.write(`${JSON.stringify({ error: code })}\n`);
   process.exitCode = 1;
 });
