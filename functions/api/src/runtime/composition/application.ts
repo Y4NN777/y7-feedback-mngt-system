@@ -14,9 +14,6 @@ import { drainAuthoritativeProjectionEvent } from "../../authoritative-projectio
 import { createAuthoritativeProjectionRouter } from "../../authoritative-projection-router.js";
 import { createNodeAppwriteOutboxStore } from "../../appwrite-outbox-store.js";
 import { createNodeAppwriteNotificationRecipientResolver } from "../../appwrite-notification-recipient-resolver.js";
-import { createNodeAppwriteIntelligenceStore } from "../../appwrite-intelligence-store.js";
-import { createNodeAppwriteIntelligenceProvenanceStore } from "../../appwrite-intelligence-provenance-store.js";
-import { createNodeAppwritePrivacyStore } from "../../appwrite-privacy-store.js";
 import { createNodeAppwritePrivacyPurgeRepository } from "../../appwrite-privacy-purge-repository.js";
 import { createNodeAppwritePrivacyCleanup } from "../../appwrite-privacy-cleanup.js";
 import { createNodeAppwritePrivacyProviderCleanup } from "../../appwrite-privacy-provider-cleanup.js";
@@ -52,11 +49,6 @@ import { createNodeAppwriteReporterConsentVerifier } from "../../appwrite-report
 import { createNodeAppwriteProviderGrantVault } from "../../appwrite-provider-grant-vault.js";
 import { createNodeAppwriteActiveSourceGrantReader } from "../../appwrite-active-source-grant-reader.js";
 import type { HttpDependencies } from "../http/http.js";
-import { createIntelligenceCoordinator } from "../../intelligence.js";
-import { createIntelligenceProvenanceCoordinator } from "../../intelligence-provenance.js";
-import { createIntelligenceHttp } from "../../intelligence-http.js";
-import { createPrivacyCoordinator } from "../../privacy.js";
-import { createPrivacyHttp } from "../../privacy-http.js";
 import { createPlatformAccessCoordinator } from "../../platform-access.js";
 import { createPlatformAccessHttp } from "../../platform-access-http.js";
 import { createPrivacyPurgeWorker } from "../../privacy-cleanup.js";
@@ -109,6 +101,7 @@ import {
 import { composeAttachmentCapability } from "./compose-attachment-capability.js";
 import { composeApplicationSecurity } from "./compose-application-security.js";
 import { composeConversationCapability } from "./compose-conversation-capability.js";
+import { composeGovernanceCapability } from "./compose-governance-capability.js";
 import { composeIntakeCapability } from "./compose-intake-capability.js";
 
 export {
@@ -225,84 +218,14 @@ export function createHttpApplication(
     runtime.tables,
     workspaceScopeSchema,
   );
-  const intelligence = createIntelligenceHttp(
-    createIntelligenceCoordinator(
-      principalVerifier,
-      workspaceScope,
-      createNodeAppwriteIntelligenceStore(
-        runtime.tables,
-        {
-          databaseId: config.appwriteSchema.databaseId,
-          feedbackTableId: config.appwriteSchema.feedbackTableId,
-          reportersTableId: config.appwriteSchema.reportersTableId,
-        },
-        sensitive,
-      ),
-    ),
-    createIntelligenceProvenanceCoordinator(
-      principalVerifier,
-      workspaceScope,
-      createNodeAppwriteIntelligenceProvenanceStore(
-        runtime.tables,
-        {
-          databaseId: config.appwriteSchema.databaseId,
-          feedbackTableId: config.appwriteSchema.feedbackTableId,
-          provenanceTableId: config.appwriteSchema.intelligenceProvenanceTableId,
-        },
-        sensitive,
-        {
-          createAssociationId: runtime.createId,
-          createEventId: runtime.createId,
-          now: runtime.nowIso,
-        },
-      ),
-    ),
+  const { intelligence, privacy } = composeGovernanceCapability(
+    config,
+    runtime,
+    sensitive,
+    principalVerifier,
+    workspaceScope,
+    accountless,
   );
-  /* v8 ignore start -- privacy composition is exercised by verify:appwrite:privacy. */
-  const privacy = createPrivacyHttp(
-    createPrivacyCoordinator(
-      principalVerifier,
-      workspaceScope,
-      {
-        authorize: async ({ reference, proof }) => {
-          const outcome = await accountless.authorize({ reference, proof });
-          return outcome.status === "ok"
-            ? { status: "authorized" as const, feedbackId: outcome.feedbackId }
-            : outcome.status === "denied"
-              ? { status: "denied" as const }
-              : { status: "retryable" as const };
-        },
-      },
-      createNodeAppwritePrivacyStore(
-        runtime.tables,
-        {
-          databaseId: config.appwriteSchema.databaseId,
-          feedbackTableId: config.appwriteSchema.feedbackTableId,
-          reportersTableId: config.appwriteSchema.reportersTableId,
-          accessGrantsTableId: config.appwriteSchema.accessGrantsTableId,
-          attachmentsTableId: config.appwriteSchema.attachmentsTableId,
-          notificationsTableId: config.appwriteSchema.notificationsTableId,
-          publicationConsentsTableId: config.appwriteSchema.publicationConsentsTableId,
-          externalIssueLinksTableId: config.appwriteSchema.externalIssueLinksTableId,
-          providerOutboxTableId: config.appwriteSchema.providerOutboxTableId,
-          providerSyncOutboxTableId: config.appwriteSchema.providerSyncOutboxTableId,
-          offlineConflictProjectionsTableId:
-            config.appwriteSchema.offlineConflictProjectionsTableId,
-          intelligenceProvenanceTableId:
-            config.appwriteSchema.intelligenceProvenanceTableId,
-          deletionRecordsTableId: config.appwriteSchema.deletionRecordsTableId,
-        },
-        sensitive,
-        {
-          createId: runtime.createId,
-          createEventId: runtime.createId,
-          now: runtime.nowIso,
-        },
-      ),
-      (value) => createHash("sha256").update(value).digest("base64url"),
-    ),
-  );
-  /* v8 ignore stop */
   const workbench = createWorkbenchHttp(
     createWorkbenchCoordinator(
       principalVerifier,
