@@ -19,17 +19,10 @@ async function navigateAcrossTransientNetworkChange(
   }
 }
 
-async function applyCommandWithResponseLossRetry(
-  page: import("@playwright/test").Page,
-) {
+async function submitCommandAndWait(page: import("@playwright/test").Page) {
   const applied = page.getByText("Commande appliquée.");
   await page.getByRole("button", { name: "Appliquer la commande" }).click();
-  try {
-    await expect(applied).toBeVisible({ timeout: 5_000 });
-  } catch {
-    await page.getByRole("button", { name: "Appliquer la commande" }).click();
-    await expect(applied).toBeVisible({ timeout: 10_000 });
-  }
+  await expect(applied).toBeVisible({ timeout: 30_000 });
 }
 
 test("deployed Preview restores a real team session and serves the created Reporter route", async ({
@@ -54,7 +47,7 @@ test("deployed Preview restores a real team session and serves the created Repor
   await page.getByLabel("Slug du projet").fill(slug);
   await page.getByLabel("But Reporter en français").fill("Parcours Reporter déployé");
   await page.getByLabel("But Reporter en anglais").fill("Deployed Reporter journey");
-  await applyCommandWithResponseLossRetry(page);
+  await submitCommandAndWait(page);
 
   await navigateAcrossTransientNetworkChange(() => page.reload());
   await expect(page.getByText("Session active.", { exact: true })).toBeVisible();

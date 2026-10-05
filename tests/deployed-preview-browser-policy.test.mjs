@@ -18,8 +18,15 @@ test("deployed browser smoke targets the Vercel deployment without route interce
   assert.doesNotMatch(scenario, /page\.route/u);
   assert.match(scenario, /page\.reload\(\)/u);
   assert.match(scenario, /Commande appliquée\./u);
-  assert.match(scenario, /applyCommandWithResponseLossRetry/u);
-  assert.match(scenario, /timeout: 10_000/u);
+  assert.match(scenario, /submitCommandAndWait/u);
+  assert.match(scenario, /timeout: 30_000/u);
+  assert.doesNotMatch(scenario, /ResponseLossRetry/u);
+  assert.equal(
+    scenario.match(
+      /getByRole\("button", \{ name: "Appliquer la commande" \}\)\.click\(\)/gu,
+    )?.length,
+    1,
+  );
   assert.match(scenario, /Parcours Reporter déployé/u);
   const fixture = await readFile(
     new URL("apps/web/e2e/deployed/fixture.ts", root),
