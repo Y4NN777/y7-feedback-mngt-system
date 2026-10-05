@@ -11,8 +11,8 @@ behavior changes.
 | Order | Task | Outcome | Status |
 |---:|---|---|---|
 | 1 | `TASK-ARCH-001A` | Architecture contract, baseline and progressive root guard | `DONE` — baseline `main@12ad8ac`, architecture boundary tests and migration contract |
-| 2 | `TASK-ARCH-001B` | Runtime, HTTP, configuration, observability and focused composition roots | `IN_PROGRESS` — runtime shell moved; application runtime contract extracted; capability factories remain |
-| 3 | `TASK-ARCH-001C` | Appwrite schema/control-plane migrations and removal of Day 4 source names | `BLOCKED_BY_001B` |
+| 2 | `TASK-ARCH-001B` | Runtime, HTTP, configuration, observability and focused composition roots | `DONE` — runtime shell moved; 1,229-line application composition reduced to a 128-line assembler backed by six focused capability factories |
+| 3 | `TASK-ARCH-001C` | Appwrite schema/control-plane migrations and removal of Day 4 source names | `READY` |
 | 4 | `TASK-ARCH-001D` | Intake and attachment capabilities with Appwrite adapters | `BLOCKED_BY_001C` |
 | 5 | `TASK-ARCH-001E` | Conversation and Workbench capabilities | `BLOCKED_BY_001D` |
 | 6 | `TASK-ARCH-001F` | Administration and platform-access capabilities | `BLOCKED_BY_001E` |
