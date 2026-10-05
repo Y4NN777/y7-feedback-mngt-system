@@ -4,11 +4,6 @@ import type { ServerConfig } from "@y7-feedback/config/server";
 
 import { createAccountlessAccessCoordinator } from "../../accountless-access.js";
 import { createNodeAppwriteAccountlessRepository } from "../../appwrite-accountless-repository.js";
-import { createNodeAppwriteAttachmentAcceptanceStore } from "../../appwrite-attachment-acceptance-store.js";
-import { createAttachmentStaging } from "../../attachment-staging.js";
-import { createAttachmentStagingTokenCodec } from "../../attachment-staging-token.js";
-import { validateAttachment } from "../../attachment-validation.js";
-import { createClamAvHttpScanner } from "../../clamav-http-scanner.js";
 import { createNodeAppwriteIntakeStore } from "../../appwrite-intake-store.js";
 import { createAppwriteAuthoritativeCommitStore } from "../../appwrite-authoritative-commit-store.js";
 import { createNodeAppwriteAuthoritativeProjectionStore } from "../../appwrite-authoritative-projection-store.js";
@@ -33,7 +28,6 @@ import { createNodeAppwritePrivacyPurgeRepository } from "../../appwrite-privacy
 import { createNodeAppwritePrivacyCleanup } from "../../appwrite-privacy-cleanup.js";
 import { createNodeAppwritePrivacyProviderCleanup } from "../../appwrite-privacy-provider-cleanup.js";
 import { createNodeAppwriteAbuseCounterStore } from "../../appwrite-abuse-counter-store.js";
-import { createNodeAppwritePrivateAttachmentStorage } from "../../appwrite-private-attachment-storage.js";
 import { createNodeAppwritePrincipalVerifier } from "../../appwrite-principal-verifier.js";
 import { createPlatformAccessAuditId } from "../../platform-access-audit-id.js";
 import {
@@ -95,7 +89,6 @@ import {
 import { createPublicApi } from "../../public-api.js";
 import { createProjectAdministration } from "../../project-administration.js";
 import { createProjectAdministrationHttp } from "../../project-administration-http.js";
-import { createReporterAttachmentDownload } from "../../reporter-attachment-download.js";
 import { createSensitiveDataProtector } from "../../sensitive-data-protector.js";
 import { createProviderSourceHttp } from "../../provider-source-composition.js";
 import { createWorkspaceAttachmentDownload } from "../../workspace-attachment-download.js";
@@ -138,6 +131,7 @@ import {
   digestExternalIssueCommand,
   type ApplicationRuntime,
 } from "./application-runtime.js";
+import { composeAttachmentCapability } from "./compose-attachment-capability.js";
 
 export {
   createProtectedFeedbackUrl,
@@ -274,54 +268,11 @@ export function createHttpApplication(
     },
   );
   /* v8 ignore stop */
-  const attachmentMetadata = createNodeAppwriteAttachmentAcceptanceStore(
-    runtime.tables,
-    {
-      databaseId: config.appwriteSchema.databaseId,
-      stagingTableId: config.appwriteSchema.attachmentStagingTableId,
-      attachmentsTableId: config.appwriteSchema.attachmentsTableId,
-    },
+  const attachments = composeAttachmentCapability(
+    config,
+    runtime,
     sensitive,
-  );
-  const attachmentStorage = createNodeAppwritePrivateAttachmentStorage(
-    runtime.storage,
-    runtime.tables,
-    {
-      bucketId: config.appwriteSchema.attachmentBucketId,
-      databaseId: config.appwriteSchema.databaseId,
-      stagingTableId: config.appwriteSchema.attachmentStagingTableId,
-    },
-  );
-  const malwareScanner = config.antivirusScanner
-    ? createClamAvHttpScanner({
-        endpoint: config.antivirusScanner.endpoint,
-        keyId: config.antivirusScanner.keyId,
-        hmacKey: Buffer.from(config.antivirusScanner.hmacKey, "base64url"),
-        timeoutMs: config.antivirusScanner.timeoutMs,
-      })
-    : undefined;
-  const attachmentStagingTokens = malwareScanner
-    ? createAttachmentStagingTokenCodec(sensitive, {
-        tableId: config.appwriteSchema.attachmentsTableId,
-        now: runtime.nowIso,
-        ttlMs: 15 * 60 * 1_000,
-      })
-    : undefined;
-  const attachmentStaging =
-    malwareScanner && attachmentStagingTokens
-      ? createAttachmentStaging(attachmentStorage, attachmentStagingTokens, {
-          validate: (candidate) =>
-            validateAttachment(candidate, {
-              malwareScanner,
-            }),
-          createAttachmentId: runtime.createId,
-          createObjectId: () => `private/${runtime.createId()}`,
-          now: runtime.nowIso,
-        })
-      : undefined;
-  const reporterAttachmentDownload = createReporterAttachmentDownload(
     accountless,
-    createAttachmentDownload(attachmentMetadata, attachmentStorage),
   );
   const principalVerifier =
     runtime.principalVerifier ??
@@ -404,7 +355,7 @@ export function createHttpApplication(
     createNodeAppwriteWorkspaceAttachmentScopeResolver(runtime.tables, {
       ...workspaceScopeSchema,
     }),
-    createAttachmentDownload(attachmentMetadata, attachmentStorage),
+    createAttachmentDownload(attachments.metadata, attachments.storage),
   );
   const workspaceScope = createNodeAppwriteWorkspaceCapabilityScopeResolver(
     runtime.tables,
@@ -1214,11 +1165,11 @@ export function createHttpApplication(
       projects,
       intake,
       accountless,
-      reporterAttachmentDownload,
+      attachments.reporterDownload,
       workspaceAttachmentDownload,
       workspaceOperations,
-      attachmentStaging,
-      attachmentStagingTokens,
+      attachments.staging,
+      attachments.stagingTokens,
     ),
     ...(sourceConnections === undefined ? {} : { sourceConnections }),
     ...(providerIssueOutbox === undefined ? {} : { providerIssueOutbox }),
