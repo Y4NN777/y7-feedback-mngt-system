@@ -5,7 +5,7 @@ import { Client, Storage, TablesDB } from "node-appwrite";
 import { parseServerConfig } from "@y7-feedback/config/server";
 
 import { createAccountlessAccessCoordinator } from "./accountless-access.js";
-import { createHttpApplication } from "./application.js";
+import { createHttpApplication } from "./runtime/composition/application.js";
 import { createNodeAppwriteAccountlessRepository } from "./appwrite-accountless-repository.js";
 import { runAppwriteG1OutboxMatrix } from "./intake-outbox-evidence.js";
 import { failCreateForTable } from "./appwrite-operation-failure-injection.js";

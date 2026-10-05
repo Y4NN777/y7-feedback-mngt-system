@@ -7,7 +7,7 @@ import {
   createProtectedFeedbackUrl,
   deriveReporterActorId,
   digestExternalIssueCommand,
-} from "./application";
+} from "./runtime/composition/application.js";
 import { canonicalDay4SchemaIds } from "./appwrite-day4-migration";
 import { routeRequest, type FunctionContext } from "./runtime/http/http.js";
 import { createSensitiveDataProtector } from "./sensitive-data-protector";

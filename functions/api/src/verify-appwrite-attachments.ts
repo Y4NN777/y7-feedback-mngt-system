@@ -4,7 +4,7 @@ import { Client, Storage, TablesDB, Users } from "node-appwrite";
 
 import { parseServerConfig } from "@y7-feedback/config/server";
 
-import { createHttpApplication } from "./application.js";
+import { createHttpApplication } from "./runtime/composition/application.js";
 import { createNodeAppwriteAttachmentAcceptanceStore } from "./appwrite-attachment-acceptance-store.js";
 import { createNodeAppwriteAttachmentLifecycleStore } from "./appwrite-attachment-lifecycle-store.js";
 import {
