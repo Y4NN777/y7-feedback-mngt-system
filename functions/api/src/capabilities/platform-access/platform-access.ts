@@ -1,6 +1,6 @@
 import type { ExceptionalAccessAction } from "@y7-feedback/domain";
 
-import type { AppwritePrincipalVerifier } from "./capabilities/attachments/workspace-attachment-download.js";
+import type { AppwritePrincipalVerifier } from "./access-contracts.js";
 
 export type PlatformAccessCommand =
   | {

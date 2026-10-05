@@ -12,6 +12,9 @@ import {
   type ProjectAdministrationState,
 } from "@y7-feedback/domain";
 
+import { ProjectAdministrationPersistenceError as AppwriteProjectAdministrationError } from "../../../capabilities/administration/administration-contracts.js";
+export { ProjectAdministrationPersistenceError as AppwriteProjectAdministrationError } from "../../../capabilities/administration/administration-contracts.js";
+
 type CreateProjectCommand = Extract<
   ProjectAdministrationCommand,
   { kind: "create_project" }
@@ -20,21 +23,6 @@ type MutationCommand = Exclude<
   ProjectAdministrationCommand,
   { kind: "create_project" }
 >;
-
-export class AppwriteProjectAdministrationError extends Error {
-  readonly code:
-    | "ERR-ADMIN-IDEMPOTENCY-CONFLICT"
-    | "ERR-ADMIN-DENIED"
-    | "ERR-ADMIN-MUTATION-INVALID"
-    | "ERR-ADMIN-SLUG-RESERVED"
-    | "ERR-ADMIN-RETRYABLE";
-
-  constructor(code: AppwriteProjectAdministrationError["code"]) {
-    super(code);
-    this.name = "AppwriteProjectAdministrationError";
-    this.code = code;
-  }
-}
 
 export interface AppwriteProjectAdministrationSchema {
   readonly databaseId: string;

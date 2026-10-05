@@ -8,7 +8,7 @@ import {
   type AppwriteWorkspaceScopeQueryPort,
   type AppwriteWorkspaceScopeTablesPort,
   type WorkspaceCapabilityScopeResolver,
-} from "../../../appwrite-workspace-capability-scope.js";
+} from "../platform-access/appwrite-workspace-capability-scope.js";
 
 export type AppwriteWorkspaceAttachmentScopeSchema =
   AppwriteWorkspaceCapabilityScopeSchema;

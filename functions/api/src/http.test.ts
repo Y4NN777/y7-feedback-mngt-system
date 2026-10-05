@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { routeRequest, type FunctionContext } from "./runtime/http/http.js";
 import { createProviderMaintenance } from "./provider-maintenance";
 import type { PublicApi } from "./runtime/http/public-api";
-import type { ProjectAdministrationHttp } from "./project-administration-http";
+import type { ProjectAdministrationHttp } from "./runtime/http/project-administration-http";
 
 const correlationId = "018f4f7e-89ab-7def-8123-456789abcdef";
 const dependencies = {

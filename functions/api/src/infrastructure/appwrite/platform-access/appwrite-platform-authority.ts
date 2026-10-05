@@ -1,6 +1,6 @@
 import { Query, type Users } from "node-appwrite";
 
-import type { PlatformAuthority } from "./platform-access.js";
+import type { PlatformAuthority } from "../../../capabilities/platform-access/platform-access.js";
 
 export interface AppwritePlatformAuthorityUsersPort {
   listMemberships(input: {

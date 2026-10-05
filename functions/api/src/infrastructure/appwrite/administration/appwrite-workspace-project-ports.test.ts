@@ -5,7 +5,7 @@ import {
   createNodeAppwriteWorkspaceProjectOperationPorts,
   type AppwriteWorkspaceProjectTablesPort,
 } from "./appwrite-workspace-project-ports";
-import { WorkspaceOperationDeniedError } from "./workspace-project-operations";
+import { WorkspaceOperationDeniedError } from "../../../capabilities/administration/workspace-project-operations";
 
 const schema = {
   databaseId: "feedback",

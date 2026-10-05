@@ -1,10 +1,10 @@
 import { Query, type TablesDB } from "node-appwrite";
 
-import { parseAttachmentMetadata } from "./infrastructure/appwrite/attachments/appwrite-attachment-acceptance-store.js";
-import { parseConversationProjectionMessage } from "./infrastructure/appwrite/conversations/appwrite-conversation-projection-store.js";
+import { parseAttachmentMetadata } from "../attachments/appwrite-attachment-acceptance-store.js";
+import { parseConversationProjectionMessage } from "../conversations/appwrite-conversation-projection-store.js";
 import type { PlatformAccessContentReader } from "./appwrite-platform-access-store.js";
-import { parseWorkbenchDetail } from "./infrastructure/appwrite/workbench/appwrite-workbench-store.js";
-import type { AppwriteSensitivePersistence } from "./sensitive-data-protector.js";
+import { parseWorkbenchDetail } from "../workbench/appwrite-workbench-store.js";
+import type { AppwriteSensitivePersistence } from "../../../sensitive-data-protector.js";
 
 export interface AppwritePlatformContentSchema {
   readonly databaseId: string;

@@ -1,11 +1,11 @@
 import { validateProjectAdministrationCommand } from "@y7-feedback/domain";
 
 import {
-  AppwriteProjectAdministrationError,
-  type AppwriteProjectAdministrationStore,
-} from "./appwrite-project-administration-store.js";
-import type { WorkspaceOwnerScopeResolver } from "./appwrite-workspace-owner-scope.js";
-import type { AppwritePrincipalVerifier } from "./capabilities/attachments/workspace-attachment-download.js";
+  ProjectAdministrationPersistenceError,
+  type ProjectAdministrationStore,
+  type WorkspaceOwnerScopeResolver,
+} from "./administration-contracts.js";
+import type { AppwritePrincipalVerifier } from "../platform-access/access-contracts.js";
 
 export type ProjectAdministrationOutcome =
   | {
@@ -39,7 +39,7 @@ export interface ProjectAdministrationDependencies {
 export function createProjectAdministration(
   principal: AppwritePrincipalVerifier,
   ownerScope: WorkspaceOwnerScopeResolver,
-  store: AppwriteProjectAdministrationStore,
+  store: ProjectAdministrationStore,
   dependencies: ProjectAdministrationDependencies,
 ): ProjectAdministration {
   return {
@@ -77,7 +77,7 @@ export function createProjectAdministration(
           result: publicResult,
         };
       } catch (error: unknown) {
-        if (error instanceof AppwriteProjectAdministrationError) {
+        if (error instanceof ProjectAdministrationPersistenceError) {
           if (error.code === "ERR-ADMIN-IDEMPOTENCY-CONFLICT") {
             return { status: "conflict" };
           }

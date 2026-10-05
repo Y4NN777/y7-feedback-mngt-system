@@ -4,15 +4,11 @@ import type {
   AttachmentDownload,
   AttachmentDownloadOutcome,
 } from "./attachment-download.js";
-
-export type AppwritePrincipalVerification =
-  | { readonly status: "verified"; readonly principalId: string }
-  | { readonly status: "denied" }
-  | { readonly status: "retryable" };
-
-export interface AppwritePrincipalVerifier {
-  verify(jwt: string): Promise<AppwritePrincipalVerification>;
-}
+import type { AppwritePrincipalVerifier } from "../platform-access/access-contracts.js";
+export type {
+  AppwritePrincipalVerification,
+  AppwritePrincipalVerifier,
+} from "../platform-access/access-contracts.js";
 
 export type WorkspaceAttachmentScopeResolution =
   | {

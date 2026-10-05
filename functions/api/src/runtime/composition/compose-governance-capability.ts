@@ -6,14 +6,14 @@ import type { AccountlessAccessCoordinator } from "../../accountless-access.js";
 import { createNodeAppwriteIntelligenceProvenanceStore } from "../../appwrite-intelligence-provenance-store.js";
 import { createNodeAppwriteIntelligenceStore } from "../../appwrite-intelligence-store.js";
 import { createNodeAppwritePrivacyStore } from "../../appwrite-privacy-store.js";
-import type { WorkspaceCapabilityScopeResolver } from "../../appwrite-workspace-capability-scope.js";
+import type { WorkspaceCapabilityScopeResolver } from "../../infrastructure/appwrite/platform-access/appwrite-workspace-capability-scope.js";
 import { createIntelligenceCoordinator } from "../../intelligence.js";
 import { createIntelligenceHttp } from "../../intelligence-http.js";
 import { createIntelligenceProvenanceCoordinator } from "../../intelligence-provenance.js";
 import { createPrivacyCoordinator } from "../../privacy.js";
 import { createPrivacyHttp } from "../../privacy-http.js";
 import type { AppwriteSensitivePersistence } from "../../sensitive-data-protector.js";
-import type { AppwritePrincipalVerifier } from "../../capabilities/attachments/workspace-attachment-download.js";
+import type { AppwritePrincipalVerifier } from "../../capabilities/platform-access/access-contracts.js";
 import type { ApplicationRuntime } from "./application-runtime.js";
 
 export function composeGovernanceCapability(

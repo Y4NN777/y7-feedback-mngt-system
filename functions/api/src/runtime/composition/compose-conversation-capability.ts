@@ -9,13 +9,13 @@ import { createNodeAppwriteConversationPendingCommitReader } from "../../infrast
 import { createNodeAppwriteConversationPreflight } from "../../infrastructure/appwrite/conversations/appwrite-conversation-preflight.js";
 import { createNodeAppwriteConversationProjectionStore } from "../../infrastructure/appwrite/conversations/appwrite-conversation-projection-store.js";
 import { createNodeAppwriteProviderMessageFanout } from "../../appwrite-provider-message-fanout.js";
-import type { WorkspaceCapabilityScopeResolver } from "../../appwrite-workspace-capability-scope.js";
+import type { WorkspaceCapabilityScopeResolver } from "../../infrastructure/appwrite/platform-access/appwrite-workspace-capability-scope.js";
 import { createAuthoritativeConversationEnvelope } from "../../capabilities/conversations/authoritative-conversation-envelope.js";
 import { createAuthoritativeConversationStore } from "../../capabilities/conversations/authoritative-conversation-store.js";
 import { createConversationLifecycleCoordinator } from "../../capabilities/conversations/conversation-lifecycle.js";
 import { createConversationLifecycleHttp } from "../http/conversation-lifecycle-http.js";
 import type { AppwriteSensitivePersistence } from "../../sensitive-data-protector.js";
-import type { AppwritePrincipalVerifier } from "../../capabilities/attachments/workspace-attachment-download.js";
+import type { AppwritePrincipalVerifier } from "../../capabilities/platform-access/access-contracts.js";
 import {
   deriveReporterActorId,
   type ApplicationRuntime,

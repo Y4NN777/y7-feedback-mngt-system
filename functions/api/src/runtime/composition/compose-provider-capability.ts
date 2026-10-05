@@ -67,11 +67,11 @@ import {
 
 import type { AccountlessAccessCoordinator } from "../../accountless-access.js";
 import type { createNodeAppwriteIntakeStore } from "../../infrastructure/appwrite/intake/appwrite-intake-store.js";
-import type { createNodeAppwritePlatformAccessExpiryWorker } from "../../appwrite-platform-access-store.js";
-import type { WorkspaceCapabilityScopeResolver } from "../../appwrite-workspace-capability-scope.js";
+import type { createNodeAppwritePlatformAccessExpiryWorker } from "../../infrastructure/appwrite/platform-access/appwrite-platform-access-store.js";
+import type { WorkspaceCapabilityScopeResolver } from "../../infrastructure/appwrite/platform-access/appwrite-workspace-capability-scope.js";
 import type { createAuthoritativeIntakeEnvelope } from "../../capabilities/intake/authoritative-intake-envelope.js";
 import type { AppwriteSensitivePersistence } from "../../sensitive-data-protector.js";
-import type { AppwritePrincipalVerifier } from "../../capabilities/attachments/workspace-attachment-download.js";
+import type { AppwritePrincipalVerifier } from "../../capabilities/platform-access/access-contracts.js";
 
 interface ProviderCompositionContext {
   readonly accountless: AccountlessAccessCoordinator;

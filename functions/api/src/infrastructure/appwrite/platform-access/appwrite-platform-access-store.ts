@@ -18,8 +18,8 @@ import type {
   PlatformAccessCommand,
   PlatformAccessContent,
   PlatformAccessStore,
-} from "./platform-access.js";
-import type { AppwriteSensitivePersistence } from "./sensitive-data-protector.js";
+} from "../../../capabilities/platform-access/platform-access.js";
+import type { AppwriteSensitivePersistence } from "../../../sensitive-data-protector.js";
 
 export interface AppwritePlatformAccessSchema {
   readonly databaseId: string;

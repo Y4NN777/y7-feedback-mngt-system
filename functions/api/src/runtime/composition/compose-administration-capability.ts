@@ -9,23 +9,23 @@ import {
 import {
   createNodeAppwritePlatformAccessExpiryWorker,
   createNodeAppwritePlatformAccessStore,
-} from "../../appwrite-platform-access-store.js";
-import { createNodeAppwritePlatformAuthority } from "../../appwrite-platform-authority.js";
-import { createNodeAppwritePlatformContentReader } from "../../appwrite-platform-content-reader.js";
-import { createNodeAppwritePrincipalVerifier } from "../../appwrite-principal-verifier.js";
-import { createNodeAppwriteProjectAdministrationStore } from "../../appwrite-project-administration-store.js";
+} from "../../infrastructure/appwrite/platform-access/appwrite-platform-access-store.js";
+import { createNodeAppwritePlatformAuthority } from "../../infrastructure/appwrite/platform-access/appwrite-platform-authority.js";
+import { createNodeAppwritePlatformContentReader } from "../../infrastructure/appwrite/platform-access/appwrite-platform-content-reader.js";
+import { createNodeAppwritePrincipalVerifier } from "../../infrastructure/appwrite/platform-access/appwrite-principal-verifier.js";
+import { createNodeAppwriteProjectAdministrationStore } from "../../infrastructure/appwrite/administration/appwrite-project-administration-store.js";
 import { createNodeAppwriteWorkbenchMutationStore } from "../../infrastructure/appwrite/workbench/appwrite-workbench-mutation-store.js";
 import { createNodeAppwriteWorkbenchStore } from "../../infrastructure/appwrite/workbench/appwrite-workbench-store.js";
 import { createNodeAppwriteWorkspaceAttachmentScopeResolver } from "../../infrastructure/appwrite/attachments/appwrite-workspace-attachment-scope.js";
-import { createNodeAppwriteWorkspaceCapabilityScopeResolver } from "../../appwrite-workspace-capability-scope.js";
-import { createNodeAppwriteWorkspaceOwnerScopeResolver } from "../../appwrite-workspace-owner-scope.js";
-import { createNodeAppwriteWorkspaceProjectOperationPorts } from "../../appwrite-workspace-project-ports.js";
+import { createNodeAppwriteWorkspaceCapabilityScopeResolver } from "../../infrastructure/appwrite/platform-access/appwrite-workspace-capability-scope.js";
+import { createNodeAppwriteWorkspaceOwnerScopeResolver } from "../../infrastructure/appwrite/administration/appwrite-workspace-owner-scope.js";
+import { createNodeAppwriteWorkspaceProjectOperationPorts } from "../../infrastructure/appwrite/administration/appwrite-workspace-project-ports.js";
 import { createAttachmentDownload } from "../../capabilities/attachments/attachment-download.js";
-import { createPlatformAccessAuditId } from "../../platform-access-audit-id.js";
-import { createPlatformAccessCoordinator } from "../../platform-access.js";
-import { createPlatformAccessHttp } from "../../platform-access-http.js";
-import { createProjectAdministration } from "../../project-administration.js";
-import { createProjectAdministrationHttp } from "../../project-administration-http.js";
+import { createPlatformAccessAuditId } from "../../capabilities/platform-access/platform-access-audit-id.js";
+import { createPlatformAccessCoordinator } from "../../capabilities/platform-access/platform-access.js";
+import { createPlatformAccessHttp } from "../http/platform-access-http.js";
+import { createProjectAdministration } from "../../capabilities/administration/project-administration.js";
+import { createProjectAdministrationHttp } from "../http/project-administration-http.js";
 import type { AppwriteSensitivePersistence } from "../../sensitive-data-protector.js";
 import { createWorkbenchCoordinator } from "../../capabilities/workbench/workbench.js";
 import { createWorkbenchHttp } from "../http/workbench-http.js";
@@ -33,7 +33,7 @@ import { createWorkspaceAttachmentDownload } from "../../capabilities/attachment
 import {
   WorkspaceOperationDeniedError,
   createWorkspaceProjectOperations,
-} from "../../workspace-project-operations.js";
+} from "../../capabilities/administration/workspace-project-operations.js";
 import type { ApplicationRuntime } from "./application-runtime.js";
 import type { composeAttachmentCapability } from "./compose-attachment-capability.js";
 

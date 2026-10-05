@@ -4,15 +4,15 @@ import { Client, TablesDB, Users } from "node-appwrite";
 
 import { parseServerConfig } from "@y7-feedback/config/server";
 
-import { createNodeAppwritePrincipalVerifier } from "./appwrite-principal-verifier.js";
-import { createNodeAppwriteWorkspaceCapabilityScopeResolver } from "./appwrite-workspace-capability-scope.js";
-import { createNodeAppwriteWorkspaceProjectOperationPorts } from "./appwrite-workspace-project-ports.js";
+import { createNodeAppwritePrincipalVerifier } from "./infrastructure/appwrite/platform-access/appwrite-principal-verifier.js";
+import { createNodeAppwriteWorkspaceCapabilityScopeResolver } from "./infrastructure/appwrite/platform-access/appwrite-workspace-capability-scope.js";
+import { createNodeAppwriteWorkspaceProjectOperationPorts } from "./infrastructure/appwrite/administration/appwrite-workspace-project-ports.js";
 import { createHttpFunctionPublicApi } from "./http-function-public-api.js";
 import { createSensitiveDataProtector } from "./sensitive-data-protector.js";
 import {
   createWorkspaceProjectOperations,
   type WorkspaceOperationOutcome,
-} from "./workspace-project-operations.js";
+} from "./capabilities/administration/workspace-project-operations.js";
 
 function isObject(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

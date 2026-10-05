@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { ProjectAdministration } from "./project-administration";
+import type { ProjectAdministration } from "../../capabilities/administration/project-administration";
 import { createProjectAdministrationHttp } from "./project-administration-http";
 
 function setup() {

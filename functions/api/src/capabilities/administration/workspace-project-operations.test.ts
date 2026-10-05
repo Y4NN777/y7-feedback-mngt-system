@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { WorkspaceCapabilityScopeResolver } from "./appwrite-workspace-capability-scope";
-import type { AppwritePrincipalVerifier } from "./capabilities/attachments/workspace-attachment-download";
+import type { WorkspaceCapabilityScopeResolver } from "../platform-access/access-contracts";
+import type { AppwritePrincipalVerifier } from "../platform-access/access-contracts";
 import {
   createWorkspaceProjectOperations,
   WorkspaceOperationDeniedError,

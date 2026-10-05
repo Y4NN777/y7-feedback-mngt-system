@@ -72,6 +72,27 @@ const appwriteWorkbenchModules = [
   "appwrite-workbench-store",
 ];
 
+const administrationCapabilityModules = [
+  "project-administration",
+  "workspace-project-operations",
+];
+
+const platformAccessCapabilityModules = ["platform-access", "platform-access-audit-id"];
+
+const appwriteAdministrationModules = [
+  "appwrite-project-administration-store",
+  "appwrite-workspace-owner-scope",
+  "appwrite-workspace-project-ports",
+];
+
+const appwritePlatformAccessModules = [
+  "appwrite-platform-access-store",
+  "appwrite-platform-authority",
+  "appwrite-platform-content-reader",
+  "appwrite-principal-verifier",
+  "appwrite-workspace-capability-scope",
+];
+
 async function sourceFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
   const nested = await Promise.all(
@@ -226,6 +247,33 @@ test("TASK-ARCH-001E colocates conversation and Workbench capabilities with thei
   }
 
   for (const handler of ["conversation-lifecycle-http", "workbench-http"]) {
+    assert.equal(files.has(`runtime/http/${handler}.ts`), true);
+    assert.equal(files.has(`runtime/http/${handler}.test.ts`), true);
+    assert.equal(files.has(`${handler}.ts`), false);
+    assert.equal(files.has(`${handler}.test.ts`), false);
+  }
+});
+
+test("TASK-ARCH-001F colocates administration and platform-access capabilities with their Appwrite adapters", async () => {
+  const files = new Set(
+    (await sourceFiles(apiSourceRoot)).map((absolute) => relativeSourcePath(absolute)),
+  );
+
+  for (const [directory, modules] of [
+    ["capabilities/administration", administrationCapabilityModules],
+    ["capabilities/platform-access", platformAccessCapabilityModules],
+    ["infrastructure/appwrite/administration", appwriteAdministrationModules],
+    ["infrastructure/appwrite/platform-access", appwritePlatformAccessModules],
+  ]) {
+    for (const module of modules) {
+      assert.equal(files.has(`${directory}/${module}.ts`), true);
+      assert.equal(files.has(`${directory}/${module}.test.ts`), true);
+      assert.equal(files.has(`${module}.ts`), false);
+      assert.equal(files.has(`${module}.test.ts`), false);
+    }
+  }
+
+  for (const handler of ["platform-access-http", "project-administration-http"]) {
     assert.equal(files.has(`runtime/http/${handler}.ts`), true);
     assert.equal(files.has(`runtime/http/${handler}.test.ts`), true);
     assert.equal(files.has(`${handler}.ts`), false);
