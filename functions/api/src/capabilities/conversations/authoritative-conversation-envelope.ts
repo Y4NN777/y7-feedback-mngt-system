@@ -5,8 +5,8 @@ import type { AuthoritativeCommit } from "@y7-feedback/domain";
 import type {
   ConversationLifecycleStoreInput,
   ConversationLifecycleStoreResult,
-} from "./appwrite-conversation-lifecycle-store.js";
-import type { AppwriteSensitivePersistence } from "./sensitive-data-protector.js";
+} from "./conversation-contracts.js";
+import type { AppwriteSensitivePersistence } from "../../sensitive-data-protector.js";
 
 const required = z.string().min(1).max(10_000);
 const timestamp = z.iso.datetime({ offset: false, precision: 3 });

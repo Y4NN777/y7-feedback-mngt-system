@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createWorkbenchHttp } from "./workbench-http";
-import type { WorkbenchCoordinator } from "./workbench";
+import type { WorkbenchCoordinator } from "../../capabilities/workbench/workbench";
 
 const path = "/v1/workspaces/workspace_1/projects/project_1/workbench";
 

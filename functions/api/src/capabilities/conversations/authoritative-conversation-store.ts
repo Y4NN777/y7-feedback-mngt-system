@@ -2,12 +2,12 @@ import { createHash } from "node:crypto";
 
 import { AuthoritativeCommitError, planAuthoritativeCommit } from "@y7-feedback/domain";
 
-import type { AuthoritativeCommitStore } from "./appwrite-authoritative-commit-store.js";
+import type { AuthoritativeCommitStore } from "../../appwrite-authoritative-commit-store.js";
 import type {
   ConversationLifecycleStore,
   ConversationLifecycleStoreInput,
   ConversationLifecycleStoreResult,
-} from "./appwrite-conversation-lifecycle-store.js";
+} from "./conversation-contracts.js";
 import type { AuthoritativeConversationPayload } from "./authoritative-conversation-envelope.js";
 
 export interface AuthoritativeConversationEnvelopeCodec {

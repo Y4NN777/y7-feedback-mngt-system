@@ -2,18 +2,18 @@ import { describe, expect, it, vi } from "vitest";
 
 import { AuthoritativeCommitError } from "@y7-feedback/domain";
 
-import type { AccountlessAccessCoordinator } from "./accountless-access";
+import type { AccountlessAccessCoordinator } from "../../accountless-access";
 import {
   AppwriteConversationProjectionError,
   type ConversationProjectionStore,
-} from "./appwrite-conversation-projection-store";
+} from "./conversation-contracts";
 import {
   AppwriteConversationLifecycleError,
   type ConversationLifecycleStore,
-} from "./appwrite-conversation-lifecycle-store";
-import type { WorkspaceCapabilityScopeResolver } from "./appwrite-workspace-capability-scope";
+} from "./conversation-contracts";
+import type { WorkspaceCapabilityScopeResolver } from "../../appwrite-workspace-capability-scope";
 import { createConversationLifecycleCoordinator } from "./conversation-lifecycle";
-import type { AppwritePrincipalVerifier } from "./capabilities/attachments/workspace-attachment-download";
+import type { AppwritePrincipalVerifier } from "../attachments/workspace-attachment-download";
 
 const message = {
   kind: "append_message",

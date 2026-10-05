@@ -12,7 +12,10 @@ import {
   type WorkbenchInboxItem,
 } from "@y7-feedback/domain";
 
-import type { AppwriteSensitivePersistence } from "./sensitive-data-protector.js";
+import { WorkbenchPersistenceError as AppwriteWorkbenchError } from "../../../capabilities/workbench/workbench-contracts.js";
+export { WorkbenchPersistenceError as AppwriteWorkbenchError } from "../../../capabilities/workbench/workbench-contracts.js";
+
+import type { AppwriteSensitivePersistence } from "../../../sensitive-data-protector.js";
 
 export interface WorkbenchDetail {
   readonly feedbackId: string;
@@ -24,16 +27,6 @@ export interface WorkbenchDetail {
   readonly attachmentNames: readonly string[];
   readonly classification: string | null;
   readonly assignedMaintainerId: string | null;
-}
-
-export class AppwriteWorkbenchError extends Error {
-  readonly code: "ERR-WORK-DENIED" | "ERR-WORK-CONFLICT" | "ERR-WORK-RETRYABLE";
-
-  constructor(code: AppwriteWorkbenchError["code"]) {
-    super(code);
-    this.name = "AppwriteWorkbenchError";
-    this.code = code;
-  }
 }
 
 export interface AppwriteWorkbenchSchema {

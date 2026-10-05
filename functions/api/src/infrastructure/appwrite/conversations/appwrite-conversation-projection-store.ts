@@ -2,7 +2,10 @@ import { Query, type TablesDB } from "node-appwrite";
 
 import type { FeedbackLifecycleState } from "@y7-feedback/domain";
 
-import type { AppwriteSensitivePersistence } from "./sensitive-data-protector.js";
+import { ConversationProjectionPersistenceError as AppwriteConversationProjectionError } from "../../../capabilities/conversations/conversation-contracts.js";
+export { ConversationProjectionPersistenceError as AppwriteConversationProjectionError } from "../../../capabilities/conversations/conversation-contracts.js";
+
+import type { AppwriteSensitivePersistence } from "../../../sensitive-data-protector.js";
 
 export interface ConversationProjectionMessage {
   readonly id: string;
@@ -36,16 +39,6 @@ export interface ReporterConversationProjection {
 
 export interface WorkspaceConversationProjection extends ReporterConversationProjection {
   readonly internalNotes: readonly ConversationProjectionMessage[];
-}
-
-export class AppwriteConversationProjectionError extends Error {
-  readonly code: "ERR-CONV-DENIED" | "ERR-CONV-RETRYABLE";
-
-  constructor(code: AppwriteConversationProjectionError["code"]) {
-    super(code);
-    this.name = "AppwriteConversationProjectionError";
-    this.code = code;
-  }
 }
 
 export interface AppwriteConversationProjectionSchema {

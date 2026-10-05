@@ -1,17 +1,15 @@
 import type { WorkbenchFilter } from "@y7-feedback/domain";
 
 import {
-  AppwriteWorkbenchError,
+  WorkbenchPersistenceError,
   type WorkbenchDetail,
   type WorkbenchStore,
-} from "./appwrite-workbench-store.js";
-import type {
-  WorkbenchCommand,
-  WorkbenchMutationResult,
-  WorkbenchMutationStore,
-} from "./appwrite-workbench-mutation-store.js";
-import type { WorkspaceCapabilityScopeResolver } from "./appwrite-workspace-capability-scope.js";
-import type { AppwritePrincipalVerifier } from "./capabilities/attachments/workspace-attachment-download.js";
+  type WorkbenchCommand,
+  type WorkbenchMutationResult,
+  type WorkbenchMutationStore,
+} from "./workbench-contracts.js";
+import type { WorkspaceCapabilityScopeResolver } from "../../appwrite-workspace-capability-scope.js";
+import type { AppwritePrincipalVerifier } from "../attachments/workspace-attachment-download.js";
 
 export type WorkbenchOutcome =
   | {
@@ -93,7 +91,7 @@ export function createWorkbenchCoordinator(
   }
 
   function failure(error: unknown): WorkbenchOutcome {
-    if (error instanceof AppwriteWorkbenchError) {
+    if (error instanceof WorkbenchPersistenceError) {
       if (error.code === "ERR-WORK-DENIED") return { status: "denied" };
       if (error.code === "ERR-WORK-CONFLICT") return { status: "conflict" };
     }

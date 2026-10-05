@@ -9,7 +9,7 @@ import {
   appendAppwriteNotificationFanout,
   type NotificationFanoutInput,
 } from "./appwrite-notification-fanout.js";
-import type { AppwriteSensitivePersistence } from "./sensitive-data-protector.js";
+import type { AppwriteSensitivePersistence } from "../../../sensitive-data-protector.js";
 
 export type WorkbenchCommand =
   | {

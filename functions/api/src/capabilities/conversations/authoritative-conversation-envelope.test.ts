@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { planAuthoritativeCommit } from "@y7-feedback/domain";
 
 import { createAuthoritativeConversationEnvelope } from "./authoritative-conversation-envelope.js";
-import type { ConversationLifecycleStoreInput } from "./appwrite-conversation-lifecycle-store.js";
+import type { ConversationLifecycleStoreInput } from "./conversation-contracts.js";
 
 const input: ConversationLifecycleStoreInput = {
   feedbackId: "feedback_1",

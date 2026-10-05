@@ -2,7 +2,7 @@ import { Query, type TablesDB } from "node-appwrite";
 
 import type { AuthoritativeCommit } from "@y7-feedback/domain";
 
-import { parseAuthoritativeCommitRow } from "./appwrite-authoritative-commit-store.js";
+import { parseAuthoritativeCommitRow } from "../../../appwrite-authoritative-commit-store.js";
 
 export interface ConversationPendingCommitReader {
   list(feedbackId: string): Promise<readonly AuthoritativeCommit[]>;

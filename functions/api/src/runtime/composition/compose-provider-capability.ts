@@ -4,11 +4,11 @@ import type { ServerConfig } from "@y7-feedback/config/server";
 
 import { createNodeAppwriteAuthoritativeProjectionStore } from "../../appwrite-authoritative-projection-store.js";
 import { createAuthoritativeIntakeProjectionHandler } from "../../capabilities/intake/authoritative-intake-projector.js";
-import { createAuthoritativeConversationEnvelope } from "../../authoritative-conversation-envelope.js";
+import { createAuthoritativeConversationEnvelope } from "../../capabilities/conversations/authoritative-conversation-envelope.js";
 import {
   authoritativeProjectionErrorCode,
   createAuthoritativeConversationProjectionHandler,
-} from "../../authoritative-conversation-projector.js";
+} from "../../capabilities/conversations/authoritative-conversation-projector.js";
 import { createAuthoritativeProjector } from "../../authoritative-projector.js";
 import { drainAuthoritativeProjectionEvent } from "../../authoritative-projection-event.js";
 import { createAuthoritativeProjectionRouter } from "../../authoritative-projection-router.js";
@@ -17,7 +17,7 @@ import { createNodeAppwriteNotificationRecipientResolver } from "../../appwrite-
 import { createNodeAppwritePrivacyPurgeRepository } from "../../appwrite-privacy-purge-repository.js";
 import { createNodeAppwritePrivacyCleanup } from "../../appwrite-privacy-cleanup.js";
 import { createNodeAppwritePrivacyProviderCleanup } from "../../appwrite-privacy-provider-cleanup.js";
-import { createNodeAppwriteConversationLifecycleStore } from "../../appwrite-conversation-lifecycle-store.js";
+import { createNodeAppwriteConversationLifecycleStore } from "../../infrastructure/appwrite/conversations/appwrite-conversation-lifecycle-store.js";
 import { createNodeAppwriteExternalIssueStore } from "../../appwrite-external-issue-store.js";
 import { createNodeAppwriteProviderIssueOutboxStore } from "../../appwrite-provider-issue-outbox-store.js";
 import { createNodeAppwriteProviderEventInboxStore } from "../../appwrite-provider-event-inbox-store.js";

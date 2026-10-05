@@ -5,7 +5,7 @@ import type { ServerConfig } from "@y7-feedback/config/server";
 import {
   AppwriteNotificationFeedError,
   createNodeAppwriteNotificationFeedStore,
-} from "../../appwrite-notification-feed-store.js";
+} from "../../infrastructure/appwrite/workbench/appwrite-notification-feed-store.js";
 import {
   createNodeAppwritePlatformAccessExpiryWorker,
   createNodeAppwritePlatformAccessStore,
@@ -14,8 +14,8 @@ import { createNodeAppwritePlatformAuthority } from "../../appwrite-platform-aut
 import { createNodeAppwritePlatformContentReader } from "../../appwrite-platform-content-reader.js";
 import { createNodeAppwritePrincipalVerifier } from "../../appwrite-principal-verifier.js";
 import { createNodeAppwriteProjectAdministrationStore } from "../../appwrite-project-administration-store.js";
-import { createNodeAppwriteWorkbenchMutationStore } from "../../appwrite-workbench-mutation-store.js";
-import { createNodeAppwriteWorkbenchStore } from "../../appwrite-workbench-store.js";
+import { createNodeAppwriteWorkbenchMutationStore } from "../../infrastructure/appwrite/workbench/appwrite-workbench-mutation-store.js";
+import { createNodeAppwriteWorkbenchStore } from "../../infrastructure/appwrite/workbench/appwrite-workbench-store.js";
 import { createNodeAppwriteWorkspaceAttachmentScopeResolver } from "../../infrastructure/appwrite/attachments/appwrite-workspace-attachment-scope.js";
 import { createNodeAppwriteWorkspaceCapabilityScopeResolver } from "../../appwrite-workspace-capability-scope.js";
 import { createNodeAppwriteWorkspaceOwnerScopeResolver } from "../../appwrite-workspace-owner-scope.js";
@@ -27,8 +27,8 @@ import { createPlatformAccessHttp } from "../../platform-access-http.js";
 import { createProjectAdministration } from "../../project-administration.js";
 import { createProjectAdministrationHttp } from "../../project-administration-http.js";
 import type { AppwriteSensitivePersistence } from "../../sensitive-data-protector.js";
-import { createWorkbenchCoordinator } from "../../workbench.js";
-import { createWorkbenchHttp } from "../../workbench-http.js";
+import { createWorkbenchCoordinator } from "../../capabilities/workbench/workbench.js";
+import { createWorkbenchHttp } from "../http/workbench-http.js";
 import { createWorkspaceAttachmentDownload } from "../../capabilities/attachments/workspace-attachment-download.js";
 import {
   WorkspaceOperationDeniedError,

@@ -4,20 +4,18 @@ import type {
 } from "@y7-feedback/domain";
 import { AuthoritativeCommitError } from "@y7-feedback/domain";
 
-import type { AccountlessAccessCoordinator } from "./accountless-access.js";
 import {
-  AppwriteConversationProjectionError,
+  ConversationLifecyclePersistenceError,
+  ConversationProjectionPersistenceError,
+  type ConversationLifecycleStore,
+  type ConversationLifecycleStoreResult,
   type ConversationProjectionStore,
   type ReporterConversationProjection,
   type WorkspaceConversationProjection,
-} from "./appwrite-conversation-projection-store.js";
-import {
-  AppwriteConversationLifecycleError,
-  type ConversationLifecycleStore,
-  type ConversationLifecycleStoreResult,
-} from "./appwrite-conversation-lifecycle-store.js";
-import type { WorkspaceCapabilityScopeResolver } from "./appwrite-workspace-capability-scope.js";
-import type { AppwritePrincipalVerifier } from "./capabilities/attachments/workspace-attachment-download.js";
+} from "./conversation-contracts.js";
+import type { AccountlessAccessCoordinator } from "../../accountless-access.js";
+import type { WorkspaceCapabilityScopeResolver } from "../../appwrite-workspace-capability-scope.js";
+import type { AppwritePrincipalVerifier } from "../attachments/workspace-attachment-download.js";
 
 type Command = AppendConversationCommand | LifecycleTransitionCommand;
 
@@ -184,7 +182,7 @@ function failure(error: unknown): ConversationLifecycleOutcome {
       status: error.code === "AUTHORITATIVE_COMMIT_CONFLICT" ? "conflict" : "invalid",
     };
   }
-  if (error instanceof AppwriteConversationLifecycleError) {
+  if (error instanceof ConversationLifecyclePersistenceError) {
     if (error.code === "ERR-CONV-DENIED") return { status: "denied" };
     if (error.code === "ERR-CONV-IDEMPOTENCY-CONFLICT") {
       return { status: "conflict" };
@@ -257,7 +255,7 @@ export function createConversationLifecycleCoordinator(
       } catch (error: unknown) {
         return {
           status:
-            error instanceof AppwriteConversationProjectionError &&
+            error instanceof ConversationProjectionPersistenceError &&
             error.code === "ERR-CONV-DENIED"
               ? "denied"
               : "retryable",
@@ -281,7 +279,7 @@ export function createConversationLifecycleCoordinator(
       } catch (error: unknown) {
         return {
           status:
-            error instanceof AppwriteConversationProjectionError &&
+            error instanceof ConversationProjectionPersistenceError &&
             error.code === "ERR-CONV-DENIED"
               ? "denied"
               : "retryable",

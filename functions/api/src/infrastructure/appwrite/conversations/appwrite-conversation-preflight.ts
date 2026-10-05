@@ -11,8 +11,8 @@ import {
   type ConversationLifecycleStoreInput,
   type ConversationLifecycleStoreResult,
 } from "./appwrite-conversation-lifecycle-store.js";
-import type { ConversationLifecyclePreflight } from "./authoritative-conversation-store.js";
-import type { AuthoritativeConversationEnvelopeReader } from "./authoritative-conversation-projector.js";
+import type { ConversationLifecyclePreflight } from "../../../capabilities/conversations/authoritative-conversation-store.js";
+import type { AuthoritativeConversationEnvelopeReader } from "../../../capabilities/conversations/authoritative-conversation-projector.js";
 import type { ConversationPendingCommitReader } from "./appwrite-conversation-pending-commits.js";
 
 export interface ConversationPreflightTablesPort {

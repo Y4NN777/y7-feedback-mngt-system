@@ -4,16 +4,16 @@ import type { ServerConfig } from "@y7-feedback/config/server";
 
 import type { AccountlessAccessCoordinator } from "../../accountless-access.js";
 import type { createAppwriteAuthoritativeCommitStore } from "../../appwrite-authoritative-commit-store.js";
-import { createNodeAppwriteConversationLifecycleStore } from "../../appwrite-conversation-lifecycle-store.js";
-import { createNodeAppwriteConversationPendingCommitReader } from "../../appwrite-conversation-pending-commits.js";
-import { createNodeAppwriteConversationPreflight } from "../../appwrite-conversation-preflight.js";
-import { createNodeAppwriteConversationProjectionStore } from "../../appwrite-conversation-projection-store.js";
+import { createNodeAppwriteConversationLifecycleStore } from "../../infrastructure/appwrite/conversations/appwrite-conversation-lifecycle-store.js";
+import { createNodeAppwriteConversationPendingCommitReader } from "../../infrastructure/appwrite/conversations/appwrite-conversation-pending-commits.js";
+import { createNodeAppwriteConversationPreflight } from "../../infrastructure/appwrite/conversations/appwrite-conversation-preflight.js";
+import { createNodeAppwriteConversationProjectionStore } from "../../infrastructure/appwrite/conversations/appwrite-conversation-projection-store.js";
 import { createNodeAppwriteProviderMessageFanout } from "../../appwrite-provider-message-fanout.js";
 import type { WorkspaceCapabilityScopeResolver } from "../../appwrite-workspace-capability-scope.js";
-import { createAuthoritativeConversationEnvelope } from "../../authoritative-conversation-envelope.js";
-import { createAuthoritativeConversationStore } from "../../authoritative-conversation-store.js";
-import { createConversationLifecycleCoordinator } from "../../conversation-lifecycle.js";
-import { createConversationLifecycleHttp } from "../../conversation-lifecycle-http.js";
+import { createAuthoritativeConversationEnvelope } from "../../capabilities/conversations/authoritative-conversation-envelope.js";
+import { createAuthoritativeConversationStore } from "../../capabilities/conversations/authoritative-conversation-store.js";
+import { createConversationLifecycleCoordinator } from "../../capabilities/conversations/conversation-lifecycle.js";
+import { createConversationLifecycleHttp } from "../http/conversation-lifecycle-http.js";
 import type { AppwriteSensitivePersistence } from "../../sensitive-data-protector.js";
 import type { AppwritePrincipalVerifier } from "../../capabilities/attachments/workspace-attachment-download.js";
 import {

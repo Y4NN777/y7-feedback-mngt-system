@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { ActorAccess } from "@y7-feedback/domain";
 
-import type { WorkbenchStore } from "./appwrite-workbench-store";
-import { AppwriteWorkbenchError } from "./appwrite-workbench-store";
+import type { WorkbenchStore } from "./workbench-contracts";
+import { AppwriteWorkbenchError } from "./workbench-contracts";
 import { createWorkbenchCoordinator } from "./workbench";
 
 const actor: ActorAccess = {

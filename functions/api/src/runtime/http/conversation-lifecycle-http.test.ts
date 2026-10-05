@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { ConversationLifecycleCoordinator } from "./conversation-lifecycle";
+import type { ConversationLifecycleCoordinator } from "../../capabilities/conversations/conversation-lifecycle";
 import { createConversationLifecycleHttp } from "./conversation-lifecycle-http";
 
 const workspacePath =
