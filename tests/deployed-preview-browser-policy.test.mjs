@@ -43,7 +43,8 @@ test("the required Browser gate waits for the exact Vercel Preview and runs the 
   assert.match(workflow, /\.creator\.login == "vercel\[bot\]"/u);
   assert.match(workflow, /\.state == "success"/u);
   assert.match(workflow, /secrets\.Y7_PREVIEW_EVIDENCE_ENV/u);
-  assert.match(workflow, /secrets\.Y7_PREVIEW_APPWRITE_API_KEY/u);
+  assert.match(workflow, /secrets\.Y7_PREVIEW_SMOKE_API_KEY/u);
+  assert.doesNotMatch(workflow, /secrets\.Y7_PREVIEW_APPWRITE_API_KEY/u);
   assert.match(workflow, /sed -i '\/\^APPWRITE_API_KEY=\/d'/u);
   assert.match(workflow, /pnpm test:e2e:deployed-preview/u);
 });
