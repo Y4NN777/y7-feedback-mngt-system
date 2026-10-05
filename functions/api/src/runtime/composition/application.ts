@@ -3,139 +3,139 @@ import { createHash, randomBytes } from "node:crypto";
 
 import type { ServerConfig } from "@y7-feedback/config/server";
 
-import { createAccountlessAccessCoordinator } from "./accountless-access.js";
-import { createNodeAppwriteAccountlessRepository } from "./appwrite-accountless-repository.js";
-import { createNodeAppwriteAttachmentAcceptanceStore } from "./appwrite-attachment-acceptance-store.js";
-import { createAttachmentStaging } from "./attachment-staging.js";
-import { createAttachmentStagingTokenCodec } from "./attachment-staging-token.js";
-import { validateAttachment } from "./attachment-validation.js";
-import { createClamAvHttpScanner } from "./clamav-http-scanner.js";
-import { createNodeAppwriteIntakeStore } from "./appwrite-intake-store.js";
-import { createAppwriteAuthoritativeCommitStore } from "./appwrite-authoritative-commit-store.js";
-import { createNodeAppwriteAuthoritativeProjectionStore } from "./appwrite-authoritative-projection-store.js";
-import { createAuthoritativeIntakeEnvelope } from "./authoritative-intake-envelope.js";
-import { createAuthoritativeIntakeProjectionHandler } from "./authoritative-intake-projector.js";
-import { createAuthoritativeIntakeStore } from "./authoritative-intake-store.js";
-import { createAuthoritativeConversationEnvelope } from "./authoritative-conversation-envelope.js";
+import { createAccountlessAccessCoordinator } from "../../accountless-access.js";
+import { createNodeAppwriteAccountlessRepository } from "../../appwrite-accountless-repository.js";
+import { createNodeAppwriteAttachmentAcceptanceStore } from "../../appwrite-attachment-acceptance-store.js";
+import { createAttachmentStaging } from "../../attachment-staging.js";
+import { createAttachmentStagingTokenCodec } from "../../attachment-staging-token.js";
+import { validateAttachment } from "../../attachment-validation.js";
+import { createClamAvHttpScanner } from "../../clamav-http-scanner.js";
+import { createNodeAppwriteIntakeStore } from "../../appwrite-intake-store.js";
+import { createAppwriteAuthoritativeCommitStore } from "../../appwrite-authoritative-commit-store.js";
+import { createNodeAppwriteAuthoritativeProjectionStore } from "../../appwrite-authoritative-projection-store.js";
+import { createAuthoritativeIntakeEnvelope } from "../../authoritative-intake-envelope.js";
+import { createAuthoritativeIntakeProjectionHandler } from "../../authoritative-intake-projector.js";
+import { createAuthoritativeIntakeStore } from "../../authoritative-intake-store.js";
+import { createAuthoritativeConversationEnvelope } from "../../authoritative-conversation-envelope.js";
 import {
   authoritativeProjectionErrorCode,
   createAuthoritativeConversationProjectionHandler,
-} from "./authoritative-conversation-projector.js";
-import { createAuthoritativeConversationStore } from "./authoritative-conversation-store.js";
-import { createAuthoritativeProjector } from "./authoritative-projector.js";
-import { drainAuthoritativeProjectionEvent } from "./authoritative-projection-event.js";
-import { createAuthoritativeProjectionRouter } from "./authoritative-projection-router.js";
-import { createNodeAppwriteOutboxStore } from "./appwrite-outbox-store.js";
-import { createNodeAppwriteNotificationRecipientResolver } from "./appwrite-notification-recipient-resolver.js";
-import { createNodeAppwriteIntelligenceStore } from "./appwrite-intelligence-store.js";
-import { createNodeAppwriteIntelligenceProvenanceStore } from "./appwrite-intelligence-provenance-store.js";
-import { createNodeAppwritePrivacyStore } from "./appwrite-privacy-store.js";
-import { createNodeAppwritePrivacyPurgeRepository } from "./appwrite-privacy-purge-repository.js";
-import { createNodeAppwritePrivacyCleanup } from "./appwrite-privacy-cleanup.js";
-import { createNodeAppwritePrivacyProviderCleanup } from "./appwrite-privacy-provider-cleanup.js";
-import { createNodeAppwriteAbuseCounterStore } from "./appwrite-abuse-counter-store.js";
-import { createNodeAppwritePrivateAttachmentStorage } from "./appwrite-private-attachment-storage.js";
-import { createNodeAppwritePrincipalVerifier } from "./appwrite-principal-verifier.js";
-import { createPlatformAccessAuditId } from "./platform-access-audit-id.js";
+} from "../../authoritative-conversation-projector.js";
+import { createAuthoritativeConversationStore } from "../../authoritative-conversation-store.js";
+import { createAuthoritativeProjector } from "../../authoritative-projector.js";
+import { drainAuthoritativeProjectionEvent } from "../../authoritative-projection-event.js";
+import { createAuthoritativeProjectionRouter } from "../../authoritative-projection-router.js";
+import { createNodeAppwriteOutboxStore } from "../../appwrite-outbox-store.js";
+import { createNodeAppwriteNotificationRecipientResolver } from "../../appwrite-notification-recipient-resolver.js";
+import { createNodeAppwriteIntelligenceStore } from "../../appwrite-intelligence-store.js";
+import { createNodeAppwriteIntelligenceProvenanceStore } from "../../appwrite-intelligence-provenance-store.js";
+import { createNodeAppwritePrivacyStore } from "../../appwrite-privacy-store.js";
+import { createNodeAppwritePrivacyPurgeRepository } from "../../appwrite-privacy-purge-repository.js";
+import { createNodeAppwritePrivacyCleanup } from "../../appwrite-privacy-cleanup.js";
+import { createNodeAppwritePrivacyProviderCleanup } from "../../appwrite-privacy-provider-cleanup.js";
+import { createNodeAppwriteAbuseCounterStore } from "../../appwrite-abuse-counter-store.js";
+import { createNodeAppwritePrivateAttachmentStorage } from "../../appwrite-private-attachment-storage.js";
+import { createNodeAppwritePrincipalVerifier } from "../../appwrite-principal-verifier.js";
+import { createPlatformAccessAuditId } from "../../platform-access-audit-id.js";
 import {
   createNodeAppwritePlatformAccessExpiryWorker,
   createNodeAppwritePlatformAccessStore,
-} from "./appwrite-platform-access-store.js";
-import { createNodeAppwritePlatformAuthority } from "./appwrite-platform-authority.js";
-import { createNodeAppwritePlatformContentReader } from "./appwrite-platform-content-reader.js";
-import { createNodeAppwriteConversationLifecycleStore } from "./appwrite-conversation-lifecycle-store.js";
-import { createNodeAppwriteConversationPendingCommitReader } from "./appwrite-conversation-pending-commits.js";
-import { createNodeAppwriteConversationPreflight } from "./appwrite-conversation-preflight.js";
-import { createNodeAppwriteConversationProjectionStore } from "./appwrite-conversation-projection-store.js";
-import { createNodeAppwriteProjectAdministrationStore } from "./appwrite-project-administration-store.js";
-import { createNodeAppwritePublicProjectReader } from "./appwrite-public-project-reader.js";
-import { createNodeAppwriteWorkspaceAttachmentScopeResolver } from "./appwrite-workspace-attachment-scope.js";
-import { createNodeAppwriteWorkspaceCapabilityScopeResolver } from "./appwrite-workspace-capability-scope.js";
-import { createNodeAppwriteWorkspaceOwnerScopeResolver } from "./appwrite-workspace-owner-scope.js";
-import { createNodeAppwriteWorkspaceProjectOperationPorts } from "./appwrite-workspace-project-ports.js";
+} from "../../appwrite-platform-access-store.js";
+import { createNodeAppwritePlatformAuthority } from "../../appwrite-platform-authority.js";
+import { createNodeAppwritePlatformContentReader } from "../../appwrite-platform-content-reader.js";
+import { createNodeAppwriteConversationLifecycleStore } from "../../appwrite-conversation-lifecycle-store.js";
+import { createNodeAppwriteConversationPendingCommitReader } from "../../appwrite-conversation-pending-commits.js";
+import { createNodeAppwriteConversationPreflight } from "../../appwrite-conversation-preflight.js";
+import { createNodeAppwriteConversationProjectionStore } from "../../appwrite-conversation-projection-store.js";
+import { createNodeAppwriteProjectAdministrationStore } from "../../appwrite-project-administration-store.js";
+import { createNodeAppwritePublicProjectReader } from "../../appwrite-public-project-reader.js";
+import { createNodeAppwriteWorkspaceAttachmentScopeResolver } from "../../appwrite-workspace-attachment-scope.js";
+import { createNodeAppwriteWorkspaceCapabilityScopeResolver } from "../../appwrite-workspace-capability-scope.js";
+import { createNodeAppwriteWorkspaceOwnerScopeResolver } from "../../appwrite-workspace-owner-scope.js";
+import { createNodeAppwriteWorkspaceProjectOperationPorts } from "../../appwrite-workspace-project-ports.js";
 import {
   AppwriteNotificationFeedError,
   createNodeAppwriteNotificationFeedStore,
-} from "./appwrite-notification-feed-store.js";
-import { createNodeAppwriteWorkbenchStore } from "./appwrite-workbench-store.js";
-import { createNodeAppwriteWorkbenchMutationStore } from "./appwrite-workbench-mutation-store.js";
-import { createNodeAppwriteExternalIssueStore } from "./appwrite-external-issue-store.js";
-import { createNodeAppwriteProviderIssueOutboxStore } from "./appwrite-provider-issue-outbox-store.js";
-import { createNodeAppwriteProviderEventInboxStore } from "./appwrite-provider-event-inbox-store.js";
-import { createAppwriteProviderWebhookAuthorityStore } from "./appwrite-provider-webhook-authority-store.js";
-import { createNodeAppwriteProviderIssueStateStore } from "./appwrite-provider-issue-state-store.js";
-import { createNodeAppwriteProviderMessageStore } from "./appwrite-provider-message-store.js";
-import { createNodeAppwriteProviderMessageFanout } from "./appwrite-provider-message-fanout.js";
-import { createNodeAppwriteProviderConsentCleanup } from "./appwrite-provider-consent-cleanup.js";
-import { createNodeAppwriteReporterConsentVerifier } from "./appwrite-reporter-consent-verifier.js";
-import { createNodeAppwriteProviderGrantVault } from "./appwrite-provider-grant-vault.js";
-import { createNodeAppwriteActiveSourceGrantReader } from "./appwrite-active-source-grant-reader.js";
-import type { HttpDependencies } from "./runtime/http/http.js";
-import { createIntakeCoordinator } from "./intake.js";
-import { createIntelligenceCoordinator } from "./intelligence.js";
-import { createIntelligenceProvenanceCoordinator } from "./intelligence-provenance.js";
-import { createIntelligenceHttp } from "./intelligence-http.js";
-import { createPrivacyCoordinator } from "./privacy.js";
-import { createPrivacyHttp } from "./privacy-http.js";
-import { createPlatformAccessCoordinator } from "./platform-access.js";
-import { createPlatformAccessHttp } from "./platform-access-http.js";
-import { createPrivacyPurgeWorker } from "./privacy-cleanup.js";
-import { createPrivacyProviderCleanup } from "./privacy-provider-cleanup.js";
-import { createConversationLifecycleCoordinator } from "./conversation-lifecycle.js";
-import { createConversationLifecycleHttp } from "./conversation-lifecycle-http.js";
-import { createGitHubIssueProvider } from "./github-issue-provider.js";
-import { createGitLabIssueProvider } from "./gitlab-issue-provider.js";
-import { createAttachmentDownload } from "./attachment-download.js";
+} from "../../appwrite-notification-feed-store.js";
+import { createNodeAppwriteWorkbenchStore } from "../../appwrite-workbench-store.js";
+import { createNodeAppwriteWorkbenchMutationStore } from "../../appwrite-workbench-mutation-store.js";
+import { createNodeAppwriteExternalIssueStore } from "../../appwrite-external-issue-store.js";
+import { createNodeAppwriteProviderIssueOutboxStore } from "../../appwrite-provider-issue-outbox-store.js";
+import { createNodeAppwriteProviderEventInboxStore } from "../../appwrite-provider-event-inbox-store.js";
+import { createAppwriteProviderWebhookAuthorityStore } from "../../appwrite-provider-webhook-authority-store.js";
+import { createNodeAppwriteProviderIssueStateStore } from "../../appwrite-provider-issue-state-store.js";
+import { createNodeAppwriteProviderMessageStore } from "../../appwrite-provider-message-store.js";
+import { createNodeAppwriteProviderMessageFanout } from "../../appwrite-provider-message-fanout.js";
+import { createNodeAppwriteProviderConsentCleanup } from "../../appwrite-provider-consent-cleanup.js";
+import { createNodeAppwriteReporterConsentVerifier } from "../../appwrite-reporter-consent-verifier.js";
+import { createNodeAppwriteProviderGrantVault } from "../../appwrite-provider-grant-vault.js";
+import { createNodeAppwriteActiveSourceGrantReader } from "../../appwrite-active-source-grant-reader.js";
+import type { HttpDependencies } from "../http/http.js";
+import { createIntakeCoordinator } from "../../intake.js";
+import { createIntelligenceCoordinator } from "../../intelligence.js";
+import { createIntelligenceProvenanceCoordinator } from "../../intelligence-provenance.js";
+import { createIntelligenceHttp } from "../../intelligence-http.js";
+import { createPrivacyCoordinator } from "../../privacy.js";
+import { createPrivacyHttp } from "../../privacy-http.js";
+import { createPlatformAccessCoordinator } from "../../platform-access.js";
+import { createPlatformAccessHttp } from "../../platform-access-http.js";
+import { createPrivacyPurgeWorker } from "../../privacy-cleanup.js";
+import { createPrivacyProviderCleanup } from "../../privacy-provider-cleanup.js";
+import { createConversationLifecycleCoordinator } from "../../conversation-lifecycle.js";
+import { createConversationLifecycleHttp } from "../../conversation-lifecycle-http.js";
+import { createGitHubIssueProvider } from "../../github-issue-provider.js";
+import { createGitLabIssueProvider } from "../../gitlab-issue-provider.js";
+import { createAttachmentDownload } from "../../attachment-download.js";
 import {
   createAccessProof,
   createProofProtector,
   digestValidatedDraft,
   hashAccessProof,
   matchesAccessProof,
-} from "./proof-crypto.js";
-import { createPublicApi } from "./public-api.js";
-import { createProjectAdministration } from "./project-administration.js";
-import { createProjectAdministrationHttp } from "./project-administration-http.js";
-import { createReporterAttachmentDownload } from "./reporter-attachment-download.js";
-import { createSensitiveDataProtector } from "./sensitive-data-protector.js";
-import { createProviderSourceHttp } from "./provider-source-composition.js";
+} from "../../proof-crypto.js";
+import { createPublicApi } from "../../public-api.js";
+import { createProjectAdministration } from "../../project-administration.js";
+import { createProjectAdministrationHttp } from "../../project-administration-http.js";
+import { createReporterAttachmentDownload } from "../../reporter-attachment-download.js";
+import { createSensitiveDataProtector } from "../../sensitive-data-protector.js";
+import { createProviderSourceHttp } from "../../provider-source-composition.js";
 import {
   createWorkspaceAttachmentDownload,
   type AppwritePrincipalVerifier,
-} from "./workspace-attachment-download.js";
+} from "../../workspace-attachment-download.js";
 import {
   WorkspaceOperationDeniedError,
   createWorkspaceProjectOperations,
-} from "./workspace-project-operations.js";
-import { createWorkbenchCoordinator } from "./workbench.js";
-import { createWorkbenchHttp } from "./workbench-http.js";
-import { createExternalIssueCoordinator } from "./external-issue-coordination.js";
-import { createExternalIssueHttp } from "./external-issue-http.js";
-import { createProviderIssueOutboxWorker } from "./provider-issue-outbox.js";
-import { createProviderIssueOutboxHttp } from "./provider-issue-outbox-http.js";
-import { createProviderWebhookIngress } from "./provider-webhook-ingress.js";
-import { createProviderWebhookHttp } from "./provider-webhook-http.js";
-import { createProviderWebhookProvisioner } from "./provider-webhook-provisioner.js";
-import { createProviderIssueEventHandler } from "./provider-issue-event.js";
-import { createProviderMessageAuthorVerifier } from "./provider-message-authority.js";
-import { createProviderMessageEventHandler } from "./provider-message-event.js";
-import { createProviderEventInboxWorker } from "./provider-event-inbox.js";
-import { createProviderEventInboxHttp } from "./provider-event-inbox-http.js";
+} from "../../workspace-project-operations.js";
+import { createWorkbenchCoordinator } from "../../workbench.js";
+import { createWorkbenchHttp } from "../../workbench-http.js";
+import { createExternalIssueCoordinator } from "../../external-issue-coordination.js";
+import { createExternalIssueHttp } from "../../external-issue-http.js";
+import { createProviderIssueOutboxWorker } from "../../provider-issue-outbox.js";
+import { createProviderIssueOutboxHttp } from "../../provider-issue-outbox-http.js";
+import { createProviderWebhookIngress } from "../../provider-webhook-ingress.js";
+import { createProviderWebhookHttp } from "../../provider-webhook-http.js";
+import { createProviderWebhookProvisioner } from "../../provider-webhook-provisioner.js";
+import { createProviderIssueEventHandler } from "../../provider-issue-event.js";
+import { createProviderMessageAuthorVerifier } from "../../provider-message-authority.js";
+import { createProviderMessageEventHandler } from "../../provider-message-event.js";
+import { createProviderEventInboxWorker } from "../../provider-event-inbox.js";
+import { createProviderEventInboxHttp } from "../../provider-event-inbox-http.js";
 import {
   createProviderMaintenance,
   type ProviderMaintenanceCapability,
-} from "./provider-maintenance.js";
-import { createProviderMaintenanceHttp } from "./provider-maintenance-http.js";
-import { createProviderWebhookReconciliation } from "./provider-webhook-reconciliation.js";
-import { createAbuseGate } from "./abuse.js";
-import { createNodeAppwriteProviderMessageOutboxStore } from "./appwrite-provider-message-outbox-store.js";
-import { createProviderMessageOutboxWorker } from "./provider-message-outbox.js";
-import { createGitHubMessageProvider } from "./github-message-provider.js";
-import { createGitLabMessageProvider } from "./gitlab-message-provider.js";
-import { createNodeAppwriteProviderMessageReconciliationReader } from "./appwrite-provider-message-reconciliation-reader.js";
-import { createProviderMessageReconciliation } from "./provider-message-reconciliation.js";
-import { createOutboxWorker, type OutboxSafeEvent } from "./outbox.js";
-import { createNodeSmtpNotificationSender } from "./smtp-notification-node.js";
+} from "../../provider-maintenance.js";
+import { createProviderMaintenanceHttp } from "../../provider-maintenance-http.js";
+import { createProviderWebhookReconciliation } from "../../provider-webhook-reconciliation.js";
+import { createAbuseGate } from "../../abuse.js";
+import { createNodeAppwriteProviderMessageOutboxStore } from "../../appwrite-provider-message-outbox-store.js";
+import { createProviderMessageOutboxWorker } from "../../provider-message-outbox.js";
+import { createGitHubMessageProvider } from "../../github-message-provider.js";
+import { createGitLabMessageProvider } from "../../gitlab-message-provider.js";
+import { createNodeAppwriteProviderMessageReconciliationReader } from "../../appwrite-provider-message-reconciliation-reader.js";
+import { createProviderMessageReconciliation } from "../../provider-message-reconciliation.js";
+import { createOutboxWorker, type OutboxSafeEvent } from "../../outbox.js";
+import { createNodeSmtpNotificationSender } from "../../smtp-notification-node.js";
 
 export function digestExternalIssueCommand(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(value)).digest("base64url");
