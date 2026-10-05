@@ -5,8 +5,8 @@ import { Client, Storage, TablesDB, Users } from "node-appwrite";
 import { parseServerConfig } from "@y7-feedback/config/server";
 
 import { createHttpApplication } from "./runtime/composition/application.js";
-import { createNodeAppwriteAttachmentAcceptanceStore } from "./appwrite-attachment-acceptance-store.js";
-import { createNodeAppwriteAttachmentLifecycleStore } from "./appwrite-attachment-lifecycle-store.js";
+import { createNodeAppwriteAttachmentAcceptanceStore } from "./infrastructure/appwrite/attachments/appwrite-attachment-acceptance-store.js";
+import { createNodeAppwriteAttachmentLifecycleStore } from "./infrastructure/appwrite/attachments/appwrite-attachment-lifecycle-store.js";
 import {
   runAppwriteG2AttachmentMatrix,
   type AppwriteG2DeployedAttachmentFixture,
@@ -16,12 +16,12 @@ import {
   appwriteG1SyntheticRows,
   type AppwriteG1MatrixIds,
 } from "./intake-evidence.js";
-import { createNodeAppwritePrivateAttachmentStorage } from "./appwrite-private-attachment-storage.js";
-import { createAttachmentDownload } from "./attachment-download.js";
-import { createAttachmentLifecycleCoordinator } from "./attachment-lifecycle.js";
-import { createAttachmentSaga } from "./attachment-saga.js";
+import { createNodeAppwritePrivateAttachmentStorage } from "./infrastructure/appwrite/attachments/appwrite-private-attachment-storage.js";
+import { createAttachmentDownload } from "./capabilities/attachments/attachment-download.js";
+import { createAttachmentLifecycleCoordinator } from "./capabilities/attachments/attachment-lifecycle.js";
+import { createAttachmentSaga } from "./capabilities/attachments/attachment-saga.js";
 import { acceptAttachmentEvidence } from "./attachment-evidence-retry.js";
-import { validateAttachment } from "./attachment-validation.js";
+import { validateAttachment } from "./capabilities/attachments/attachment-validation.js";
 import { parseClamAvHttpScannerConfig } from "./clamav-http-scanner-config.js";
 import { createClamAvHttpScanner } from "./clamav-http-scanner.js";
 import { createHttpFunctionPublicApi } from "./http-function-public-api.js";

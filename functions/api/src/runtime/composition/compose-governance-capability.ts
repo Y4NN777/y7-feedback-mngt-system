@@ -13,7 +13,7 @@ import { createIntelligenceProvenanceCoordinator } from "../../intelligence-prov
 import { createPrivacyCoordinator } from "../../privacy.js";
 import { createPrivacyHttp } from "../../privacy-http.js";
 import type { AppwriteSensitivePersistence } from "../../sensitive-data-protector.js";
-import type { AppwritePrincipalVerifier } from "../../workspace-attachment-download.js";
+import type { AppwritePrincipalVerifier } from "../../capabilities/attachments/workspace-attachment-download.js";
 import type { ApplicationRuntime } from "./application-runtime.js";
 
 export function composeGovernanceCapability(

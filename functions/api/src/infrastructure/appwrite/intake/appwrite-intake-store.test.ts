@@ -2,14 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import { createAttachmentRecord } from "@y7-feedback/domain";
 
-import type { AcceptanceCommit } from "./intake";
+import type { AcceptanceCommit } from "../../../capabilities/intake/intake";
 import {
   createAppwriteIntakeStore,
   createNodeAppwriteIntakeStore,
   type AppwriteIntakeSchema,
   type AppwriteTablesDbPort,
 } from "./appwrite-intake-store";
-import { createSensitiveDataProtector } from "./sensitive-data-protector";
+import { createSensitiveDataProtector } from "../../../sensitive-data-protector";
 
 const schema: AppwriteIntakeSchema = {
   databaseId: "y7",

@@ -3,7 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import type { ServerConfig } from "@y7-feedback/config/server";
 
 import { createNodeAppwriteAuthoritativeProjectionStore } from "../../appwrite-authoritative-projection-store.js";
-import { createAuthoritativeIntakeProjectionHandler } from "../../authoritative-intake-projector.js";
+import { createAuthoritativeIntakeProjectionHandler } from "../../capabilities/intake/authoritative-intake-projector.js";
 import { createAuthoritativeConversationEnvelope } from "../../authoritative-conversation-envelope.js";
 import {
   authoritativeProjectionErrorCode,
@@ -66,12 +66,12 @@ import {
 } from "./application-runtime.js";
 
 import type { AccountlessAccessCoordinator } from "../../accountless-access.js";
-import type { createNodeAppwriteIntakeStore } from "../../appwrite-intake-store.js";
+import type { createNodeAppwriteIntakeStore } from "../../infrastructure/appwrite/intake/appwrite-intake-store.js";
 import type { createNodeAppwritePlatformAccessExpiryWorker } from "../../appwrite-platform-access-store.js";
 import type { WorkspaceCapabilityScopeResolver } from "../../appwrite-workspace-capability-scope.js";
-import type { createAuthoritativeIntakeEnvelope } from "../../authoritative-intake-envelope.js";
+import type { createAuthoritativeIntakeEnvelope } from "../../capabilities/intake/authoritative-intake-envelope.js";
 import type { AppwriteSensitivePersistence } from "../../sensitive-data-protector.js";
-import type { AppwritePrincipalVerifier } from "../../workspace-attachment-download.js";
+import type { AppwritePrincipalVerifier } from "../../capabilities/attachments/workspace-attachment-download.js";
 
 interface ProviderCompositionContext {
   readonly accountless: AccountlessAccessCoordinator;

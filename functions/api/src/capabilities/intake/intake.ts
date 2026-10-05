@@ -11,7 +11,7 @@ import {
   type FeedbackType,
 } from "@y7-feedback/domain";
 
-import type { AttachmentStagingGrant } from "./attachment-staging-token.js";
+import type { AttachmentStagingGrant } from "../attachments/attachment-staging-token.js";
 
 export interface AcceptedFeedbackRecord {
   readonly id: string;

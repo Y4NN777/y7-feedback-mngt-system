@@ -2,7 +2,7 @@ import type {
   AttachmentAcceptanceCommand,
   AttachmentAcceptanceOutcome,
   AttachmentSaga,
-} from "./attachment-saga.js";
+} from "./capabilities/attachments/attachment-saga.js";
 import { pollVerification } from "./verification-poll.js";
 
 export async function acceptAttachmentEvidence(

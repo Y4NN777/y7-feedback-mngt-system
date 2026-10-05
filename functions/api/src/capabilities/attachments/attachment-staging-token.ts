@@ -1,4 +1,4 @@
-import type { AppwriteSensitivePersistence } from "./sensitive-data-protector.js";
+import type { AppwriteSensitivePersistence } from "../../sensitive-data-protector.js";
 
 export interface AttachmentStagingGrant {
   readonly attachmentId: string;

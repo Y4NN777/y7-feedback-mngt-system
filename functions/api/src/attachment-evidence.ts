@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
-import type { AttachmentSaga } from "./attachment-saga.js";
-import type { AttachmentDownload } from "./attachment-download.js";
+import type { AttachmentSaga } from "./capabilities/attachments/attachment-saga.js";
+import type { AttachmentDownload } from "./capabilities/attachments/attachment-download.js";
 import {
   appwriteG1SyntheticRows,
   type AppwriteG1MatrixIds,

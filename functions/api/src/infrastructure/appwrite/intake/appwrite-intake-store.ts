@@ -2,9 +2,13 @@ import { createHash } from "node:crypto";
 
 import { Query, type TablesDB } from "node-appwrite";
 
-import type { AcceptanceCommit, IdempotencyRecord, IntakeStore } from "./intake.js";
-import { attachmentMetadataData } from "./appwrite-attachment-acceptance-store.js";
-import type { AppwriteSensitivePersistence } from "./sensitive-data-protector.js";
+import type {
+  AcceptanceCommit,
+  IdempotencyRecord,
+  IntakeStore,
+} from "../../../capabilities/intake/intake.js";
+import { attachmentMetadataData } from "../attachments/appwrite-attachment-acceptance-store.js";
+import type { AppwriteSensitivePersistence } from "../../../sensitive-data-protector.js";
 
 export interface AppwriteIntakeSchema {
   readonly databaseId: string;

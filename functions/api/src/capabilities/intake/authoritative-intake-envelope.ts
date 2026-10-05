@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { AuthoritativeCommit } from "@y7-feedback/domain";
 
 import type { AcceptanceCommit } from "./intake.js";
-import type { AppwriteSensitivePersistence } from "./sensitive-data-protector.js";
+import type { AppwriteSensitivePersistence } from "../../sensitive-data-protector.js";
 
 const required = z.string().min(1).max(10_000);
 const timestamp = z.iso.datetime({ offset: false, precision: 3 });

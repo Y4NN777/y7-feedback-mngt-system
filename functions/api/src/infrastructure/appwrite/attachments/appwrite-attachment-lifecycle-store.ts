@@ -2,7 +2,7 @@ import type { TablesDB } from "node-appwrite";
 
 import type { AttachmentLifecycle } from "@y7-feedback/domain";
 
-import type { AttachmentLifecycleRepository } from "./attachment-lifecycle.js";
+import type { AttachmentLifecycleRepository } from "../../../capabilities/attachments/attachment-lifecycle.js";
 
 export interface AppwriteAttachmentLifecycleSchema {
   readonly databaseId: string;

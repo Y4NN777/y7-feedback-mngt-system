@@ -7,9 +7,9 @@ import {
   type AttachmentSourceEntry,
 } from "@y7-feedback/domain";
 
-import type { AttachmentMetadataReader } from "./attachment-download.js";
-import type { AttachmentAcceptanceStore } from "./attachment-saga.js";
-import type { AppwriteSensitivePersistence } from "./sensitive-data-protector.js";
+import type { AttachmentMetadataReader } from "../../../capabilities/attachments/attachment-download.js";
+import type { AttachmentAcceptanceStore } from "../../../capabilities/attachments/attachment-saga.js";
+import type { AppwriteSensitivePersistence } from "../../../sensitive-data-protector.js";
 
 export interface AppwriteAttachmentAcceptanceSchema {
   readonly databaseId: string;

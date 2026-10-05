@@ -7,11 +7,11 @@ import { createAccountlessAccessCoordinator } from "../../accountless-access.js"
 import { createNodeAppwriteAbuseCounterStore } from "../../appwrite-abuse-counter-store.js";
 import { createNodeAppwriteAccountlessRepository } from "../../appwrite-accountless-repository.js";
 import { createAppwriteAuthoritativeCommitStore } from "../../appwrite-authoritative-commit-store.js";
-import { createNodeAppwriteIntakeStore } from "../../appwrite-intake-store.js";
+import { createNodeAppwriteIntakeStore } from "../../infrastructure/appwrite/intake/appwrite-intake-store.js";
 import { createNodeAppwritePublicProjectReader } from "../../appwrite-public-project-reader.js";
-import { createAuthoritativeIntakeEnvelope } from "../../authoritative-intake-envelope.js";
-import { createAuthoritativeIntakeStore } from "../../authoritative-intake-store.js";
-import { createIntakeCoordinator } from "../../intake.js";
+import { createAuthoritativeIntakeEnvelope } from "../../capabilities/intake/authoritative-intake-envelope.js";
+import { createAuthoritativeIntakeStore } from "../../capabilities/intake/authoritative-intake-store.js";
+import { createIntakeCoordinator } from "../../capabilities/intake/intake.js";
 import {
   createAccessProof,
   digestValidatedDraft,

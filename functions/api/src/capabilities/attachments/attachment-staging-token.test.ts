@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createSensitiveDataProtector } from "./sensitive-data-protector";
+import { createSensitiveDataProtector } from "../../sensitive-data-protector";
 import {
   createAttachmentStagingTokenCodec,
   type AttachmentStagingGrant,

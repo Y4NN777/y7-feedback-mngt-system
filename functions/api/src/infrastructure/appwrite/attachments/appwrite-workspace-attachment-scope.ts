@@ -1,6 +1,6 @@
 import type { TablesDB } from "node-appwrite";
 
-import type { WorkspaceAttachmentScopeResolver } from "./workspace-attachment-download.js";
+import type { WorkspaceAttachmentScopeResolver } from "../../../capabilities/attachments/workspace-attachment-download.js";
 import {
   createAppwriteWorkspaceCapabilityScopeResolver,
   createNodeAppwriteWorkspaceCapabilityScopeResolver,
@@ -8,7 +8,7 @@ import {
   type AppwriteWorkspaceScopeQueryPort,
   type AppwriteWorkspaceScopeTablesPort,
   type WorkspaceCapabilityScopeResolver,
-} from "./appwrite-workspace-capability-scope.js";
+} from "../../../appwrite-workspace-capability-scope.js";
 
 export type AppwriteWorkspaceAttachmentScopeSchema =
   AppwriteWorkspaceCapabilityScopeSchema;

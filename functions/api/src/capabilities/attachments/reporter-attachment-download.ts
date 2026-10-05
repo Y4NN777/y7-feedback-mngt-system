@@ -1,6 +1,6 @@
 import type { AccessRequest } from "@y7-feedback/domain";
 
-import type { AccountlessAccessCoordinator } from "./accountless-access.js";
+import type { AccountlessAccessCoordinator } from "../../accountless-access.js";
 import type {
   AttachmentDownloadOutcome,
   AttachmentDownload,
