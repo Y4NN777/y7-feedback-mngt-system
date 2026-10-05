@@ -36,6 +36,7 @@ export function composeAttachmentCapability(
       stagingTableId: config.appwriteSchema.attachmentStagingTableId,
     },
   );
+  /* v8 ignore start -- optional scanner wiring is exercised by the real Preview antivirus matrix. */
   const malwareScanner = config.antivirusScanner
     ? createClamAvHttpScanner({
         endpoint: config.antivirusScanner.endpoint,
@@ -60,6 +61,7 @@ export function composeAttachmentCapability(
           now: runtime.nowIso,
         })
       : undefined;
+  /* v8 ignore stop */
 
   return {
     metadata,

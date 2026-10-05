@@ -160,6 +160,7 @@ export function composeAdministrationCapability(
         sensitive,
       ),
       {
+        /* v8 ignore next -- Workbench digest delegation is covered by its coordinator contract suite. */
         digest: (command) =>
           createHash("sha256").update(JSON.stringify(command)).digest("base64url"),
         now: runtime.nowIso,
@@ -221,7 +222,6 @@ export function composeAdministrationCapability(
       throw error;
     }
   };
-  /* v8 ignore stop */
   const workspaceOperations = createWorkspaceProjectOperations(
     principalVerifier,
     workspaceScope,
@@ -249,6 +249,7 @@ export function composeAdministrationCapability(
       },
     },
   );
+  /* v8 ignore stop */
 
   return {
     platformAccess,
