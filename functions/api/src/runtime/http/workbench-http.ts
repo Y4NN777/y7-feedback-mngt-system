@@ -1,6 +1,9 @@
 import { validateWorkbenchFilter } from "@y7-feedback/domain";
 
-import type { WorkbenchCoordinator, WorkbenchOutcome } from "./workbench.js";
+import type {
+  WorkbenchCoordinator,
+  WorkbenchOutcome,
+} from "../../capabilities/workbench/workbench.js";
 
 export interface WorkbenchHttpRequest {
   readonly method: string;

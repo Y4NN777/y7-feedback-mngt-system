@@ -13,7 +13,7 @@ import {
   declaredSloConcurrency,
   declaredSloSamplesPerReadMetric,
 } from "./slo-capacity-envelope.js";
-import { createNodeAppwriteWorkbenchStore } from "./appwrite-workbench-store.js";
+import { createNodeAppwriteWorkbenchStore } from "./infrastructure/appwrite/workbench/appwrite-workbench-store.js";
 import { createNodeAppwriteWorkspaceCapabilityScopeResolver } from "./appwrite-workspace-capability-scope.js";
 
 function object(value: unknown): value is Readonly<Record<string, unknown>> {

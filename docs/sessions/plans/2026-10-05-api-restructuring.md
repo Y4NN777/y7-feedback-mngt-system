@@ -8,18 +8,18 @@ behavior changes.
 
 ## Ledger
 
-| Order | Task             | Outcome                                                                    | Status                                                                                                                                             |
-| ----: | ---------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-|     1 | `TASK-ARCH-001A` | Architecture contract, baseline and progressive root guard                 | `DONE` — baseline `main@12ad8ac`, architecture boundary tests and migration contract                                                               |
-|     2 | `TASK-ARCH-001B` | Runtime, HTTP, configuration, observability and focused composition roots  | `DONE` — runtime shell moved; 1,229-line application composition reduced to a 128-line assembler backed by six focused capability factories        |
-|     3 | `TASK-ARCH-001C` | Appwrite schema/control-plane migrations and removal of Day 4 source names | `DONE` — PR #151 rebase-merged at `a196788`; schema parity, protected Preview migration, Quality and deployed Browser gates green                  |
-|     4 | `TASK-ARCH-001D` | Intake and attachment capabilities with Appwrite adapters                  | `IN_REVIEW` — capability modules, HTTP transport, capability-owned public-project port and concrete Appwrite adapters moved; local full gate green |
-|     5 | `TASK-ARCH-001E` | Conversation and Workbench capabilities                                    | `BLOCKED_BY_001D`                                                                                                                                  |
-|     6 | `TASK-ARCH-001F` | Administration and platform-access capabilities                            | `BLOCKED_BY_001E`                                                                                                                                  |
-|     7 | `TASK-ARCH-001G` | GitHub/GitLab provider boundaries                                          | `BLOCKED_BY_001F`                                                                                                                                  |
-|     8 | `TASK-ARCH-001H` | Intelligence, privacy and abuse boundaries                                 | `BLOCKED_BY_001G`                                                                                                                                  |
-|     9 | `TASK-TEST-003A` | Verification, fixtures and provisioning tooling layout                     | `BLOCKED_BY_001H`                                                                                                                                  |
-|    10 | `TASK-ARCH-001I` | Final root cleanup, dead-code/cycle audit and parity proof                 | `BLOCKED_BY_TEST_003A`                                                                                                                             |
+| Order | Task             | Outcome                                                                    | Status                                                                                                                                      |
+| ----: | ---------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+|     1 | `TASK-ARCH-001A` | Architecture contract, baseline and progressive root guard                 | `DONE` — baseline `main@12ad8ac`, architecture boundary tests and migration contract                                                        |
+|     2 | `TASK-ARCH-001B` | Runtime, HTTP, configuration, observability and focused composition roots  | `DONE` — runtime shell moved; 1,229-line application composition reduced to a 128-line assembler backed by six focused capability factories |
+|     3 | `TASK-ARCH-001C` | Appwrite schema/control-plane migrations and removal of Day 4 source names | `DONE` — PR #151 rebase-merged at `a196788`; schema parity, protected Preview migration, Quality and deployed Browser gates green           |
+|     4 | `TASK-ARCH-001D` | Intake and attachment capabilities with Appwrite adapters                  | `DONE` — PR #152 rebase-merged at `a2e92d1`; Quality, deployed Browser and Vercel gates green                                               |
+|     5 | `TASK-ARCH-001E` | Conversation and Workbench capabilities                                    | `IN_PROGRESS` — branch created from validated `main@a2e92d1`; characterization and ownership inventory in progress                          |
+|     6 | `TASK-ARCH-001F` | Administration and platform-access capabilities                            | `BLOCKED_BY_001E`                                                                                                                           |
+|     7 | `TASK-ARCH-001G` | GitHub/GitLab provider boundaries                                          | `BLOCKED_BY_001F`                                                                                                                           |
+|     8 | `TASK-ARCH-001H` | Intelligence, privacy and abuse boundaries                                 | `BLOCKED_BY_001G`                                                                                                                           |
+|     9 | `TASK-TEST-003A` | Verification, fixtures and provisioning tooling layout                     | `BLOCKED_BY_001H`                                                                                                                           |
+|    10 | `TASK-ARCH-001I` | Final root cleanup, dead-code/cycle audit and parity proof                 | `BLOCKED_BY_TEST_003A`                                                                                                                      |
 
 ## Target
 

@@ -6,8 +6,8 @@ import {
   authoritativeProjectionErrorCode,
   createAuthoritativeConversationProjectionHandler,
 } from "./authoritative-conversation-projector.js";
-import type { ConversationLifecycleStoreInput } from "./appwrite-conversation-lifecycle-store.js";
-import { createAuthoritativeProjectionRouter } from "./authoritative-projection-router.js";
+import type { ConversationLifecycleStoreInput } from "./conversation-contracts.js";
+import { createAuthoritativeProjectionRouter } from "../../authoritative-projection-router.js";
 
 const input = {
   feedbackId: "feedback_1",

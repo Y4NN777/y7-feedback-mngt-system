@@ -6,7 +6,7 @@ import {
   type NotificationEventKind,
 } from "@y7-feedback/domain";
 
-import type { AppwriteSensitivePersistence } from "./sensitive-data-protector.js";
+import type { AppwriteSensitivePersistence } from "../../../sensitive-data-protector.js";
 
 export interface AppwriteNotificationFanoutSchema {
   readonly databaseId: string;

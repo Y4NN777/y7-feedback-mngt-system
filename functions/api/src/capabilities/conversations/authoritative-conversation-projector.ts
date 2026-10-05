@@ -1,8 +1,8 @@
 import type { AuthoritativeCommit } from "@y7-feedback/domain";
 
-import type { ConversationLifecycleStore } from "./appwrite-conversation-lifecycle-store.js";
+import type { ConversationLifecycleStore } from "./conversation-contracts.js";
 import type { AuthoritativeConversationPayload } from "./authoritative-conversation-envelope.js";
-import type { AuthoritativeProjectionHandler } from "./authoritative-projector.js";
+import type { AuthoritativeProjectionHandler } from "../../authoritative-projector.js";
 
 export function authoritativeProjectionErrorCode(error: unknown): string {
   if (!(error instanceof Error)) return "AUTHORITATIVE_PROJECTION_RETRYABLE";

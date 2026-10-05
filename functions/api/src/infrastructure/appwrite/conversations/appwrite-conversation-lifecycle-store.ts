@@ -10,29 +10,17 @@ import {
   type LifecycleTransitionCommand,
 } from "@y7-feedback/domain";
 
+import { ConversationLifecyclePersistenceError as AppwriteConversationLifecycleError } from "../../../capabilities/conversations/conversation-contracts.js";
+export { ConversationLifecyclePersistenceError as AppwriteConversationLifecycleError } from "../../../capabilities/conversations/conversation-contracts.js";
+
 import {
   appendAppwriteNotificationFanout,
   type NotificationFanoutInput,
-} from "./appwrite-notification-fanout.js";
-import type { ProviderMessageFanout } from "./appwrite-provider-message-fanout.js";
-import type { AppwriteSensitivePersistence } from "./sensitive-data-protector.js";
+} from "../workbench/appwrite-notification-fanout.js";
+import type { ProviderMessageFanout } from "../../../appwrite-provider-message-fanout.js";
+import type { AppwriteSensitivePersistence } from "../../../sensitive-data-protector.js";
 
 type Command = AppendConversationCommand | LifecycleTransitionCommand;
-
-export class AppwriteConversationLifecycleError extends Error {
-  readonly code:
-    | "ERR-CONV-DENIED"
-    | "ERR-CONV-IDEMPOTENCY-CONFLICT"
-    | "ERR-CONV-INVALID"
-    | "ERR-CONV-RETRYABLE"
-    | "ERR-CONV-STALE";
-
-  constructor(code: AppwriteConversationLifecycleError["code"]) {
-    super(code);
-    this.name = "AppwriteConversationLifecycleError";
-    this.code = code;
-  }
-}
 
 export interface AppwriteConversationLifecycleSchema {
   readonly databaseId: string;

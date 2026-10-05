@@ -7,7 +7,7 @@ import {
   createAppwriteWorkbenchStore,
   type AppwriteWorkbenchTablesPort,
 } from "./appwrite-workbench-store";
-import { createSensitiveDataProtector } from "./sensitive-data-protector";
+import { createSensitiveDataProtector } from "../../../sensitive-data-protector";
 
 const schema = { databaseId: "feedback", feedbackTableId: "feedback_items" };
 const sensitive = {

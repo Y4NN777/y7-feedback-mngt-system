@@ -2,7 +2,7 @@ import type {
   ConversationLifecycleCoordinator,
   ConversationLifecycleOutcome,
   ConversationProjectionOutcome,
-} from "./conversation-lifecycle.js";
+} from "../../capabilities/conversations/conversation-lifecycle.js";
 
 export interface ConversationLifecycleHttpRequest {
   readonly method: string;

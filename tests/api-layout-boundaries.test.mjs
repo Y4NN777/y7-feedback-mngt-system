@@ -49,6 +49,29 @@ const appwriteAttachmentModules = [
   "appwrite-workspace-attachment-scope",
 ];
 
+const conversationCapabilityModules = [
+  "authoritative-conversation-envelope",
+  "authoritative-conversation-projector",
+  "authoritative-conversation-store",
+  "conversation-lifecycle",
+];
+
+const workbenchCapabilityModules = ["workbench"];
+
+const appwriteConversationModules = [
+  "appwrite-conversation-lifecycle-store",
+  "appwrite-conversation-pending-commits",
+  "appwrite-conversation-preflight",
+  "appwrite-conversation-projection-store",
+];
+
+const appwriteWorkbenchModules = [
+  "appwrite-notification-fanout",
+  "appwrite-notification-feed-store",
+  "appwrite-workbench-mutation-store",
+  "appwrite-workbench-store",
+];
+
 async function sourceFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
   const nested = await Promise.all(
@@ -180,5 +203,32 @@ test("TASK-ARCH-001D colocates intake and attachment capabilities with their App
     "public-api-workspace-operations.test.ts",
   ]) {
     assert.equal(files.has(legacy), false);
+  }
+});
+
+test("TASK-ARCH-001E colocates conversation and Workbench capabilities with their Appwrite adapters", async () => {
+  const files = new Set(
+    (await sourceFiles(apiSourceRoot)).map((absolute) => relativeSourcePath(absolute)),
+  );
+
+  for (const [directory, modules] of [
+    ["capabilities/conversations", conversationCapabilityModules],
+    ["capabilities/workbench", workbenchCapabilityModules],
+    ["infrastructure/appwrite/conversations", appwriteConversationModules],
+    ["infrastructure/appwrite/workbench", appwriteWorkbenchModules],
+  ]) {
+    for (const module of modules) {
+      assert.equal(files.has(`${directory}/${module}.ts`), true);
+      assert.equal(files.has(`${directory}/${module}.test.ts`), true);
+      assert.equal(files.has(`${module}.ts`), false);
+      assert.equal(files.has(`${module}.test.ts`), false);
+    }
+  }
+
+  for (const handler of ["conversation-lifecycle-http", "workbench-http"]) {
+    assert.equal(files.has(`runtime/http/${handler}.ts`), true);
+    assert.equal(files.has(`runtime/http/${handler}.test.ts`), true);
+    assert.equal(files.has(`${handler}.ts`), false);
+    assert.equal(files.has(`${handler}.test.ts`), false);
   }
 });

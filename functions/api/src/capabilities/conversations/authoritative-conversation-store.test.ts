@@ -5,7 +5,7 @@ import type { AuthoritativeCommit } from "@y7-feedback/domain";
 import type {
   ConversationLifecycleStoreInput,
   ConversationLifecycleStoreResult,
-} from "./appwrite-conversation-lifecycle-store.js";
+} from "./conversation-contracts.js";
 import { createAuthoritativeConversationStore } from "./authoritative-conversation-store.js";
 
 const input: ConversationLifecycleStoreInput = {
